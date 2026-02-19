@@ -1,0 +1,25 @@
+[project]
+name = "qhat"
+version = "0.1.0"
+
+dependencies = [
+    # Dependencies required for resource estimation
+    "juliacall<=0.9.28",
+    "pyLIQTR>=1.4.2",
+    # Dependencies required for Hamiltonian generation
+    # -- basis-set-exchange is technically optional if you use a basis set already provided by pySCF
+    "basis-set-exchange",
+    "mendeleev",
+    "openfermionpyscf",
+    # Dependencies to accelerate / improve double-factorization
+    # -- most or all are technically optional, but give faster or better results
+    "baytune",
+    "chocolate",
+    "cmaes",
+    #"kahypar", # Fails to install on my laptop, so commented out
+    "nevergrad",
+    "optuna",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
