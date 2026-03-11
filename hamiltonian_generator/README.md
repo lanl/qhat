@@ -1,5 +1,7 @@
 # QHAT Hamiltonian Generation
 
+[[_TOC_]]
+
 The Hamiltonian generation tool takes a description of a simple molecule and generates a
 Hamiltonian that can be used with other QHAT analysis tools.  This is run by
 ```

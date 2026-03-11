@@ -1,5 +1,7 @@
 # QHAT Quantum Resource Estimation
 
+[[_TOC_]]
+
 This directory contains the modules for performing quantum resource estimation (QRE).  This is run
 by
 ```
