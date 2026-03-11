@@ -1,6 +1,8 @@
 my_method = "Trotter"
 #my_method = "double-factorization"
 
+# this configuration file assumes equipartition of energy between Trotterization error and phase
+# estimation error (see usage of energy_error below)
 energy_error = meV_to_Hartree(1e4) # 0.01 keV
 
 # _________________________________________________________________________________________________
