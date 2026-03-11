@@ -1,3 +1,22 @@
+# This script generates a large number of configuration files to the hamgen.py script, spanning a
+# number of different axes:
+# - All elements up to period 6
+# - The STO-6G basis (to match HamLib) and the HGBS-5 basis (arbitrarily chosen out of the basis
+#   sets available from Basis Set Exchange that cover all elements)
+# - Homonuclear diatomic (X-X) and hydride (X-H) molecules
+# - Interatomic separation of 1 Å (to match HamLib) and the sum of the atomic radii (to grow
+#   proportionally as the atoms get larger)
+# - Smallest to largest possible active space, getting as close to 40% occupied and 60% unoccupied
+#   as possible given the constraints pySCF places on the active space, the size of the active
+#   space, and the number of electrons in the molecule
+# - Mapping fermionic operators to qubit operators using the Jordan-Wigner and Bravyi-Kitaev
+#   transformations
+# This script is provided as an example of how to set up a large suite of Hamiltonians.  It will
+# generate a very large number of configuration files, and running resource estimation on all of
+# them would take a significant amount of compute time.  Because of the choice of filenames and
+# file stubs, the resulting configuration file suite can re-use intermediate calculations to
+# accelerate the process.
+
 import basis_set_exchange
 import math
 import mendeleev

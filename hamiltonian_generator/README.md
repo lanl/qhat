@@ -1,5 +1,7 @@
 # QHAT Hamiltonian Generation
 
+[[_TOC_]]
+
 The Hamiltonian generation tool takes a description of a simple molecule and generates a
 Hamiltonian that can be used with other QHAT analysis tools.  This is run by
 ```
@@ -97,3 +99,13 @@ a plaintext file called "[filestub]\_[astag]\_[f2q].dat", where "[f2q]" will be 
 
 A logfile will also be written to, recording the progress of the calculation.  The name for this is
 set by the `general.logfile` option.
+
+## Examples
+
+The `config.py` file included provides a simple example that will generate the Hamiltonian for a
+single molecule.  Running the `hamgen.py` script with no arguments will load this file and generate
+the described Hamiltonian.
+
+The `build_config.py` script is an example of how to build a large suite of configuration files to
+build Hamiltonians for many related molecules.  It does not run the Hamiltonian generation script,
+but only builds the configuration files that can then be fed into the Hamiltonian generate script.

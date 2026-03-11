@@ -1,5 +1,7 @@
 # QHAT Quantum Resource Estimation
 
+[[_TOC_]]
+
 This directory contains the modules for performing quantum resource estimation (QRE).  This is run
 by
 ```
@@ -154,3 +156,12 @@ The script will print a log both to the screen and to a logfile.  It also genera
 that summarizes the inputs and results.  The TOML file is based on a hash, so the filename will
 likely be a long string of numbers with the `.toml` extension.  The TOML file only shows the final
 results and does not report the intermediate values, so the logfile will typically be more useful.
+
+## Example
+
+The provided `config.py` file presents an example configuration file that can be used to generate
+resource estimates.  It loads data from the tensors file in the `examples` directory, and uses the
+options specified in the configuration file to generate resource estimates.  The first two lines of
+the provided `config.py` file allow the user to easily switch between a Trotterization-based
+analysis or a double-factorization-based analysis (additionally demonstrating that configuration
+files are themselves Python scripts rather than simple key-value lists).
