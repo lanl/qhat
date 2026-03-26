@@ -1,0 +1,68 @@
+# Build QHAT on Darwin.
+
+default:
+  tags:
+    - darwin-slurm-shared
+  id_tokens:
+    SITE_ID_TOKEN:
+      aud: https://lisdi-git.lanl.gov
+
+stages:
+  - build
+  - test
+
+install-deps:
+  stage: build
+  script:
+    - hostname
+    - python3.11 -m venv .venv
+    - source .venv/bin/activate
+    - pip install --upgrade pip
+    - pip install .
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .venv/
+    policy: pull-push
+
+run-hamgen:
+  stage: test
+  script:
+    - hostname
+    - source .venv/bin/activate
+    - cd hamiltonian_generator
+    - python hamgen.py
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .venv/
+    policy: pull
+
+run-qre-trotter:
+  stage: test
+  script:
+    - hostname
+    - source .venv/bin/activate
+    - module load gcc/13.2.0
+    - cd qre
+    - python qre_driver.py
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .venv/
+    policy: pull
+
+run-qre-dbl-fact:
+  stage: test
+  script:
+    - hostname
+    - source .venv/bin/activate
+    - module load gcc/13.2.0
+    - cd qre
+    - sed -e 's/^my_method = "Trotter"/my_method = "double-factorization"/' config.py > config-df.py
+    - python qre_driver.py config-df.py
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .venv/
+    policy: pull
