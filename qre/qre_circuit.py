@@ -119,6 +119,28 @@ def build_qpe_pyliqtr_qubitized(
 
 # -------------------------------------------------------------------------------------------------
 
+def build_time_evolution(
+        config_general: GeneralConfiguration,
+        config_qpe: QPEConfiguration,
+        unitary):
+
+    config_general.log_verbose("Build a time evolution circuit.")
+
+    return unitary
+
+# -------------------------------------------------------------------------------------------------
+
+def build_controlled_time_evolution(
+        config_general: GeneralConfiguration,
+        config_qpe: QPEConfiguration,
+        unitary):
+
+    config_general.log_verbose("Build a singly-controlled time evolution circuit.")
+
+    return unitary.controlled()
+
+# -------------------------------------------------------------------------------------------------
+
 def build_qpe_circuit(
         config_general: GeneralConfiguration,
         config_qpe: QPEConfiguration,
@@ -127,13 +149,17 @@ def build_qpe_circuit(
 
     config_general.log("Beginning to construct quantum phase estimation circuit.")
 
-    if config_qpe.method.lower() in ("qualtran textbook",):
+    if config_qpe.method.lower() in ("qpe: qualtran textbook",):
         return build_qpe_qualtran_textbook(config_general, config_qpe, unitary, P0)
-    elif config_qpe.method.lower() in ("qualtran qubitization",):
+    elif config_qpe.method.lower() in ("qpe: qualtran qubitization",):
         # TODO: This may be more specialized (for LCU only?), but I'm not yet sure of the details.
         raise NotImplementedError()
-    elif config_qpe.method.lower() in ("pyliqtr qubitized",):
+    elif config_qpe.method.lower() in ("qpe: pyliqtr qubitized",):
         return build_qpe_pyliqtr_qubitized(config_general, config_qpe, unitary)
+    elif config_qpe.method.lower() in ("time evolution",):
+        return build_time_evolution(config_general, config_qpe, unitary)
+    elif config_qpe.method.lower() in ("controlled time evolution",):
+        return build_controlled_time_evolution(config_general, config_qpe, unitary)
     else:
         raise ValueError(f"Invalid QPE circuit method \"{config_qpe.method}\".")
 
