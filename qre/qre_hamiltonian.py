@@ -37,6 +37,21 @@ def tuple_to_string(pauli_tuple, coef, num_qubits):
 
 # -------------------------------------------------------------------------------------------------
 
+# TODO: Add a way to support Pauli strings in either of the two formats ("tuples" or "strings").
+#    -- Setting the mapping would be a no-op.  You could explicitly make it a no-op, leave it as-is
+#       and just never use the mapping, or raise an error if someone sets the mapping.  Probably
+#       leave it as-is?  Make it consistent with a fermion-only Hamiltonian and setting the boson
+#       mapping.
+#    -- What would get_core_operator do?  Look at where that's called to see what it should do.
+#    -- The num_qubits function should be fairly straightforward.
+#    -- The get_all_pauli_strings in one format will just return what's provided, and in the other
+#       format will translate between the two formats.
+#    -- What would get_grouped_terms do?  Does it do anything right now anyway?
+#    -- The energy_shift function would add an all-identity string (which would have to combine
+#       with the existing all-identity string if there already is one).
+#    -- The compute_initial_energy_bounds function probably doesn't have to change, as it calls
+#       get_all_pauli_strings.  Double-check this.
+
 class Hamiltonian:
     def __init__(self, hamiltonian):
         self._H = hamiltonian
