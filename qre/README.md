@@ -138,11 +138,11 @@ Calling more than one of these functions will generate an error.
 A variety of circuits can be generated and analyzed based on the time-evolution unitary operator.
 However, this section is still under development and currently has very limited options:
 
-- Textbook Phase Estimation: Setting `circuit.method` to "qualtran textbook" will embed the unitary
-  encoding of the Hamiltonian into a phase estimation circuit that uses the classic
+- Textbook Phase Estimation: Setting `circuit.method` to "QPE: qualtran textbook" will embed the
+  unitary encoding of the Hamiltonian into a phase estimation circuit that uses the classic
   "textbook" method (see, for example, Nielson and Chuang's "Quantum Computation and Quantum
   Information").
-- Qubitized Phase Estimation: Setting `circuit.method` to "pyliqtr qubitized" will embed the
+- Qubitized Phase Estimation: Setting `circuit.method` to "QPE: pyliqtr qubitized" will embed the
   unitary encoding of the Hamiltonian into a phase estimation circuit that uses pyLIQTR's qubitized
   phase estimation.  This uses only a single ancilla qubit for the phase, with multiple
   measurements to extract the necessary number of bits of information.  This method only works with

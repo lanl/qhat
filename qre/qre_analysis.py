@@ -1,6 +1,7 @@
 from qre_types import GeneralConfiguration, AnalysisConfiguration
 
 from pyLIQTR.utils.resource_analysis import estimate_resources as estimate_pyliqtr
+from qualtran.resource_counting import get_cost_value, QubitCount
 
 # -------------------------------------------------------------------------------------------------
 
@@ -28,11 +29,15 @@ def resource_estimation_pyliqtr(
     #       -- argument profile = False: estimate rotations as Clifford+T
     resources = estimate_pyliqtr(qpe_circuit)
 
-    return {
-            "Clifford_count" : resources["Clifford"],
-            "T_count"        : resources["T"],
-            "qubit_count"    : resources["LogicalQubits"]
-           }
+    resource_dict = {
+        "Clifford_count" : resources["Clifford"],
+        "T_count"        : resources["T"],
+        }
+    if "LogicalQubits" in resources:
+        resource_dict["qubit_count"] = resources["LogicalQubits"]
+    else:
+        get_cost_value(qpe_circuit, QubitCount())
+    return resource_dict
 
 # -------------------------------------------------------------------------------------------------
 
