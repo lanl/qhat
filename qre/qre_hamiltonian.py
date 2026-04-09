@@ -27,13 +27,13 @@ bosonic_mapping = {
 
 # -------------------------------------------------------------------------------------------------
 
-# TODO: This is a generally useful utility.  Where should it live?
-def tuple_to_string(pauli_tuple, coef, num_qubits):
-    s = ["I",] * num_qubits
-    for idx, op in pauli_tuple:
-        s[idx] = op
-    s = "".join(s)
-    return (s, coef)
+# TODO: These are generally useful utilities.  Where should they live?
+def sparse_to_dense_pauli(sparse_pauli, num_qubits):
+    dense_pauli = ["I",] * num_qubits
+    for idx, op in sparse_pauli:
+        dense_pauli[idx] = op
+    return "".join(dense_pauli)
+
 
 # -------------------------------------------------------------------------------------------------
 
@@ -105,8 +105,9 @@ class Hamiltonian:
         elif return_as == "strings":
             as_tuples = self.get_all_pauli_strings(return_as="tuples")
             Nq = self.num_qubits()
-            return (tuple_to_string(pauli, coef, Nq)
-                    for pauli, coef in as_tuples.items() if pauli != ())
+            # TODO: Why is the all-identity string excluded?  Isn't that a bug?
+            return {sparse_to_dense_pauli(pauli, Nq) : coef
+                    for pauli, coef in as_tuples.items() if pauli != ()}
         else:
             raise ValueError("  ".join([
                 "The value of return_as must be \"tuples\" or \"strings\".",

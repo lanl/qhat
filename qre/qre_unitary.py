@@ -159,7 +159,7 @@ def encode_ramped_trotter(
         from common.trotter_flattened import build_ramped_trotterized_unitary
         # Pass combine_terms parameter only for flattened implementation
         return build_ramped_trotterized_unitary(
-                hamiltonian.get_all_pauli_strings(return_as='strings'),
+                hamiltonian.get_all_pauli_strings(return_as='strings').items(),
                 method,
                 timestep,
                 Nsteps,
@@ -168,7 +168,7 @@ def encode_ramped_trotter(
         from common.trotter_original import build_ramped_trotterized_unitary
         # Original implementation doesn't support combine_terms parameter
         return build_ramped_trotterized_unitary(
-                hamiltonian.get_all_pauli_strings(return_as='strings'),
+                hamiltonian.get_all_pauli_strings(return_as='strings').items(),
                 method,
                 timestep,
                 Nsteps)
