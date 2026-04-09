@@ -33,24 +33,60 @@ def sparse_to_dense_pauli(sparse_pauli, num_qubits):
     for idx, op in sparse_pauli:
         dense_pauli[idx] = op
     return "".join(dense_pauli)
-
+def dense_to_sparse_pauli(dense_pauli):
+    sparse_pauli = tuple()
+    for idx, op in enumerate(dense_pauli):
+        if op in ["X", "Y", "Z"]:
+            sparse_pauli = (*sparse_pauli, (idx,op))
+        elif op != "I":
+            raise ValueError(f"Invalid character in dense pauli string: \"{op}\".")
+    return sparse_pauli
 
 # -------------------------------------------------------------------------------------------------
 
-# TODO: Add a way to support Pauli strings in either of the two formats ("tuples" or "strings").
-#    -- Setting the mapping would be a no-op.  You could explicitly make it a no-op, leave it as-is
-#       and just never use the mapping, or raise an error if someone sets the mapping.  Probably
-#       leave it as-is?  Make it consistent with a fermion-only Hamiltonian and setting the boson
-#       mapping.
-#    -- What would get_core_operator do?  Look at where that's called to see what it should do.
-#    -- The num_qubits function should be fairly straightforward.
-#    -- The get_all_pauli_strings in one format will just return what's provided, and in the other
-#       format will translate between the two formats.
-#    -- What would get_grouped_terms do?  Does it do anything right now anyway?
-#    -- The energy_shift function would add an all-identity string (which would have to combine
-#       with the existing all-identity string if there already is one).
-#    -- The compute_initial_energy_bounds function probably doesn't have to change, as it calls
-#       get_all_pauli_strings.  Double-check this.
+class LinearCombinationOfPauliStrings:
+    def __init__(self, **kwargs):
+        self._nq = None
+        self._format = None
+        self._data = None
+        self._nq = kwargs["num_qubits"]
+        for f in [ "dense", "sparse" ]:
+            if f in kwargs:
+                if self._format is not None:
+                    raise ValueError(
+                        "Too many formats provided to LinearCombinationOfPauliStrings.")
+                self._format = f
+                self._data = kwargs[f]
+                assert isinstance(self._data, dict)
+        if self._format is None:
+            raise ValueError("No data provided to LinearCombinationOfPauliStrings.")
+    def num_qubits(self):
+        raise NotImplementedError()
+    def get_dense_pauli_strings(self):
+        if self._format == "dense":
+            return self._data
+        elif self._format == "sparse":
+            return {sparse_to_dense_pauli(pauli) : coef for pauli, coef in self._data}
+        else:
+            raise ValueError("Invalid data format \"{self._format}\".")
+    def pauli_strings_as_strings(self):
+        if self._format == "dense":
+            return {dense_to_sparse_pauli(pauli) : coef for pauli, coef in self._data}
+        elif self._format == "sparse":
+            return self._data
+        else:
+            raise ValueError("Invalid data format \"{self._format}\".")
+    def energy_shift(self, shift):
+        all_identity = tuple()
+        if self._format == "dense":
+            all_identity = sparse_to_dense(all_identity)
+        identity_coefficient = self._data.get(all_identity, 0.0) + shift
+        self._data[all_identity] = identity_coefficient
+
+# -------------------------------------------------------------------------------------------------
+
+# TODO: The heavy use of isinstance() suggests that perhaps Hamiltonian should be a base class that
+#       other things are built on top of?
 
 class Hamiltonian:
     def __init__(self, hamiltonian):
@@ -60,6 +96,7 @@ class Hamiltonian:
         #       pyLIQTR problem instance.
         return self._H
     def set_fermionic_mapping(self, mapping):
+        # self._fmap is never used for LinearCombinationOfPauliStrings
         if isinstance(mapping, str):
             self._fmap = fermionic_mapping[mapping]
         else:
@@ -67,6 +104,7 @@ class Hamiltonian:
         if isinstance(self._H, MixedFermionBosonOperator):
             self._H.set_fermionic_encoding(self._fmap)
     def set_bosonic_mapping(self, mapping, max_bosons_per_state):
+        # self._bmap is never used for LinearCombinationOfPauliStrings
         if isinstance(mapping, str):
             self._bmap = bosonic_mapping[mapping](max_bosons_per_state)
         else:
@@ -78,9 +116,10 @@ class Hamiltonian:
             return self._H.n_qubits
         elif isinstance(self._H, MixedFermionBosonOperator):
             return self._H.num_qubits()
+        elif isinstance(self._H, LinearCombinationOfPauliStrings):
+            return self._H.num_qubits()
         else:
-            raise TypeError(" ".join(["Unable to determine the number of qubits for types other",
-                                      "than \"InteractionOperator\"."]))
+            raise TypeError("Unable to determine the number of qubits.")
     def get_all_pauli_strings(self, return_as="tuples"):
         # Returns all Pauli strings as a flat data structure, specifically a dictionary where the
         # key is the Pauli string and the value is the coefficient.
@@ -91,6 +130,8 @@ class Hamiltonian:
         # -- If return_as == "strings": The Pauli string is encoded as a character string, where
         #    each character is a Pauli matrix, explicitly including identity entries.  For example,
         #    assuming 6 qubits, "XIIZII".
+        # TODO: I'd prefer that the flag identify not the data structure but the concept: dense vs
+        #       sparse, rather than strings vs tuples.
         if return_as == "tuples":
             if isinstance(self._H, InteractionOperator):
                 return self._fmap(self._H).terms
@@ -99,14 +140,19 @@ class Hamiltonian:
                 #       encodings selected by Hamiltonian.  Clean this up.  Probably by deferring
                 #       the specification of encodings for MixedFermionBosonOperator?
                 return self._H.generate_qubit_operator().terms
+            elif isinstance(self._H, LinearCombinationOfPauliStrings):
+                return self._H.sparse_pauli_strings()
             else:
                 raise TypeError(
                     f"Unable to generate Pauli strings from object of type \"{type(self._H)}\".")
         elif return_as == "strings":
-            as_tuples = self.get_all_pauli_strings(return_as="tuples")
-            Nq = self.num_qubits()
-            # TODO: Why is the all-identity string excluded?  Isn't that a bug?
-            return {sparse_to_dense_pauli(pauli, Nq) : coef
+            if isinstance(self._H, LinearCombinationOfPauliStrings):
+                return self._H.dense_pauli_strings()
+            else:
+                as_tuples = self.get_all_pauli_strings(return_as="tuples")
+                Nq = self.num_qubits()
+                # TODO: Why is the all-identity string excluded?  Isn't that a bug?
+                return {sparse_to_dense_pauli(pauli, Nq) : coef
                     for pauli, coef in as_tuples.items() if pauli != ()}
         else:
             raise ValueError("  ".join([
@@ -141,6 +187,8 @@ class Hamiltonian:
             self._H = InteractionOperator(t0, t1, t2)
         elif isinstance(self._H, MixedFermionBosonOperator):
             self._H.energy_shift(dE)
+        elif isinstance(self._H, LinearCombinationOfPauliStrings):
+            self._H.energy_shift(dE)
         else:
             raise TypeError(
                     f"Unable to shift a fermionic Hamiltonian of type \"{type(self._H)}\".")
@@ -170,7 +218,6 @@ class Hamiltonian:
             Ehi1 = config_hamiltonian.upper_bound
         config_general.log_verbose(f"-- initial bounds = [{Elo1}, {Ehi1})")
         return (Elo1, Ehi1)
-    # TODO: Should there be a method to generate a pyLIQTR problem instance?
 
 # -------------------------------------------------------------------------------------------------
 
