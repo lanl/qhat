@@ -52,19 +52,29 @@ class HamiltonianConfiguration(ConfigurationBase):
         self.upper_bound = float('inf')
         self.exact_energy_lower_bound = False
         self.exact_energy_upper_bound = False
+        # TODO: The F2Q and B2Q transforms should be arguments to the second-quantization file
+        #       loading function(s)
         self.fermion_to_qubit_transform = "JW"
         self.boson_to_qubit_transform = "binary"
     def _only_once(self):
         if self.source is not None:
             print("Already set Hamiltonian source to {self.source}.")
             assert self.source is None
+    # TODO: Rename to indicate this is second-quantization tensors
     def load_numpy(self, filename):
         self._only_once()
         self.source = "numpy"
         self.filename = filename
+    # TODO: Rename to indicate this is second-quantization tensors
+    # TODO: Can we merge HDF5 and NumPy paths by inspecting the extensions and looking for HDF5,
+    #       NPY, or NPY?
     def load_hdf5(self, filename):
         self._only_once()
         self.source = "hdf5"
+        self.filename = filename
+    def load_pauli_strings(self, filename):
+        self._only_once()
+        self.source = "pauli"
         self.filename = filename
     def set_energy_lower_bound(self, value, exact=False):
         self.lower_bound = value

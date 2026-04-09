@@ -66,12 +66,13 @@ class LinearCombinationOfPauliStrings:
         if self._format == "dense":
             return self._data
         elif self._format == "sparse":
-            return {sparse_to_dense_pauli(pauli) : coef for pauli, coef in self._data}
+            return {sparse_to_dense_pauli(pauli, self._nq) : coef
+                    for pauli, coef in self._data.items()}
         else:
             raise ValueError("Invalid data format \"{self._format}\".")
-    def pauli_strings_as_strings(self):
+    def get_sparse_pauli_strings(self):
         if self._format == "dense":
-            return {dense_to_sparse_pauli(pauli) : coef for pauli, coef in self._data}
+            return {dense_to_sparse_pauli(pauli) : coef for pauli, coef in self._data.items()}
         elif self._format == "sparse":
             return self._data
         else:
@@ -79,7 +80,7 @@ class LinearCombinationOfPauliStrings:
     def energy_shift(self, shift):
         all_identity = tuple()
         if self._format == "dense":
-            all_identity = sparse_to_dense(all_identity)
+            all_identity = sparse_to_dense_pauli(all_identity, self._nq)
         identity_coefficient = self._data.get(all_identity, 0.0) + shift
         self._data[all_identity] = identity_coefficient
 
@@ -141,13 +142,13 @@ class Hamiltonian:
                 #       the specification of encodings for MixedFermionBosonOperator?
                 return self._H.generate_qubit_operator().terms
             elif isinstance(self._H, LinearCombinationOfPauliStrings):
-                return self._H.sparse_pauli_strings()
+                return self._H.get_sparse_pauli_strings()
             else:
                 raise TypeError(
                     f"Unable to generate Pauli strings from object of type \"{type(self._H)}\".")
         elif return_as == "strings":
             if isinstance(self._H, LinearCombinationOfPauliStrings):
-                return self._H.dense_pauli_strings()
+                return self._H.get_dense_pauli_strings()
             else:
                 as_tuples = self.get_all_pauli_strings(return_as="tuples")
                 Nq = self.num_qubits()
@@ -299,6 +300,64 @@ def load_numpy(
 
 # -------------------------------------------------------------------------------------------------
 
+def load_pauli(
+        config_general: GeneralConfiguration,
+        config_hamiltonian: HamiltonianConfiguration):
+    filename = config_hamiltonian.filename
+    config_general.log(
+            f"Loading Pauli string Hamiltonian from file \"{filename}\".")
+    extension = filename[filename.rfind('.')+1:]
+    if extension in [ "txt", "dat" ]:
+        fmt = None
+        numq = 0
+        pauli_dict = dict()
+        with open(filename, 'r') as file:
+            for line in file:
+                line = line.strip()
+                if line[0] == "#":
+                    continue
+                idx = line.find(' ')
+                coef_str = line[:idx].strip()
+                pauli = line[idx+1:].strip()
+                if pauli[0] == '[':
+                    if fmt is not None and fmt != "sparse":
+                        raise ValueError("Inconsistent Pauli string file format.")
+                    fmt = "sparse"
+                    coefficient = np.complex128(coef_str[1:-1])
+                    if pauli[-1] == '+':
+                        pauli = pauli[:pauli.rfind(']')+1]
+                    pauli = pauli[1:-1]
+                    pauli_tokens = pauli.split()
+                    sparse_pauli = tuple()
+                    for token in pauli_tokens:
+                        op = token[0]
+                        idx = int(token[1:])
+                        numq = max(numq, idx+1)
+                        sparse_pauli = (*sparse_pauli, (idx, op))
+                    pauli_dict[sparse_pauli] = coefficient
+                else:
+                    if fmt is not None and fmt != "dense":
+                        raise ValueError("Inconsistent Pauli string file format.")
+                    fmt = "dense"
+                    coefficient = np.complex128(coef_str)
+                    if numq != 0 and len(pauli) != numq:
+                        raise ValueError("Inconsistent dense Pauli string length.")
+                    numq = len(pauli)
+                    pauli_dict[pauli] = coefficient
+        if fmt == "dense":
+            return Hamiltonian(LinearCombinationOfPauliStrings(num_qubits=numq, dense=pauli_dict))
+        elif fmt == "sparse":
+            return Hamiltonian(LinearCombinationOfPauliStrings(num_qubits=numq, sparse=pauli_dict))
+        else:
+            raise ValueError(f"Invalid Pauli format: \"{fmt}\".")
+    elif extension == "json":
+        raise NotImplementedError("JSON Pauli string file not yet implemented.")
+    else:
+        raise ValueError(
+            f"Invalid file extension for loading a Pauli string file: \"{extension}\".")
+
+# -------------------------------------------------------------------------------------------------
+
 # TODO: Scott and I have both spent time chasing down the types of different things for a variety
 #       of reasons.  If we can get this code to the point where it always returns the same type
 #       regardless of the options passed in, then we should annotate the return type.  If it turns
@@ -318,5 +377,7 @@ def get_physical_hamiltonian(
         return load_LCPS(config_general, config_hamiltonian)
     elif config_hamiltonian.source == "hdf5":
         return load_hdf5(config_general, config_hamiltonian)
+    elif config_hamiltonian.source == "pauli":
+        return load_pauli(config_general, config_hamiltonian)
     else:
         raise ValueError(f"Invalid Hamiltonian source \"{config_hamiltonian.source}\".")
