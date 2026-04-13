@@ -1,0 +1,112 @@
+name: Python application
+
+on:
+  push:
+    branches: '**'
+  pull_request:
+    branches: '**'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: 3.x
+        cache: 'pip'
+
+    - name: Report versions
+      run: |
+        lsb_release -a
+        uname -a
+        python -V
+        pip --version
+
+    - name: Patch pyLIQTR wheel
+      run: |
+        set -euxo pipefail
+        pip download --dest=python-wheels --no-deps --ignore-requires-python --no-binary :all: pyLIQTR
+        cd python-wheels
+        tar -xzvf pyliqtr-*.tar.gz
+        plver=$(awk '/^Version:/ {print $2}' < pyliqtr-*/PKG-INFO)
+        cd "pyliqtr-$plver"
+        sed -i -e '/python_requires/d' setup.py
+        sed -i -e '/Requires-Python:/d' PKG-INFO src/pyLIQTR.egg-info/PKG-INFO
+        pip wheel --wheel-dir=.. .
+        cd ../..
+        rm -rf "python-wheels/pyliqtr-$plver" "python-wheels/pyliqtr-${plver}.tar.gz"
+
+    - name: Download dependencies
+      run: |
+        set -euxo pipefail
+        pip download --dest=python-wheels --find-links=python-wheels .
+
+    - name: Store Python wheels
+      uses: actions/upload-artifact@v7
+      with:
+        name: python-wheels
+        path: python-wheels
+        retention-days: 7
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        test-suite:
+          - name: hamgen
+            directory: hamiltonian_generator
+            script: hamgen.py
+            config_file: ''
+
+          - name: qre-trotter
+            directory: qre
+            script: qre_driver.py
+            config_file: ''
+
+          - name: qre-dbl-factor
+            directory: qre
+            script: qre_driver.py
+            config_file: config-df.py
+            config_setup: 'sed -e ''s/^my_method = "Trotter"/my_method = "double-factorization"/'' config.py > config-df.py'
+
+    name: Test ${{ matrix.test-suite.name }}
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: 3.x
+
+    - name: Restore Python wheels
+      uses: actions/download-artifact@v8
+      with:
+        name: python-wheels
+        path: python-wheels
+
+    - name: Install dependencies
+      run: |
+        set -euxo pipefail
+        pip install --upgrade pip
+        pip install --find-links=python-wheels .
+
+    - name: Setup config
+      if: matrix.test-suite.config_setup != ''
+      run: |
+        cd ${{ matrix.test-suite.directory }}
+        ${{ matrix.test-suite.config_setup }}
+
+    - name: Run test
+      run: |
+        set -euxo pipefail
+        cd ${{ matrix.test-suite.directory }}
+        python ${{ matrix.test-suite.script }} ${{ matrix.test-suite.config_file }}
