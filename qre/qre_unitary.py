@@ -120,7 +120,7 @@ def encode_ramped_trotter(
     config_general.log(f"-- using {method} Trotter formula with {Nsteps} steps ({Nsteps0})")
 
     return build_ramped_trotterized_unitary(
-            hamiltonian.get_all_pauli_strings(return_as='strings'),
+            hamiltonian.get_all_pauli_strings(return_as='strings').items(),
             method,
             timestep,
             Nsteps)
