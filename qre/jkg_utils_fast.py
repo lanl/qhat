@@ -23,6 +23,19 @@ EXACT_COMPUTATION_TIME_BUDGET = 60
 EXACT_COMPUTATION_MEMORY_LIMIT_MB = 100
 
 # --------------------------------------------------
+# Configuration for convergence monitoring
+# --------------------------------------------------
+# Enable convergence monitoring and reporting
+ENABLE_CONVERGENCE_MONITORING = True
+
+# Relative standard error threshold for early termination (e.g., 0.01 = 1%)
+# Set to 0 to disable early termination based on convergence
+CONVERGENCE_THRESHOLD = 0.01  # Terminate when SE/mean < 1%
+
+# Minimum number of samples before checking convergence
+MIN_SAMPLES_FOR_CONVERGENCE = 100000
+
+# --------------------------------------------------
 # Binary encoding for Pauli strings
 # --------------------------------------------------
 # Each Pauli operator is encoded as 2 bits:
@@ -379,6 +392,7 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
     # ---------------------------
     print(f"Estimating C1 with batch_size={batch_size}...")
     C1_sum = 0.0
+    C1_sum_sq = 0.0  # For variance calculation
     samples_C1 = 0
     start_time = time.time()
 
@@ -394,7 +408,27 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
         norms = batch_compute_C1(x_bits, z_bits, coeffs, indices, N)
 
         C1_sum += np.sum(norms)
+        C1_sum_sq += np.sum(norms**2)
         samples_C1 += batch_size
+
+        # Check convergence if enabled
+        if ENABLE_CONVERGENCE_MONITORING and samples_C1 >= MIN_SAMPLES_FOR_CONVERGENCE:
+            total_C1_count = N * (N - 1) / 2
+            C1_est_current = C1_sum * (total_C1_count / samples_C1)
+            # Standard error: SE = std(samples) * sqrt(N_total / N_samples) / sqrt(N_samples)
+            sample_mean = C1_sum / samples_C1
+            sample_var = (C1_sum_sq / samples_C1) - sample_mean**2
+            if sample_var > 0:
+                sample_std = np.sqrt(sample_var)
+                se = sample_std * np.sqrt(total_C1_count / samples_C1) / np.sqrt(samples_C1)
+                rel_se = se / C1_est_current if C1_est_current > 0 else float('inf')
+
+                # Check if converged
+                if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
+                    print(f"  C1 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
+                    print(f"  C1 estimate: {C1_est_current:.6f} ± {se:.6f} (95% CI)")
+                    C1_est = C1_est_current
+                    break
 
         # Track exact values if enabled
         if use_exact:
@@ -420,7 +454,21 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
         total_C1 = N * (N - 1) / 2
         C1_est = C1_sum * (total_C1 / samples_C1) if samples_C1 > 0 else 0.0
         print(f"  C1 estimation: {samples_C1} samples in {time.time() - start_time:.3f}s")
-        print(f"  C1 estimate: {C1_est:.6f}")
+
+        # Report standard error if convergence monitoring enabled
+        if ENABLE_CONVERGENCE_MONITORING and samples_C1 > 0:
+            sample_mean = C1_sum / samples_C1
+            sample_var = (C1_sum_sq / samples_C1) - sample_mean**2
+            if sample_var > 0:
+                sample_std = np.sqrt(sample_var)
+                se = sample_std * np.sqrt(total_C1 / samples_C1) / np.sqrt(samples_C1)
+                rel_se = se / C1_est if C1_est > 0 else float('inf')
+                print(f"  C1 estimate: {C1_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
+            else:
+                print(f"  C1 estimate: {C1_est:.6f}")
+        else:
+            print(f"  C1 estimate: {C1_est:.6f}")
+
         if use_exact:
             print(f"    (Sampled {len(seen_c1)}/{total_c1} unique pairs, {100*len(seen_c1)/total_c1:.1f}% coverage)")
 
@@ -429,6 +477,7 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
     # ---------------------------
     print(f"Estimating C21 with batch_size={batch_size}...")
     C21_sum = 0.0
+    C21_sum_sq = 0.0  # For variance calculation
     samples_C21 = 0
     start_time = time.time()
 
@@ -457,7 +506,25 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
         norms = batch_compute_C21(x_bits, z_bits, coeffs, indices, N)
 
         C21_sum += np.sum(norms)
+        C21_sum_sq += np.sum(norms**2)
         samples_C21 += len(indices)
+
+        # Check convergence if enabled
+        if ENABLE_CONVERGENCE_MONITORING and samples_C21 >= MIN_SAMPLES_FOR_CONVERGENCE:
+            total_C21_count = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
+            C21_est_current = C21_sum * (total_C21_count / samples_C21)
+            sample_mean = C21_sum / samples_C21
+            sample_var = (C21_sum_sq / samples_C21) - sample_mean**2
+            if sample_var > 0:
+                sample_std = np.sqrt(sample_var)
+                se = sample_std * np.sqrt(total_C21_count / samples_C21) / np.sqrt(samples_C21)
+                rel_se = se / C21_est_current if C21_est_current > 0 else float('inf')
+
+                if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
+                    print(f"  C21 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
+                    print(f"  C21 estimate: {C21_est_current:.6f} ± {se:.6f} (95% CI)")
+                    C21_est = C21_est_current
+                    break
 
         # Track exact values if enabled
         if use_exact:
@@ -484,7 +551,21 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
         total_C21 = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
         C21_est = C21_sum * (total_C21 / samples_C21) if samples_C21 > 0 else 0.0
         print(f"  C21 estimation: {samples_C21} samples in {time.time() - start_time:.3f}s")
-        print(f"  C21 estimate: {C21_est:.6f}")
+
+        # Report standard error if convergence monitoring enabled
+        if ENABLE_CONVERGENCE_MONITORING and samples_C21 > 0:
+            sample_mean = C21_sum / samples_C21
+            sample_var = (C21_sum_sq / samples_C21) - sample_mean**2
+            if sample_var > 0:
+                sample_std = np.sqrt(sample_var)
+                se = sample_std * np.sqrt(total_C21 / samples_C21) / np.sqrt(samples_C21)
+                rel_se = se / C21_est if C21_est > 0 else float('inf')
+                print(f"  C21 estimate: {C21_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
+            else:
+                print(f"  C21 estimate: {C21_est:.6f}")
+        else:
+            print(f"  C21 estimate: {C21_est:.6f}")
+
         if use_exact:
             print(f"    (Sampled {len(seen_c21)}/{total_c21} unique triples, {100*len(seen_c21)/total_c21:.1f}% coverage)")
 
@@ -493,6 +574,7 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
     # ---------------------------
     print(f"Estimating C22 with batch_size={batch_size}...")
     C22_sum = 0.0
+    C22_sum_sq = 0.0  # For variance calculation
     samples_C22 = 0
     start_time = time.time()
 
@@ -508,7 +590,25 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
         norms = batch_compute_C22(x_bits, z_bits, coeffs, indices, N)
 
         C22_sum += np.sum(norms)
+        C22_sum_sq += np.sum(norms**2)
         samples_C22 += batch_size
+
+        # Check convergence if enabled
+        if ENABLE_CONVERGENCE_MONITORING and samples_C22 >= MIN_SAMPLES_FOR_CONVERGENCE:
+            total_C22_count = N * (N - 1) / 2
+            C22_est_current = C22_sum * (total_C22_count / samples_C22)
+            sample_mean = C22_sum / samples_C22
+            sample_var = (C22_sum_sq / samples_C22) - sample_mean**2
+            if sample_var > 0:
+                sample_std = np.sqrt(sample_var)
+                se = sample_std * np.sqrt(total_C22_count / samples_C22) / np.sqrt(samples_C22)
+                rel_se = se / C22_est_current if C22_est_current > 0 else float('inf')
+
+                if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
+                    print(f"  C22 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
+                    print(f"  C22 estimate: {C22_est_current:.6f} ± {se:.6f} (95% CI)")
+                    C22_est = C22_est_current
+                    break
 
         # Track exact values if enabled
         if use_exact:
@@ -534,7 +634,21 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
         total_C22 = N * (N - 1) / 2
         C22_est = C22_sum * (total_C22 / samples_C22) if samples_C22 > 0 else 0.0
         print(f"  C22 estimation: {samples_C22} samples in {time.time() - start_time:.3f}s")
-        print(f"  C22 estimate: {C22_est:.6f}")
+
+        # Report standard error if convergence monitoring enabled
+        if ENABLE_CONVERGENCE_MONITORING and samples_C22 > 0:
+            sample_mean = C22_sum / samples_C22
+            sample_var = (C22_sum_sq / samples_C22) - sample_mean**2
+            if sample_var > 0:
+                sample_std = np.sqrt(sample_var)
+                se = sample_std * np.sqrt(total_C22 / samples_C22) / np.sqrt(samples_C22)
+                rel_se = se / C22_est if C22_est > 0 else float('inf')
+                print(f"  C22 estimate: {C22_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
+            else:
+                print(f"  C22 estimate: {C22_est:.6f}")
+        else:
+            print(f"  C22 estimate: {C22_est:.6f}")
+
         if use_exact:
             print(f"    (Sampled {len(seen_c22)}/{total_c22} unique pairs, {100*len(seen_c22)/total_c22:.1f}% coverage)")
 
