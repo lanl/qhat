@@ -138,6 +138,7 @@ def trotter_error_estimator(pauli_terms, time_limit, batch_size=100):
             break
     total_C1 = N * (N - 1)/2  # Total number of distinct pairs (i < j)
     C1_est = C1_sum * (total_C1 / samples_C1) if samples_C1 > 0 else 0.0
+    print(f"  C1: {samples_C1} samples")
 
     # ---------------------------
     # Estimate C21 = sum_{k<j, k<i} ||[H_i, [H_j, H_k]]||
@@ -170,6 +171,7 @@ def trotter_error_estimator(pauli_terms, time_limit, batch_size=100):
     # Total number of valid triples: for each k, there are C(N-k-1, 2) choices of (i,j).
     total_C21 = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
     C21_est = C21_sum * (total_C21 / samples_C21) if samples_C21 > 0 else 0.0
+    print(f"  C21: {samples_C21} samples")
 
     # ---------------------------
     # Estimate C22 = sum_{k<j} ||[H_k, [H_k, H_j]]||
@@ -197,6 +199,7 @@ def trotter_error_estimator(pauli_terms, time_limit, batch_size=100):
             break
     total_C22 = N * (N - 1) / 2  # Total number of (k, j) pairs with k < j
     C22_est = C22_sum * (total_C22 / samples_C22) if samples_C22 > 0 else 0.0
+    print(f"  C22: {samples_C22} samples")
 
     # ---------------------------
     # Final output
