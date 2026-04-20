@@ -278,6 +278,17 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
     x_bits, z_bits, coeffs, n_qubits = preprocess_pauli_terms(pauli_terms)
     print(f"  Preprocessing done in {time.time() - start_prep:.3f}s ({n_qubits} qubits)")
 
+    # Warmup: trigger Numba JIT compilation before timing
+    print(f"Warming up Numba JIT compilation...")
+    if N >= 2:
+        dummy_indices = np.array([[0, 1]], dtype=np.int64)
+        batch_compute_C1(x_bits, z_bits, coeffs, dummy_indices, N)
+        if N >= 3:
+            dummy_indices_3 = np.array([[0, 1, 2]], dtype=np.int64)
+            batch_compute_C21(x_bits, z_bits, coeffs, dummy_indices_3, N)
+            batch_compute_C22(x_bits, z_bits, coeffs, dummy_indices[:, [0, 1]], N)
+    print(f"  Warmup complete")
+
     # ---------------------------
     # Estimate C1 = sum_{i<j} ||[H_i, H_j]||
     # ---------------------------
@@ -318,23 +329,24 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
 
     while time.time() - start_time < time_limit / 3:
         # Generate random triples (i, j, k) with k < i and k < j
-        k_vals = np.random.randint(0, max(1, N - 1), size=batch_size)
+        # Only sample k values that allow at least 2 choices above them
+        k_vals = np.random.randint(0, max(1, N - 2), size=batch_size)
 
         # For each k, sample two distinct indices from {k+1, ..., N-1}
-        valid_samples = []
-        for k in k_vals:
-            valid_range = N - k - 1
-            if valid_range < 2:
-                continue
-            # Sample two distinct indices
-            choices = np.random.choice(valid_range, size=2, replace=False)
-            i, j = k + 1 + choices[0], k + 1 + choices[1]
-            valid_samples.append([i, j, k])
+        # Vectorized approach: sample i and j independently, then ensure distinctness
+        valid_ranges = N - k_vals - 1
 
-        if not valid_samples:
-            continue
+        # Sample first index i from [k+1, N)
+        i_offsets = np.random.randint(0, valid_ranges, dtype=np.int64)
+        i_vals = k_vals + 1 + i_offsets
 
-        indices = np.array(valid_samples, dtype=np.int64)
+        # Sample second index j from [k+1, N) \ {i}
+        # Use rejection sampling trick: sample from [0, valid_range-1), then adjust
+        j_offsets = np.random.randint(0, valid_ranges - 1, dtype=np.int64)
+        j_offsets = np.where(j_offsets >= i_offsets, j_offsets + 1, j_offsets)
+        j_vals = k_vals + 1 + j_offsets
+
+        indices = np.column_stack([i_vals, j_vals, k_vals])
 
         # Compute nested norms in parallel
         norms = batch_compute_C21(x_bits, z_bits, coeffs, indices, N)
@@ -361,7 +373,8 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
     while time.time() - start_time < time_limit / 3:
         # Generate random pairs (k, j) with k < j
         k_vals = np.random.randint(0, max(1, N - 1), size=batch_size)
-        j_vals = np.array([np.random.randint(k + 1, N) for k in k_vals], dtype=np.int64)
+        # Vectorized: for each k, sample j from [k+1, N)
+        j_vals = k_vals + 1 + np.random.randint(0, N - 1 - k_vals, dtype=np.int64)
 
         indices = np.column_stack([k_vals, j_vals])
 
