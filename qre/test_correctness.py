@@ -10,10 +10,10 @@ import numpy as np
 from openfermion import QubitOperator
 
 # Import original functions
-from jkg_utils import anticommute, pauli_product_key, compute_commutator
+from trotter_coefficients import anticommute, pauli_product_key, compute_commutator
 
 # Import optimized functions
-from jkg_utils_fast import (
+from trotter_coefficients_fast import (
     encode_pauli_string,
     pauli_anticommute,
     pauli_product_bits,
@@ -360,8 +360,8 @@ def test_statistical_agreement():
     print("TEST 4: Statistical Agreement (Monte Carlo)")
     print("=" * 70)
 
-    from jkg_utils import trotter_error_estimator
-    from jkg_utils_fast import trotter_error_estimator_fast
+    from trotter_coefficients import trotter_error_estimator
+    from trotter_coefficients_fast import trotter_error_estimator_fast
 
     # Generate small test case
     print("\n  Generating random Pauli terms...")

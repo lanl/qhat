@@ -19,15 +19,15 @@ def example_usage():
     print("=" * 70)
 
     # Import the original module
-    from jkg_utils import generate_resource_estimate
+    from trotter_coefficients import generate_resource_estimate
 
     # Import the fast module
-    from jkg_utils_fast import generate_resource_estimate_fast
+    from trotter_coefficients_fast import generate_resource_estimate_fast
 
     print("\nThis example shows how to use both versions:")
     print()
     print("1. ORIGINAL VERSION:")
-    print("   from jkg_utils import generate_resource_estimate")
+    print("   from trotter_coefficients import generate_resource_estimate")
     print("   qubits, tcount = generate_resource_estimate(")
     print("       molecule, n_active_electrons_per_atom,")
     print("       n_active_unocc_orbitals_per_atom, epsilon_per_atom,")
@@ -35,7 +35,7 @@ def example_usage():
     print("   )")
     print()
     print("2. FAST VERSION (drop-in replacement):")
-    print("   from jkg_utils_fast import generate_resource_estimate_fast")
+    print("   from trotter_coefficients_fast import generate_resource_estimate_fast")
     print("   qubits, tcount = generate_resource_estimate_fast(")
     print("       molecule, n_active_electrons_per_atom,")
     print("       n_active_unocc_orbitals_per_atom, epsilon_per_atom,")
@@ -44,8 +44,8 @@ def example_usage():
     print()
     print("3. OR, use just the fast commutator estimator:")
     print("   from openfermion.transforms import jordan_wigner")
-    print("   from jkg_utils import build_active_space")
-    print("   from jkg_utils_fast import trotter_error_estimator_fast")
+    print("   from trotter_coefficients import build_active_space")
+    print("   from trotter_coefficients_fast import trotter_error_estimator_fast")
     print()
     print("   # Get Hamiltonian and convert to Pauli strings")
     print("   active_hamiltonian, init_state = build_active_space(...)")

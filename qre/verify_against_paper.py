@@ -7,7 +7,7 @@ to help verify the formulas are correct.
 
 import numpy as np
 from openfermion import QubitOperator
-from jkg_utils import compute_commutator, compute_nested_commutator_norm
+from trotter_coefficients import compute_commutator, compute_nested_commutator_norm
 
 print("="*70)
 print("VERIFICATION: Simple Test Case for Manual Calculation")
@@ -138,7 +138,7 @@ print("\n" + "="*70)
 print("RUNNING ACTUAL CODE")
 print("="*70)
 
-from jkg_utils import trotter_error_estimator
+from trotter_coefficients import trotter_error_estimator
 c1_est, c2_est = trotter_error_estimator(terms, time_limit=2.0, batch_size=10000)
 
 print(f"\nMonte Carlo estimates:")
@@ -166,7 +166,7 @@ To verify against the paper:
 
 4. If C₁ in the paper uses (1/2)∑ᵢ≠ⱼ notation, then:
    - The code should return C1_est/2 to match the paper's definition
-   - Update line 209 in jkg_utils.py to: return C1_est/2, C21_est/12 + C22_est/24
+   - Update line 209 in trotter_coefficients.py to: return C1_est/2, C21_est/12 + C22_est/24
 
 5. Verify the 1/12 and 1/24 coefficients match the paper
 """)

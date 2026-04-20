@@ -9,7 +9,7 @@ This is simple enough to compute Trotter errors analytically.
 import numpy as np
 import math
 from openfermion import QubitOperator
-from jkg_utils import trotter_error_estimator
+from trotter_coefficients import trotter_error_estimator
 
 print("="*70)
 print("TEST: Verify Trotter Step Count Formulas")

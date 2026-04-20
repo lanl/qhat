@@ -3,7 +3,7 @@ Verify the user's changes to the code.
 
 User made two changes:
 1. Changed qre_unitary.py to use energy_error instead of eps_trotter in denominators
-2. Divided C1 by 2 in the return statements of jkg_utils.py
+2. Divided C1 by 2 in the return statements of trotter_coefficients.py
 
 Let's verify these changes produce correct results.
 """
@@ -11,7 +11,7 @@ Let's verify these changes produce correct results.
 import numpy as np
 import math
 from openfermion import QubitOperator
-from jkg_utils import trotter_error_estimator
+from trotter_coefficients import trotter_error_estimator
 
 print("="*70)
 print("VERIFICATION OF USER'S CHANGES")
