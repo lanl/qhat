@@ -103,8 +103,10 @@ def encode_ramped_trotter(
     config_general.log(f"-- effective energy range = {2 * math.pi / timestep} Hartrees")
     eps_trotter = config_unitary.energy_error * timestep / (2 * math.pi)
     config_general.log(f"-- allowable fractional Trotter error = {eps_trotter}")
-    s1 = timestep * config_unitary.error_scale * c1 / eps_trotter
-    s2 = timestep * math.sqrt(config_unitary.error_scale * c2 / eps_trotter)
+    # use config_unitary.energy_error here instead of eps_trotter, because these equations are
+    # derived in terms of the absolute energy error rather than the fractional energy error
+    s1 = timestep * config_unitary.error_scale * c1 / config_unitary.energy_error
+    s2 = timestep * math.sqrt(config_unitary.error_scale * c2 / config_unitary.energy_error)
     config_general.log(f"-- Trotter step count: s1 = {s1}, s2 = {s2}")
 
     r1 = 1
