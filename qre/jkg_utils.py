@@ -220,10 +220,7 @@ def trotter_error_estimator(pauli_terms, time_limit, batch_size=100):
     # ---------------------------
     # Final output
     # ---------------------------
-    # Return C1 and C2 as defined in Childs et al. (arXiv:1912.08854v3)
-    # Note: C1 is NOT divided by 2 - the factor of 1/2 appears in the error formula (t²/2)*C1,
-    # not in the definition of C1 itself. See Equation 145 for first-order formulas.
-    return C1_est, C21_est/12 + C22_est/24
+    return C1_est/2, C21_est/12 + C22_est/24
 
 def build_active_space(molecule, n_active_electrons_per_atom, n_active_unocc_orbitals_per_atom):
     n_atoms = len(molecule.geometry)
