@@ -1,8 +1,9 @@
 """
-Test script to verify correctness of the optimized implementation.
+Test script to verify correctness of both implementations.
 
-This script tests the low-level functions to ensure they produce
-correct results compared to the original implementation.
+This script tests:
+1. Ground truth: Both implementations against known mathematical properties
+2. Consistency: The optimized implementation matches the original
 """
 
 import numpy as np
@@ -18,6 +19,189 @@ from jkg_utils_fast import (
     pauli_product_bits,
     compute_commutator_norm_fast
 )
+
+
+def test_ground_truth_anticommutation():
+    """Test that both implementations correctly identify Pauli anticommutation."""
+    print("\n" + "=" * 70)
+    print("TEST: Ground Truth - Pauli Anticommutation Properties")
+    print("=" * 70)
+
+    # Known mathematical facts about Pauli matrices:
+    # - Different Paulis on same qubit anticommute
+    # - Same Paulis on same qubit commute
+    # - Paulis on different qubits commute
+    test_cases = [
+        # (key1, key2, should_anticommute, description)
+        (((0, 'X'),), ((0, 'Y'),), True, "X and Y on same qubit"),
+        (((0, 'X'),), ((0, 'Z'),), True, "X and Z on same qubit"),
+        (((0, 'Y'),), ((0, 'Z'),), True, "Y and Z on same qubit"),
+        (((0, 'X'),), ((0, 'X'),), False, "X and X on same qubit"),
+        (((0, 'Y'),), ((0, 'Y'),), False, "Y and Y on same qubit"),
+        (((0, 'Z'),), ((0, 'Z'),), False, "Z and Z on same qubit"),
+        (((0, 'X'),), ((1, 'X'),), False, "X on different qubits"),
+        (((0, 'X'),), ((1, 'Y'),), False, "X and Y on different qubits"),
+        # Multi-qubit: odd number of anticommuting positions = anticommute
+        (((0, 'X'), (1, 'Y')), ((0, 'Y'), (1, 'Y')), True, "1 position differs"),
+        (((0, 'X'), (1, 'Y')), ((0, 'Y'), (1, 'X')), False, "2 positions differ"),
+        (((0, 'X'), (1, 'Y'), (2, 'Z')), ((0, 'Y'), (1, 'X'), (2, 'Z')), False, "2 positions differ"),
+        (((0, 'X'), (1, 'Y'), (2, 'Z')), ((0, 'Y'), (1, 'X'), (2, 'X')), True, "3 positions differ (X0Y1Z2 vs Y0X1X2)"),
+    ]
+
+    all_passed = True
+    for key1, key2, expected, description in test_cases:
+        # Test original implementation
+        result_orig = anticommute(key1, key2)
+
+        # Test fast implementation
+        x1, z1 = encode_pauli_string(key1, 10)
+        x2, z2 = encode_pauli_string(key2, 10)
+        result_fast = pauli_anticommute(x1, z1, x2, z2)
+
+        # Both should match expected
+        passed = (result_orig == expected) and (result_fast == expected)
+
+        status = "✓" if passed else "❌"
+        print(f"  {status} {description}")
+        if not passed:
+            print(f"     Expected: {expected}, Original: {result_orig}, Fast: {result_fast}")
+            all_passed = False
+
+    if all_passed:
+        print("\n  ✅ All ground truth anticommutation tests PASSED")
+    else:
+        print("\n  ❌ Some ground truth anticommutation tests FAILED")
+
+    return all_passed
+
+
+def test_ground_truth_commutator_norms():
+    """Test that both implementations compute correct commutator norms."""
+    print("\n" + "=" * 70)
+    print("TEST: Ground Truth - Commutator Norms")
+    print("=" * 70)
+
+    # [A, B] = AB - BA
+    # If A and B commute: [A, B] = 0, norm = 0
+    # If A and B anticommute: AB = -BA, so [A, B] = 2AB, norm = 2|coeff_A * coeff_B|
+    test_cases = [
+        # (op1, op2, expected_norm, description)
+        (QubitOperator('X0', 1.0), QubitOperator('Y0', 1.0), 2.0, "[X, Y] with unit coefficients"),
+        (QubitOperator('X0', 2.0), QubitOperator('Y0', 3.0), 12.0, "[X, Y] with coefficients 2 and 3"),
+        (QubitOperator('X0', 1.0), QubitOperator('X0', 1.0), 0.0, "[X, X] = 0"),
+        (QubitOperator('X0', 5.0), QubitOperator('X0', 7.0), 0.0, "[X, X] = 0 regardless of coefficients"),
+        (QubitOperator('X0', 1.0), QubitOperator('X1', 1.0), 0.0, "Different qubits commute"),
+        (QubitOperator('X0 Y1', 1.0), QubitOperator('Y0 Y1', 1.0), 2.0, "Anticommute at 1 position"),
+        (QubitOperator('X0 Y1', 2.0), QubitOperator('Y0 X1', 3.0), 0.0, "Commute (2 position differences)"),
+        # Complex coefficients
+        (QubitOperator('X0', 1.0j), QubitOperator('Y0', 1.0), 2.0, "[X, Y] with imaginary coefficient"),
+        (QubitOperator('Z0', 1+1j), QubitOperator('X0', 1-1j), 2*np.sqrt(2)*np.sqrt(2), "[Z, X] with complex coefficients"),
+    ]
+
+    all_passed = True
+    for op1, op2, expected_norm, description in test_cases:
+        # Test original implementation
+        _, norm_orig = compute_commutator(op1, op2)
+
+        # Test fast implementation
+        key1 = list(op1.terms.keys())[0]
+        key2 = list(op2.terms.keys())[0]
+        c1 = list(op1.terms.values())[0]
+        c2 = list(op2.terms.values())[0]
+
+        x1, z1 = encode_pauli_string(key1, 10)
+        x2, z2 = encode_pauli_string(key2, 10)
+        norm_fast = compute_commutator_norm_fast(x1, z1, c1, x2, z2, c2)
+
+        # Check both match expected
+        diff_orig = abs(norm_orig - expected_norm)
+        diff_fast = abs(norm_fast - expected_norm)
+        passed = (diff_orig < 1e-10) and (diff_fast < 1e-10)
+
+        status = "✓" if passed else "❌"
+        print(f"  {status} {description}")
+        if not passed:
+            print(f"     Expected: {expected_norm:.6f}")
+            print(f"     Original: {norm_orig:.6f} (diff: {diff_orig:.2e})")
+            print(f"     Fast:     {norm_fast:.6f} (diff: {diff_fast:.2e})")
+            all_passed = False
+
+    if all_passed:
+        print("\n  ✅ All ground truth commutator norm tests PASSED")
+    else:
+        print("\n  ❌ Some ground truth commutator norm tests FAILED")
+
+    return all_passed
+
+
+def test_ground_truth_pauli_products():
+    """Test that both implementations correctly compute Pauli products."""
+    print("\n" + "=" * 70)
+    print("TEST: Ground Truth - Pauli Product Rules")
+    print("=" * 70)
+
+    # Pauli product rules (ignoring phase factors):
+    # X*X = I, Y*Y = I, Z*Z = I
+    # X*Y = Z, Y*Z = X, Z*X = Y (cyclic)
+    # Y*X = Z, Z*Y = X, X*Z = Y (reverse)
+    test_cases = [
+        # (key1, key2, expected_product_key, description)
+        (((0, 'X'),), ((0, 'X'),), (), "X*X = I"),
+        (((0, 'Y'),), ((0, 'Y'),), (), "Y*Y = I"),
+        (((0, 'Z'),), ((0, 'Z'),), (), "Z*Z = I"),
+        (((0, 'X'),), ((0, 'Y'),), ((0, 'Z'),), "X*Y = Z"),
+        (((0, 'Y'),), ((0, 'Z'),), ((0, 'X'),), "Y*Z = X"),
+        (((0, 'Z'),), ((0, 'X'),), ((0, 'Y'),), "Z*X = Y"),
+        (((0, 'Y'),), ((0, 'X'),), ((0, 'Z'),), "Y*X = Z"),
+        (((0, 'Z'),), ((0, 'Y'),), ((0, 'X'),), "Z*Y = X"),
+        (((0, 'X'),), ((0, 'Z'),), ((0, 'Y'),), "X*Z = Y"),
+        # Different qubits: product keeps both
+        (((0, 'X'),), ((1, 'Y'),), ((0, 'X'), (1, 'Y')), "X0 * Y1 = X0 Y1"),
+        # Multi-qubit products
+        (((0, 'X'), (1, 'Y')), ((0, 'Y'), (1, 'Y')), ((0, 'Z'),), "X0Y1 * Y0Y1 = Z0"),
+    ]
+
+    all_passed = True
+    for key1, key2, expected_product, description in test_cases:
+        # Test original implementation
+        product_orig = pauli_product_key(key1, key2)
+
+        # Test fast implementation
+        x1, z1 = encode_pauli_string(key1, 10)
+        x2, z2 = encode_pauli_string(key2, 10)
+        x_prod, z_prod = pauli_product_bits(x1, z1, x2, z2)
+
+        # Convert fast result back to key format
+        product_fast = []
+        for qubit in range(10):
+            x_bit = (x_prod >> qubit) & 1
+            z_bit = (z_prod >> qubit) & 1
+            if x_bit or z_bit:
+                if x_bit and z_bit:
+                    product_fast.append((qubit, 'Y'))
+                elif x_bit:
+                    product_fast.append((qubit, 'X'))
+                elif z_bit:
+                    product_fast.append((qubit, 'Z'))
+        product_fast = tuple(product_fast)
+
+        # Both should match expected
+        passed = (product_orig == expected_product) and (product_fast == expected_product)
+
+        status = "✓" if passed else "❌"
+        print(f"  {status} {description}")
+        if not passed:
+            print(f"     Expected: {expected_product}")
+            print(f"     Original: {product_orig}")
+            print(f"     Fast:     {product_fast}")
+            all_passed = False
+
+    if all_passed:
+        print("\n  ✅ All ground truth Pauli product tests PASSED")
+    else:
+        print("\n  ❌ Some ground truth Pauli product tests FAILED")
+
+    return all_passed
 
 
 def test_encoding():
@@ -240,6 +424,18 @@ def run_all_tests():
 
     results = []
 
+    # Ground truth tests (verify both implementations against known results)
+    print("\n" + "┌" + "─" * 68 + "┐")
+    print("│" + " " * 15 + "PART 1: GROUND TRUTH TESTS" + " " * 27 + "│")
+    print("└" + "─" * 68 + "┘")
+    results.append(("Ground Truth: Anticommutation", test_ground_truth_anticommutation()))
+    results.append(("Ground Truth: Commutator Norms", test_ground_truth_commutator_norms()))
+    results.append(("Ground Truth: Pauli Products", test_ground_truth_pauli_products()))
+
+    # Consistency tests (compare fast vs original implementation)
+    print("\n" + "┌" + "─" * 68 + "┐")
+    print("│" + " " * 13 + "PART 2: IMPLEMENTATION CONSISTENCY" + " " * 21 + "│")
+    print("└" + "─" * 68 + "┘")
     results.append(("Pauli String Encoding", test_encoding()))
     results.append(("Anticommutation Check", test_anticommutation()))
     results.append(("Commutator Norm", test_commutator_norm()))
@@ -258,9 +454,11 @@ def run_all_tests():
 
     print()
     if all_passed:
-        print("  🎉 All tests PASSED! The optimized implementation is correct.")
+        print("  🎉 All tests PASSED!")
+        print("     - Both implementations satisfy ground truth properties")
+        print("     - Fast and original implementations are consistent")
     else:
-        print("  ⚠️  Some tests FAILED. Please review the implementation.")
+        print("  ⚠️  Some tests FAILED. Please review the implementations.")
 
     print("=" * 70)
 
