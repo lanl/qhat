@@ -109,6 +109,22 @@ def compute_nested_commutator_norm(H_outer, inner_operator):
 # Main Monte Carlo estimation
 # --------------------------------------------------
 def trotter_error_estimator(pauli_terms, time_limit, batch_size=100):
+    """
+    Monte Carlo estimation of Trotter error coefficients.
+
+    Reference: Childs et al., "Theory of Trotter Error" (arXiv:1912.08854v3)
+
+    For first-order formulas (Equation 145):
+      Error ≤ (t²/2) * C1, where C1 = Σᵢ<ⱼ ||[Hᵢ, Hⱼ]||
+
+    For second-order formulas (Equation 152):
+      Error ≤ (t³/12) * C21 + (t³/24) * C22, where
+      C21 = Σₖ<ᵢ,ₖ<ⱼ ||[Hᵢ, [Hⱼ, Hₖ]]||  (all triples with k < i and k < j)
+      C22 = Σₖ<ⱼ ||[Hₖ, [Hₖ, Hⱼ]]||       (all pairs with k < j)
+
+    Returns:
+      (C1, C2) where C2 = C21/12 + C22/24
+    """
     N = len(pauli_terms)
 
     # Dictionary to cache computed pair commutators.
@@ -204,8 +220,9 @@ def trotter_error_estimator(pauli_terms, time_limit, batch_size=100):
     # ---------------------------
     # Final output
     # ---------------------------
-    # TODO: Should we return C1_est/2 instead of C1_est?  See, for example, Childs et al Eq 145,
-    #       DARPA Report #1, Brendan's notes from studying this with SymPy.
+    # Return C1 and C2 as defined in Childs et al. (arXiv:1912.08854v3)
+    # Note: C1 is NOT divided by 2 - the factor of 1/2 appears in the error formula (t²/2)*C1,
+    # not in the definition of C1 itself. See Equation 145 for first-order formulas.
     return C1_est, C21_est/12 + C22_est/24
 
 def build_active_space(molecule, n_active_electrons_per_atom, n_active_unocc_orbitals_per_atom):
