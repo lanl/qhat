@@ -257,11 +257,21 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
     """
     Fast Monte Carlo estimation of nested commutator norms.
 
+    Reference: Childs et al., "Theory of Trotter Error" (arXiv:1912.08854v3)
+
     This is an optimized version of trotter_error_estimator that uses:
     - Binary encoding for Pauli strings
     - Numba JIT compilation
     - Vectorized batch operations
     - Parallel processing
+
+    For first-order formulas (Equation 145):
+      Error ≤ (t²/2) * C1, where C1 = Σᵢ<ⱼ ||[Hᵢ, Hⱼ]||
+
+    For second-order formulas (Equation 152):
+      Error ≤ (t³/12) * C21 + (t³/24) * C22, where
+      C21 = Σₖ<ᵢ,ₖ<ⱼ ||[Hᵢ, [Hⱼ, Hₖ]]||  (all triples with k < i and k < j)
+      C22 = Σₖ<ⱼ ||[Hₖ, [Hₖ, Hⱼ]]||       (all pairs with k < j)
 
     Args:
         pauli_terms: List of QubitOperator terms
@@ -270,6 +280,7 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
 
     Returns:
         (C1_est, C2_est): Estimated first and second order commutator norms
+        where C2_est = C21/12 + C22/24
     """
     N = len(pauli_terms)
 
@@ -395,6 +406,9 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
     # ---------------------------
     # Final output
     # ---------------------------
+    # Return C1 and C2 as defined in Childs et al. (arXiv:1912.08854v3)
+    # C1 is NOT divided by 2 - the factor of 1/2 appears in the error formula (t²/2)*C1
+    # See Equations 145 and 152 for first- and second-order formulas respectively
     return C1_est, C21_est / 12 + C22_est / 24
 
 
