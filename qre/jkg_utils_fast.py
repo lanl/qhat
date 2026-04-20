@@ -14,6 +14,15 @@ import math
 from numba import njit, prange
 
 # --------------------------------------------------
+# Configuration for exact computation
+# --------------------------------------------------
+# Time budget for exact computation feasibility check (seconds)
+EXACT_COMPUTATION_TIME_BUDGET = 60
+
+# Memory limit for exact computation tracking (MB)
+EXACT_COMPUTATION_MEMORY_LIMIT_MB = 100
+
+# --------------------------------------------------
 # Binary encoding for Pauli strings
 # --------------------------------------------------
 # Each Pauli operator is encoded as 2 bits:
@@ -253,9 +262,55 @@ def preprocess_pauli_terms(pauli_terms):
     return x_bits, z_bits, coeffs, n_qubits
 
 
+def should_use_exact_tracking(N, time_budget=None, memory_limit_mb=None):
+    """
+    Decide whether to use exact computation tracking based on time and memory constraints.
+
+    Args:
+        N: Number of Pauli terms
+        time_budget: Time budget in seconds (defaults to EXACT_COMPUTATION_TIME_BUDGET)
+        memory_limit_mb: Memory limit in MB (defaults to EXACT_COMPUTATION_MEMORY_LIMIT_MB)
+
+    Returns:
+        bool: True if exact tracking is feasible and beneficial
+    """
+    if time_budget is None:
+        time_budget = EXACT_COMPUTATION_TIME_BUDGET
+    if memory_limit_mb is None:
+        memory_limit_mb = EXACT_COMPUTATION_MEMORY_LIMIT_MB
+
+    # Compute combination counts
+    c1_count = N * (N - 1) // 2
+
+    # For C21, use approximation for large N to avoid expensive computation
+    if N < 500:
+        c21_count = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
+    else:
+        c21_count = N**3 // 6  # Approximation
+
+    c22_count = N * (N - 1) // 2
+
+    # Memory check (12 bytes per triple for set overhead, 8 per pair)
+    estimated_memory_mb = (c1_count * 8 + c21_count * 12 + c22_count * 8) / (1024**2)
+    if estimated_memory_mb > memory_limit_mb:
+        return False
+
+    # Time check (coupon collector: N*ln(N) samples needed on average)
+    # Use throughput estimates: 15M/s for C1, 8M/s for C21, 11M/s for C22
+    c1_time = c1_count * np.log(max(2, c1_count)) / 15e6 if c1_count > 0 else 0
+    c21_time = c21_count * np.log(max(2, c21_count)) / 8e6 if c21_count > 0 else 0
+    c22_time = c22_count * np.log(max(2, c22_count)) / 11e6 if c22_count > 0 else 0
+    estimated_time = c1_time + c21_time + c22_time
+
+    if estimated_time > time_budget:
+        return False
+
+    return True
+
+
 def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
     """
-    Fast Monte Carlo estimation of nested commutator norms.
+    Fast Monte Carlo estimation of nested commutator norms with exact computation for small systems.
 
     Reference: Childs et al., "Theory of Trotter Error" (arXiv:1912.08854v3)
 
@@ -264,6 +319,7 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
     - Numba JIT compilation
     - Vectorized batch operations
     - Parallel processing
+    - Early termination with exact results when all combinations are sampled
 
     For first-order formulas (Equation 145):
       Error ≤ (t²/2) * C1, where C1 = Σᵢ<ⱼ ||[Hᵢ, Hⱼ]||
@@ -288,6 +344,24 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
     start_prep = time.time()
     x_bits, z_bits, coeffs, n_qubits = preprocess_pauli_terms(pauli_terms)
     print(f"  Preprocessing done in {time.time() - start_prep:.3f}s ({n_qubits} qubits)")
+
+    # Check if exact computation is feasible
+    use_exact = should_use_exact_tracking(N, time_limit)
+    if use_exact:
+        print(f"  Exact computation is feasible for N={N} - enabling tracking")
+        seen_c1 = set()
+        seen_c21 = set()
+        seen_c22 = set()
+        c1_values = {}
+        c21_values = {}
+        c22_values = {}
+
+        # Compute total combinations for completion check
+        total_c1 = N * (N - 1) // 2
+        total_c21 = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
+        total_c22 = N * (N - 1) // 2
+    else:
+        print(f"  Using Monte Carlo estimation (N={N} too large for exact computation)")
 
     # Warmup: trigger Numba JIT compilation before timing
     print(f"Warming up Numba JIT compilation...")
@@ -322,13 +396,33 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
         C1_sum += np.sum(norms)
         samples_C1 += batch_size
 
+        # Track exact values if enabled
+        if use_exact:
+            for idx in range(len(indices)):
+                i, j = int(indices[idx, 0]), int(indices[idx, 1])
+                pair = (min(i, j), max(i, j))
+                if pair not in seen_c1:
+                    seen_c1.add(pair)
+                    c1_values[pair] = norms[idx]
+
+            # Check if we've seen all pairs
+            if len(seen_c1) == total_c1:
+                C1_exact = sum(c1_values.values())
+                print(f"  C1 EXACT: All {total_c1} pairs sampled in {time.time() - start_time:.3f}s")
+                print(f"  C1 exact value: {C1_exact:.6f}")
+                C1_est = C1_exact
+                break
+
         if time.time() - start_time >= time_limit / 3:
             break
 
-    total_C1 = N * (N - 1) / 2
-    C1_est = C1_sum * (total_C1 / samples_C1) if samples_C1 > 0 else 0.0
-    print(f"  C1 estimation: {samples_C1} samples in {time.time() - start_time:.3f}s")
-    print(f"  C1 estimate: {C1_est:.6f}")
+    if not use_exact or len(seen_c1) < total_c1:
+        total_C1 = N * (N - 1) / 2
+        C1_est = C1_sum * (total_C1 / samples_C1) if samples_C1 > 0 else 0.0
+        print(f"  C1 estimation: {samples_C1} samples in {time.time() - start_time:.3f}s")
+        print(f"  C1 estimate: {C1_est:.6f}")
+        if use_exact:
+            print(f"    (Sampled {len(seen_c1)}/{total_c1} unique pairs, {100*len(seen_c1)/total_c1:.1f}% coverage)")
 
     # ---------------------------
     # Estimate C21 = sum_{k<j, k<i} ||[H_i, [H_j, H_k]]||
@@ -365,13 +459,34 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
         C21_sum += np.sum(norms)
         samples_C21 += len(indices)
 
+        # Track exact values if enabled
+        if use_exact:
+            for idx in range(len(indices)):
+                i, j, k = int(indices[idx, 0]), int(indices[idx, 1]), int(indices[idx, 2])
+                # Canonical form: k is smallest, then sort i and j
+                triple = (k, min(i, j), max(i, j))
+                if triple not in seen_c21:
+                    seen_c21.add(triple)
+                    c21_values[triple] = norms[idx]
+
+            # Check if we've seen all triples
+            if len(seen_c21) == total_c21:
+                C21_exact = sum(c21_values.values())
+                print(f"  C21 EXACT: All {total_c21} triples sampled in {time.time() - start_time:.3f}s")
+                print(f"  C21 exact value: {C21_exact:.6f}")
+                C21_est = C21_exact
+                break
+
         if time.time() - start_time >= time_limit / 3:
             break
 
-    total_C21 = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
-    C21_est = C21_sum * (total_C21 / samples_C21) if samples_C21 > 0 else 0.0
-    print(f"  C21 estimation: {samples_C21} samples in {time.time() - start_time:.3f}s")
-    print(f"  C21 estimate: {C21_est:.6f}")
+    if not use_exact or len(seen_c21) < total_c21:
+        total_C21 = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
+        C21_est = C21_sum * (total_C21 / samples_C21) if samples_C21 > 0 else 0.0
+        print(f"  C21 estimation: {samples_C21} samples in {time.time() - start_time:.3f}s")
+        print(f"  C21 estimate: {C21_est:.6f}")
+        if use_exact:
+            print(f"    (Sampled {len(seen_c21)}/{total_c21} unique triples, {100*len(seen_c21)/total_c21:.1f}% coverage)")
 
     # ---------------------------
     # Estimate C22 = sum_{k<j} ||[H_k, [H_k, H_j]]||
@@ -395,19 +510,48 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
         C22_sum += np.sum(norms)
         samples_C22 += batch_size
 
+        # Track exact values if enabled
+        if use_exact:
+            for idx in range(len(indices)):
+                k, j = int(indices[idx, 0]), int(indices[idx, 1])
+                pair = (min(k, j), max(k, j))
+                if pair not in seen_c22:
+                    seen_c22.add(pair)
+                    c22_values[pair] = norms[idx]
+
+            # Check if we've seen all pairs
+            if len(seen_c22) == total_c22:
+                C22_exact = sum(c22_values.values())
+                print(f"  C22 EXACT: All {total_c22} pairs sampled in {time.time() - start_time:.3f}s")
+                print(f"  C22 exact value: {C22_exact:.6f}")
+                C22_est = C22_exact
+                break
+
         if time.time() - start_time >= time_limit / 3:
             break
 
-    total_C22 = N * (N - 1) / 2
-    C22_est = C22_sum * (total_C22 / samples_C22) if samples_C22 > 0 else 0.0
-    print(f"  C22 estimation: {samples_C22} samples in {time.time() - start_time:.3f}s")
-    print(f"  C22 estimate: {C22_est:.6f}")
+    if not use_exact or len(seen_c22) < total_c22:
+        total_C22 = N * (N - 1) / 2
+        C22_est = C22_sum * (total_C22 / samples_C22) if samples_C22 > 0 else 0.0
+        print(f"  C22 estimation: {samples_C22} samples in {time.time() - start_time:.3f}s")
+        print(f"  C22 estimate: {C22_est:.6f}")
+        if use_exact:
+            print(f"    (Sampled {len(seen_c22)}/{total_c22} unique pairs, {100*len(seen_c22)/total_c22:.1f}% coverage)")
 
     # ---------------------------
     # Final output
     # ---------------------------
+    # Check if we achieved exact computation
+    if use_exact and len(seen_c1) == total_c1 and len(seen_c21) == total_c21 and len(seen_c22) == total_c22:
+        print("\n" + "="*70)
+        print("✅ EXACT COMPUTATION ACHIEVED")
+        print(f"   All {total_c1} C1 pairs sampled")
+        print(f"   All {total_c21} C21 triples sampled")
+        print(f"   All {total_c22} C22 pairs sampled")
+        print("="*70)
+
     # Return C1 and C2 as defined in Childs et al. (arXiv:1912.08854v3)
-    # C1 is NOT divided by 2 - the factor of 1/2 appears in the error formula (t²/2)*C1
+    # C1 is divided by 2 as per the convention (see VERIFICATION_OF_USER_FIX.md)
     # See Equations 145 and 152 for first- and second-order formulas respectively
     return C1_est / 2, C21_est / 12 + C22_est / 24
 
