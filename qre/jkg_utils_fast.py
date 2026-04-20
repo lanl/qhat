@@ -69,9 +69,9 @@ def pauli_anticommute(x1, z1, x2, z2):
     Returns:
         True if they anticommute, False otherwise
     """
-    # XOR gives 1 where operators differ
-    # AND gives 1 where both are non-identity
-    diff = (x1 ^ x2) & (x2 | z2) & (x1 | z1)
+    # Operators differ if either x-bits or z-bits differ
+    # Both are non-identity if (x|z) != 0
+    diff = ((x1 ^ x2) | (z1 ^ z2)) & (x1 | z1) & (x2 | z2)
 
     # Count bits set in diff
     count = 0
