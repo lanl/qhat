@@ -235,7 +235,7 @@ def test_statistical_agreement():
 def run_all_tests():
     """Run all correctness tests."""
     print("\n" + "╔" + "═" * 68 + "╗")
-    print("║" + " " * 15 + "CORRECTNESS TEST SUITE" + " " * 30 + "║")
+    print("║" + " " * 16 + "CORRECTNESS TEST SUITE" + " " * 30 + "║")
     print("╚" + "═" * 68 + "╝")
 
     results = []
