@@ -1,8 +1,8 @@
 """Quick benchmark to compare sample throughput."""
 import numpy as np
 from openfermion import QubitOperator
-from jkg_utils import trotter_error_estimator
-from jkg_utils_fast import trotter_error_estimator_fast
+from trotter_coefficients import trotter_error_estimator
+from trotter_coefficients_fast import trotter_error_estimator_fast
 
 # Generate test data
 np.random.seed(42)

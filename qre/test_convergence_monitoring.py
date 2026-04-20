@@ -9,8 +9,8 @@ Verifies that:
 
 import numpy as np
 from openfermion import QubitOperator
-from jkg_utils_fast import trotter_error_estimator_fast
-import jkg_utils_fast
+from trotter_coefficients_fast import trotter_error_estimator_fast
+import trotter_coefficients_fast
 
 print("="*70)
 print("TEST: Convergence Monitoring")
@@ -31,7 +31,7 @@ for i in range(200):
     terms_large.append(QubitOperator(f'{op}{qubit}', coeff))
 
 print(f"\nTest Hamiltonian with {len(terms_large)} terms")
-print(f"Convergence threshold: {jkg_utils_fast.CONVERGENCE_THRESHOLD:.4f} (1%)")
+print(f"Convergence threshold: {trotter_coefficients_fast.CONVERGENCE_THRESHOLD:.4f} (1%)")
 print(f"Time limit: 30s")
 print("\nWith convergence monitoring enabled, estimation may terminate early")
 print("if the relative standard error drops below 1%.")
@@ -48,8 +48,8 @@ print("TEST 2: Same system with convergence monitoring DISABLED")
 print("="*70)
 
 # Temporarily disable convergence monitoring
-original_enable = jkg_utils_fast.ENABLE_CONVERGENCE_MONITORING
-jkg_utils_fast.ENABLE_CONVERGENCE_MONITORING = False
+original_enable = trotter_coefficients_fast.ENABLE_CONVERGENCE_MONITORING
+trotter_coefficients_fast.ENABLE_CONVERGENCE_MONITORING = False
 
 print(f"\nWith convergence monitoring disabled, all time budget will be used")
 
@@ -60,17 +60,17 @@ print(f"  c1 = {c1_no_conv:.6f}")
 print(f"  c2 = {c2_no_conv:.6f}")
 
 # Restore original setting
-jkg_utils_fast.ENABLE_CONVERGENCE_MONITORING = original_enable
+trotter_coefficients_fast.ENABLE_CONVERGENCE_MONITORING = original_enable
 
 # Test 3: Adjust convergence threshold
 print("\n" + "="*70)
 print("TEST 3: Tighter convergence threshold (0.1%)")
 print("="*70)
 
-original_threshold = jkg_utils_fast.CONVERGENCE_THRESHOLD
-jkg_utils_fast.CONVERGENCE_THRESHOLD = 0.001  # 0.1%
+original_threshold = trotter_coefficients_fast.CONVERGENCE_THRESHOLD
+trotter_coefficients_fast.CONVERGENCE_THRESHOLD = 0.001  # 0.1%
 
-print(f"\nConvergence threshold: {jkg_utils_fast.CONVERGENCE_THRESHOLD:.4f} (0.1%)")
+print(f"\nConvergence threshold: {trotter_coefficients_fast.CONVERGENCE_THRESHOLD:.4f} (0.1%)")
 print("This requires 100x more samples to converge than 1% threshold.")
 
 c1_tight, c2_tight = trotter_error_estimator_fast(terms_large, 30.0, batch_size=10000)
@@ -80,7 +80,7 @@ print(f"  c1 = {c1_tight:.6f}")
 print(f"  c2 = {c2_tight:.6f}")
 
 # Restore original threshold
-jkg_utils_fast.CONVERGENCE_THRESHOLD = original_threshold
+trotter_coefficients_fast.CONVERGENCE_THRESHOLD = original_threshold
 
 # Test 4: Very large system (should not converge in time limit)
 print("\n" + "="*70)

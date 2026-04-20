@@ -10,8 +10,8 @@ import numpy as np
 from openfermion import QubitOperator
 
 # Import both versions
-from jkg_utils import trotter_error_estimator
-from jkg_utils_fast import trotter_error_estimator_fast
+from trotter_coefficients import trotter_error_estimator
+from trotter_coefficients_fast import trotter_error_estimator_fast
 
 
 def generate_random_pauli_terms(n_terms, n_qubits, max_weight=4):

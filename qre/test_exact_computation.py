@@ -9,7 +9,7 @@ Verifies that:
 
 import numpy as np
 from openfermion import QubitOperator
-from jkg_utils_fast import trotter_error_estimator_fast
+from trotter_coefficients_fast import trotter_error_estimator_fast
 
 print("="*70)
 print("TEST: Exact Computation with Early Termination")
