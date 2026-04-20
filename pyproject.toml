@@ -19,6 +19,8 @@ dependencies = [
     #"kahypar", # Fails to install on my laptop, so commented out
     "nevergrad",
     "optuna",
+    # Dependencies for fast Trotter error estimation
+    "numba>=0.56.0",  # JIT compilation for jkg_utils_fast.py
 ]
 
 [tool.setuptools.packages.find]
