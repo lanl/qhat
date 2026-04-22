@@ -59,26 +59,24 @@ class HamiltonianConfiguration(ConfigurationBase):
         if self.source is not None:
             print("Already set Hamiltonian source to {self.source}.")
             assert self.source is None
-    def load_numpy(self,
-                   filename,
-                   fermion_to_qubit_transform="JW",
-                   boson_to_qubit_transform="binary",
-                   max_bosons_per_state=None):
+    def load_second_quantization(self,
+                                 filename,
+                                 fermion_to_qubit_transform="JW",
+                                 boson_to_qubit_transform="binary",
+                                 max_bosons_per_state=None):
         self._only_once()
-        self.source = "numpy"
         self.filename = filename
+        # Auto-detect file format based on extension
+        if filename.endswith('.h5') or filename.endswith('.hdf5'):
+            self.source = "hdf5"
+        elif filename.endswith('.npy') or filename.endswith('.npz'):
+            self.source = "numpy"
+        else:
+            raise ValueError(f"Unable to determine file format from extension: {filename}. "
+                           f"Supported extensions: .h5, .hdf5, .npy, .npz")
         self.fermion_to_qubit_transform = fermion_to_qubit_transform
         self.boson_to_qubit_transform = boson_to_qubit_transform
         self.max_bosons_per_state = max_bosons_per_state
-    def load_hdf5(self,
-                  filename,
-                  fermion_to_qubit_transform="JW",
-                  boson_to_qubit_transform="binary",
-                  max_bosons_per_state=None):
-        self._only_once()
-        self.source = "hdf5"
-        self.filename = filename
-        self.fermion_to_qubit_transform = fermion_to_qubit_transform
     def set_energy_lower_bound(self, value, exact=False):
         self.lower_bound = value
         self.exact_energy_lower_bound = exact

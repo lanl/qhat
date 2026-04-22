@@ -49,28 +49,24 @@ different, your own format may not currently be readable without help from the d
 appropriate reader.  Trying to load more than one Hamiltonian will generate an error.  We currently
 support the following inputs source:
 
-- HDF5: HDF5 files can be loaded by calling the function **`hamiltonian.load_hdf5(filename)`**,
-  which takes as its primary argument the name of the HDF5 file.  Currently the format assumes that
-  there is no constant term, the one-body term is called "1e", and the two-body term is called "2e".
-  This function also accepts optional parameters for specifying fermion-to-qubit transformations:
-  - `fermion_to_qubit_transform`: Transformation method (default: "JW" for Jordan-Wigner)
-  - `boson_to_qubit_transform`: Boson transformation method (default: "binary")
-  - `max_bosons_per_state`: Maximum bosons per state (required for bosonic systems, default: None)
+- **Second-quantization Hamiltonians**: Second-quantized Hamiltonians can be loaded from HDF5 or
+  NumPy files by calling **`hamiltonian.load_second_quantization(filename)`**. The file format is
+  automatically detected based on the file extension:
+  - `.h5` or `.hdf5`: HDF5 format (currently supports one-body term "1e" and two-body term "2e";
+    constant terms and bosons not yet supported)
+  - `.npy` or `.npz`: NumPy format with the following fields:
+    - "constant" (optional): constant energy term
+    - "one_body" (required): one-body tensor
+    - "two_body" (required): two-body tensor
+    - "bosonic\_scalar" (optional): scalar for bosonic terms
+    - "fb\_interaction" (optional): fermion-boson interaction tensor
 
-- NumPy: NumPy-generated files (.npy or .npz) can be loaded by calling the function
-  **`hamiltonian.load_numpy(filename)`**, which takes as its primary argument the name of the NPY
-  or NPZ file. Currently the format is assumed to include:
-  - a constant called "constant" (optional)
-  - a one-body tensor called "one-body" (required)
-  - a two-body tensor called "two-body" (required)
-  - a scalar for bosons called "bosonic\_scalar" (optional)
-  - a tensor for fermion-boson interactions called "fb\_interaction" (optional)
+  If "bosonic\_scalar" and "fb\_interaction" are not present, this is a standard fermionic
+  second-quantization Hamiltonian. The scripts in the `hamiltonian_generator` directory create
+  Hamiltonians in this format, providing only the one-body and two-body tensors.
 
-  If the "bosonic\_scalar" and "fb\_interaction" options are not present, this is the standard
-  fermionic second-quantization format.  The scripts in the `hamiltonian_generator` directory
-  create Hamiltonians in this format, but provide only the one-body and two-body tensors.
-
-  Like `load_hdf5()`, this function accepts optional parameters for transformation settings:
+  This function accepts optional parameters for specifying fermion-to-qubit and boson-to-qubit
+  transformations:
   - `fermion_to_qubit_transform`: Transformation method (default: "JW" for Jordan-Wigner)
   - `boson_to_qubit_transform`: Boson transformation method (default: "binary")
   - `max_bosons_per_state`: Maximum bosons per state (required for bosonic systems, default: None)
@@ -86,7 +82,7 @@ precedence over prior calls to the same function.
 
 Hamiltonians loaded in second-quantization format can use different fermion-to-qubit and/or
 boson-to-qubit transformations. These transformations must be specified as optional parameters
-when calling the load functions (`load_numpy()` or `load_hdf5()`). The available parameters are:
+when calling `load_second_quantization()`. The available parameters are:
 
 - **`fermion_to_qubit_transform`**: Specify "JW" for Jordan-Wigner or "BK" for Bravyi-Kitaev.
   The default is "JW" (Jordan-Wigner).
@@ -102,10 +98,14 @@ when calling the load functions (`load_numpy()` or `load_hdf5()`). The available
 
 **Example usage**:
 ```python
-hamiltonian.load_numpy("file.npz",
-                       fermion_to_qubit_transform="BK",
-                       boson_to_qubit_transform="binary",
-                       max_bosons_per_state=10)
+# Load a NumPy file with custom transformation
+hamiltonian.load_second_quantization("file.npz",
+                                     fermion_to_qubit_transform="BK",
+                                     boson_to_qubit_transform="binary",
+                                     max_bosons_per_state=10)
+
+# Load an HDF5 file with default Jordan-Wigner transformation
+hamiltonian.load_second_quantization("data.h5")
 ```
 
 ### Encoding as a Unitary
