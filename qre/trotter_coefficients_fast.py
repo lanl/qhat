@@ -397,13 +397,12 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_
     # For long runs (60+ seconds), this is negligible, but it improves benchmarking
     # consistency and ensures fair distribution of time_limit across C1/C21/C22.
     config_general.log_verbose(f"Warming up Numba JIT compilation...")
-    if N >= 2:
-        dummy_indices = np.array([[0, 1]], dtype=np.int64)
-        batch_compute_C1(x_bits, z_bits, coeffs, dummy_indices, N)
-        if N >= 3:
-            dummy_indices_3 = np.array([[0, 1, 2]], dtype=np.int64)
-            batch_compute_C21(x_bits, z_bits, coeffs, dummy_indices_3, N)
-            batch_compute_C22(x_bits, z_bits, coeffs, dummy_indices[:, [0, 1]], N)
+    dummy_indices = np.array([[0, 1]], dtype=np.int64)
+    batch_compute_C1(x_bits, z_bits, coeffs, dummy_indices, N)
+    batch_compute_C22(x_bits, z_bits, coeffs, dummy_indices, N)
+    if N >= 3:
+        dummy_indices_3 = np.array([[0, 1, 2]], dtype=np.int64)
+        batch_compute_C21(x_bits, z_bits, coeffs, dummy_indices_3, N)
     config_general.log_verbose(f"  Warmup complete")
 
     # ---------------------------
