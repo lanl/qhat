@@ -254,6 +254,7 @@ class GeneralConfiguration:
         self.logger = _configure_log(user_config.logfile, get_log_level(user_config._loglevel))
         self.git_hash = _get_git_hash()
         self.log("\n".join(["", '*' * 99, "QRE_DRIVER START", '*' * 99]))
+        self.log(f"Logfile: {self.logfile}")
         self.log(f"Running script with git hash {self.git_hash}")
     def log(self, *args, **kwargs):
         self.logger.info(*args, **kwargs)
