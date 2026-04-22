@@ -49,12 +49,17 @@ different, your own format may not currently be readable without help from the d
 appropriate reader.  Trying to load more than one Hamiltonian will generate an error.  We currently
 support the following inputs source:
 
-- HDF5: HDF5 files can be loaded by calling the function **`hamiltonian.load_hdf5()`**, which takes
-  as argument the name of the HDF5 file.  Currently the format assumes that there is no constant
-  term, the one-body term is called "1e", and the two-body term is called "2e".
+- HDF5: HDF5 files can be loaded by calling the function **`hamiltonian.load_hdf5(filename)`**,
+  which takes as its primary argument the name of the HDF5 file.  Currently the format assumes that
+  there is no constant term, the one-body term is called "1e", and the two-body term is called "2e".
+  This function also accepts optional parameters for specifying fermion-to-qubit transformations:
+  - `fermion_to_qubit_transform`: Transformation method (default: "JW" for Jordan-Wigner)
+  - `boson_to_qubit_transform`: Boson transformation method (default: "binary")
+  - `max_bosons_per_state`: Maximum bosons per state (required for bosonic systems, default: None)
+
 - NumPy: NumPy-generated files (.npy or .npz) can be loaded by calling the function
-  **`hamiltonian.load_numpy()`**, which takes as argument the name of the NPY or NPZ file.
-  Currently the format is assumed to include:
+  **`hamiltonian.load_numpy(filename)`**, which takes as its primary argument the name of the NPY
+  or NPZ file. Currently the format is assumed to include:
   - a constant called "constant" (optional)
   - a one-body tensor called "one-body" (required)
   - a two-body tensor called "two-body" (required)
@@ -65,6 +70,11 @@ support the following inputs source:
   fermionic second-quantization format.  The scripts in the `hamiltonian_generator` directory
   create Hamiltonians in this format, but provide only the one-body and two-body tensors.
 
+  Like `load_hdf5()`, this function accepts optional parameters for transformation settings:
+  - `fermion_to_qubit_transform`: Transformation method (default: "JW" for Jordan-Wigner)
+  - `boson_to_qubit_transform`: Boson transformation method (default: "binary")
+  - `max_bosons_per_state`: Maximum bosons per state (required for bosonic systems, default: None)
+
 After loading a Hamiltonian, the user may have knowledge regarding the bounds on the eigenvalues of
 the Hamiltonian, which can be used to optimize certain parts of the resource analysis.  In order to
 specify these, use the functions **`hamiltonian.set_energy_lower_bound()`** and
@@ -74,20 +84,29 @@ use this value exactly (`exact=True`) or only use it if the automatic bound esti
 constraint than the bound provided here (`exact=False`).  The last call to each function takes
 precedence over prior calls to the same function.
 
-Certain formats load Hamiltonians in second-quantization format and can use different
-fermion-to-qubit and/or boson-to-qubit transformations.  These can be set by the following options:
+Hamiltonians loaded in second-quantization format can use different fermion-to-qubit and/or
+boson-to-qubit transformations. These transformations must be specified as optional parameters
+when calling the load functions (`load_numpy()` or `load_hdf5()`). The available parameters are:
 
-- Set **`hamiltonian.fermion_to_qubit_transform`** to "JW" for Jordan-Wigner or "BK" for
-  Bravyi-Kitaev.  The default is Jordan-Wigner.
-- The **`hamiltonian.boson_to_qubit_transform`** option also exists, but currently the only option
-  available (which is the default) is "binary", so this option currently has no effect.
-- The **`hamiltonian.max_bosons_per_state`** option specifies the maximum number of bosons that can
-  exist in a single bosonic state.  Formally an infinite number of bosons is permitted in each
-  bosonic state, but this must be truncated to a finite value for computation.  For encodings such
-  as "binary" that cannot provide an arbitrary upper limit on the number of bosons, this will be
-  rounded up if necessary.  That is, the circuit will be able to represent _at least_ this many
-  bosons per bosonic state.  There is no default value, so if your system contains bosons this
-  option is required.
+- **`fermion_to_qubit_transform`**: Specify "JW" for Jordan-Wigner or "BK" for Bravyi-Kitaev.
+  The default is "JW" (Jordan-Wigner).
+- **`boson_to_qubit_transform`**: Currently the only available option is "binary" (the default),
+  so this setting currently has no effect.
+- **`max_bosons_per_state`**: Specifies the maximum number of bosons that can exist in a single
+  bosonic state.  Formally an infinite number of bosons is permitted in each bosonic state, but
+  this must be truncated to a finite value for computation.  For encodings such as "binary" that
+  cannot provide an arbitrary upper limit on the number of bosons, this will be rounded up if
+  necessary.  That is, the circuit will be able to represent _at least_ this many bosons per
+  bosonic state.  **This parameter is required for systems containing bosons** and has no default
+  value—the script will raise an error if bosons are present and this is not specified.
+
+**Example usage**:
+```python
+hamiltonian.load_numpy("file.npz",
+                       fermion_to_qubit_transform="BK",
+                       boson_to_qubit_transform="binary",
+                       max_bosons_per_state=10)
+```
 
 ### Encoding as a Unitary
 

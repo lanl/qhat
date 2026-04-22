@@ -52,20 +52,33 @@ class HamiltonianConfiguration(ConfigurationBase):
         self.upper_bound = float('inf')
         self.exact_energy_lower_bound = False
         self.exact_energy_upper_bound = False
-        self.fermion_to_qubit_transform = "JW"
-        self.boson_to_qubit_transform = "binary"
+        self.fermion_to_qubit_transform = None
+        self.boson_to_qubit_transform = None
+        self.max_bosons_per_state = None
     def _only_once(self):
         if self.source is not None:
             print("Already set Hamiltonian source to {self.source}.")
             assert self.source is None
-    def load_numpy(self, filename):
+    def load_numpy(self,
+                   filename,
+                   fermion_to_qubit_transform="JW",
+                   boson_to_qubit_transform="binary",
+                   max_bosons_per_state=None):
         self._only_once()
         self.source = "numpy"
         self.filename = filename
-    def load_hdf5(self, filename):
+        self.fermion_to_qubit_transform = fermion_to_qubit_transform
+        self.boson_to_qubit_transform = boson_to_qubit_transform
+        self.max_bosons_per_state = max_bosons_per_state
+    def load_hdf5(self,
+                  filename,
+                  fermion_to_qubit_transform="JW",
+                  boson_to_qubit_transform="binary",
+                  max_bosons_per_state=None):
         self._only_once()
         self.source = "hdf5"
         self.filename = filename
+        self.fermion_to_qubit_transform = fermion_to_qubit_transform
     def set_energy_lower_bound(self, value, exact=False):
         self.lower_bound = value
         self.exact_energy_lower_bound = exact
@@ -76,6 +89,9 @@ class HamiltonianConfiguration(ConfigurationBase):
         table = tomlkit.table()
         table["source"] = self.source
         self.save_if_present(table, "filename")
+        self.save_if_present(table, "fermion_to_qubit_transform")
+        self.save_if_present(table, "boson_to_qubit_transform")
+        self.save_if_present(table, "max_bosons_per_state")
         table["lower_bound"] = self.lower_bound
         table["exact_energy_lower_bound"] = self.exact_energy_lower_bound
         table["upper_bound"] = self.lower_bound
