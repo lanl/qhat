@@ -20,7 +20,7 @@ dependencies = [
     "nevergrad",
     "optuna",
     # Dependencies for fast Trotter error estimation
-    "numba>=0.56.0",  # JIT compilation for jkg_utils_fast.py
+    "numba>=0.56.0",  # JIT compilation for trotter_coefficients_fast.py
 ]
 
 [tool.setuptools.packages.find]
