@@ -52,20 +52,31 @@ class HamiltonianConfiguration(ConfigurationBase):
         self.upper_bound = float('inf')
         self.exact_energy_lower_bound = False
         self.exact_energy_upper_bound = False
-        self.fermion_to_qubit_transform = "JW"
-        self.boson_to_qubit_transform = "binary"
+        self.fermion_to_qubit_transform = None
+        self.boson_to_qubit_transform = None
+        self.max_bosons_per_state = None
     def _only_once(self):
         if self.source is not None:
             print("Already set Hamiltonian source to {self.source}.")
             assert self.source is None
-    def load_numpy(self, filename):
+    def load_second_quantization(self,
+                                 filename,
+                                 fermion_to_qubit_transform="JW",
+                                 boson_to_qubit_transform="binary",
+                                 max_bosons_per_state=None):
         self._only_once()
-        self.source = "numpy"
         self.filename = filename
-    def load_hdf5(self, filename):
-        self._only_once()
-        self.source = "hdf5"
-        self.filename = filename
+        # Auto-detect file format based on extension
+        if filename.endswith('.h5') or filename.endswith('.hdf5'):
+            self.source = "hdf5"
+        elif filename.endswith('.npy') or filename.endswith('.npz'):
+            self.source = "numpy"
+        else:
+            raise ValueError(f"Unable to determine file format from extension: {filename}. "
+                           f"Supported extensions: .h5, .hdf5, .npy, .npz")
+        self.fermion_to_qubit_transform = fermion_to_qubit_transform
+        self.boson_to_qubit_transform = boson_to_qubit_transform
+        self.max_bosons_per_state = max_bosons_per_state
     def set_energy_lower_bound(self, value, exact=False):
         self.lower_bound = value
         self.exact_energy_lower_bound = exact
@@ -76,6 +87,9 @@ class HamiltonianConfiguration(ConfigurationBase):
         table = tomlkit.table()
         table["source"] = self.source
         self.save_if_present(table, "filename")
+        self.save_if_present(table, "fermion_to_qubit_transform")
+        self.save_if_present(table, "boson_to_qubit_transform")
+        self.save_if_present(table, "max_bosons_per_state")
         table["lower_bound"] = self.lower_bound
         table["exact_energy_lower_bound"] = self.exact_energy_lower_bound
         table["upper_bound"] = self.lower_bound
@@ -240,6 +254,7 @@ class GeneralConfiguration:
         self.logger = _configure_log(user_config.logfile, get_log_level(user_config._loglevel))
         self.git_hash = _get_git_hash()
         self.log("\n".join(["", '*' * 99, "QRE_DRIVER START", '*' * 99]))
+        self.log(f"Logfile: {self.logfile}")
         self.log(f"Running script with git hash {self.git_hash}")
     def log(self, *args, **kwargs):
         self.logger.info(*args, **kwargs)

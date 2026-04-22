@@ -14,7 +14,7 @@ general.logfile = "Be-H.log"
 # _________________________________________________________________________________________________
 # hamiltonian
 
-hamiltonian.load_numpy("examples/Be-H_1.30_sto-6g_as-003-003.tensors.npz")
+hamiltonian.load_second_quantization("examples/Be-H_1.30_sto-6g_as-003-003.tensors.npz")
 
 # _________________________________________________________________________________________________
 # unitary encoding

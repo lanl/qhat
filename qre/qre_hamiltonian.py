@@ -176,22 +176,32 @@ def _verify_and_construct_second_quantization(
         Nb = fb.shape[2]
     if bs is None and fb is None:
         H = Hamiltonian(InteractionOperator(f0, f1, f2))
-        H.set_fermionic_mapping(config_hamiltonian.fermion_to_qubit_transform)
         config_general.log(
-                f"fermionic second-quantization Hamiltonian uses {H.num_qubits()} qubits.")
+                f"Fermionic second-quantization Hamiltonian uses {H.num_qubits()} qubits.")
+        H.set_fermionic_mapping(config_hamiltonian.fermion_to_qubit_transform)
+        config_general.log(" ".join(["Mapping fermionic operators to qubit operaturs using",
+                                     f"{config_hamiltonian.fermion_to_qubit_transform} method."]))
         return H
     else:
         assert bs is not None
         assert fb is not None
         assert Nb > 0
         H = Hamiltonian(MixedFermionBosonOperator(f0, f1, f2, bs, fb))
-        H.set_fermionic_mapping(config_hamiltonian.fermion_to_qubit_transform)
-        H.set_bosonic_mapping(
-                config_hamiltonian.boson_to_qubit_transform,
-                config_hamiltonian.max_bosons_per_state)
         config_general.log(" ".join([
             "mixed fermionic-bosonic second-quantization Hamiltonian",
             f"uses {H.num_qubits()} qubits."]))
+        H.set_fermionic_mapping(config_hamiltonian.fermion_to_qubit_transform)
+        config_general.log(" ".join(["Mapping fermionic operators to qubit operaturs using",
+                                     f"{config_hamiltonian.fermion_to_qubit_transform} method."]))
+        if config_hamiltonian.max_bosons_per_state is None:
+            raise ValueError("User did not specify maximum bosons per state.")
+        H.set_bosonic_mapping(
+                config_hamiltonian.boson_to_qubit_transform,
+                config_hamiltonian.max_bosons_per_state)
+        config_general.log(" ".join(["Mapping bosonic operators to qubit operaturs using",
+                                     f"{config_hamiltonian.boson_to_qubit_transform} method",
+                                     f"with {config_hamiltonian.max_bosons_per_state} maximum",
+                                     "bosons per state."]))
         return H
 
 # -------------------------------------------------------------------------------------------------
