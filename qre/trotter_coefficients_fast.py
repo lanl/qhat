@@ -385,6 +385,11 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
         print(f"  Using Monte Carlo estimation (N={N} too large for exact computation)")
 
     # Warmup: trigger Numba JIT compilation before timing
+    # This ensures accurate time budget allocation by moving the one-time compilation
+    # cost (~0.5s) out of the timed loops. Without warmup, the C1 loop would be
+    # penalized by compilation overhead, making time budgets less predictable.
+    # For long runs (60+ seconds), this is negligible, but it improves benchmarking
+    # consistency and ensures fair distribution of time_limit across C1/C21/C22.
     print(f"Warming up Numba JIT compilation...")
     if N >= 2:
         dummy_indices = np.array([[0, 1]], dtype=np.int64)
