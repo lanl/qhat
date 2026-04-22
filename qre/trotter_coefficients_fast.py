@@ -429,8 +429,25 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_
         C1_sum_sq += np.sum(norms**2)
         samples_C1 += batch_size
 
-        # Check convergence if enabled
-        if ENABLE_CONVERGENCE_MONITORING and samples_C1 >= MIN_SAMPLES_FOR_CONVERGENCE:
+        # Track exact values or check convergence (mutually exclusive approaches)
+        if use_exact:
+            # Track exact values
+            for idx in range(len(indices)):
+                i, j = int(indices[idx, 0]), int(indices[idx, 1])
+                pair = (min(i, j), max(i, j))
+                if pair not in seen_c1:
+                    seen_c1.add(pair)
+                    c1_values[pair] = norms[idx]
+
+            # Check if we've seen all pairs
+            if len(seen_c1) == total_c1:
+                C1_exact = sum(c1_values.values())
+                config_general.log(f"  C1 EXACT: All {total_c1} pairs sampled in {time.time() - start_time:.3f}s")
+                config_general.log(f"  C1 exact value: {C1_exact:.6f}")
+                C1_est = C1_exact
+                break
+        elif ENABLE_CONVERGENCE_MONITORING and samples_C1 >= MIN_SAMPLES_FOR_CONVERGENCE:
+            # Check convergence for Monte Carlo estimation
             total_C1_count = N * (N - 1) / 2
             C1_est_current = C1_sum * (total_C1_count / samples_C1)
             # Standard error: SE = std(samples) * sqrt(N_total / N_samples) / sqrt(N_samples)
@@ -447,23 +464,6 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_
                     config_general.log(f"  C1 estimate: {C1_est_current:.6f} ± {se:.6f} (95% CI)")
                     C1_est = C1_est_current
                     break
-
-        # Track exact values if enabled
-        if use_exact:
-            for idx in range(len(indices)):
-                i, j = int(indices[idx, 0]), int(indices[idx, 1])
-                pair = (min(i, j), max(i, j))
-                if pair not in seen_c1:
-                    seen_c1.add(pair)
-                    c1_values[pair] = norms[idx]
-
-            # Check if we've seen all pairs
-            if len(seen_c1) == total_c1:
-                C1_exact = sum(c1_values.values())
-                config_general.log(f"  C1 EXACT: All {total_c1} pairs sampled in {time.time() - start_time:.3f}s")
-                config_general.log(f"  C1 exact value: {C1_exact:.6f}")
-                C1_est = C1_exact
-                break
 
         if time.time() - start_time >= time_limit / 3:
             break
@@ -532,25 +532,9 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_
             C21_sum_sq += np.sum(norms**2)
             samples_C21 += len(indices)
 
-            # Check convergence if enabled
-            if ENABLE_CONVERGENCE_MONITORING and samples_C21 >= MIN_SAMPLES_FOR_CONVERGENCE:
-                total_C21_count = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
-                C21_est_current = C21_sum * (total_C21_count / samples_C21)
-                sample_mean = C21_sum / samples_C21
-                sample_var = (C21_sum_sq / samples_C21) - sample_mean**2
-                if sample_var > 0:
-                    sample_std = np.sqrt(sample_var)
-                    se = sample_std * np.sqrt(total_C21_count / samples_C21) / np.sqrt(samples_C21)
-                    rel_se = se / C21_est_current if C21_est_current > 0 else float('inf')
-
-                    if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
-                        config_general.log(f"  C21 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
-                        config_general.log(f"  C21 estimate: {C21_est_current:.6f} ± {se:.6f} (95% CI)")
-                        C21_est = C21_est_current
-                        break
-
-            # Track exact values if enabled
+            # Track exact values or check convergence (mutually exclusive approaches)
             if use_exact:
+                # Track exact values
                 for idx in range(len(indices)):
                     i, j, k = int(indices[idx, 0]), int(indices[idx, 1]), int(indices[idx, 2])
                     # Canonical form: k is smallest, then sort i and j
@@ -566,6 +550,22 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_
                     config_general.log(f"  C21 exact value: {C21_exact:.6f}")
                     C21_est = C21_exact
                     break
+            elif ENABLE_CONVERGENCE_MONITORING and samples_C21 >= MIN_SAMPLES_FOR_CONVERGENCE:
+                # Check convergence for Monte Carlo estimation
+                total_C21_count = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
+                C21_est_current = C21_sum * (total_C21_count / samples_C21)
+                sample_mean = C21_sum / samples_C21
+                sample_var = (C21_sum_sq / samples_C21) - sample_mean**2
+                if sample_var > 0:
+                    sample_std = np.sqrt(sample_var)
+                    se = sample_std * np.sqrt(total_C21_count / samples_C21) / np.sqrt(samples_C21)
+                    rel_se = se / C21_est_current if C21_est_current > 0 else float('inf')
+
+                    if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
+                        config_general.log(f"  C21 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
+                        config_general.log(f"  C21 estimate: {C21_est_current:.6f} ± {se:.6f} (95% CI)")
+                        C21_est = C21_est_current
+                        break
 
             if time.time() - start_time >= time_limit / 3:
                 break
@@ -616,25 +616,9 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_
         C22_sum_sq += np.sum(norms**2)
         samples_C22 += batch_size
 
-        # Check convergence if enabled
-        if ENABLE_CONVERGENCE_MONITORING and samples_C22 >= MIN_SAMPLES_FOR_CONVERGENCE:
-            total_C22_count = N * (N - 1) / 2
-            C22_est_current = C22_sum * (total_C22_count / samples_C22)
-            sample_mean = C22_sum / samples_C22
-            sample_var = (C22_sum_sq / samples_C22) - sample_mean**2
-            if sample_var > 0:
-                sample_std = np.sqrt(sample_var)
-                se = sample_std * np.sqrt(total_C22_count / samples_C22) / np.sqrt(samples_C22)
-                rel_se = se / C22_est_current if C22_est_current > 0 else float('inf')
-
-                if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
-                    config_general.log(f"  C22 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
-                    config_general.log(f"  C22 estimate: {C22_est_current:.6f} ± {se:.6f} (95% CI)")
-                    C22_est = C22_est_current
-                    break
-
-        # Track exact values if enabled
+        # Track exact values or check convergence (mutually exclusive approaches)
         if use_exact:
+            # Track exact values
             for idx in range(len(indices)):
                 k, j = int(indices[idx, 0]), int(indices[idx, 1])
                 pair = (min(k, j), max(k, j))
@@ -649,6 +633,22 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_
                 config_general.log(f"  C22 exact value: {C22_exact:.6f}")
                 C22_est = C22_exact
                 break
+        elif ENABLE_CONVERGENCE_MONITORING and samples_C22 >= MIN_SAMPLES_FOR_CONVERGENCE:
+            # Check convergence for Monte Carlo estimation
+            total_C22_count = N * (N - 1) / 2
+            C22_est_current = C22_sum * (total_C22_count / samples_C22)
+            sample_mean = C22_sum / samples_C22
+            sample_var = (C22_sum_sq / samples_C22) - sample_mean**2
+            if sample_var > 0:
+                sample_std = np.sqrt(sample_var)
+                se = sample_std * np.sqrt(total_C22_count / samples_C22) / np.sqrt(samples_C22)
+                rel_se = se / C22_est_current if C22_est_current > 0 else float('inf')
+
+                if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
+                    config_general.log(f"  C22 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
+                    config_general.log(f"  C22 estimate: {C22_est_current:.6f} ± {se:.6f} (95% CI)")
+                    C22_est = C22_est_current
+                    break
 
         if time.time() - start_time >= time_limit / 3:
             break
