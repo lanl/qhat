@@ -117,7 +117,7 @@ def compute_nested_commutator_norm(H_outer, inner_operator):
 # --------------------------------------------------
 # Main Monte Carlo estimation
 # --------------------------------------------------
-def trotter_error_estimator(pauli_terms, time_limit, batch_size=100):
+def trotter_error_estimator(pauli_terms, time_limit, config_general, batch_size=100):
     """
     Monte Carlo estimation of Trotter error coefficients.
 
@@ -130,6 +130,12 @@ def trotter_error_estimator(pauli_terms, time_limit, batch_size=100):
       Error ≤ (t³/12) * C21 + (t³/24) * C22, where
       C21 = Σₖ<ᵢ,ₖ<ⱼ ||[Hᵢ, [Hⱼ, Hₖ]]||  (all triples with k < i and k < j)
       C22 = Σₖ<ⱼ ||[Hₖ, [Hₖ, Hⱼ]]||       (all pairs with k < j)
+
+    Args:
+        pauli_terms: List of QubitOperator terms
+        time_limit: Total time limit in seconds
+        config_general: GeneralConfiguration instance for logging
+        batch_size: Number of samples per batch
 
     Returns:
       (C1, C2) where C2 = C21/12 + C22/24
@@ -163,7 +169,7 @@ def trotter_error_estimator(pauli_terms, time_limit, batch_size=100):
             break
     total_C1 = N * (N - 1)/2  # Total number of distinct pairs (i < j)
     C1_est = C1_sum * (total_C1 / samples_C1) if samples_C1 > 0 else 0.0
-    print(f"  C1: {samples_C1} samples")
+    config_general.log_verbose(f"  C1: {samples_C1} samples")
 
     # ---------------------------
     # Estimate C21 = sum_{k<j, k<i} ||[H_i, [H_j, H_k]]||
@@ -196,7 +202,7 @@ def trotter_error_estimator(pauli_terms, time_limit, batch_size=100):
     # Total number of valid triples: for each k, there are C(N-k-1, 2) choices of (i,j).
     total_C21 = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
     C21_est = C21_sum * (total_C21 / samples_C21) if samples_C21 > 0 else 0.0
-    print(f"  C21: {samples_C21} samples")
+    config_general.log_verbose(f"  C21: {samples_C21} samples")
 
     # ---------------------------
     # Estimate C22 = sum_{k<j} ||[H_k, [H_k, H_j]]||
@@ -224,7 +230,7 @@ def trotter_error_estimator(pauli_terms, time_limit, batch_size=100):
             break
     total_C22 = N * (N - 1) / 2  # Total number of (k, j) pairs with k < j
     C22_est = C22_sum * (total_C22 / samples_C22) if samples_C22 > 0 else 0.0
-    print(f"  C22: {samples_C22} samples")
+    config_general.log_verbose(f"  C22: {samples_C22} samples")
 
     # ---------------------------
     # Final output

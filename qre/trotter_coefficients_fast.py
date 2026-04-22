@@ -329,7 +329,7 @@ def should_use_exact_tracking(N, time_budget=None, memory_limit_mb=None):
     return True
 
 
-def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
+def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_size=10000):
     """
     Fast Monte Carlo estimation of nested commutator norms with exact computation for small systems.
 
@@ -353,6 +353,7 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
     Args:
         pauli_terms: List of QubitOperator terms
         time_limit: Total time limit in seconds
+        config_general: GeneralConfiguration instance for logging
         batch_size: Number of samples per batch (larger = better parallelization)
 
     Returns:
@@ -361,15 +362,15 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
     """
     N = len(pauli_terms)
 
-    print(f"Preprocessing {N} Pauli terms...")
+    config_general.log(f"Preprocessing {N} Pauli terms...")
     start_prep = time.time()
     x_bits, z_bits, coeffs, n_qubits = preprocess_pauli_terms(pauli_terms)
-    print(f"  Preprocessing done in {time.time() - start_prep:.3f}s ({n_qubits} qubits)")
+    config_general.log_verbose(f"  Preprocessing done in {time.time() - start_prep:.3f}s ({n_qubits} qubits)")
 
     # Check if exact computation is feasible
     use_exact = should_use_exact_tracking(N, time_limit)
     if use_exact:
-        print(f"  Exact computation is feasible for N={N} - enabling tracking")
+        config_general.log(f"  Exact computation is feasible for N={N} - enabling tracking")
         seen_c1 = set()
         seen_c21 = set()
         seen_c22 = set()
@@ -382,7 +383,7 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
         total_c21 = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
         total_c22 = N * (N - 1) // 2
     else:
-        print(f"  Using Monte Carlo estimation (N={N} too large for exact computation)")
+        config_general.log(f"  Using Monte Carlo estimation (N={N} too large for exact computation)")
 
     # Warmup: trigger Numba JIT compilation before timing
     # This ensures accurate time budget allocation by moving the one-time compilation
@@ -390,7 +391,7 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
     # penalized by compilation overhead, making time budgets less predictable.
     # For long runs (60+ seconds), this is negligible, but it improves benchmarking
     # consistency and ensures fair distribution of time_limit across C1/C21/C22.
-    print(f"Warming up Numba JIT compilation...")
+    config_general.log_verbose(f"Warming up Numba JIT compilation...")
     if N >= 2:
         dummy_indices = np.array([[0, 1]], dtype=np.int64)
         batch_compute_C1(x_bits, z_bits, coeffs, dummy_indices, N)
@@ -398,12 +399,12 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
             dummy_indices_3 = np.array([[0, 1, 2]], dtype=np.int64)
             batch_compute_C21(x_bits, z_bits, coeffs, dummy_indices_3, N)
             batch_compute_C22(x_bits, z_bits, coeffs, dummy_indices[:, [0, 1]], N)
-    print(f"  Warmup complete")
+    config_general.log_verbose(f"  Warmup complete")
 
     # ---------------------------
     # Estimate C1 = sum_{i<j} ||[H_i, H_j]||
     # ---------------------------
-    print(f"Estimating C1 with batch_size={batch_size}...")
+    config_general.log_verbose(f"Estimating C1 with batch_size={batch_size}...")
     C1_sum = 0.0
     C1_sum_sq = 0.0  # For variance calculation
     samples_C1 = 0
@@ -438,8 +439,8 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
 
                 # Check if converged
                 if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
-                    print(f"  C1 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
-                    print(f"  C1 estimate: {C1_est_current:.6f} ± {se:.6f} (95% CI)")
+                    config_general.log(f"  C1 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
+                    config_general.log(f"  C1 estimate: {C1_est_current:.6f} ± {se:.6f} (95% CI)")
                     C1_est = C1_est_current
                     break
 
@@ -455,8 +456,8 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
             # Check if we've seen all pairs
             if len(seen_c1) == total_c1:
                 C1_exact = sum(c1_values.values())
-                print(f"  C1 EXACT: All {total_c1} pairs sampled in {time.time() - start_time:.3f}s")
-                print(f"  C1 exact value: {C1_exact:.6f}")
+                config_general.log(f"  C1 EXACT: All {total_c1} pairs sampled in {time.time() - start_time:.3f}s")
+                config_general.log(f"  C1 exact value: {C1_exact:.6f}")
                 C1_est = C1_exact
                 break
 
@@ -466,7 +467,7 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
     if not use_exact or len(seen_c1) < total_c1:
         total_C1 = N * (N - 1) / 2
         C1_est = C1_sum * (total_C1 / samples_C1) if samples_C1 > 0 else 0.0
-        print(f"  C1 estimation: {samples_C1} samples in {time.time() - start_time:.3f}s")
+        config_general.log_verbose(f"  C1 estimation: {samples_C1} samples in {time.time() - start_time:.3f}s")
 
         # Report standard error if convergence monitoring enabled
         if ENABLE_CONVERGENCE_MONITORING and samples_C1 > 0:
@@ -476,19 +477,19 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
                 sample_std = np.sqrt(sample_var)
                 se = sample_std * np.sqrt(total_C1 / samples_C1) / np.sqrt(samples_C1)
                 rel_se = se / C1_est if C1_est > 0 else float('inf')
-                print(f"  C1 estimate: {C1_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
+                config_general.log(f"  C1 estimate: {C1_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
             else:
-                print(f"  C1 estimate: {C1_est:.6f}")
+                config_general.log(f"  C1 estimate: {C1_est:.6f}")
         else:
-            print(f"  C1 estimate: {C1_est:.6f}")
+            config_general.log(f"  C1 estimate: {C1_est:.6f}")
 
         if use_exact:
-            print(f"    (Sampled {len(seen_c1)}/{total_c1} unique pairs, {100*len(seen_c1)/total_c1:.1f}% coverage)")
+            config_general.log_verbose(f"    (Sampled {len(seen_c1)}/{total_c1} unique pairs, {100*len(seen_c1)/total_c1:.1f}% coverage)")
 
     # ---------------------------
     # Estimate C21 = sum_{k<j, k<i} ||[H_i, [H_j, H_k]]||
     # ---------------------------
-    print(f"Estimating C21 with batch_size={batch_size}...")
+    config_general.log_verbose(f"Estimating C21 with batch_size={batch_size}...")
     C21_sum = 0.0
     C21_sum_sq = 0.0  # For variance calculation
     samples_C21 = 0
@@ -534,8 +535,8 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
                 rel_se = se / C21_est_current if C21_est_current > 0 else float('inf')
 
                 if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
-                    print(f"  C21 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
-                    print(f"  C21 estimate: {C21_est_current:.6f} ± {se:.6f} (95% CI)")
+                    config_general.log(f"  C21 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
+                    config_general.log(f"  C21 estimate: {C21_est_current:.6f} ± {se:.6f} (95% CI)")
                     C21_est = C21_est_current
                     break
 
@@ -552,8 +553,8 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
             # Check if we've seen all triples
             if len(seen_c21) == total_c21:
                 C21_exact = sum(c21_values.values())
-                print(f"  C21 EXACT: All {total_c21} triples sampled in {time.time() - start_time:.3f}s")
-                print(f"  C21 exact value: {C21_exact:.6f}")
+                config_general.log(f"  C21 EXACT: All {total_c21} triples sampled in {time.time() - start_time:.3f}s")
+                config_general.log(f"  C21 exact value: {C21_exact:.6f}")
                 C21_est = C21_exact
                 break
 
@@ -563,7 +564,7 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
     if not use_exact or len(seen_c21) < total_c21:
         total_C21 = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
         C21_est = C21_sum * (total_C21 / samples_C21) if samples_C21 > 0 else 0.0
-        print(f"  C21 estimation: {samples_C21} samples in {time.time() - start_time:.3f}s")
+        config_general.log_verbose(f"  C21 estimation: {samples_C21} samples in {time.time() - start_time:.3f}s")
 
         # Report standard error if convergence monitoring enabled
         if ENABLE_CONVERGENCE_MONITORING and samples_C21 > 0:
@@ -573,19 +574,19 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
                 sample_std = np.sqrt(sample_var)
                 se = sample_std * np.sqrt(total_C21 / samples_C21) / np.sqrt(samples_C21)
                 rel_se = se / C21_est if C21_est > 0 else float('inf')
-                print(f"  C21 estimate: {C21_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
+                config_general.log(f"  C21 estimate: {C21_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
             else:
-                print(f"  C21 estimate: {C21_est:.6f}")
+                config_general.log(f"  C21 estimate: {C21_est:.6f}")
         else:
-            print(f"  C21 estimate: {C21_est:.6f}")
+            config_general.log(f"  C21 estimate: {C21_est:.6f}")
 
         if use_exact:
-            print(f"    (Sampled {len(seen_c21)}/{total_c21} unique triples, {100*len(seen_c21)/total_c21:.1f}% coverage)")
+            config_general.log_verbose(f"    (Sampled {len(seen_c21)}/{total_c21} unique triples, {100*len(seen_c21)/total_c21:.1f}% coverage)")
 
     # ---------------------------
     # Estimate C22 = sum_{k<j} ||[H_k, [H_k, H_j]]||
     # ---------------------------
-    print(f"Estimating C22 with batch_size={batch_size}...")
+    config_general.log_verbose(f"Estimating C22 with batch_size={batch_size}...")
     C22_sum = 0.0
     C22_sum_sq = 0.0  # For variance calculation
     samples_C22 = 0
@@ -618,8 +619,8 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
                 rel_se = se / C22_est_current if C22_est_current > 0 else float('inf')
 
                 if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
-                    print(f"  C22 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
-                    print(f"  C22 estimate: {C22_est_current:.6f} ± {se:.6f} (95% CI)")
+                    config_general.log(f"  C22 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
+                    config_general.log(f"  C22 estimate: {C22_est_current:.6f} ± {se:.6f} (95% CI)")
                     C22_est = C22_est_current
                     break
 
@@ -635,8 +636,8 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
             # Check if we've seen all pairs
             if len(seen_c22) == total_c22:
                 C22_exact = sum(c22_values.values())
-                print(f"  C22 EXACT: All {total_c22} pairs sampled in {time.time() - start_time:.3f}s")
-                print(f"  C22 exact value: {C22_exact:.6f}")
+                config_general.log(f"  C22 EXACT: All {total_c22} pairs sampled in {time.time() - start_time:.3f}s")
+                config_general.log(f"  C22 exact value: {C22_exact:.6f}")
                 C22_est = C22_exact
                 break
 
@@ -646,7 +647,7 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
     if not use_exact or len(seen_c22) < total_c22:
         total_C22 = N * (N - 1) / 2
         C22_est = C22_sum * (total_C22 / samples_C22) if samples_C22 > 0 else 0.0
-        print(f"  C22 estimation: {samples_C22} samples in {time.time() - start_time:.3f}s")
+        config_general.log_verbose(f"  C22 estimation: {samples_C22} samples in {time.time() - start_time:.3f}s")
 
         # Report standard error if convergence monitoring enabled
         if ENABLE_CONVERGENCE_MONITORING and samples_C22 > 0:
@@ -656,26 +657,21 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, batch_size=10000):
                 sample_std = np.sqrt(sample_var)
                 se = sample_std * np.sqrt(total_C22 / samples_C22) / np.sqrt(samples_C22)
                 rel_se = se / C22_est if C22_est > 0 else float('inf')
-                print(f"  C22 estimate: {C22_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
+                config_general.log(f"  C22 estimate: {C22_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
             else:
-                print(f"  C22 estimate: {C22_est:.6f}")
+                config_general.log(f"  C22 estimate: {C22_est:.6f}")
         else:
-            print(f"  C22 estimate: {C22_est:.6f}")
+            config_general.log(f"  C22 estimate: {C22_est:.6f}")
 
         if use_exact:
-            print(f"    (Sampled {len(seen_c22)}/{total_c22} unique pairs, {100*len(seen_c22)/total_c22:.1f}% coverage)")
+            config_general.log_verbose(f"    (Sampled {len(seen_c22)}/{total_c22} unique pairs, {100*len(seen_c22)/total_c22:.1f}% coverage)")
 
     # ---------------------------
     # Final output
     # ---------------------------
     # Check if we achieved exact computation
     if use_exact and len(seen_c1) == total_c1 and len(seen_c21) == total_c21 and len(seen_c22) == total_c22:
-        print("\n" + "="*70)
-        print("✅ EXACT COMPUTATION ACHIEVED")
-        print(f"   All {total_c1} C1 pairs sampled")
-        print(f"   All {total_c21} C21 triples sampled")
-        print(f"   All {total_c22} C22 pairs sampled")
-        print("="*70)
+        config_general.log(f"Exact computation achieved: all {total_c1} C1 + {total_c21} C21 + {total_c22} C22 terms sampled")
 
     # Return C1 and C2 as defined in Childs et al. (arXiv:1912.08854v3)
     # C1 is divided by 2 as per the convention (see VERIFICATION_OF_USER_FIX.md)
