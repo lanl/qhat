@@ -404,267 +404,282 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_
     # ---------------------------
     # Estimate C1 = sum_{i<j} ||[H_i, H_j]||
     # ---------------------------
-    config_general.log_verbose(f"Estimating C1 with batch_size={batch_size}...")
-    C1_sum = 0.0
-    C1_sum_sq = 0.0  # For variance calculation
-    samples_C1 = 0
-    start_time = time.time()
+    # C1 requires at least 2 terms to have pairs
+    if N < 2:
+        config_general.log_verbose(f"Skipping C1 (N={N} < 2, no valid pairs)")
+        C1_est = 0.0
+    else:
+        config_general.log_verbose(f"Estimating C1 with batch_size={batch_size}...")
+        C1_sum = 0.0
+        C1_sum_sq = 0.0  # For variance calculation
+        samples_C1 = 0
+        start_time = time.time()
 
-    while time.time() - start_time < time_limit / 3:
-        # Generate random pairs in batch
-        i_vals = np.random.randint(0, N, size=batch_size)
-        j_vals = np.random.randint(0, N - 1, size=batch_size)
-        j_vals = np.where(j_vals >= i_vals, j_vals + 1, j_vals)
+        while time.time() - start_time < time_limit / 3:
+            # Generate random pairs in batch
+            i_vals = np.random.randint(0, N, size=batch_size)
+            j_vals = np.random.randint(0, N - 1, size=batch_size)
+            j_vals = np.where(j_vals >= i_vals, j_vals + 1, j_vals)
 
-        indices = np.column_stack([i_vals, j_vals])
+            indices = np.column_stack([i_vals, j_vals])
 
-        # Compute norms in parallel
-        norms = batch_compute_C1(x_bits, z_bits, coeffs, indices, N)
+            # Compute norms in parallel
+            norms = batch_compute_C1(x_bits, z_bits, coeffs, indices, N)
 
-        C1_sum += np.sum(norms)
-        C1_sum_sq += np.sum(norms**2)
-        samples_C1 += batch_size
+            C1_sum += np.sum(norms)
+            C1_sum_sq += np.sum(norms**2)
+            samples_C1 += batch_size
 
-        # Check convergence if enabled
-        if ENABLE_CONVERGENCE_MONITORING and samples_C1 >= MIN_SAMPLES_FOR_CONVERGENCE:
-            total_C1_count = N * (N - 1) / 2
-            C1_est_current = C1_sum * (total_C1_count / samples_C1)
-            # Standard error: SE = std(samples) * sqrt(N_total / N_samples) / sqrt(N_samples)
-            sample_mean = C1_sum / samples_C1
-            sample_var = (C1_sum_sq / samples_C1) - sample_mean**2
-            if sample_var > 0:
-                sample_std = np.sqrt(sample_var)
-                se = sample_std * np.sqrt(total_C1_count / samples_C1) / np.sqrt(samples_C1)
-                rel_se = se / C1_est_current if C1_est_current > 0 else float('inf')
+            # Check convergence if enabled
+            if ENABLE_CONVERGENCE_MONITORING and samples_C1 >= MIN_SAMPLES_FOR_CONVERGENCE:
+                total_C1_count = N * (N - 1) / 2
+                C1_est_current = C1_sum * (total_C1_count / samples_C1)
+                # Standard error: SE = std(samples) * sqrt(N_total / N_samples) / sqrt(N_samples)
+                sample_mean = C1_sum / samples_C1
+                sample_var = (C1_sum_sq / samples_C1) - sample_mean**2
+                if sample_var > 0:
+                    sample_std = np.sqrt(sample_var)
+                    se = sample_std * np.sqrt(total_C1_count / samples_C1) / np.sqrt(samples_C1)
+                    rel_se = se / C1_est_current if C1_est_current > 0 else float('inf')
 
-                # Check if converged
-                if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
-                    config_general.log(f"  C1 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
-                    config_general.log(f"  C1 estimate: {C1_est_current:.6f} ± {se:.6f} (95% CI)")
-                    C1_est = C1_est_current
+                    # Check if converged
+                    if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
+                        config_general.log(f"  C1 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
+                        config_general.log(f"  C1 estimate: {C1_est_current:.6f} ± {se:.6f} (95% CI)")
+                        C1_est = C1_est_current
+                        break
+
+            # Track exact values if enabled
+            if use_exact:
+                for idx in range(len(indices)):
+                    i, j = int(indices[idx, 0]), int(indices[idx, 1])
+                    pair = (min(i, j), max(i, j))
+                    if pair not in seen_c1:
+                        seen_c1.add(pair)
+                        c1_values[pair] = norms[idx]
+
+                # Check if we've seen all pairs
+                if len(seen_c1) == total_c1:
+                    C1_exact = sum(c1_values.values())
+                    config_general.log(f"  C1 EXACT: All {total_c1} pairs sampled in {time.time() - start_time:.3f}s")
+                    config_general.log(f"  C1 exact value: {C1_exact:.6f}")
+                    C1_est = C1_exact
                     break
 
-        # Track exact values if enabled
-        if use_exact:
-            for idx in range(len(indices)):
-                i, j = int(indices[idx, 0]), int(indices[idx, 1])
-                pair = (min(i, j), max(i, j))
-                if pair not in seen_c1:
-                    seen_c1.add(pair)
-                    c1_values[pair] = norms[idx]
-
-            # Check if we've seen all pairs
-            if len(seen_c1) == total_c1:
-                C1_exact = sum(c1_values.values())
-                config_general.log(f"  C1 EXACT: All {total_c1} pairs sampled in {time.time() - start_time:.3f}s")
-                config_general.log(f"  C1 exact value: {C1_exact:.6f}")
-                C1_est = C1_exact
+            if time.time() - start_time >= time_limit / 3:
                 break
 
-        if time.time() - start_time >= time_limit / 3:
-            break
+        if not use_exact or len(seen_c1) < total_c1:
+            total_C1 = N * (N - 1) / 2
+            C1_est = C1_sum * (total_C1 / samples_C1) if samples_C1 > 0 else 0.0
+            config_general.log_verbose(f"  C1 estimation: {samples_C1} samples in {time.time() - start_time:.3f}s")
 
-    if not use_exact or len(seen_c1) < total_c1:
-        total_C1 = N * (N - 1) / 2
-        C1_est = C1_sum * (total_C1 / samples_C1) if samples_C1 > 0 else 0.0
-        config_general.log_verbose(f"  C1 estimation: {samples_C1} samples in {time.time() - start_time:.3f}s")
-
-        # Report standard error if convergence monitoring enabled
-        if ENABLE_CONVERGENCE_MONITORING and samples_C1 > 0:
-            sample_mean = C1_sum / samples_C1
-            sample_var = (C1_sum_sq / samples_C1) - sample_mean**2
-            if sample_var > 0:
-                sample_std = np.sqrt(sample_var)
-                se = sample_std * np.sqrt(total_C1 / samples_C1) / np.sqrt(samples_C1)
-                rel_se = se / C1_est if C1_est > 0 else float('inf')
-                config_general.log(f"  C1 estimate: {C1_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
+            # Report standard error if convergence monitoring enabled
+            if ENABLE_CONVERGENCE_MONITORING and samples_C1 > 0:
+                sample_mean = C1_sum / samples_C1
+                sample_var = (C1_sum_sq / samples_C1) - sample_mean**2
+                if sample_var > 0:
+                    sample_std = np.sqrt(sample_var)
+                    se = sample_std * np.sqrt(total_C1 / samples_C1) / np.sqrt(samples_C1)
+                    rel_se = se / C1_est if C1_est > 0 else float('inf')
+                    config_general.log(f"  C1 estimate: {C1_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
+                else:
+                    config_general.log(f"  C1 estimate: {C1_est:.6f}")
             else:
                 config_general.log(f"  C1 estimate: {C1_est:.6f}")
-        else:
-            config_general.log(f"  C1 estimate: {C1_est:.6f}")
 
-        if use_exact:
-            config_general.log_verbose(f"    (Sampled {len(seen_c1)}/{total_c1} unique pairs, {100*len(seen_c1)/total_c1:.1f}% coverage)")
+            if use_exact:
+                config_general.log_verbose(f"    (Sampled {len(seen_c1)}/{total_c1} unique pairs, {100*len(seen_c1)/total_c1:.1f}% coverage)")
 
     # ---------------------------
     # Estimate C21 = sum_{k<j, k<i} ||[H_i, [H_j, H_k]]||
     # ---------------------------
-    config_general.log_verbose(f"Estimating C21 with batch_size={batch_size}...")
-    C21_sum = 0.0
-    C21_sum_sq = 0.0  # For variance calculation
-    samples_C21 = 0
-    start_time = time.time()
+    # C21 requires at least 3 terms (k < i and k < j with all distinct)
+    if N < 3:
+        config_general.log_verbose(f"Skipping C21 (N={N} < 3, no valid triples)")
+        C21_est = 0.0
+    else:
+        config_general.log_verbose(f"Estimating C21 with batch_size={batch_size}...")
+        C21_sum = 0.0
+        C21_sum_sq = 0.0  # For variance calculation
+        samples_C21 = 0
+        start_time = time.time()
 
-    while time.time() - start_time < time_limit / 3:
-        # Generate random triples (i, j, k) with k < i and k < j
-        # Only sample k values that allow at least 2 choices above them
-        k_vals = np.random.randint(0, max(1, N - 2), size=batch_size)
+        while time.time() - start_time < time_limit / 3:
+            # Generate random triples (i, j, k) with k < i and k < j
+            # Only sample k values that allow at least 2 choices above them
+            k_vals = np.random.randint(0, max(1, N - 2), size=batch_size)
 
-        # For each k, sample two distinct indices from {k+1, ..., N-1}
-        # Vectorized approach: sample i and j independently, then ensure distinctness
-        valid_ranges = N - k_vals - 1
+            # For each k, sample two distinct indices from {k+1, ..., N-1}
+            # Vectorized approach: sample i and j independently, then ensure distinctness
+            valid_ranges = N - k_vals - 1
 
-        # Sample first index i from [k+1, N)
-        i_offsets = np.random.randint(0, valid_ranges, dtype=np.int64)
-        i_vals = k_vals + 1 + i_offsets
+            # Sample first index i from [k+1, N)
+            i_offsets = np.random.randint(0, valid_ranges, dtype=np.int64)
+            i_vals = k_vals + 1 + i_offsets
 
-        # Sample second index j from [k+1, N) \ {i}
-        # Use rejection sampling trick: sample from [0, valid_range-1), then adjust
-        j_offsets = np.random.randint(0, valid_ranges - 1, dtype=np.int64)
-        j_offsets = np.where(j_offsets >= i_offsets, j_offsets + 1, j_offsets)
-        j_vals = k_vals + 1 + j_offsets
+            # Sample second index j from [k+1, N) \ {i}
+            # Use rejection sampling trick: sample from [0, valid_range-1), then adjust
+            j_offsets = np.random.randint(0, valid_ranges - 1, dtype=np.int64)
+            j_offsets = np.where(j_offsets >= i_offsets, j_offsets + 1, j_offsets)
+            j_vals = k_vals + 1 + j_offsets
 
-        indices = np.column_stack([i_vals, j_vals, k_vals])
+            indices = np.column_stack([i_vals, j_vals, k_vals])
 
-        # Compute nested norms in parallel
-        norms = batch_compute_C21(x_bits, z_bits, coeffs, indices, N)
+            # Compute nested norms in parallel
+            norms = batch_compute_C21(x_bits, z_bits, coeffs, indices, N)
 
-        C21_sum += np.sum(norms)
-        C21_sum_sq += np.sum(norms**2)
-        samples_C21 += len(indices)
+            C21_sum += np.sum(norms)
+            C21_sum_sq += np.sum(norms**2)
+            samples_C21 += len(indices)
 
-        # Check convergence if enabled
-        if ENABLE_CONVERGENCE_MONITORING and samples_C21 >= MIN_SAMPLES_FOR_CONVERGENCE:
-            total_C21_count = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
-            C21_est_current = C21_sum * (total_C21_count / samples_C21)
-            sample_mean = C21_sum / samples_C21
-            sample_var = (C21_sum_sq / samples_C21) - sample_mean**2
-            if sample_var > 0:
-                sample_std = np.sqrt(sample_var)
-                se = sample_std * np.sqrt(total_C21_count / samples_C21) / np.sqrt(samples_C21)
-                rel_se = se / C21_est_current if C21_est_current > 0 else float('inf')
+            # Check convergence if enabled
+            if ENABLE_CONVERGENCE_MONITORING and samples_C21 >= MIN_SAMPLES_FOR_CONVERGENCE:
+                total_C21_count = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
+                C21_est_current = C21_sum * (total_C21_count / samples_C21)
+                sample_mean = C21_sum / samples_C21
+                sample_var = (C21_sum_sq / samples_C21) - sample_mean**2
+                if sample_var > 0:
+                    sample_std = np.sqrt(sample_var)
+                    se = sample_std * np.sqrt(total_C21_count / samples_C21) / np.sqrt(samples_C21)
+                    rel_se = se / C21_est_current if C21_est_current > 0 else float('inf')
 
-                if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
-                    config_general.log(f"  C21 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
-                    config_general.log(f"  C21 estimate: {C21_est_current:.6f} ± {se:.6f} (95% CI)")
-                    C21_est = C21_est_current
+                    if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
+                        config_general.log(f"  C21 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
+                        config_general.log(f"  C21 estimate: {C21_est_current:.6f} ± {se:.6f} (95% CI)")
+                        C21_est = C21_est_current
+                        break
+
+            # Track exact values if enabled
+            if use_exact:
+                for idx in range(len(indices)):
+                    i, j, k = int(indices[idx, 0]), int(indices[idx, 1]), int(indices[idx, 2])
+                    # Canonical form: k is smallest, then sort i and j
+                    triple = (k, min(i, j), max(i, j))
+                    if triple not in seen_c21:
+                        seen_c21.add(triple)
+                        c21_values[triple] = norms[idx]
+
+                # Check if we've seen all triples
+                if len(seen_c21) == total_c21:
+                    C21_exact = sum(c21_values.values())
+                    config_general.log(f"  C21 EXACT: All {total_c21} triples sampled in {time.time() - start_time:.3f}s")
+                    config_general.log(f"  C21 exact value: {C21_exact:.6f}")
+                    C21_est = C21_exact
                     break
 
-        # Track exact values if enabled
-        if use_exact:
-            for idx in range(len(indices)):
-                i, j, k = int(indices[idx, 0]), int(indices[idx, 1]), int(indices[idx, 2])
-                # Canonical form: k is smallest, then sort i and j
-                triple = (k, min(i, j), max(i, j))
-                if triple not in seen_c21:
-                    seen_c21.add(triple)
-                    c21_values[triple] = norms[idx]
-
-            # Check if we've seen all triples
-            if len(seen_c21) == total_c21:
-                C21_exact = sum(c21_values.values())
-                config_general.log(f"  C21 EXACT: All {total_c21} triples sampled in {time.time() - start_time:.3f}s")
-                config_general.log(f"  C21 exact value: {C21_exact:.6f}")
-                C21_est = C21_exact
+            if time.time() - start_time >= time_limit / 3:
                 break
 
-        if time.time() - start_time >= time_limit / 3:
-            break
+        if not use_exact or len(seen_c21) < total_c21:
+            total_C21 = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
+            C21_est = C21_sum * (total_C21 / samples_C21) if samples_C21 > 0 else 0.0
+            config_general.log_verbose(f"  C21 estimation: {samples_C21} samples in {time.time() - start_time:.3f}s")
 
-    if not use_exact or len(seen_c21) < total_c21:
-        total_C21 = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
-        C21_est = C21_sum * (total_C21 / samples_C21) if samples_C21 > 0 else 0.0
-        config_general.log_verbose(f"  C21 estimation: {samples_C21} samples in {time.time() - start_time:.3f}s")
-
-        # Report standard error if convergence monitoring enabled
-        if ENABLE_CONVERGENCE_MONITORING and samples_C21 > 0:
-            sample_mean = C21_sum / samples_C21
-            sample_var = (C21_sum_sq / samples_C21) - sample_mean**2
-            if sample_var > 0:
-                sample_std = np.sqrt(sample_var)
-                se = sample_std * np.sqrt(total_C21 / samples_C21) / np.sqrt(samples_C21)
-                rel_se = se / C21_est if C21_est > 0 else float('inf')
-                config_general.log(f"  C21 estimate: {C21_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
+            # Report standard error if convergence monitoring enabled
+            if ENABLE_CONVERGENCE_MONITORING and samples_C21 > 0:
+                sample_mean = C21_sum / samples_C21
+                sample_var = (C21_sum_sq / samples_C21) - sample_mean**2
+                if sample_var > 0:
+                    sample_std = np.sqrt(sample_var)
+                    se = sample_std * np.sqrt(total_C21 / samples_C21) / np.sqrt(samples_C21)
+                    rel_se = se / C21_est if C21_est > 0 else float('inf')
+                    config_general.log(f"  C21 estimate: {C21_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
+                else:
+                    config_general.log(f"  C21 estimate: {C21_est:.6f}")
             else:
                 config_general.log(f"  C21 estimate: {C21_est:.6f}")
-        else:
-            config_general.log(f"  C21 estimate: {C21_est:.6f}")
 
-        if use_exact:
-            config_general.log_verbose(f"    (Sampled {len(seen_c21)}/{total_c21} unique triples, {100*len(seen_c21)/total_c21:.1f}% coverage)")
+            if use_exact:
+                config_general.log_verbose(f"    (Sampled {len(seen_c21)}/{total_c21} unique triples, {100*len(seen_c21)/total_c21:.1f}% coverage)")
 
     # ---------------------------
     # Estimate C22 = sum_{k<j} ||[H_k, [H_k, H_j]]||
     # ---------------------------
-    config_general.log_verbose(f"Estimating C22 with batch_size={batch_size}...")
-    C22_sum = 0.0
-    C22_sum_sq = 0.0  # For variance calculation
-    samples_C22 = 0
-    start_time = time.time()
+    # C22 requires at least 2 terms (k < j with both distinct)
+    if N < 2:
+        config_general.log_verbose(f"Skipping C22 (N={N} < 2, no valid pairs)")
+        C22_est = 0.0
+    else:
+        config_general.log_verbose(f"Estimating C22 with batch_size={batch_size}...")
+        C22_sum = 0.0
+        C22_sum_sq = 0.0  # For variance calculation
+        samples_C22 = 0
+        start_time = time.time()
 
-    while time.time() - start_time < time_limit / 3:
-        # Generate random pairs (k, j) with k < j
-        k_vals = np.random.randint(0, max(1, N - 1), size=batch_size)
-        # Vectorized: for each k, sample j from [k+1, N)
-        j_vals = k_vals + 1 + np.random.randint(0, N - 1 - k_vals, dtype=np.int64)
+        while time.time() - start_time < time_limit / 3:
+            # Generate random pairs (k, j) with k < j
+            k_vals = np.random.randint(0, max(1, N - 1), size=batch_size)
+            # Vectorized: for each k, sample j from [k+1, N)
+            j_vals = k_vals + 1 + np.random.randint(0, N - 1 - k_vals, dtype=np.int64)
 
-        indices = np.column_stack([k_vals, j_vals])
+            indices = np.column_stack([k_vals, j_vals])
 
-        # Compute nested norms in parallel
-        norms = batch_compute_C22(x_bits, z_bits, coeffs, indices, N)
+            # Compute nested norms in parallel
+            norms = batch_compute_C22(x_bits, z_bits, coeffs, indices, N)
 
-        C22_sum += np.sum(norms)
-        C22_sum_sq += np.sum(norms**2)
-        samples_C22 += batch_size
+            C22_sum += np.sum(norms)
+            C22_sum_sq += np.sum(norms**2)
+            samples_C22 += batch_size
 
-        # Check convergence if enabled
-        if ENABLE_CONVERGENCE_MONITORING and samples_C22 >= MIN_SAMPLES_FOR_CONVERGENCE:
-            total_C22_count = N * (N - 1) / 2
-            C22_est_current = C22_sum * (total_C22_count / samples_C22)
-            sample_mean = C22_sum / samples_C22
-            sample_var = (C22_sum_sq / samples_C22) - sample_mean**2
-            if sample_var > 0:
-                sample_std = np.sqrt(sample_var)
-                se = sample_std * np.sqrt(total_C22_count / samples_C22) / np.sqrt(samples_C22)
-                rel_se = se / C22_est_current if C22_est_current > 0 else float('inf')
+            # Check convergence if enabled
+            if ENABLE_CONVERGENCE_MONITORING and samples_C22 >= MIN_SAMPLES_FOR_CONVERGENCE:
+                total_C22_count = N * (N - 1) / 2
+                C22_est_current = C22_sum * (total_C22_count / samples_C22)
+                sample_mean = C22_sum / samples_C22
+                sample_var = (C22_sum_sq / samples_C22) - sample_mean**2
+                if sample_var > 0:
+                    sample_std = np.sqrt(sample_var)
+                    se = sample_std * np.sqrt(total_C22_count / samples_C22) / np.sqrt(samples_C22)
+                    rel_se = se / C22_est_current if C22_est_current > 0 else float('inf')
 
-                if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
-                    config_general.log(f"  C22 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
-                    config_general.log(f"  C22 estimate: {C22_est_current:.6f} ± {se:.6f} (95% CI)")
-                    C22_est = C22_est_current
+                    if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
+                        config_general.log(f"  C22 CONVERGED: SE/mean = {rel_se:.4f} < {CONVERGENCE_THRESHOLD:.4f}")
+                        config_general.log(f"  C22 estimate: {C22_est_current:.6f} ± {se:.6f} (95% CI)")
+                        C22_est = C22_est_current
+                        break
+
+            # Track exact values if enabled
+            if use_exact:
+                for idx in range(len(indices)):
+                    k, j = int(indices[idx, 0]), int(indices[idx, 1])
+                    pair = (min(k, j), max(k, j))
+                    if pair not in seen_c22:
+                        seen_c22.add(pair)
+                        c22_values[pair] = norms[idx]
+
+                # Check if we've seen all pairs
+                if len(seen_c22) == total_c22:
+                    C22_exact = sum(c22_values.values())
+                    config_general.log(f"  C22 EXACT: All {total_c22} pairs sampled in {time.time() - start_time:.3f}s")
+                    config_general.log(f"  C22 exact value: {C22_exact:.6f}")
+                    C22_est = C22_exact
                     break
 
-        # Track exact values if enabled
-        if use_exact:
-            for idx in range(len(indices)):
-                k, j = int(indices[idx, 0]), int(indices[idx, 1])
-                pair = (min(k, j), max(k, j))
-                if pair not in seen_c22:
-                    seen_c22.add(pair)
-                    c22_values[pair] = norms[idx]
-
-            # Check if we've seen all pairs
-            if len(seen_c22) == total_c22:
-                C22_exact = sum(c22_values.values())
-                config_general.log(f"  C22 EXACT: All {total_c22} pairs sampled in {time.time() - start_time:.3f}s")
-                config_general.log(f"  C22 exact value: {C22_exact:.6f}")
-                C22_est = C22_exact
+            if time.time() - start_time >= time_limit / 3:
                 break
 
-        if time.time() - start_time >= time_limit / 3:
-            break
+        if not use_exact or len(seen_c22) < total_c22:
+            total_C22 = N * (N - 1) / 2
+            C22_est = C22_sum * (total_C22 / samples_C22) if samples_C22 > 0 else 0.0
+            config_general.log_verbose(f"  C22 estimation: {samples_C22} samples in {time.time() - start_time:.3f}s")
 
-    if not use_exact or len(seen_c22) < total_c22:
-        total_C22 = N * (N - 1) / 2
-        C22_est = C22_sum * (total_C22 / samples_C22) if samples_C22 > 0 else 0.0
-        config_general.log_verbose(f"  C22 estimation: {samples_C22} samples in {time.time() - start_time:.3f}s")
-
-        # Report standard error if convergence monitoring enabled
-        if ENABLE_CONVERGENCE_MONITORING and samples_C22 > 0:
-            sample_mean = C22_sum / samples_C22
-            sample_var = (C22_sum_sq / samples_C22) - sample_mean**2
-            if sample_var > 0:
-                sample_std = np.sqrt(sample_var)
-                se = sample_std * np.sqrt(total_C22 / samples_C22) / np.sqrt(samples_C22)
-                rel_se = se / C22_est if C22_est > 0 else float('inf')
-                config_general.log(f"  C22 estimate: {C22_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
+            # Report standard error if convergence monitoring enabled
+            if ENABLE_CONVERGENCE_MONITORING and samples_C22 > 0:
+                sample_mean = C22_sum / samples_C22
+                sample_var = (C22_sum_sq / samples_C22) - sample_mean**2
+                if sample_var > 0:
+                    sample_std = np.sqrt(sample_var)
+                    se = sample_std * np.sqrt(total_C22 / samples_C22) / np.sqrt(samples_C22)
+                    rel_se = se / C22_est if C22_est > 0 else float('inf')
+                    config_general.log(f"  C22 estimate: {C22_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
+                else:
+                    config_general.log(f"  C22 estimate: {C22_est:.6f}")
             else:
                 config_general.log(f"  C22 estimate: {C22_est:.6f}")
-        else:
-            config_general.log(f"  C22 estimate: {C22_est:.6f}")
 
-        if use_exact:
-            config_general.log_verbose(f"    (Sampled {len(seen_c22)}/{total_c22} unique pairs, {100*len(seen_c22)/total_c22:.1f}% coverage)")
+            if use_exact:
+                config_general.log_verbose(f"    (Sampled {len(seen_c22)}/{total_c22} unique pairs, {100*len(seen_c22)/total_c22:.1f}% coverage)")
 
     # ---------------------------
     # Final output
