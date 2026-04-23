@@ -375,17 +375,14 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_
     # Check if exact computation is feasible
     use_exact = should_use_exact_tracking(N, time_limit)
     if use_exact:
-        config_general.log(f"  Exact computation is feasible for N={N} - enabling tracking")
+        config_general.log(f"  Exact computation is feasible for N={N} - enabling tracking (except C21)")
         seen_c1 = set()
-        seen_c21 = set()
         seen_c22 = set()
         c1_values = {}
-        c21_values = {}
         c22_values = {}
 
         # Compute total combinations for completion check
         total_c1 = N * (N - 1) // 2
-        total_c21 = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
         total_c22 = N * (N - 1) // 2
     else:
         config_general.log(f"  Using Monte Carlo estimation (N={N} too large for exact computation)")
@@ -450,12 +447,13 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_
             # Check convergence for Monte Carlo estimation
             total_C1_count = N * (N - 1) / 2
             C1_est_current = C1_sum * (total_C1_count / samples_C1)
-            # Standard error: SE = std(samples) * sqrt(N_total / N_samples) / sqrt(N_samples)
+            # Standard error: SE = σ * N_total / sqrt(n)
+            # where σ is estimated from sample variance
             sample_mean = C1_sum / samples_C1
             sample_var = (C1_sum_sq / samples_C1) - sample_mean**2
             if sample_var > 0:
                 sample_std = np.sqrt(sample_var)
-                se = sample_std * np.sqrt(total_C1_count / samples_C1) / np.sqrt(samples_C1)
+                se = sample_std * total_C1_count / np.sqrt(samples_C1)
                 rel_se = se / C1_est_current if C1_est_current > 0 else float('inf')
 
                 # Check if converged
@@ -479,7 +477,7 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_
             sample_var = (C1_sum_sq / samples_C1) - sample_mean**2
             if sample_var > 0:
                 sample_std = np.sqrt(sample_var)
-                se = sample_std * np.sqrt(total_C1 / samples_C1) / np.sqrt(samples_C1)
+                se = sample_std * total_C1 / np.sqrt(samples_C1)
                 rel_se = se / C1_est if C1_est > 0 else float('inf')
                 config_general.log(f"  C1 estimate: {C1_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
             else:
@@ -532,25 +530,12 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_
             C21_sum_sq += np.sum(norms**2)
             samples_C21 += len(indices)
 
-            # Track exact values or check convergence (mutually exclusive approaches)
-            if use_exact:
-                # Track exact values
-                for idx in range(len(indices)):
-                    i, j, k = int(indices[idx, 0]), int(indices[idx, 1]), int(indices[idx, 2])
-                    # Canonical form: k is smallest, then sort i and j
-                    triple = (k, min(i, j), max(i, j))
-                    if triple not in seen_c21:
-                        seen_c21.add(triple)
-                        c21_values[triple] = norms[idx]
+            # NOTE: Exact computation disabled for C21 because nested commutators
+            # [H_i, [H_j, H_k]] and [H_j, [H_i, H_k]] are generally different, making
+            # exact tracking with unordered pairs {i, j} non-deterministic (depends on
+            # which ordering is sampled first). Always use Monte Carlo with convergence monitoring.
 
-                # Check if we've seen all triples
-                if len(seen_c21) == total_c21:
-                    C21_exact = sum(c21_values.values())
-                    config_general.log(f"  C21 EXACT: All {total_c21} triples sampled in {time.time() - start_time:.3f}s")
-                    config_general.log(f"  C21 exact value: {C21_exact:.6f}")
-                    C21_est = C21_exact
-                    break
-            elif ENABLE_CONVERGENCE_MONITORING and samples_C21 >= MIN_SAMPLES_FOR_CONVERGENCE:
+            if ENABLE_CONVERGENCE_MONITORING and samples_C21 >= MIN_SAMPLES_FOR_CONVERGENCE:
                 # Check convergence for Monte Carlo estimation
                 total_C21_count = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
                 C21_est_current = C21_sum * (total_C21_count / samples_C21)
@@ -558,7 +543,7 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_
                 sample_var = (C21_sum_sq / samples_C21) - sample_mean**2
                 if sample_var > 0:
                     sample_std = np.sqrt(sample_var)
-                    se = sample_std * np.sqrt(total_C21_count / samples_C21) / np.sqrt(samples_C21)
+                    se = sample_std * total_C21_count / np.sqrt(samples_C21)
                     rel_se = se / C21_est_current if C21_est_current > 0 else float('inf')
 
                     if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
@@ -570,27 +555,24 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_
             if time.time() - start_time >= time_limit / 3:
                 break
 
-        if not use_exact or len(seen_c21) < total_c21:
-            total_C21 = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
-            C21_est = C21_sum * (total_C21 / samples_C21) if samples_C21 > 0 else 0.0
-            config_general.log_verbose(f"  C21 estimation: {samples_C21} samples in {time.time() - start_time:.3f}s")
+        # C21 always uses Monte Carlo (exact tracking disabled - see note above)
+        total_C21 = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
+        C21_est = C21_sum * (total_C21 / samples_C21) if samples_C21 > 0 else 0.0
+        config_general.log_verbose(f"  C21 estimation: {samples_C21} samples in {time.time() - start_time:.3f}s")
 
-            # Report standard error if convergence monitoring enabled
-            if ENABLE_CONVERGENCE_MONITORING and samples_C21 > 0:
-                sample_mean = C21_sum / samples_C21
-                sample_var = (C21_sum_sq / samples_C21) - sample_mean**2
-                if sample_var > 0:
-                    sample_std = np.sqrt(sample_var)
-                    se = sample_std * np.sqrt(total_C21 / samples_C21) / np.sqrt(samples_C21)
-                    rel_se = se / C21_est if C21_est > 0 else float('inf')
-                    config_general.log(f"  C21 estimate: {C21_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
-                else:
-                    config_general.log(f"  C21 estimate: {C21_est:.6f}")
+        # Report standard error if convergence monitoring enabled
+        if ENABLE_CONVERGENCE_MONITORING and samples_C21 > 0:
+            sample_mean = C21_sum / samples_C21
+            sample_var = (C21_sum_sq / samples_C21) - sample_mean**2
+            if sample_var > 0:
+                sample_std = np.sqrt(sample_var)
+                se = sample_std * total_C21 / np.sqrt(samples_C21)
+                rel_se = se / C21_est if C21_est > 0 else float('inf')
+                config_general.log(f"  C21 estimate: {C21_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
             else:
                 config_general.log(f"  C21 estimate: {C21_est:.6f}")
-
-            if use_exact:
-                config_general.log_verbose(f"    (Sampled {len(seen_c21)}/{total_c21} unique triples, {100*len(seen_c21)/total_c21:.1f}% coverage)")
+        else:
+            config_general.log(f"  C21 estimate: {C21_est:.6f}")
 
     # ---------------------------
     # Estimate C22 = sum_{k<j} ||[H_k, [H_k, H_j]]||
@@ -641,7 +623,7 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_
             sample_var = (C22_sum_sq / samples_C22) - sample_mean**2
             if sample_var > 0:
                 sample_std = np.sqrt(sample_var)
-                se = sample_std * np.sqrt(total_C22_count / samples_C22) / np.sqrt(samples_C22)
+                se = sample_std * total_C22_count / np.sqrt(samples_C22)
                 rel_se = se / C22_est_current if C22_est_current > 0 else float('inf')
 
                 if CONVERGENCE_THRESHOLD > 0 and rel_se < CONVERGENCE_THRESHOLD:
@@ -664,7 +646,7 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_
             sample_var = (C22_sum_sq / samples_C22) - sample_mean**2
             if sample_var > 0:
                 sample_std = np.sqrt(sample_var)
-                se = sample_std * np.sqrt(total_C22 / samples_C22) / np.sqrt(samples_C22)
+                se = sample_std * total_C22 / np.sqrt(samples_C22)
                 rel_se = se / C22_est if C22_est > 0 else float('inf')
                 config_general.log(f"  C22 estimate: {C22_est:.6f} ± {se:.6f} (rel. SE: {rel_se:.4f})")
             else:
@@ -678,9 +660,9 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general, batch_
     # ---------------------------
     # Final output
     # ---------------------------
-    # Check if we achieved exact computation
-    if use_exact and len(seen_c1) == total_c1 and len(seen_c21) == total_c21 and len(seen_c22) == total_c22:
-        config_general.log(f"Exact computation achieved: all {total_c1} C1 + {total_c21} C21 + {total_c22} C22 terms sampled")
+    # Check if we achieved exact computation (C21 always uses Monte Carlo)
+    if use_exact and len(seen_c1) == total_c1 and len(seen_c22) == total_c22:
+        config_general.log(f"Exact computation achieved for C1 and C22: {total_c1} C1 + {total_c22} C22 terms sampled (C21 uses Monte Carlo)")
 
     # Return C1 and C2 as defined in Childs et al. (arXiv:1912.08854v3)
     # C1 is divided by 2 as per the convention (see VERIFICATION_OF_USER_FIX.md)
