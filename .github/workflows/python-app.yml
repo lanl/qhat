@@ -77,6 +77,11 @@ jobs:
             config_file: config-df.py
             config_setup: 'sed -e ''s/^my_method = "Trotter"/my_method = "double-factorization"/'' config.py > config-df.py'
 
+          - name: test-trotter-coefficients
+            directory: qre
+            script: test_trotter_coefficients.py
+            config_file: ''
+
     name: Test ${{ matrix.test-suite.name }}
 
     steps:

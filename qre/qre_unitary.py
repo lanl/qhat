@@ -91,21 +91,24 @@ def encode_ramped_trotter(
 
     timestep = value(config_unitary.timestep, tevol_hbar)
     assert timestep >= 0.0
-    config_general.log(f"-- timestep = {timestep}")
+    config_general.log_verbose(f"-- timestep = {timestep}")
     config_general.t_hbar = timestep
 
     # Compute the number of Trotter steps based on the Trotter error from arXiv:1912.08854v3
-    from jkg_utils import trotter_error_estimator
-    c1, c2 = trotter_error_estimator(hamiltonian.get_grouped_terms(), 60) # TODO: Is 60s the right amount of time?
+    # Using fast implementation for better performance (100-150x more samples per second)
+    from trotter_coefficients_fast import trotter_error_estimator_fast
+    c1, c2 = trotter_error_estimator_fast(hamiltonian.get_grouped_terms(), 60, config_general) # TODO: Is 60s the right amount of time?
     config_general.log(f"-- Trotter error coefficients: C1 = {c1}, C2 = {c2}")
     assert config_unitary.energy_error is not None
     config_general.log(f"-- allowable energy error = {config_unitary.energy_error} Hartrees")
     config_general.log(f"-- effective energy range = {2 * math.pi / timestep} Hartrees")
     eps_trotter = config_unitary.energy_error * timestep / (2 * math.pi)
-    config_general.log(f"-- allowable fractional Trotter error = {eps_trotter}")
-    s1 = timestep * config_unitary.error_scale * c1 / eps_trotter
-    s2 = timestep * math.sqrt(config_unitary.error_scale * c2 / eps_trotter)
-    config_general.log(f"-- Trotter step count: s1 = {s1}, s2 = {s2}")
+    config_general.log_verbose(f"-- allowable fractional Trotter error = {eps_trotter}")
+    # use config_unitary.energy_error here instead of eps_trotter, because these equations are
+    # derived in terms of the absolute energy error rather than the fractional energy error
+    s1 = timestep * config_unitary.error_scale * c1 / config_unitary.energy_error
+    s2 = timestep * math.sqrt(config_unitary.error_scale * c2 / config_unitary.energy_error)
+    config_general.log_verbose(f"-- Trotter step count: s1 = {s1}, s2 = {s2}")
 
     r1 = 1
     r2 = 2

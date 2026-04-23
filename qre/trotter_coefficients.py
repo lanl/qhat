@@ -1,10 +1,19 @@
+"""
+Reference implementation for Trotter error coefficient estimation.
+
+Based on: Childs et al., "Theory of Trotter Error" (arXiv:1912.08854v3)
+
+This file provides the original (slower) implementation for:
+- Testing and validation
+- Reference for understanding the algorithm
+- Comparison against the optimized version
+
+For production use, prefer trotter_coefficients_fast.py which is 100-150x faster.
+"""
+
 import time
 import numpy as np
 import math
-from pyLIQTR.PhaseEstimation.pe import PhaseEstimation
-from pyLIQTR.utils.resource_analysis import estimate_resources
-
-from openfermion.transforms import jordan_wigner
 
 # --------------------------------------------------
 # Helper functions for Pauli string arithmetic
@@ -108,7 +117,29 @@ def compute_nested_commutator_norm(H_outer, inner_operator):
 # --------------------------------------------------
 # Main Monte Carlo estimation
 # --------------------------------------------------
-def trotter_error_estimator(pauli_terms, time_limit, batch_size=100):
+def trotter_error_estimator(pauli_terms, time_limit, config_general, batch_size=100):
+    """
+    Monte Carlo estimation of Trotter error coefficients.
+
+    Reference: Childs et al., "Theory of Trotter Error" (arXiv:1912.08854v3)
+
+    For first-order formulas (Equation 145):
+      Error ≤ (t²/2) * C1, where C1 = Σᵢ<ⱼ ||[Hᵢ, Hⱼ]||
+
+    For second-order formulas (Equation 152):
+      Error ≤ (t³/12) * C21 + (t³/24) * C22, where
+      C21 = Σₖ<ᵢ,ₖ<ⱼ ||[Hᵢ, [Hⱼ, Hₖ]]||  (all triples with k < i and k < j)
+      C22 = Σₖ<ⱼ ||[Hₖ, [Hₖ, Hⱼ]]||       (all pairs with k < j)
+
+    Args:
+        pauli_terms: List of QubitOperator terms
+        time_limit: Total time limit in seconds
+        config_general: GeneralConfiguration instance for logging
+        batch_size: Number of samples per batch
+
+    Returns:
+      (C1, C2) where C2 = C21/12 + C22/24
+    """
     N = len(pauli_terms)
 
     # Dictionary to cache computed pair commutators.
@@ -138,6 +169,7 @@ def trotter_error_estimator(pauli_terms, time_limit, batch_size=100):
             break
     total_C1 = N * (N - 1)/2  # Total number of distinct pairs (i < j)
     C1_est = C1_sum * (total_C1 / samples_C1) if samples_C1 > 0 else 0.0
+    config_general.log_verbose(f"  C1: {samples_C1} samples")
 
     # ---------------------------
     # Estimate C21 = sum_{k<j, k<i} ||[H_i, [H_j, H_k]]||
@@ -170,6 +202,7 @@ def trotter_error_estimator(pauli_terms, time_limit, batch_size=100):
     # Total number of valid triples: for each k, there are C(N-k-1, 2) choices of (i,j).
     total_C21 = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
     C21_est = C21_sum * (total_C21 / samples_C21) if samples_C21 > 0 else 0.0
+    config_general.log_verbose(f"  C21: {samples_C21} samples")
 
     # ---------------------------
     # Estimate C22 = sum_{k<j} ||[H_k, [H_k, H_j]]||
@@ -197,156 +230,9 @@ def trotter_error_estimator(pauli_terms, time_limit, batch_size=100):
             break
     total_C22 = N * (N - 1) / 2  # Total number of (k, j) pairs with k < j
     C22_est = C22_sum * (total_C22 / samples_C22) if samples_C22 > 0 else 0.0
+    config_general.log_verbose(f"  C22: {samples_C22} samples")
 
     # ---------------------------
     # Final output
     # ---------------------------
-    # TODO: Should we return C1_est/2 instead of C1_est?  See, for example, Childs et al Eq 145,
-    #       DARPA Report #1, Brendan's notes from studying this with SymPy.
-    return C1_est, C21_est/12 + C22_est/24
-
-def build_active_space(molecule, n_active_electrons_per_atom, n_active_unocc_orbitals_per_atom):
-    n_atoms = len(molecule.geometry)
-    n_electrons_total = molecule.n_electrons
-
-    n_active_electrons = n_active_electrons_per_atom * n_atoms
-    n_active_DE_occ_orbs = n_active_electrons//2
-    n_active_DE_unocc_orbs = (n_active_unocc_orbitals_per_atom * n_atoms)//2
-
-    n_DE_occupied = n_electrons_total//2
-
-    frozen_occupied = n_DE_occupied - n_active_DE_occ_orbs
-    occupied_indices = range(frozen_occupied)
-
-    active_occ_start = frozen_occupied
-    active_occ_stop  = n_DE_occupied
-    active_vir_start = n_DE_occupied
-    active_vir_stop  = n_DE_occupied + n_active_DE_unocc_orbs
-
-    active_indices = list(range(active_occ_start, active_occ_stop)) \
-                + list(range(active_vir_start, active_vir_stop))
-
-    molecular_hamiltonian = molecule.get_molecular_hamiltonian(
-        occupied_indices=occupied_indices,
-        active_indices=active_indices
-    )
-
-    n_active_unocc_total = n_active_unocc_orbitals_per_atom * n_atoms
-
-    init_state = [0]*n_active_unocc_total + [1]*n_active_electrons
-
-    return molecular_hamiltonian, init_state
-
-
-def trotter_resource_estimator(active_hamiltonian, init_state, trot_ord):
-    # things we care less about right now
-    trotterize = True
-    ev_time = 1 # this has no effect on the resource estimate
-    trot_num = 1 # just do a single trotter step
-    precision_order = 1 # and a single bit of precision
-    # NOTE: skipping phase_offset for now
-
-    gse_args = {
-        'mol_ham' : active_hamiltonian,
-        'trotterize': trotterize,
-        'ev_time': ev_time,
-        'trot_ord': trot_ord,
-        'trot_num': trot_num,
-    }
-
-    gse_inst = PhaseEstimation(
-        precision_order=precision_order,
-        init_state=init_state,
-        kwargs=gse_args
-    )
-
-    gse_inst.generate_circuit()
-    gse_circuit = gse_inst.pe_circuit
-
-    # calculate resource estimate with pyliqtr/qualtran
-
-    re_qualtran = estimate_resources(gse_circuit)
-
-    return re_qualtran['T']
-
-def generate_resource_estimate(molecule,
-                               n_active_electrons_per_atom,
-                               n_active_unocc_orbitals_per_atom,
-                               epsilon_per_atom,
-                               output_qubits,
-                               trotter_order,
-                               trotter_error_runtime):
-
-    active_space_size = (n_active_electrons_per_atom + n_active_unocc_orbitals_per_atom)*molecule.n_atoms
-
-    print("\n-----------------------------")
-    print("Starting resource estimation with active space of size", active_space_size)
-
-    # --------------------------------------
-    # Step 1: Restrict to the Active Space
-    # --------------------------------------
-    print("\nStep 1: Restricting to the active space...")
-    start_time = time.time()
-
-    active_hamiltonian, init_state = build_active_space(
-        molecule, n_active_electrons_per_atom, n_active_unocc_orbitals_per_atom
-    )
-
-    end_time = time.time()
-    print(f"    ...finished in {end_time - start_time:.2f} seconds.")
-
-    # ------------------------------------------------------
-    # Step 2: Convert to Pauli strings via JW Transform
-    # ------------------------------------------------------
-    print("\nStep 2: Applying Jordan-Wigner transformation...")
-    start_time = time.time()
-
-    H = list(jordan_wigner(active_hamiltonian))
-
-    end_time = time.time()
-    print(f"    ...finished in {end_time - start_time:.2f} seconds, number of Pauli strings: {len(H)}")
-
-    # ----------------------------------------------
-    # Step 3: Estimate Trotter Error Coefficients
-    # ----------------------------------------------
-    print("\nStep 3: Estimating Trotter error coefficients...")
-    start_time = time.time()
-
-    _, c2 = trotter_error_estimator(H, trotter_error_runtime)
-
-    end_time = time.time()
-    print(f"    ...finished in {end_time - start_time:.2f} seconds, estimated coefficient: C = {c2:.6f}")
-
-    # ----------------------------------------------
-    # Step 4: Estimate Trotter T Count
-    # ----------------------------------------------
-    print("\nStep 4: Estimating Trotter T count...")
-    start_time = time.time()
-
-    trotter_Tcount = trotter_resource_estimator(active_hamiltonian, init_state, trotter_order)
-
-    end_time = time.time()
-    print(f"    ...finished in {end_time - start_time:.2f} seconds, estimated T count per step: {trotter_Tcount:.2e}")
-
-    # ----------------------------------------------
-    # Step 5: Compute Final Resource Estimation
-    # ----------------------------------------------
-
-    start_time = time.time()
-
-    epsilon = epsilon_per_atom * molecule.n_atoms
-    m = output_qubits
-
-    t = np.pi / ((epsilon / 2) * (2 ** (m - 1)))  # for U = e^{-iHt}
-    trotter_steps = (2 * np.pi * (2**m - 1) * c2 * (t**2) / (epsilon / 2)) ** 0.5
-    total_Tcount = (2**m - 1) * trotter_steps * trotter_Tcount
-    total_qubits = active_space_size + output_qubits
-
-    # ----------------------------------------------
-    # Final Output
-    # ----------------------------------------------
-
-    print("\nFinal result:")
-    print(f"    {total_qubits} qubits, {total_Tcount:.2e} T gates")
-
-    return total_qubits, total_Tcount
+    return C1_est/2, C21_est/12 + C22_est/24

@@ -66,3 +66,16 @@ run-qre-dbl-fact:
     paths:
       - .venv/
     policy: pull
+
+test-trotter-coefficients:
+  stage: test
+  script:
+    - hostname
+    - source .venv/bin/activate
+    - cd qre
+    - python3.11 test_trotter_coefficients.py
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .venv/
+    policy: pull
