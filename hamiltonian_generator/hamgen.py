@@ -6,6 +6,7 @@ import math
 import mendeleev
 import numpy as np
 from openfermion import InteractionOperator, MolecularData, jordan_wigner, bravyi_kitaev
+from openfermion.transforms.opconversions.binary_codes import _encoder_bk
 from openfermionpyscf import PyscfMolecularData
 from openfermionpyscf._run_pyscf import compute_integrals, compute_scf, prepare_pyscf_molecule
 import pickle
@@ -312,6 +313,14 @@ def write_data(state, pauli_sum, num_qubits):
 
 # -------------------------------------------------------------------------------------------------
 
+def write_initial_state(vec, path, n_qubits):
+    dim = 2 ** n_qubits
+    if vec.shape[0] != dim:
+        raise ValueError(f'Vector length {vec.shape[0]} != {dim} (2**{n_qubits}).')
+    np.save(path, vec, allow_pickle=False)
+
+# -------------------------------------------------------------------------------------------------
+
 def get_ham1(state):
     ham1_filename = state.filename_ham1()
     try:
@@ -372,6 +381,35 @@ def get_ham2(state):
             f"Loaded \"{ham2_filename}\".",
             "Continuing from after the active space is applied."]))
         return ham2_ActiveSpace
+
+# -------------------------------------------------------------------------------------------------
+
+def get_initial_state(state, ham3_Fermion2Qubit):
+    # Compute initial occupancy in terms of active spin orbitals
+    # Assume electrons are in lowest active orbitals
+    # TODO:  Change this to use real occupancy from pyscf_scf.mo_occ
+    n_act_occ = ham3_Fermion2Qubit.asmeta["n_act_occ_so"]
+    n_act_vac = ham3_Fermion2Qubit.asmeta["n_act_vac_so"]
+    n_qubits = n_act_occ + n_act_vac
+    n_electrons = n_act_occ
+    occ_spin = np.zeros(n_qubits, dtype=int)
+    occ_spin[0:n_electrons] = 1
+
+    # Switch from fermion to qubit basis
+    f2q_mapping = ham3_Fermion2Qubit.f2q_mapping
+    if f2q_mapping == "jordan-wigner":
+        occ_qubit = occ_spin
+    elif f2q_mapping == "bravyi-kitaev":
+        occ_qubit = (_encoder_bk(n_qubits) @ occ_spin) % 2
+
+    # Convert occupancy vector to a binary number
+    powers_of_2 = np.logspace(n_qubits-1, 0, num=n_qubits, base=2, dtype=int)
+    occ_binary = np.dot(occ_qubit, powers_of_2)
+
+    # Construct initial state vector
+    psi0 = np.zeros(2 ** n_qubits, dtype=complex)
+    psi0[occ_binary] = 1.
+    return psi0
 
 # -------------------------------------------------------------------------------------------------
 
@@ -437,11 +475,18 @@ def run():
     state.log("Generate sum of Pauli strings.")
     pauli_sum = ham3_Fermion2Qubit.terms
 
+    state.log("Generate initial state vector.")
+    psi0 = get_initial_state(state, ham3_Fermion2Qubit)
+
     compute_metadata(state, ham3_Fermion2Qubit)
 
     ham3_filename = state.filename_ham3()
     state.log(f"Save sum of Pauli strings to data file \"{ham3_filename}\".")
     write_data(state, pauli_sum, ham2_ActiveSpace.n_qubits)
+
+    is_filename = ham3_filename[0:-4] + ".npy"
+    state.log(f"Save initial state to data file \"{is_filename}\".")
+    write_initial_state(psi0, is_filename, ham2_ActiveSpace.n_qubits)
 
     state.log("Hamiltonian generation complete.")
 
