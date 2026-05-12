@@ -403,8 +403,7 @@ def get_initial_state(state, ham3_Fermion2Qubit):
         occ_qubit = (_encoder_bk(n_qubits) @ occ_spin) % 2
 
     # Convert occupancy vector to a binary number
-    powers_of_2 = np.logspace(n_qubits-1, 0, num=n_qubits, base=2, dtype=int)
-    occ_binary = np.dot(occ_qubit, powers_of_2)
+    occ_binary = sum([occ_qubit[i] << (n_qubits-1-i) for i in range(n_qubits)])
 
     # Construct initial state vector
     psi0 = np.zeros(2 ** n_qubits, dtype=complex)
