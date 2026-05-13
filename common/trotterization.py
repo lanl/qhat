@@ -14,7 +14,7 @@ from typing import Sequence, Tuple, List
 from qualtran import Bloq, BloqBuilder, Signature, SoquetT
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
 
-from common.pauli_string_evolution import PauliStringEvolution
+from common.commuting_pauli_string_evolution import CommutingPauliStringEvolution
 from common.test_utils import validate_pauli_string
 from math import cbrt
 from typing import Union
@@ -327,7 +327,11 @@ class Trotterization(Bloq):
         )
 
     def build_composite_bloq(self, bb: BloqBuilder, **soqs: SoquetT) -> dict[str, SoquetT]:
-        """Decompose into a sequence of PauliStringEvolution bloqs.
+        """Decompose into a sequence of CommutingPauliStringEvolution bloqs.
+
+        Uses CommutingPauliStringEvolution to enable future grouping of commuting terms.
+        Currently, each instance contains a single term, but the infrastructure is in place
+        for future optimization where multiple commuting terms can be grouped together.
 
         Uses the expanded sequence with combined terms for efficiency.
         """
@@ -342,15 +346,15 @@ class Trotterization(Bloq):
         for term_idx, coeff in self.expanded_sequence:
             pauli_string, h_i = self.pauli_terms[term_idx]
 
-            # Create PauliStringEvolution for this term
+            # Create CommutingPauliStringEvolution for this term
             # The effective evolution is exp(-i * h_i * P_i * coeff * dt / hbar)
-            pse = PauliStringEvolution(
-                pauli_string=pauli_string,
-                coefficient=h_i * coeff,
+            # Currently wraps a single term, but enables future grouping of commuting terms
+            cpse = CommutingPauliStringEvolution(
+                pauli_terms=((pauli_string, h_i * coeff),),
                 time=dt,
                 hbar=self.hbar
             )
-            register = bb.add(pse, q=register)
+            register = bb.add(cpse, q=register)
 
         return {reg_name: register}
 
@@ -359,6 +363,9 @@ class Trotterization(Bloq):
 
         Since T-complexity is independent of time and coefficients, we count how many
         times each term appears and compute the complexity once per unique term.
+
+        Uses CommutingPauliStringEvolution to match the decomposition used in
+        build_composite_bloq.
         """
         # Count occurrences of each term in the expanded sequence
         term_counts = {}
@@ -372,13 +379,13 @@ class Trotterization(Bloq):
         for term_idx, count in term_counts.items():
             pauli_string, h_i = self.pauli_terms[term_idx]
             # Coefficient and time don't affect T-complexity, so use dummy values
-            pse = PauliStringEvolution(
-                pauli_string=pauli_string,
-                coefficient=1.0,  # Dummy value - doesn't affect complexity
+            # Use CommutingPauliStringEvolution to match build_composite_bloq
+            cpse = CommutingPauliStringEvolution(
+                pauli_terms=((pauli_string, 1.0),),  # Dummy coefficient
                 time=1.0,         # Dummy value - doesn't affect complexity
                 hbar=1.0
             )
-            term_complexity = t_complexity(pse)
+            term_complexity = t_complexity(cpse)
             total_complexity += count * term_complexity
 
         return total_complexity
