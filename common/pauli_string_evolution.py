@@ -17,11 +17,10 @@ from functools import cached_property
 from typing import Dict, TYPE_CHECKING
 from scipy.linalg import expm
 
-from cirq import LineQubit, PauliStringPhasorGate
+from cirq import LineQubit, PauliStringPhasorGate, DensePauliString as CirqDensePauliString
 from qualtran import Bloq, BloqBuilder, Signature, SoquetT, QBit, Register, Side
 from qualtran.cirq_interop import CirqGateAsBloq
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
-from pyLIQTR.utils.pauli_string_manip import convert_to_dense_pauli_string
 
 if TYPE_CHECKING:
     import quimb.tensor as qtn
@@ -131,8 +130,9 @@ class PauliStringEvolution(Bloq):
 
     def _build_cirq_gate(self):
         """Build the corresponding Cirq gate for resource estimation."""
-        # Use pyLIQTR's utility to create a DensePauliString from the string
-        cirq_pauli = convert_to_dense_pauli_string((self.pauli_string, 1.0))
+        # Create a Cirq DensePauliString directly from the Pauli string
+        # We use coefficient=1.0 as the base, and scale via the power parameter below
+        cirq_pauli = CirqDensePauliString(self.pauli_string, coefficient=1.0)
 
         # PauliStringPhasorGate implements exp(-i * exponent * P / 2) where P has eigenvalues ±1
         # We want exp(-i * coefficient * time / hbar * P)
