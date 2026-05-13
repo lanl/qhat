@@ -115,6 +115,7 @@ class UnitaryConfiguration(ConfigurationBase):
         self.energy_error = kwargs.get("energy_error", None)
         self.error_scale = kwargs.get("error_scale", 1.0)
         self.trotter_implementation = kwargs.get("trotter_implementation", "flattened")
+        self.trotter_combine_terms = kwargs.get("trotter_combine_terms", True)
     def encode_double_factorization(self, **kwargs):
         self._only_once()
         self.method = "double factorization"
@@ -126,6 +127,7 @@ class UnitaryConfiguration(ConfigurationBase):
         self.save_if_present(table, "energy_error")
         self.save_if_present(table, "error_scale")
         self.save_if_present(table, "trotter_implementation")
+        self.save_if_present(table, "trotter_combine_terms")
         return table
 
 # -------------------------------------------------------------------------------------------------

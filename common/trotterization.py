@@ -108,7 +108,8 @@ def get_trotterization_coefficients(method):
 def expand_ramped_trotterization(
     num_terms: int,
     coefficients: Sequence[float],
-    num_steps: int
+    num_steps: int,
+    combine_terms: bool = True
 ) -> List[Tuple[int, float]]:
     """Expand ramped Trotterization into a flat list of (term_index, coefficient) pairs.
 
@@ -117,22 +118,27 @@ def expand_ramped_trotterization(
     - Each ramp applies all terms in either ascending (0,1,2,...) or descending (...,2,1,0) order
     - Ramps alternate direction: ascending, descending, ascending, descending, etc.
     - The trailing term of one ramp matches the leading term of the next ramp
-    - Adjacent occurrences of the same term are combined for efficiency
+    - By default, adjacent occurrences of the same term are combined for efficiency
 
     Args:
         num_terms: Number of Pauli string terms in the Hamiltonian
         coefficients: Sequence of coefficients for each ramp in a step
         num_steps: Number of Trotterization steps
+        combine_terms: If True (default), combine adjacent identical terms. If False, keep all terms separate.
 
     Returns:
         List of (term_index, coefficient) tuples representing the full sequence
 
     Example:
-        >>> # 3 terms, 2 ramps per step, 1 step
+        >>> # 3 terms, 2 ramps per step, 1 step, with combining (default)
         >>> expand_ramped_trotterization(3, [0.5, 0.5], 1)
         [(0, 0.5), (1, 0.5), (2, 1.0), (1, 0.5), (0, 0.5)]
 
-        Note: term 2 appears once with coefficient 1.0 (0.5 + 0.5 combined)
+        >>> # Same but without combining
+        >>> expand_ramped_trotterization(3, [0.5, 0.5], 1, combine_terms=False)
+        [(0, 0.5), (1, 0.5), (2, 0.5), (2, 0.5), (1, 0.5), (0, 0.5)]
+
+        Note: term 2 appears once with coefficient 1.0 when combined, twice with 0.5 when not
     """
     if num_terms == 0:
         raise ValueError("Must have at least one term")
@@ -159,7 +165,10 @@ def expand_ramped_trotterization(
             # Alternate direction for next ramp
             ascending = not ascending
 
-    # Combine adjacent terms with the same index
+    # Optionally combine adjacent terms with the same index
+    if not combine_terms:
+        return result
+
     # At this point, result is guaranteed to be non-empty due to validation
     combined = []
     current_idx, current_coeff = result[0]
@@ -189,7 +198,7 @@ class Trotterization(Bloq):
 
     The Trotterization uses ramped coefficients (e.g., second-order, fourth-order methods)
     to achieve higher accuracy. All steps and ramps are expanded into a single flat
-    sequence of operations, with adjacent identical terms combined for efficiency.
+    sequence of operations. By default, adjacent identical terms are combined for efficiency.
 
     Attributes:
         pauli_terms: Sequence of (pauli_string, h_i) tuples defining the Hamiltonian.
@@ -199,6 +208,7 @@ class Trotterization(Bloq):
         time: Total evolution time.
         num_steps: Number of Trotterization steps (time is divided by this).
         hbar: Reduced Planck constant (default 1.0).
+        combine_terms: If True (default), combine adjacent identical terms. If False, keep all terms separate.
 
     Example:
         >>> # Second-order Trotterization using named method
@@ -227,6 +237,7 @@ class Trotterization(Bloq):
     time: float
     num_steps: int
     hbar: float = 1.0
+    combine_terms: bool = True
 
     def __attrs_post_init__(self):
         """Validate inputs."""
@@ -256,7 +267,8 @@ class Trotterization(Bloq):
         method,
         time: float,
         num_steps: int,
-        hbar: float = 1.0
+        hbar: float = 1.0,
+        combine_terms: bool = True
     ):
         """Create Trotterization using a named method.
 
@@ -266,6 +278,7 @@ class Trotterization(Bloq):
             time: Total evolution time
             num_steps: Number of Trotterization steps
             hbar: Reduced Planck constant (default 1.0)
+            combine_terms: If True (default), combine adjacent identical terms. If False, keep all terms separate.
 
         Returns:
             Trotterization instance
@@ -284,7 +297,8 @@ class Trotterization(Bloq):
             coefficients=coefficients,
             time=time,
             num_steps=num_steps,
-            hbar=hbar
+            hbar=hbar,
+            combine_terms=combine_terms
         )
 
     @cached_property
@@ -302,13 +316,14 @@ class Trotterization(Bloq):
     def expanded_sequence(self) -> List[Tuple[int, float]]:
         """Expanded sequence of (term_index, coefficient) pairs.
 
-        This expands all steps and ramps into a flat list and combines adjacent
-        identical terms.
+        This expands all steps and ramps into a flat list. If combine_terms is True,
+        adjacent identical terms are combined for efficiency.
         """
         return expand_ramped_trotterization(
             num_terms=len(self.pauli_terms),
             coefficients=self.coefficients,
-            num_steps=self.num_steps
+            num_steps=self.num_steps,
+            combine_terms=self.combine_terms
         )
 
     def build_composite_bloq(self, bb: BloqBuilder, **soqs: SoquetT) -> dict[str, SoquetT]:
@@ -406,7 +421,8 @@ def build_ramped_trotterized_unitary(
     pauli_strings: Union[Sequence[Tuple[str, float]], 'Iterable[Tuple[str, float]]'],
     method,
     timestep: float,
-    numsteps: int
+    numsteps: int,
+    combine_terms: bool = True
 ):
     """Build a Trotterization using the old interface for backward compatibility.
 
@@ -419,6 +435,7 @@ def build_ramped_trotterized_unitary(
         method: Trotterization method name or int (e.g., "second order", 2)
         timestep: Time step for evolution
         numsteps: Number of Trotterization steps
+        combine_terms: If True (default), combine adjacent identical terms. If False, keep all terms separate.
 
     Returns:
         Trotterization instance
@@ -438,5 +455,6 @@ def build_ramped_trotterized_unitary(
         method=method,
         time=timestep,
         num_steps=numsteps,
-        hbar=1.0
+        hbar=1.0,
+        combine_terms=combine_terms
     )
