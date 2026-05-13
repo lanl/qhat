@@ -94,7 +94,7 @@ when calling `load_second_quantization()`. The available parameters are:
   cannot provide an arbitrary upper limit on the number of bosons, this will be rounded up if
   necessary.  That is, the circuit will be able to represent _at least_ this many bosons per
   bosonic state.  **This parameter is required for systems containing bosons** and has no default
-  value—the script will raise an error if bosons are present and this is not specified.
+  value -- the script will raise an error if bosons are present and this is not specified.
 
 **Example usage**:
 ```python
