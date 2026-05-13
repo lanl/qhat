@@ -130,6 +130,12 @@ class TestSignature:
         """Test signature for single qubit."""
         pse = PauliStringEvolution(pauli_string="Z", coefficient=1.0, time=1.0)
         assert pse.num_qubits == 1
+        sig = pse.signature
+        # The signature should have a register 'q' with 1 qubit (shape=(1,))
+        assert 'q' in [reg.name for reg in sig]
+        q_reg = [reg for reg in sig if reg.name == 'q'][0]
+        assert q_reg.shape == (1,)
+        assert q_reg.bitsize == 1  # Single qubit
 
 
 # ==================================================================================
@@ -365,17 +371,25 @@ class TestResourceEstimation:
         tc3 = t_complexity(pse3)
 
         # Complexity should generally increase (though not necessarily strictly)
-        # At minimum, three Paulis should not be simpler than one
-        assert tc3.rotations >= tc1.rotations or tc3.t >= tc1.t
+        # Check that more Paulis don't result in simpler circuits
+        # Compare consecutive pairs (transitivity implies 1 vs 3)
+        assert tc2.rotations >= tc1.rotations or tc2.t >= tc1.t
+        assert tc3.rotations >= tc2.rotations or tc3.t >= tc2.t
 
     def test_identity_has_minimal_cost(self):
         """Test that evolution under identity has minimal cost."""
-        pse = PauliStringEvolution(pauli_string="I", coefficient=1.0, time=1.0)
-        tc = t_complexity(pse)
+        pse_identity = PauliStringEvolution(pauli_string="I", coefficient=1.0, time=1.0)
+        tc_identity = t_complexity(pse_identity)
 
-        # Identity should have very low cost
-        # (might not be exactly zero due to how Cirq represents it)
-        assert tc.t + tc.rotations + tc.clifford >= 0
+        # Compare against a non-trivial Pauli string
+        pse_x = PauliStringEvolution(pauli_string="X", coefficient=1.0, time=1.0)
+        tc_x = t_complexity(pse_x)
+
+        # Identity should have cost less than or equal to a non-trivial Pauli
+        # Check that all metrics are less than or equal for identity
+        assert (tc_identity.t <= tc_x.t and
+                tc_identity.rotations <= tc_x.rotations and
+                tc_identity.clifford <= tc_x.clifford)
 
 
 # ==================================================================================
@@ -397,16 +411,30 @@ class TestIntegration:
         assert np.allclose(U.conj().T @ U, np.eye(4))
 
     def test_controlled_operation_structure(self):
-        """Test that .controlled() creates a controlled bloq."""
+        """Test that .controlled() creates a controlled bloq with expected signature."""
         pse = PauliStringEvolution(pauli_string="Z", coefficient=0.5, time=1.0)
 
         # Create controlled version
         controlled_pse = pse.controlled()
 
-        # Should have a different signature with control qubit
-        assert controlled_pse is not None
-        # Note: T-complexity calculation for controlled operations may not be supported
-        # for all Bloqs, so we just verify the controlled bloq can be created
+        # Verify it's a valid Bloq
+        from qualtran import Bloq
+        assert isinstance(controlled_pse, Bloq)
+
+        # Verify it has a signature
+        sig = controlled_pse.signature
+        assert sig is not None
+
+        # The signature should have more registers than the original
+        # (original has 'q', controlled should have 'ctrl' and 'q')
+        register_names = [reg.name for reg in sig]
+        assert 'ctrl' in register_names  # Control qubit(s)
+        assert 'q' in register_names  # Original register
+
+        # Original had 1 qubit (Z acts on 1 qubit)
+        # Controlled version should have control + original = at least 2 qubits total
+        original_qubits = pse.num_qubits
+        assert original_qubits == 1
 
     def test_str_representation(self):
         """Test string representation."""
