@@ -20,9 +20,13 @@ hamiltonian.load_second_quantization("examples/Be-H_1.30_sto-6g_as-003-003.tenso
 # unitary encoding
 
 if my_method == "Trotter":
+    # trotter_implementation options:
+    #   "flattened" - flattened QHAT implementation (flat expansion with term combining)
+    #   "original" - original QHAT implementation (nested bloq structure)
     unitary.encode_ramped_trotter(
             energy_error = 0.5 * energy_error,
             error_scale = 1.0,
+            trotter_implementation = "flattened",
             )
 elif my_method == "double-factorization":
     unitary.encode_double_factorization(energy_error=1.0e-4)

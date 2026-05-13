@@ -1,5 +1,3 @@
-from common.trotter import build_ramped_trotterized_unitary
-
 from qre_types import GeneralConfiguration, UnitaryConfiguration, value
 
 from openfermion import InteractionOperator, jordan_wigner
@@ -87,7 +85,18 @@ def encode_ramped_trotter(
         tevol_hbar):
         #tevol_hbar) -> RampedTrotterizedUnitary:
 
-    config_general.log_verbose("Encoding with ramped-trotterization method from `common`.")
+    # Get the implementation choice from config
+    trotter_impl = config_unitary.trotter_implementation
+
+    # Validate the implementation choice
+    if trotter_impl not in ('original', 'flattened'):
+        raise ValueError(
+            f"Invalid trotter_implementation '{trotter_impl}'. "
+            f"Must be 'original' or 'flattened'."
+        )
+
+    impl_label = f"{trotter_impl} QHAT"
+    config_general.log_verbose(f"Encoding with ramped-trotterization method from `common` ({impl_label}).")
 
     timestep = value(config_unitary.timestep, tevol_hbar)
     assert timestep >= 0.0
@@ -118,6 +127,12 @@ def encode_ramped_trotter(
     # TODO: Add fourth-order (possibly only computed if second order is better than first order)
     Nsteps = max(1, math.ceil(Nsteps0))
     config_general.log(f"-- using {method} Trotter formula with {Nsteps} steps ({Nsteps0})")
+
+    # Import the appropriate implementation
+    if trotter_impl == 'flattened':
+        from common.trotterization import build_ramped_trotterized_unitary
+    else:  # 'original'
+        from common.trotter import build_ramped_trotterized_unitary
 
     return build_ramped_trotterized_unitary(
             hamiltonian.get_all_pauli_strings(return_as='strings'),
