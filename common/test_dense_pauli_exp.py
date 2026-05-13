@@ -10,32 +10,7 @@ import pytest
 from scipy.linalg import expm
 
 from dense_pauli_exp import DensePauliString, DensePauliExponential
-
-
-# ==================================================================================
-# Helper functions
-# ==================================================================================
-
-def get_pauli_matrix(char):
-    """Return the 2x2 Pauli matrix for a given character."""
-    if char == 'I':
-        return np.array([[1, 0], [0, 1]], dtype=complex)
-    elif char == 'X':
-        return np.array([[0, 1], [1, 0]], dtype=complex)
-    elif char == 'Y':
-        return np.array([[0, -1j], [1j, 0]], dtype=complex)
-    elif char == 'Z':
-        return np.array([[1, 0], [0, -1]], dtype=complex)
-    else:
-        raise ValueError(f"Invalid Pauli character: {char}")
-
-
-def pauli_string_to_matrix(pauli_string):
-    """Convert a Pauli string to its matrix representation via tensor product."""
-    result = get_pauli_matrix(pauli_string[0])
-    for char in pauli_string[1:]:
-        result = np.kron(result, get_pauli_matrix(char))
-    return result
+from test_utils import get_pauli_matrix, pauli_string_to_matrix
 
 
 # ==================================================================================

@@ -13,56 +13,13 @@ from commuting_pauli_string_evolution import (
     pauli_strings_commute,
     all_commute,
 )
+from pauli_string_evolution import PauliStringEvolution
 from qualtran.cirq_interop.t_complexity_protocol import t_complexity
-
-
-# ==================================================================================
-# Helper functions for analytical comparisons
-# ==================================================================================
-
-def get_pauli_matrix(char):
-    """Return the 2x2 Pauli matrix for a given character."""
-    if char == 'I':
-        return np.array([[1, 0], [0, 1]], dtype=complex)
-    elif char == 'X':
-        return np.array([[0, 1], [1, 0]], dtype=complex)
-    elif char == 'Y':
-        return np.array([[0, -1j], [1j, 0]], dtype=complex)
-    elif char == 'Z':
-        return np.array([[1, 0], [0, -1]], dtype=complex)
-    else:
-        raise ValueError(f"Invalid Pauli character: {char}")
-
-
-def pauli_string_to_matrix(pauli_string):
-    """Convert a Pauli string to its matrix representation via tensor product."""
-    result = get_pauli_matrix(pauli_string[0])
-    for char in pauli_string[1:]:
-        result = np.kron(result, get_pauli_matrix(char))
-    return result
-
-
-def analytical_commuting_evolution(pauli_terms, time, hbar=1.0):
-    """Compute the exact evolution for commuting terms analytically.
-
-    Since terms commute: exp(-i*(A+B)*t) = exp(-i*A*t) * exp(-i*B*t)
-    """
-    if len(pauli_terms) == 0:
-        raise ValueError("Must have at least one term")
-
-    num_qubits = len(pauli_terms[0][0])
-    dim = 2 ** num_qubits
-
-    # Start with identity
-    U = np.eye(dim, dtype=complex)
-
-    # Multiply by each individual evolution
-    for pauli_string, coefficient in pauli_terms:
-        P = pauli_string_to_matrix(pauli_string)
-        U_term = expm(-1j * coefficient * P * time / hbar)
-        U = U_term @ U
-
-    return U
+from test_utils import (
+    get_pauli_matrix,
+    pauli_string_to_matrix,
+    analytical_commuting_evolution,
+)
 
 
 # ==================================================================================
@@ -130,6 +87,27 @@ class TestCommutativity:
     def test_all_commute_pairwise_false(self):
         """Test all_commute when at least one pair doesn't commute."""
         assert not all_commute(["XI", "YI"])  # X and Y on same qubit don't commute
+
+    def test_commutativity_not_transitive(self):
+        """Test that commutativity is not transitive.
+
+        Shows a case where:
+        - Term 1 and Term 2 commute
+        - Term 2 and Term 3 commute
+        - But Term 1 and Term 3 do NOT commute
+        """
+        term1 = "XI"
+        term2 = "IY"
+        term3 = "YI"
+
+        # Verify pairwise commutativity
+        assert pauli_strings_commute(term1, term2), "Term 1 and Term 2 should commute"
+        assert pauli_strings_commute(term2, term3), "Term 2 and Term 3 should commute"
+        assert not pauli_strings_commute(term1, term3), "Term 1 and Term 3 should NOT commute"
+
+        # Verify that all_commute correctly identifies this as non-commuting
+        assert not all_commute([term1, term2, term3]), \
+            "all_commute should return False when any pair doesn't commute"
 
 
 # ==================================================================================
@@ -249,6 +227,49 @@ class TestUnitaryGeneration:
         expected = analytical_commuting_evolution(terms, 1.0)
         assert np.allclose(U, expected)
 
+    def test_order_independence(self):
+        """Test that the order of commuting terms doesn't affect the result."""
+        # Since all terms commute, any ordering should give the same unitary
+        from itertools import permutations
+
+        terms = [("XII", 0.5), ("IXI", 0.3), ("IIX", 0.2)]
+
+        # Get reference unitary from original order
+        cpse_ref = CommutingPauliStringEvolution(pauli_terms=tuple(terms), time=1.0)
+        U_ref = cpse_ref.tensor_contract()
+
+        # Test all permutations
+        for perm in permutations(terms):
+            cpse = CommutingPauliStringEvolution(pauli_terms=tuple(perm), time=1.0)
+            U = cpse.tensor_contract()
+            assert np.allclose(U, U_ref), \
+                f"Order {perm} gave different unitary than reference"
+
+    def test_coefficient_addition(self):
+        """Test that same string with two coefficients equals sum of coefficients."""
+        # Adding same Pauli string twice: c1*P + c2*P = (c1+c2)*P
+        pauli_str = "XY"
+        c1 = 0.3
+        c2 = 0.5
+        time = 1.0
+
+        # Version 1: same string twice with different coefficients
+        cpse1 = CommutingPauliStringEvolution(
+            pauli_terms=((pauli_str, c1), (pauli_str, c2)),
+            time=time
+        )
+        U1 = cpse1.tensor_contract()
+
+        # Version 2: same string once with sum of coefficients
+        cpse2 = CommutingPauliStringEvolution(
+            pauli_terms=((pauli_str, c1 + c2),),
+            time=time
+        )
+        U2 = cpse2.tensor_contract()
+
+        assert np.allclose(U1, U2), \
+            "Duplicate string with separate coefficients should equal single string with summed coefficient"
+
     def test_unitarity(self):
         """Test that generated matrix is unitary."""
         terms = (("XY", 0.5), ("YX", 0.3))
@@ -341,24 +362,148 @@ class TestResourceEstimation:
 class TestDecomposition:
     """Test the decomposition into PauliStringEvolution bloqs."""
 
-    def test_decompose_single_term(self):
-        """Test decomposition with single term."""
+    def test_decompose_returns_composite_bloq(self):
+        """Test that decomposition returns a CompositeBloq."""
+        from qualtran import CompositeBloq
+
         cpse = CommutingPauliStringEvolution(
             pauli_terms=(("XY", 0.5),),
             time=1.0
         )
-        # Should be able to decompose
         cbloq = cpse.decompose_bloq()
-        assert cbloq is not None
+        assert isinstance(cbloq, CompositeBloq)
 
-    def test_decompose_multiple_terms(self):
-        """Test decomposition with multiple terms."""
+    def test_decompose_has_correct_number_of_bloqs(self):
+        """Test that decomposition contains the right number of bloqs."""
+        terms = (("XII", 0.5), ("IXI", 0.3), ("IIX", 0.2))
+        cpse = CommutingPauliStringEvolution(pauli_terms=terms, time=1.0)
+        cbloq = cpse.decompose_bloq()
+
+        # Count the bloq instances
+        num_bloqs = len(list(cbloq.bloq_instances))
+        assert num_bloqs == len(terms), \
+            f"Expected {len(terms)} bloqs, got {num_bloqs}"
+
+    def test_decompose_contains_pauli_string_evolutions(self):
+        """Test that all bloqs in decomposition are PauliStringEvolution."""
         cpse = CommutingPauliStringEvolution(
-            pauli_terms=(("XII", 0.5), ("IXI", 0.3)),
+            pauli_terms=(("XY", 0.5), ("YX", 0.3)),
             time=1.0
         )
         cbloq = cpse.decompose_bloq()
-        assert cbloq is not None
+
+        for binst in cbloq.bloq_instances:
+            assert isinstance(binst.bloq, PauliStringEvolution), \
+                f"Expected PauliStringEvolution, got {type(binst.bloq)}"
+
+    def test_decompose_preserves_parameters(self):
+        """Test that decomposed bloqs have correct parameters."""
+        terms = (("XII", 0.5), ("IXI", 0.3))
+        time = 1.5
+        hbar = 2.0
+        cpse = CommutingPauliStringEvolution(
+            pauli_terms=terms,
+            time=time,
+            hbar=hbar
+        )
+        cbloq = cpse.decompose_bloq()
+
+        # Extract the PauliStringEvolution bloqs
+        pse_bloqs = [binst.bloq for binst in cbloq.bloq_instances]
+
+        # Check that all have correct time and hbar
+        for pse in pse_bloqs:
+            assert pse.time == time
+            assert pse.hbar == hbar
+
+        # Check that each term appears in the decomposition
+        term_dict = {ps: coeff for ps, coeff in terms}
+        pse_dict = {pse.pauli_string: pse.coefficient for pse in pse_bloqs}
+
+        assert term_dict == pse_dict, \
+            f"Terms don't match: expected {term_dict}, got {pse_dict}"
+
+    def test_decompose_unitary_matches_original(self):
+        """Test that decomposed bloq produces same unitary as original."""
+        terms = (("XII", 0.5), ("IXI", 0.3), ("IIX", 0.2))
+        cpse = CommutingPauliStringEvolution(pauli_terms=terms, time=1.0)
+        cbloq = cpse.decompose_bloq()
+
+        U_original = cpse.tensor_contract()
+        U_decomposed = cbloq.tensor_contract()
+
+        assert np.allclose(U_original, U_decomposed), \
+            "Decomposed unitary doesn't match original"
+
+
+# ==================================================================================
+# Test: Controlled operations
+# ==================================================================================
+
+class TestControlled:
+    """Test controlled versions of CommutingPauliStringEvolution."""
+
+    def test_controlled_operation_structure(self):
+        """Test that .controlled() creates a controlled bloq with expected signature."""
+        cpse = CommutingPauliStringEvolution(
+            pauli_terms=(("XY", 0.5), ("YX", 0.3)),
+            time=1.0
+        )
+
+        # Create controlled version
+        controlled_cpse = cpse.controlled()
+
+        # Verify it's a valid Bloq
+        from qualtran import Bloq
+        assert isinstance(controlled_cpse, Bloq)
+
+        # Verify it has a signature
+        sig = controlled_cpse.signature
+        assert sig is not None
+
+        # The signature should have more registers than the original
+        # (original has 'q', controlled should have 'ctrl' and 'q')
+        register_names = [reg.name for reg in sig]
+        assert 'ctrl' in register_names  # Control qubit(s)
+        assert 'q' in register_names  # Original register
+
+        # Original had 2 qubits (XY acts on 2 qubits)
+        # Controlled version should have control + original = at least 3 qubits total
+        original_qubits = cpse.num_qubits
+        assert original_qubits == 2
+
+    def test_controlled_single_term(self):
+        """Test controlled operation with single Pauli term."""
+        cpse = CommutingPauliStringEvolution(
+            pauli_terms=(("Z", 0.5),),
+            time=1.0
+        )
+        controlled_cpse = cpse.controlled()
+
+        from qualtran import Bloq
+        assert isinstance(controlled_cpse, Bloq)
+
+        sig = controlled_cpse.signature
+        register_names = [reg.name for reg in sig]
+        assert 'ctrl' in register_names
+        assert 'q' in register_names
+
+    def test_controlled_multiple_terms(self):
+        """Test controlled operation with multiple commuting terms."""
+        cpse = CommutingPauliStringEvolution(
+            pauli_terms=(("XII", 0.5), ("IXI", 0.3), ("IIX", 0.2)),
+            time=1.0
+        )
+        controlled_cpse = cpse.controlled()
+
+        from qualtran import Bloq
+        assert isinstance(controlled_cpse, Bloq)
+
+        sig = controlled_cpse.signature
+        assert sig is not None
+        register_names = [reg.name for reg in sig]
+        assert 'ctrl' in register_names
+        assert 'q' in register_names
 
 
 # ==================================================================================

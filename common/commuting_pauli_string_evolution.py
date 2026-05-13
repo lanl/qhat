@@ -164,8 +164,7 @@ class CommutingPauliStringEvolution(Bloq):
     @cached_property
     def num_qubits(self) -> int:
         """Number of qubits the operator acts on."""
-        if len(self.pauli_terms) == 0:
-            return 0
+        # Guaranteed to have at least one term due to __attrs_post_init__ validation
         return len(self.pauli_terms[0][0])
 
     @cached_property
