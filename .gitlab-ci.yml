@@ -66,3 +66,16 @@ run-qre-dbl-fact:
     paths:
       - .venv/
     policy: pull
+
+run-common-tests:
+  stage: test
+  script:
+    - hostname
+    - source .venv/bin/activate
+    - cd common
+    - python3.11 -m pytest -v
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .venv/
+    policy: pull
