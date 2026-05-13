@@ -17,7 +17,8 @@ from typing import Dict, Sequence, Tuple, TYPE_CHECKING, Iterable
 from qualtran import Bloq, BloqBuilder, Signature, SoquetT, QBit, Register, Side, CompositeBloq
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
 
-from pauli_string_evolution import PauliStringEvolution
+from common.pauli_string_evolution import PauliStringEvolution
+from common.test_utils import validate_pauli_string
 
 if TYPE_CHECKING:
     import quimb.tensor as qtn
@@ -126,12 +127,7 @@ class CommutingPauliStringEvolution(Bloq):
 
         # Validate each Pauli string
         for pauli_string, coeff in self.pauli_terms:
-            for char in pauli_string:
-                if char not in 'IXYZ':
-                    raise ValueError(
-                        f"Invalid character '{char}' in Pauli string '{pauli_string}'. "
-                        f"Only 'I', 'X', 'Y', 'Z' are allowed."
-                    )
+            validate_pauli_string(pauli_string)
 
         # Check that all Pauli strings pairwise commute
         if not all_commute(pauli_strings):

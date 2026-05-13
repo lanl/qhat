@@ -12,6 +12,7 @@ from trotterization import (
     Trotterization,
     expand_ramped_trotterization,
     get_trotterization_coefficients,
+    build_ramped_trotterized_unitary,
 )
 from qualtran.cirq_interop.t_complexity_protocol import t_complexity
 from test_utils import pauli_string_to_matrix
@@ -33,52 +34,52 @@ class TestExpansion:
     def test_three_terms_first_order(self):
         """Test 3 terms with first-order method (single coefficient)."""
         result = expand_ramped_trotterization(3, [1.0], 1)
-        # First-order: descending ramp
-        assert result == [(2, 1.0), (1, 1.0), (0, 1.0)]
+        # First-order: ascending ramp
+        assert result == [(0, 1.0), (1, 1.0), (2, 1.0)]
 
     def test_three_terms_second_order_single_step(self):
         """Test 3 terms with second-order method (0.5, 0.5)."""
         result = expand_ramped_trotterization(3, [0.5, 0.5], 1)
-        # Step 1: descending with 0.5, then ascending with 0.5
-        # Descending: 2, 1, 0
+        # Step 1: ascending with 0.5, then descending with 0.5
         # Ascending: 0, 1, 2
-        # After combining adjacent: (2, 0.5), (1, 0.5), (0, 1.0), (1, 0.5), (2, 0.5)
-        assert result == [(2, 0.5), (1, 0.5), (0, 1.0), (1, 0.5), (2, 0.5)]
+        # Descending: 2, 1, 0
+        # After combining adjacent: (0, 0.5), (1, 0.5), (2, 1.0), (1, 0.5), (0, 0.5)
+        assert result == [(0, 0.5), (1, 0.5), (2, 1.0), (1, 0.5), (0, 0.5)]
 
     def test_two_terms_second_order_two_steps(self):
         """Test 2 terms, second-order, 2 steps."""
         result = expand_ramped_trotterization(2, [0.5, 0.5], 2)
 
         # Step 1:
-        #   Ramp 1 (desc): 1, 0
-        #   Ramp 2 (asc): 0, 1
+        #   Ramp 1 (asc): 0, 1
+        #   Ramp 2 (desc): 1, 0
         # Step 2:
-        #   Ramp 3 (desc): 1, 0
-        #   Ramp 4 (asc): 0, 1
+        #   Ramp 3 (asc): 0, 1
+        #   Ramp 4 (desc): 1, 0
         # Combining:
-        #   Step 1: (1, 0.5), (0, 1.0), (1, 0.5)
-        #   Step 2: (1, 0.5), (0, 1.0), (1, 0.5)
-        #   Between steps: (1, 0.5) + (1, 0.5) = (1, 1.0)
-        # Final: (1, 0.5), (0, 1.0), (1, 1.0), (0, 1.0), (1, 0.5)
-        assert result == [(1, 0.5), (0, 1.0), (1, 1.0), (0, 1.0), (1, 0.5)]
+        #   Step 1: (0, 0.5), (1, 1.0), (0, 0.5)
+        #   Step 2: (0, 0.5), (1, 1.0), (0, 0.5)
+        #   Between steps: (0, 0.5) + (0, 0.5) = (0, 1.0)
+        # Final: (0, 0.5), (1, 1.0), (0, 1.0), (1, 1.0), (0, 0.5)
+        assert result == [(0, 0.5), (1, 1.0), (0, 1.0), (1, 1.0), (0, 0.5)]
 
     def test_four_terms_custom_coefficients(self):
         """Test with custom coefficients."""
         result = expand_ramped_trotterization(4, [0.3, 0.7], 1)
-        # Descending: 3, 2, 1, 0 with 0.3
-        # Ascending: 0, 1, 2, 3 with 0.7
-        # Middle term 0 combines: 0.3 + 0.7 = 1.0
-        assert result == [(3, 0.3), (2, 0.3), (1, 0.3), (0, 1.0), (1, 0.7), (2, 0.7), (3, 0.7)]
+        # Ascending: 0, 1, 2, 3 with 0.3
+        # Descending: 3, 2, 1, 0 with 0.7
+        # Middle term 3 combines: 0.3 + 0.7 = 1.0
+        assert result == [(0, 0.3), (1, 0.3), (2, 0.3), (3, 1.0), (2, 0.7), (1, 0.7), (0, 0.7)]
 
     def test_direction_alternates(self):
         """Test that ramp direction alternates correctly."""
         result = expand_ramped_trotterization(2, [0.25, 0.25, 0.25, 0.25], 1)
-        # Ramp 1 (desc): 1, 0
-        # Ramp 2 (asc): 0, 1
-        # Ramp 3 (desc): 1, 0
-        # Ramp 4 (asc): 0, 1
+        # Ramp 1 (asc): 0, 1
+        # Ramp 2 (desc): 1, 0
+        # Ramp 3 (asc): 0, 1
+        # Ramp 4 (desc): 1, 0
         # After combining:
-        expected = [(1, 0.25), (0, 0.5), (1, 0.5), (0, 0.5), (1, 0.25)]
+        expected = [(0, 0.25), (1, 0.5), (0, 0.5), (1, 0.5), (0, 0.25)]
         assert result == expected
 
     def test_empty_terms_raises_error(self):
@@ -259,7 +260,7 @@ class TestExpandedSequence:
             time=1.0,
             num_steps=1
         )
-        # 2 terms, second-order: desc (1,0), asc (0,1) -> combine middle -> 3 ops
+        # 2 terms, second-order: asc (0,1), desc (1,0) -> combine middle -> 3 ops
         assert trotter.num_operations == 3
 
 
@@ -698,6 +699,40 @@ class TestConvenienceConstructors:
         )
         assert trotter.coefficients == tuple(custom_coeffs)
 
+    def test_from_method_with_integer(self):
+        """Test from_method with integer method identifier."""
+        trotter = Trotterization.from_method(
+            pauli_terms=[("X", 1.0), ("Y", 1.0)],
+            method=2,  # Integer for second-order
+            time=1.0,
+            num_steps=10
+        )
+        assert trotter.coefficients == (0.5, 0.5)
+        assert trotter.num_steps == 10
+
+    def test_from_method_integer_matches_string(self):
+        """Test that integer and string methods produce same result."""
+        terms = [("X", 1.0), ("Y", 1.0)]
+        time = 1.0
+        num_steps = 10
+
+        trotter_int = Trotterization.from_method(
+            pauli_terms=terms,
+            method=2,
+            time=time,
+            num_steps=num_steps
+        )
+
+        trotter_str = Trotterization.from_method(
+            pauli_terms=terms,
+            method="second order",
+            time=time,
+            num_steps=num_steps
+        )
+
+        # Should have same expanded sequence
+        assert trotter_int.expanded_sequence == trotter_str.expanded_sequence
+
     def test_from_method_matches_direct_construction(self):
         """Test that from_method produces same result as direct construction."""
         terms = [("X", 1.0), ("Y", 1.0)]
@@ -720,3 +755,101 @@ class TestConvenienceConstructors:
 
         # Should have same expanded sequence
         assert trotter1.expanded_sequence == trotter2.expanded_sequence
+
+
+# ==================================================================================
+# Test: Backward compatibility
+# ==================================================================================
+
+class TestBackwardCompatibility:
+    """Test backward compatibility with old trotter.py interface."""
+
+    def test_build_ramped_trotterized_unitary_interface(self):
+        """Test the old interface function exists and works."""
+        # Old interface: build_ramped_trotterized_unitary(pauli_strings, method, timestep, numsteps)
+        bloq = build_ramped_trotterized_unitary(
+            [("X", 1.0), ("Y", 1.0)],
+            "second order",
+            1.0,
+            10
+        )
+        assert isinstance(bloq, Trotterization)
+        assert bloq.time == 1.0
+        assert bloq.num_steps == 10
+        assert bloq.coefficients == (0.5, 0.5)
+
+    def test_build_with_integer_method(self):
+        """Test old interface with integer method."""
+        bloq = build_ramped_trotterized_unitary(
+            [("X", 1.0), ("Y", 1.0)],
+            2,  # Integer for second-order
+            1.0,
+            10
+        )
+        assert bloq.coefficients == (0.5, 0.5)
+
+    def test_build_with_generator(self):
+        """Test old interface with generator input (as from qre Hamiltonian)."""
+        # Simulate what hamiltonian.get_all_pauli_strings(return_as='strings') returns
+        def pauli_generator():
+            yield ("XY", 0.5)
+            yield ("YZ", 0.3)
+            yield ("ZX", 0.2)
+
+        bloq = build_ramped_trotterized_unitary(
+            pauli_generator(),
+            "second order",
+            1.0,
+            5
+        )
+        assert bloq.num_terms == 3
+        assert bloq.num_steps == 5
+
+    def test_backward_compatible_with_qre_usage(self):
+        """Test the exact usage pattern from qre/qre_unitary.py."""
+        # This simulates the exact call from qre_unitary.py line 122-126
+        pauli_strings = [("XII", 0.5), ("IXI", 0.3), ("IIX", 0.2)]
+        method = "second order"
+        timestep = 1.0
+        Nsteps = 10
+
+        bloq = build_ramped_trotterized_unitary(
+            pauli_strings,
+            method,
+            timestep,
+            Nsteps
+        )
+
+        # Verify it creates a valid Bloq
+        assert isinstance(bloq, Trotterization)
+        assert bloq.num_qubits == 3
+
+        # Verify resource estimation works
+        tc = t_complexity(bloq)
+        assert tc.rotations > 0
+
+    def test_equivalence_old_and_new_interface(self):
+        """Test that old and new interfaces produce identical results."""
+        terms = [("X", 1.0), ("Y", 1.0)]
+        method = "second order"
+        time = 1.0
+        num_steps = 5
+
+        # Old interface
+        bloq_old = build_ramped_trotterized_unitary(terms, method, time, num_steps)
+
+        # New interface
+        bloq_new = Trotterization.from_method(
+            pauli_terms=terms,
+            method=method,
+            time=time,
+            num_steps=num_steps
+        )
+
+        # Should produce identical expanded sequences
+        assert bloq_old.expanded_sequence == bloq_new.expanded_sequence
+
+        # Should produce identical unitaries
+        U_old = bloq_old.tensor_contract()
+        U_new = bloq_new.tensor_contract()
+        assert np.allclose(U_old, U_new)

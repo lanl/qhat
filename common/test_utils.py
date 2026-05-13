@@ -1,11 +1,36 @@
 """
-Shared test utilities for Pauli string operations.
+Shared utilities for Pauli string operations.
 
-This module provides common helper functions used across multiple test files.
+This module provides common helper functions used across multiple files,
+including validation and analytical computation utilities.
 """
 
 import numpy as np
 from scipy.linalg import expm
+
+
+def validate_pauli_string(pauli_string: str) -> None:
+    """Validate that a Pauli string contains only valid characters.
+
+    Args:
+        pauli_string: String to validate
+
+    Raises:
+        ValueError: If the string is empty or contains invalid characters
+
+    Example:
+        >>> validate_pauli_string("XYZ")  # OK
+        >>> validate_pauli_string("XAZ")  # Raises ValueError
+    """
+    if len(pauli_string) == 0:
+        raise ValueError("Pauli string cannot be empty.")
+
+    for char in pauli_string:
+        if char not in 'IXYZ':
+            raise ValueError(
+                f"Invalid character '{char}' in Pauli string '{pauli_string}'. "
+                f"Only 'I', 'X', 'Y', 'Z' are allowed."
+            )
 
 
 def get_pauli_matrix(char):

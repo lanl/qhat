@@ -14,8 +14,10 @@ from typing import Sequence, Tuple, List
 from qualtran import Bloq, BloqBuilder, Signature, SoquetT
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
 
-from pauli_string_evolution import PauliStringEvolution
+from common.pauli_string_evolution import PauliStringEvolution
+from common.test_utils import validate_pauli_string
 from math import cbrt
+from typing import Union
 
 
 def get_trotterization_coefficients(method):
@@ -113,7 +115,7 @@ def expand_ramped_trotterization(
     In ramped Trotterization:
     - Each step consists of multiple ramps with different coefficients
     - Each ramp applies all terms in either ascending (0,1,2,...) or descending (...,2,1,0) order
-    - Ramps alternate direction: descending, ascending, descending, ascending, etc.
+    - Ramps alternate direction: ascending, descending, ascending, descending, etc.
     - The trailing term of one ramp matches the leading term of the next ramp
     - Adjacent occurrences of the same term are combined for efficiency
 
@@ -128,9 +130,9 @@ def expand_ramped_trotterization(
     Example:
         >>> # 3 terms, 2 ramps per step, 1 step
         >>> expand_ramped_trotterization(3, [0.5, 0.5], 1)
-        [(2, 0.5), (1, 0.5), (0, 1.0), (1, 0.5), (2, 0.5)]
+        [(0, 0.5), (1, 0.5), (2, 1.0), (1, 0.5), (0, 0.5)]
 
-        Note: term 0 appears once with coefficient 1.0 (0.5 + 0.5 combined)
+        Note: term 2 appears once with coefficient 1.0 (0.5 + 0.5 combined)
     """
     if num_terms == 0:
         raise ValueError("Must have at least one term")
@@ -140,27 +142,25 @@ def expand_ramped_trotterization(
         raise ValueError("Must have at least one coefficient")
 
     result = []
-    descending = True  # Start with descending direction
+    ascending = True  # Start with ascending direction
 
     for step in range(num_steps):
         for coeff in coefficients:
             # Generate indices for this ramp
-            if descending:
-                indices = range(num_terms - 1, -1, -1)  # n-1, n-2, ..., 1, 0
-            else:
+            if ascending:
                 indices = range(num_terms)  # 0, 1, 2, ..., n-1
+            else:
+                indices = range(num_terms - 1, -1, -1)  # n-1, n-2, ..., 1, 0
 
             # Add each term from this ramp
             for idx in indices:
                 result.append((idx, coeff))
 
             # Alternate direction for next ramp
-            descending = not descending
+            ascending = not ascending
 
     # Combine adjacent terms with the same index
-    if len(result) == 0:
-        return result
-
+    # At this point, result is guaranteed to be non-empty due to validation
     combined = []
     current_idx, current_coeff = result[0]
 
@@ -247,12 +247,7 @@ class Trotterization(Bloq):
 
         # Validate each Pauli string
         for pauli_string, coeff in self.pauli_terms:
-            for char in pauli_string:
-                if char not in 'IXYZ':
-                    raise ValueError(
-                        f"Invalid character '{char}' in Pauli string '{pauli_string}'. "
-                        f"Only 'I', 'X', 'Y', 'Z' are allowed."
-                    )
+            validate_pauli_string(pauli_string)
 
     @classmethod
     def from_method(
@@ -345,19 +340,31 @@ class Trotterization(Bloq):
         return {reg_name: register}
 
     def _t_complexity_(self) -> TComplexity:
-        """Return T-complexity by summing individual term complexities."""
+        """Return T-complexity by counting term occurrences.
+
+        Since T-complexity is independent of time and coefficients, we count how many
+        times each term appears and compute the complexity once per unique term.
+        """
+        # Count occurrences of each term in the expanded sequence
+        term_counts = {}
+        for term_idx, coeff in self.expanded_sequence:
+            term_counts[term_idx] = term_counts.get(term_idx, 0) + 1
+
+        # Compute complexity once per unique term and multiply by occurrence count
         dt = self.time / self.num_steps
         total_complexity = TComplexity()
 
-        for term_idx, coeff in self.expanded_sequence:
+        for term_idx, count in term_counts.items():
             pauli_string, h_i = self.pauli_terms[term_idx]
+            # Coefficient and time don't affect T-complexity, so use dummy values
             pse = PauliStringEvolution(
                 pauli_string=pauli_string,
-                coefficient=h_i * coeff,
-                time=dt,
-                hbar=self.hbar
+                coefficient=1.0,  # Dummy value - doesn't affect complexity
+                time=1.0,         # Dummy value - doesn't affect complexity
+                hbar=1.0
             )
-            total_complexity += t_complexity(pse)
+            term_complexity = t_complexity(pse)
+            total_complexity += count * term_complexity
 
         return total_complexity
 
@@ -389,3 +396,47 @@ class Trotterization(Bloq):
             return "second-order"
         else:
             return f"{len(self.coefficients)}-coeff"
+
+
+# =================================================================================================
+# Compatibility function for old interface
+# =================================================================================================
+
+def build_ramped_trotterized_unitary(
+    pauli_strings: Union[Sequence[Tuple[str, float]], 'Iterable[Tuple[str, float]]'],
+    method,
+    timestep: float,
+    numsteps: int
+):
+    """Build a Trotterization using the old interface for backward compatibility.
+
+    This function provides compatibility with the old `common.trotter` module interface
+    used by QPE code in the qre/ directory.
+
+    Args:
+        pauli_strings: Iterable of (pauli_string, coefficient) tuples.
+            Example: [("XYZ", 0.5), ("ZZI", 0.3)]
+        method: Trotterization method name or int (e.g., "second order", 2)
+        timestep: Time step for evolution
+        numsteps: Number of Trotterization steps
+
+    Returns:
+        Trotterization instance
+
+    Example:
+        >>> # Old interface (for compatibility)
+        >>> from common.trotter import build_ramped_trotterized_unitary
+        >>> bloq = build_ramped_trotterized_unitary(
+        ...     [("XY", 0.5), ("YZ", 0.3)],
+        ...     "second order",
+        ...     1.0,
+        ...     10
+        ... )
+    """
+    return Trotterization.from_method(
+        pauli_terms=pauli_strings,
+        method=method,
+        time=timestep,
+        num_steps=numsteps,
+        hbar=1.0
+    )

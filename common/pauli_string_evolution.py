@@ -21,6 +21,7 @@ from cirq import LineQubit, PauliStringPhasorGate, DensePauliString as CirqDense
 from qualtran import Bloq, BloqBuilder, Signature, SoquetT, QBit, Register, Side
 from qualtran.cirq_interop import CirqGateAsBloq
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
+from common.test_utils import validate_pauli_string
 
 if TYPE_CHECKING:
     import quimb.tensor as qtn
@@ -54,14 +55,7 @@ class PauliStringEvolution(Bloq):
 
     def __attrs_post_init__(self):
         """Validate the Pauli string contains only valid characters."""
-        for char in self.pauli_string:
-            if char not in 'IXYZ':
-                raise ValueError(
-                    f"Invalid character '{char}' in Pauli string. "
-                    f"Only 'I', 'X', 'Y', 'Z' are allowed."
-                )
-        if len(self.pauli_string) == 0:
-            raise ValueError("Pauli string cannot be empty.")
+        validate_pauli_string(self.pauli_string)
 
     @cached_property
     def signature(self) -> Signature:
@@ -145,6 +139,20 @@ class PauliStringEvolution(Bloq):
         exp_gate = PauliStringPhasorGate(cirq_pauli) ** power
 
         return exp_gate
+
+    def build_composite_bloq(self, bb: BloqBuilder, **soqs: SoquetT) -> Dict[str, SoquetT]:
+        """Decompose into a Cirq gate for resource estimation.
+
+        This decomposition is needed for pyLIQTR and controlled versions to work properly.
+        """
+        # Get the Cirq gate representation
+        cirq_gate = self._build_cirq_gate()
+
+        # Wrap it as a Bloq
+        gate_bloq = CirqGateAsBloq(cirq_gate)
+
+        # Add it to the bloq builder
+        return bb.add_d(gate_bloq, **soqs)
 
     def _t_complexity_(self) -> TComplexity:
         """Return the T-complexity for resource estimation."""
