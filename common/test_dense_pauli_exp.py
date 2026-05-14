@@ -10,7 +10,7 @@ import pytest
 from scipy.linalg import expm
 
 from dense_pauli_exp import DensePauliString, DensePauliExponential
-from test_utils import get_pauli_matrix, pauli_string_to_matrix
+from pauli_utils import get_pauli_matrix, pauli_string_to_matrix
 
 
 # ==================================================================================

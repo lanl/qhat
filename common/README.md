@@ -77,11 +77,14 @@ be used directly by users.
   - ⚠️ **Note:** May be superseded by Qualtran's TextbookQPE and other QPE implementations
   - Currently used for educational/exploratory purposes
 
-## Testing Utilities
+## Utilities
 
-- **`test_utils.py`**: Shared testing utilities including:
+- **`pauli_utils.py`**: Shared Pauli string utility functions used by both source and test code:
   - `validate_pauli_string()`: Validates Pauli string format (only I, X, Y, Z characters)
-  - Used across multiple modules to ensure consistent validation
+  - `get_pauli_matrix()`: Returns matrix representation of Pauli operators
+  - `pauli_string_to_matrix()`: Converts Pauli string to full matrix
+  - `analytical_evolution()`: Computes analytical time evolution for validation
+  - Used across multiple modules to ensure consistent validation and testing
 
 ## Example/Development Files
 
@@ -121,7 +124,7 @@ pytest common/test_trotterization.py -v                        # 57 tests
 | `MixedFermionBosonOperator.py` | ⚠️ None | Production use |
 | `bosons_binary.py` | ⚠️ None | Production use |
 | `QPE_Kitaev.py` | ⚠️ None | Exploratory |
-| `test_utils.py` | N/A | Utility |
+| `pauli_utils.py` | N/A | Utility |
 
 ## Documentation
 

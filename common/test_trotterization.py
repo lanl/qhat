@@ -8,14 +8,14 @@ import numpy as np
 import pytest
 from scipy.linalg import expm
 
-from trotterization import (
+from common.trotterization import (
     Trotterization,
     expand_ramped_trotterization,
     get_trotterization_coefficients,
     build_ramped_trotterized_unitary,
 )
 from qualtran.cirq_interop.t_complexity_protocol import t_complexity
-from test_utils import pauli_string_to_matrix
+from common.pauli_utils import pauli_string_to_matrix
 
 
 # ==================================================================================

@@ -9,9 +9,9 @@ import numpy as np
 import pytest
 from scipy.linalg import expm
 
-from pauli_string_evolution import PauliStringEvolution
+from common.pauli_string_evolution import PauliStringEvolution
 from qualtran.cirq_interop.t_complexity_protocol import t_complexity
-from test_utils import get_pauli_matrix, pauli_string_to_matrix, analytical_evolution
+from common.pauli_utils import get_pauli_matrix, pauli_string_to_matrix, analytical_evolution
 
 
 # ==================================================================================

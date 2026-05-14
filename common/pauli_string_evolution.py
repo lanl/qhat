@@ -21,7 +21,7 @@ from cirq import LineQubit, PauliStringPhasorGate, DensePauliString as CirqDense
 from qualtran import Bloq, BloqBuilder, Signature, SoquetT, QBit, Register, Side
 from qualtran.cirq_interop import CirqGateAsBloq
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
-from common.test_utils import validate_pauli_string
+from common.pauli_utils import validate_pauli_string
 
 if TYPE_CHECKING:
     import quimb.tensor as qtn
