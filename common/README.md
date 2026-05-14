@@ -33,7 +33,7 @@ be used directly by users.
 - **`trotter_flattened.py`**: Flattened QHAT implementation of Trotterization with ramped coefficients.
   Supports first through eighth-order methods. Features:
   - Flat expansion of all Trotter steps and ramps into a single sequence
-  - Optional combining of adjacent identical terms (~30% operation reduction)
+  - Optional combining of adjacent identical terms (reduces operation count, benefit varies by Hamiltonian)
   - Uses `CommutingPauliStringEvolution` internally, enabling future grouping of commuting terms
   - **Fully tested with 57 comprehensive tests**
   - **Recommended for all use cases**
