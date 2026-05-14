@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from scipy.linalg import expm
 
-from common.trotterization import (
+from common.trotter_flattened import (
     Trotterization,
     expand_ramped_trotterization,
     get_trotterization_coefficients,

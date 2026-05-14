@@ -30,7 +30,7 @@ be used directly by users.
 
 ### Modern Implementation (Recommended)
 
-- **`trotterization.py`**: Flattened QHAT implementation of Trotterization with ramped coefficients.
+- **`trotter_flattened.py`**: Flattened QHAT implementation of Trotterization with ramped coefficients.
   Supports first through eighth-order methods. Features:
   - Flat expansion of all Trotter steps and ramps into a single sequence
   - Optional combining of adjacent identical terms (~30% operation reduction)
@@ -40,7 +40,7 @@ be used directly by users.
 
 ### Original Implementation
 
-- **`trotter.py`**: Original QHAT implementation with nested bloq structure
+- **`trotter_original.py`**: Original QHAT implementation with nested bloq structure
   (RampedTrotterizedUnitary → RampedTrotterStep → TrotterRamp). ⚠️ **Little to no test coverage.**
   Preserved for backward compatibility and comparison. **Not recommended for new work.**
 
@@ -101,12 +101,12 @@ Modules with comprehensive test coverage have corresponding test files:
 
 ```bash
 # Run all tests
-pytest common/test_*.py -v
+pytest common/tests/ -v
 
 # Individual test suites
-pytest common/test_pauli_string_evolution.py -v                # 53 tests
-pytest common/test_commuting_pauli_string_evolution.py -v      # 47 tests
-pytest common/test_trotterization.py -v                        # 57 tests
+pytest common/tests/test_pauli_string_evolution.py -v                # 53 tests
+pytest common/tests/test_commuting_pauli_string_evolution.py -v      # 47 tests
+pytest common/tests/test_trotter_flattened.py -v                     # 57 tests
 ```
 
 **Total: 157 comprehensive tests**
@@ -117,8 +117,8 @@ pytest common/test_trotterization.py -v                        # 57 tests
 |--------|---------------|--------|
 | `pauli_string_evolution.py` | ✅ 53 tests | Recommended |
 | `commuting_pauli_string_evolution.py` | ✅ 47 tests | Recommended |
-| `trotterization.py` | ✅ 57 tests | Recommended |
-| `trotter.py` | ⚠️ Minimal | Legacy only |
+| `trotter_flattened.py` | ✅ 57 tests | Recommended |
+| `trotter_original.py` | ⚠️ Minimal | Legacy only |
 | `dense_pauli_exp.py` | ⚠️ Minimal | Used by legacy code |
 | `LCPSHamiltonian.py` | ⚠️ None | Production use |
 | `MixedFermionBosonOperator.py` | ⚠️ None | Production use |
