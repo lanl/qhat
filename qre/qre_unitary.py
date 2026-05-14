@@ -1,5 +1,3 @@
-from common.trotter import build_ramped_trotterized_unitary
-
 from qre_types import GeneralConfiguration, UnitaryConfiguration, value
 
 from openfermion import InteractionOperator, jordan_wigner
@@ -87,7 +85,18 @@ def encode_ramped_trotter(
         tevol_hbar):
         #tevol_hbar) -> RampedTrotterizedUnitary:
 
-    config_general.log_verbose("Encoding with ramped-trotterization method from `common`.")
+    # Get the implementation choice from config
+    trotter_impl = config_unitary.trotter_implementation
+
+    # Validate the implementation choice
+    if trotter_impl not in ('original', 'flattened'):
+        raise ValueError(
+            f"Invalid trotter_implementation '{trotter_impl}'. "
+            f"Must be 'original' or 'flattened'."
+        )
+
+    impl_label = f"{trotter_impl} QHAT"
+    config_general.log_verbose(f"Encoding with ramped-trotterization method from `common` ({impl_label}).")
 
     timestep = value(config_unitary.timestep, tevol_hbar)
     assert timestep >= 0.0
@@ -119,11 +128,24 @@ def encode_ramped_trotter(
     Nsteps = max(1, math.ceil(Nsteps0))
     config_general.log(f"-- using {method} Trotter formula with {Nsteps} steps ({Nsteps0})")
 
-    return build_ramped_trotterized_unitary(
-            hamiltonian.get_all_pauli_strings(return_as='strings'),
-            method,
-            timestep,
-            Nsteps)
+    # Import the appropriate implementation
+    if trotter_impl == 'flattened':
+        from common.trotter_flattened import build_ramped_trotterized_unitary
+        # Pass combine_terms parameter only for flattened implementation
+        return build_ramped_trotterized_unitary(
+                hamiltonian.get_all_pauli_strings(return_as='strings'),
+                method,
+                timestep,
+                Nsteps,
+                combine_terms=config_unitary.trotter_combine_terms)
+    else:  # 'original'
+        from common.trotter_original import build_ramped_trotterized_unitary
+        # Original implementation doesn't support combine_terms parameter
+        return build_ramped_trotterized_unitary(
+                hamiltonian.get_all_pauli_strings(return_as='strings'),
+                method,
+                timestep,
+                Nsteps)
 
 # -------------------------------------------------------------------------------------------------
 

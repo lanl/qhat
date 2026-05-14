@@ -150,7 +150,7 @@ def test2():
 
 def test3():
     import datetime
-    from common.trotter import build_ramped_trotterized_unitary
+    from common.trotter_original import build_ramped_trotterized_unitary
     group1 = (
             ("IXYZ", 0.1),
             ("IXZY", 0.2),

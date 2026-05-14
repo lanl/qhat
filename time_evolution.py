@@ -1,10 +1,10 @@
 """
-time_evolution.py — Pauli-string Hamiltonian time evolution for QHAT.
+time_evolution.py -- Pauli-string Hamiltonian time evolution for QHAT.
 
 Loads a Hamiltonian via the QRE configuration system and performs:
-  exact     — U = exp(-i H t)
-  trotter1  — 1st-order Lie-Trotter product formula
-  trotter2  — 2nd-order Suzuki-Trotter product formula
+  exact     -- U = exp(-i H t)
+  trotter1  -- 1st-order Lie-Trotter product formula
+  trotter2  -- 2nd-order Suzuki-Trotter product formula
 
 Place at the qhat-main/ root. Defaults to qre/config.py if no config is given.
 

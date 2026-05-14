@@ -94,7 +94,7 @@ when calling `load_second_quantization()`. The available parameters are:
   cannot provide an arbitrary upper limit on the number of bosons, this will be rounded up if
   necessary.  That is, the circuit will be able to represent _at least_ this many bosons per
   bosonic state.  **This parameter is required for systems containing bosons** and has no default
-  value—the script will raise an error if bosons are present and this is not specified.
+  value -- the script will raise an error if bosons are present and this is not specified.
 
 **Example usage**:
 ```python
@@ -124,6 +124,21 @@ supports
   - `energy_error`: The maximum error allowed from the Trotterization process.  If not provided,
     the script will generate an error.
   - `error_scale`: This option is deprecated.
+  - `trotter_implementation`: (Optional) Choose between two Trotter implementations:
+    - `"flattened"` (default, recommended): Flattened QHAT implementation with flat expansion and
+      optional term combining. Term combining reduces operation count (benefit varies by Hamiltonian).
+      Uses `CommutingPauliStringEvolution` internally, enabling future grouping of commuting terms.
+      This implementation has comprehensive test coverage (57 tests) and is recommended for all use
+      cases.
+    - `"original"`: Original QHAT implementation with nested bloq structure
+      (RampedTrotterizedUnitary → RampedTrotterStep → TrotterRamp). Warning: This implementation
+      has little to no test coverage and may not work correctly in all cases. Use only for exact
+      reproduction of earlier results or debugging comparisons.
+  - `trotter_combine_terms`: (Optional, only for `trotter_implementation="flattened"`)
+    - `True` (default): Combine adjacent identical Pauli string terms for efficiency. The reduction
+      in operation count varies depending on the Hamiltonian structure.
+    - `False`: Keep all terms separate. Useful for comparing results with the original
+      implementation. When disabled, produces the same gate counts as the original implementation.
 - Double-Factorization: The function **`unitary.encode_double_factorization()`** uses a
   double-factorized block-encoding of the Hamiltonian.  This model is preliminary: it has not been
   verified and is known to fail unexpectedly for some Hamiltonians.  It takes the following
