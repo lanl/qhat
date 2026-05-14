@@ -116,7 +116,7 @@ jobs:
         set -euxo pipefail
         cd ${{ matrix.test-suite.directory }}
         if [ "${{ matrix.test-suite.script }}" = "pytest" ]; then
-          python -m pytest -v
+          python -m pytest tests/ -v
         else
           python ${{ matrix.test-suite.script }} ${{ matrix.test-suite.config_file }}
         fi
