@@ -311,6 +311,115 @@ def load_numpy(
 
 # -------------------------------------------------------------------------------------------------
 
+def load_hamlib_hdf5(
+        config_general: GeneralConfiguration,
+        config_hamiltonian: HamiltonianConfiguration):
+    """
+    Load Pauli string Hamiltonian from HamLib HDF5 file format.
+
+    HamLib format stores operators as UTF-8 strings in the OpenFermion QubitOperator format:
+    (coefficient+0j) [pauli_string] +
+
+    Example: (1.5+0j) [X0 Z3] +\n(-0.5+0j) [Y1 Y2] +
+    """
+    filename = config_hamiltonian.filename
+    config_general.log(f"Loading HamLib HDF5 Hamiltonian from file \"{filename}\".")
+
+    # Determine the HDF5 key/path - user can specify it or we'll try to find it
+    hdf5_key = getattr(config_hamiltonian, 'hdf5_key', None)
+
+    with h5py.File(filename, 'r') as f:
+        # If no key specified, try to auto-detect
+        if hdf5_key is None:
+            # Get all dataset keys
+            all_keys = []
+            def collect_keys(name, obj):
+                if isinstance(obj, h5py.Dataset):
+                    all_keys.append(name)
+            f.visititems(collect_keys)
+
+            if len(all_keys) == 0:
+                raise ValueError(f"No datasets found in HDF5 file \"{filename}\".")
+            elif len(all_keys) == 1:
+                hdf5_key = all_keys[0]
+                config_general.log(f"Auto-detected HDF5 key: \"{hdf5_key}\"")
+            else:
+                raise ValueError(
+                    f"Multiple datasets found in HDF5 file. Please specify hdf5_key. "
+                    f"Available keys: {all_keys}")
+
+        # Load the dataset
+        dataset = f[hdf5_key]
+
+        # Read metadata if available (HamLib v1.1+)
+        metadata = dict(dataset.attrs.items()) if hasattr(dataset, 'attrs') else {}
+        if metadata:
+            config_general.log(f"HamLib metadata: {metadata}")
+
+        # Read the Pauli string data as UTF-8
+        hamlib_string = dataset[()].decode("utf-8")
+
+    # Parse the HamLib format
+    # Format: (coefficient+0j) [pauli_ops] +\n
+    numq = 0
+    pauli_dict = {}
+
+    # Split into individual terms (separated by ' +\n')
+    terms = hamlib_string.strip().split(' +\n')
+
+    for term_str in terms:
+        term_str = term_str.strip()
+        if not term_str:
+            continue
+
+        # Find the coefficient part (between parentheses)
+        paren_end = term_str.find(')')
+        if paren_end == -1:
+            raise ValueError(f"Invalid HamLib format: missing ')' in term: {term_str}")
+
+        coef_str = term_str[1:paren_end]  # Extract content between ( )
+        coefficient = complex(coef_str)
+
+        # Find the Pauli string part (between brackets)
+        bracket_start = term_str.find('[', paren_end)
+        bracket_end = term_str.find(']', bracket_start)
+
+        if bracket_start == -1 or bracket_end == -1:
+            raise ValueError(f"Invalid HamLib format: missing brackets in term: {term_str}")
+
+        pauli_str = term_str[bracket_start+1:bracket_end].strip()
+
+        # Parse the sparse Pauli string (reusing existing logic)
+        pauli_tokens = pauli_str.split() if pauli_str else []
+        sparse_pauli = tuple()
+
+        for token in pauli_tokens:
+            op = token[0]  # Pauli operator: X, Y, or Z
+            idx = int(token[1:])  # Qubit index
+            numq = max(numq, idx + 1)
+            sparse_pauli = (*sparse_pauli, (idx, op))
+
+        pauli_dict[sparse_pauli] = coefficient
+
+    # Validate that all coefficients are real (Hamiltonians must be Hermitian)
+    # and convert to float
+    for pauli in pauli_dict:
+        coef = pauli_dict[pauli]
+        # Use relative tolerance (scale-invariant)
+        if abs(coef.imag) > abs(coef) * 1e-8:
+            imag_ratio_percent = abs(coef.imag) / abs(coef) * 100
+            raise ValueError(
+                f"Hamiltonian must be Hermitian (real coefficients). "
+                f"Found coefficient {coef} where imaginary part is "
+                f"{imag_ratio_percent:.4g}% of magnitude (max allowed: 1e-6%).")
+        pauli_dict[pauli] = coef.real
+
+    config_general.log(f"Loaded {len(pauli_dict)} Pauli terms on {numq} qubits.")
+
+    return Hamiltonian(LinearCombinationOfPauliStrings(num_qubits=numq, sparse=pauli_dict))
+
+# -------------------------------------------------------------------------------------------------
+
 def load_pauli(
         config_general: GeneralConfiguration,
         config_hamiltonian: HamiltonianConfiguration):
@@ -318,7 +427,11 @@ def load_pauli(
     config_general.log(
             f"Loading Pauli string Hamiltonian from file \"{filename}\".")
     extension = filename[filename.rfind('.')+1:]
-    if extension in [ "txt", "dat" ]:
+
+    # Check for HamLib HDF5 format
+    if extension in ["h5", "hdf5"]:
+        return load_hamlib_hdf5(config_general, config_hamiltonian)
+    elif extension in [ "txt", "dat" ]:
         fmt = None
         numq = 0
         pauli_dict = dict()
