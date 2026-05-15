@@ -664,10 +664,10 @@ class TestEdgeCases:
             load_pauli(config_gen, config_ham)
 
     def test_load_json_test_file(self, config):
-        """Test loading the test_pauli.json file."""
+        """Test loading the data_pauli.json file."""
         test_file = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
-            "test_pauli.json"
+            "data_pauli.json"
         )
 
         config_gen, config_ham = config
