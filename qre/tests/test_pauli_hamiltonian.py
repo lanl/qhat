@@ -299,6 +299,75 @@ class TestFileLoading:
         with pytest.raises(ValueError, match="Inconsistent Pauli string file format"):
             load_pauli(config_gen, config_ham)
 
+    def test_load_json_format(self, config, tmp_path):
+        """Test loading JSON format Pauli file."""
+        import json
+        test_file = tmp_path / "test.json"
+        data = {
+            "n_qubits": 4,
+            "terms": [
+                {"ops": [], "coeff": 2.5},
+                {"ops": [[0, "X"]], "coeff": 0.5},
+                {"ops": [[1, "X"]], "coeff": -0.3},
+                {"ops": [[0, "X"], [1, "X"]], "coeff": 1.2}
+            ]
+        }
+        test_file.write_text(json.dumps(data))
+
+        config_gen, config_ham = config
+        config_ham.load_pauli_strings(str(test_file))
+        H = load_pauli(config_gen, config_ham)
+
+        assert H.num_qubits() == 4
+        pauli_dict = H.get_all_pauli_strings(return_as="tuples")
+        assert len(pauli_dict) == 4
+        assert pauli_dict[tuple()] == 2.5
+        assert pauli_dict[((0, 'X'),)] == 0.5
+        assert pauli_dict[((1, 'X'),)] == -0.3
+        assert pauli_dict[((0, 'X'), (1, 'X'))] == 1.2
+
+    def test_json_missing_n_qubits(self, config, tmp_path):
+        """Test that JSON without n_qubits raises error."""
+        import json
+        test_file = tmp_path / "test.json"
+        data = {"terms": [{"ops": [], "coeff": 1.0}]}
+        test_file.write_text(json.dumps(data))
+
+        config_gen, config_ham = config
+        config_ham.load_pauli_strings(str(test_file))
+
+        with pytest.raises(ValueError, match="must contain 'n_qubits'"):
+            load_pauli(config_gen, config_ham)
+
+    def test_json_missing_terms(self, config, tmp_path):
+        """Test that JSON without terms raises error."""
+        import json
+        test_file = tmp_path / "test.json"
+        data = {"n_qubits": 4}
+        test_file.write_text(json.dumps(data))
+
+        config_gen, config_ham = config
+        config_ham.load_pauli_strings(str(test_file))
+
+        with pytest.raises(ValueError, match="must contain 'terms'"):
+            load_pauli(config_gen, config_ham)
+
+    def test_json_term_missing_fields(self, config, tmp_path):
+        """Test that JSON terms must have ops and coeff."""
+        import json
+        test_file = tmp_path / "test.json"
+        data = {
+            "n_qubits": 4,
+            "terms": [{"ops": [[0, "X"]]}]  # missing coeff
+        }
+        test_file.write_text(json.dumps(data))
+
+        config_gen, config_ham = config
+        config_ham.load_pauli_strings(str(test_file))
+
+        with pytest.raises(ValueError, match="must have 'ops' and 'coeff'"):
+            load_pauli(config_gen, config_ham)
+
 
 # ==================================================================================
 # Test: Hermitian validation
@@ -559,16 +628,29 @@ class TestEdgeCases:
         identity = pauli_dict.get(tuple(), 0.0)
         assert identity == 0.0
 
-    def test_json_format_not_implemented(self, config, tmp_path):
-        """Test that JSON format raises NotImplementedError."""
-        test_file = tmp_path / "test.json"
-        test_file.write_text("""{"terms": []}""")
+    def test_json_complex_hamiltonian(self, config, tmp_path):
+        """Test loading a more complex JSON Hamiltonian."""
+        import json
+        test_file = tmp_path / "test_complex.json"
+        data = {
+            "n_qubits": 3,
+            "terms": [
+                {"ops": [[0, "X"], [1, "Y"], [2, "Z"]], "coeff": 0.5},
+                {"ops": [[0, "Z"]], "coeff": 1.5},
+                {"ops": [[1, "Z"]], "coeff": 1.5},
+                {"ops": [[2, "Z"]], "coeff": 1.5}
+            ]
+        }
+        test_file.write_text(json.dumps(data))
 
         config_gen, config_ham = config
         config_ham.load_pauli_strings(str(test_file))
+        H = load_pauli(config_gen, config_ham)
 
-        with pytest.raises(NotImplementedError, match="JSON"):
-            load_pauli(config_gen, config_ham)
+        assert H.num_qubits() == 3
+        pauli_dict = H.get_all_pauli_strings(return_as="strings")
+        assert pauli_dict["XYZ"] == 0.5
+        assert pauli_dict["ZII"] == 1.5
 
     def test_invalid_extension(self, config, tmp_path):
         """Test that invalid file extension raises ValueError."""
@@ -580,3 +662,25 @@ class TestEdgeCases:
 
         with pytest.raises(ValueError, match="Invalid file extension"):
             load_pauli(config_gen, config_ham)
+
+    def test_load_json_test_file(self, config):
+        """Test loading the test_pauli.json file."""
+        test_file = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "test_pauli.json"
+        )
+
+        config_gen, config_ham = config
+        config_ham.load_pauli_strings(test_file)
+        H = load_pauli(config_gen, config_ham)
+
+        # Verify basic properties
+        assert H.num_qubits() == 4
+        pauli_dict = H.get_all_pauli_strings(return_as="tuples")
+        assert len(pauli_dict) == 10
+
+        # Verify specific terms
+        assert pauli_dict[tuple()] == 2.5
+        assert pauli_dict[((0, 'X'),)] == 0.5
+        assert pauli_dict[((0, 'X'), (1, 'X'))] == 1.2
+        assert pauli_dict[((0, 'X'), (1, 'Y'), (2, 'Z'))] == 0.25

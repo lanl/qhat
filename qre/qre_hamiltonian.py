@@ -4,6 +4,7 @@ from qre_types import GeneralConfiguration, HamiltonianConfiguration, value
 
 from functools import cache, reduce
 import h5py
+import json
 import numpy as np
 from openfermion import InteractionOperator, QubitOperator, count_qubits, bravyi_kitaev, \
                         jordan_wigner, binary_code_transform
@@ -200,7 +201,7 @@ class Hamiltonian:
         config_general.log("Computing initial energy bounds.")
         pauli_sum = self.get_all_pauli_strings()
         config_general.log_verbose(f"-- number of Pauli strings = {len(pauli_sum)}")
-        energy_shift = pauli_sum[()] # the encoding only lists non-identity matrices, so () = I
+        energy_shift = pauli_sum.get(tuple(), 0.0) # identity term (may not exist in all formats)
         dE = sum(abs(coefficient) for coefficient in pauli_sum.values()) - abs(energy_shift)
         Elo0 = energy_shift - dE
         Ehi0 = energy_shift + dE
@@ -373,7 +374,49 @@ def load_pauli(
         else:
             raise ValueError(f"Invalid Pauli format: \"{fmt}\".")
     elif extension == "json":
-        raise NotImplementedError("JSON Pauli string file not yet implemented.")
+        with open(filename, 'r') as file:
+            data = json.load(file)
+
+        # Validate structure
+        if "n_qubits" not in data:
+            raise ValueError("JSON Pauli file must contain 'n_qubits' field.")
+        if "terms" not in data:
+            raise ValueError("JSON Pauli file must contain 'terms' field.")
+
+        numq = data["n_qubits"]
+        pauli_dict = dict()
+
+        for term in data["terms"]:
+            if "ops" not in term or "coeff" not in term:
+                raise ValueError("Each term must have 'ops' and 'coeff' fields.")
+
+            # Convert ops list to sparse tuple format
+            # ops is list of [index, operator] pairs
+            sparse_pauli = tuple((idx, op) for idx, op in term["ops"])
+            coefficient = term["coeff"]
+
+            # Convert to complex for validation
+            if isinstance(coefficient, (int, float)):
+                coefficient = complex(coefficient)
+            elif isinstance(coefficient, complex):
+                pass
+            else:
+                raise ValueError(f"Coefficient must be numeric, got {type(coefficient)}.")
+
+            pauli_dict[sparse_pauli] = coefficient
+
+        # Validate Hermitian and convert to float
+        for pauli in pauli_dict:
+            coef = pauli_dict[pauli]
+            if abs(coef.imag) > abs(coef) * 1e-8:
+                imag_ratio_percent = abs(coef.imag) / abs(coef) * 100
+                raise ValueError(
+                    f"Hamiltonian must be Hermitian (real coefficients). "
+                    f"Found coefficient {coef} where imaginary part is "
+                    f"{imag_ratio_percent:.4g}% of magnitude (max allowed: 1e-6%).")
+            pauli_dict[pauli] = coef.real
+
+        return Hamiltonian(LinearCombinationOfPauliStrings(num_qubits=numq, sparse=pauli_dict))
     else:
         raise ValueError(
             f"Invalid file extension for loading a Pauli string file: \"{extension}\".")
