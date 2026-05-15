@@ -5,6 +5,12 @@ Test performance characteristics of exact vs Monte Carlo computation.
 import time
 import numpy as np
 from openfermion import QubitOperator
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from trotter_coefficients_fast import trotter_error_estimator_fast
 
 
