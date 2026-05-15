@@ -83,6 +83,12 @@ jobs:
             config_file: ''
             config_setup: ''
 
+          - name: qre-unit-tests
+            directory: qre
+            script: pytest
+            config_file: ''
+            config_setup: ''
+
     name: Test ${{ matrix.test-suite.name }}
 
     steps:

@@ -80,13 +80,13 @@ run-common-tests:
       - .venv/
     policy: pull
 
-test-jkg-utils-correctness:
+run-qre-tests:
   stage: test
   script:
     - hostname
     - source .venv/bin/activate
     - cd qre
-    - python3.11 test_correctness.py
+    - python3.11 -m pytest tests/ -v
   cache:
     key: "${CI_COMMIT_REF_SLUG}"
     paths:
