@@ -61,7 +61,7 @@ class LinearCombinationOfPauliStrings:
         if self._format is None:
             raise ValueError("No data provided to LinearCombinationOfPauliStrings.")
     def num_qubits(self):
-        raise NotImplementedError()
+        return self._nq
     def get_dense_pauli_strings(self):
         if self._format == "dense":
             return self._data
@@ -324,7 +324,7 @@ def load_pauli(
         with open(filename, 'r') as file:
             for line in file:
                 line = line.strip()
-                if line[0] == "#":
+                if not line or line[0] == "#":
                     continue
                 idx = line.find(' ')
                 coef_str = line[:idx].strip()
@@ -333,7 +333,7 @@ def load_pauli(
                     if fmt is not None and fmt != "sparse":
                         raise ValueError("Inconsistent Pauli string file format.")
                     fmt = "sparse"
-                    coefficient = np.complex128(coef_str[1:-1])
+                    coefficient = complex(coef_str[1:-1])
                     if pauli[-1] == '+':
                         pauli = pauli[:pauli.rfind(']')+1]
                     pauli = pauli[1:-1]
@@ -349,11 +349,23 @@ def load_pauli(
                     if fmt is not None and fmt != "dense":
                         raise ValueError("Inconsistent Pauli string file format.")
                     fmt = "dense"
-                    coefficient = np.complex128(coef_str)
+                    coefficient = complex(coef_str)
                     if numq != 0 and len(pauli) != numq:
                         raise ValueError("Inconsistent dense Pauli string length.")
                     numq = len(pauli)
                     pauli_dict[pauli] = coefficient
+        # Validate that all coefficients are real (Hamiltonians must be Hermitian)
+        # and convert to float
+        for pauli in pauli_dict:
+            coef = pauli_dict[pauli]
+            # Use relative tolerance (scale-invariant)
+            if abs(coef.imag) > abs(coef) * 1e-8:
+                imag_ratio_percent = abs(coef.imag) / abs(coef) * 100
+                raise ValueError(
+                    f"Hamiltonian must be Hermitian (real coefficients). "
+                    f"Found coefficient {coef} where imaginary part is "
+                    f"{imag_ratio_percent:.4g}% of magnitude (max allowed: 1e-6%).")
+            pauli_dict[pauli] = coef.real
         if fmt == "dense":
             return Hamiltonian(LinearCombinationOfPauliStrings(num_qubits=numq, dense=pauli_dict))
         elif fmt == "sparse":

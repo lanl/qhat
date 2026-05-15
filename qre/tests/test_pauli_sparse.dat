@@ -1,0 +1,21 @@
+# Simple test Hamiltonian in sparse Pauli string format
+# Format: (<coefficient>) [<op><idx> <op><idx> ...]
+# This represents a small Hamiltonian on 4 qubits
+
+# Identity term (constant energy shift)
+(2.5) []+
+
+# Single-qubit terms
+(0.5) [X0]+
+(-0.3) [X1]+
+(0.7) [Z2]+
+
+# Two-qubit interactions
+(1.2) [X0 X1]+
+(-0.8) [Y0 Y1]+
+(0.6) [Z0 Z1]+
+(0.4) [X1 Z2]+
+
+# Additional terms
+(0.25) [X0 Y1 Z2]+
+(-0.15) [Z0 Y1 X2]+
