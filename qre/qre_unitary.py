@@ -126,6 +126,7 @@ def encode_ramped_trotter(
     c1, c2 = trotter_error_estimator_fast(
         hamiltonian.get_grouped_terms(),
         error_coeff_time_limit,
+        config_general,
         mode=error_coeff_mode,
         auto_exact=error_coeff_auto_exact
     )

@@ -24,6 +24,7 @@ from trotter_coefficients_fast import (
     compute_C21_exact,
     compute_C22_exact
 )
+from .mock_config import mock_config
 
 
 # =============================================================================
@@ -63,8 +64,8 @@ def test_two_anticommuting_paulis():
     H2 = QubitOperator('Y0', 1.0)
     terms = [H1, H2]
 
-    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 10, mode='exact')
-    c1_auto, c2_auto = trotter_error_estimator_fast(terms, 60, mode='monte_carlo', auto_exact=True)
+    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
+    c1_auto, c2_auto = trotter_error_estimator_fast(terms, 60, mock_config, mode='monte_carlo', auto_exact=True)
 
     expected_c1 = 1.0
     expected_c2 = 1.0/6.0
@@ -89,7 +90,7 @@ def test_three_mutually_anticommuting():
     H3 = QubitOperator('Z0', 1.0)
     terms = [H1, H2, H3]
 
-    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 10, mode='exact')
+    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
 
     expected_c1 = 3.0
     expected_c2 = 0.5
@@ -110,7 +111,7 @@ def test_commuting_paulis():
     H2 = QubitOperator('X1', 1.0)
     terms = [H1, H2]
 
-    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 10, mode='exact')
+    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
 
     assert abs(c1_ex) < 1e-10, f"C1: got {c1_ex}, expected 0.0"
     assert abs(c2_ex) < 1e-10, f"C2: got {c2_ex}, expected 0.0"
@@ -129,7 +130,7 @@ def test_non_unit_coefficients():
     H2 = QubitOperator('Y0', 3.0)
     terms = [H1, H2]
 
-    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 10, mode='exact')
+    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
 
     expected_c1 = 6.0
     expected_c2 = 2.0
@@ -147,7 +148,7 @@ def test_non_unit_coefficients():
 def test_single_term():
     """N=1: Single term - no pairs or triples."""
     terms = [QubitOperator('X0', 1.0)]
-    c1, c2 = trotter_error_estimator_fast(terms, 10, mode='exact')
+    c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
 
     assert c1 == 0.0, f"Expected C1=0, got {c1}"
     assert c2 == 0.0, f"Expected C2=0, got {c2}"
@@ -157,7 +158,7 @@ def test_single_term():
 def test_two_terms_minimum_pairs():
     """N=2: Minimum for pairs, no triples."""
     terms = [QubitOperator('X0', 1.0), QubitOperator('Y0', 1.0)]
-    c1, c2 = trotter_error_estimator_fast(terms, 10, mode='exact')
+    c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
 
     assert c1 > 0, f"Expected C1>0, got {c1}"
     assert c2 > 0, f"Expected C2>0, got {c2}"
@@ -171,7 +172,7 @@ def test_three_terms_minimum_triples():
         QubitOperator('Y0', 1.0),
         QubitOperator('Z0', 1.0)
     ]
-    c1, c2 = trotter_error_estimator_fast(terms, 10, mode='exact')
+    c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
 
     assert c1 > 0, f"Expected C1>0, got {c1}"
     assert c2 > 0, f"Expected C2>0, got {c2}"
@@ -186,7 +187,7 @@ def test_all_commute():
         QubitOperator('X2', 1.0),
         QubitOperator('X3', 1.0)
     ]
-    c1, c2 = trotter_error_estimator_fast(terms, 10, mode='exact')
+    c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
 
     assert abs(c1) < 1e-10, f"Expected C1≈0, got {c1}"
     assert abs(c2) < 1e-10, f"Expected C2≈0, got {c2}"
@@ -201,7 +202,7 @@ def test_mixed_commuting_anticommuting():
         QubitOperator('X1', 1.0),  # commutes with above
         QubitOperator('Y1', 1.0)   # anticommutes with X1
     ]
-    c1, c2 = trotter_error_estimator_fast(terms, 10, mode='exact')
+    c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
 
     # Expected: 2 pairs contribute (X0,Y0) and (X1,Y1)
     # C1 = 2+2 = 4, so C1_est = 2.0
@@ -217,7 +218,7 @@ def test_zero_coefficients():
         QubitOperator('Y0', 1.0),
         QubitOperator('Z0', 1.0)
     ]
-    c1, c2 = trotter_error_estimator_fast(terms, 10, mode='exact')
+    c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
 
     # Only Y0-Z0 pair contributes: C1 = 2, so C1_est = 1.0
     assert abs(c1 - 1.0) < 1e-10, f"Expected C1=1.0, got {c1}"
@@ -230,7 +231,7 @@ def test_complex_coefficients():
         QubitOperator('X0', 1.0 + 1.0j),
         QubitOperator('Y0', 2.0 - 0.5j)
     ]
-    c1, c2 = trotter_error_estimator_fast(terms, 10, mode='exact')
+    c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
 
     # |ab| = sqrt(2.5^2 + 1.5^2) = sqrt(8.5)
     expected = np.sqrt(8.5)
@@ -244,7 +245,7 @@ def test_large_coefficients():
         QubitOperator('X0', 100.0),
         QubitOperator('Y0', 200.0)
     ]
-    c1, c2 = trotter_error_estimator_fast(terms, 10, mode='exact')
+    c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
 
     # C1 = 2|100*200| = 40000, so C1_est = 20000
     assert abs(c1 - 20000.0) < 1e-8, f"Expected C1=20000, got {c1}"

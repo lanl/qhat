@@ -17,6 +17,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from trotter_coefficients_fast import trotter_error_estimator_fast
+from .mock_config import mock_config
+
 
 
 # =============================================================================
@@ -30,7 +32,7 @@ def test_backward_compatibility():
     terms = [H1, H2]
 
     # Default should be monte_carlo with auto_exact=False
-    c1, c2 = trotter_error_estimator_fast(terms, 10)
+    c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config)
 
     expected_c1 = 1.0
     expected_c2 = 1.0/6.0
@@ -46,7 +48,7 @@ def test_explicit_monte_carlo():
     H2 = QubitOperator('Y0', 1.0)
     terms = [H1, H2]
 
-    c1, c2 = trotter_error_estimator_fast(terms, 10, mode='monte_carlo')
+    c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config, mode='monte_carlo')
 
     assert abs(c1 - 1.0) < 1e-6
     assert abs(c2 - 1.0/6.0) < 1e-6
@@ -59,7 +61,7 @@ def test_exact_mode_small_system():
     H2 = QubitOperator('Y0', 1.0)
     terms = [H1, H2]
 
-    c1, c2 = trotter_error_estimator_fast(terms, 10, mode='exact')
+    c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
 
     assert abs(c1 - 1.0) < 1e-10, f"C1: expected 1.0, got {c1}"
     assert abs(c2 - 1.0/6.0) < 1e-10, f"C2: expected {1.0/6.0}, got {c2}"
@@ -72,7 +74,7 @@ def test_auto_exact_mode():
     H2 = QubitOperator('Y0', 1.0)
     terms = [H1, H2]
 
-    c1, c2 = trotter_error_estimator_fast(terms, 60, mode='monte_carlo', auto_exact=True)
+    c1, c2 = trotter_error_estimator_fast(terms, 60, mock_config, mode='monte_carlo', auto_exact=True)
 
     assert abs(c1 - 1.0) < 1e-10, f"C1: expected 1.0, got {c1}"
     assert abs(c2 - 1.0/6.0) < 1e-10, f"C2: expected {1.0/6.0}, got {c2}"
@@ -86,7 +88,7 @@ def test_invalid_mode_raises_error():
     terms = [H1, H2]
 
     try:
-        c1, c2 = trotter_error_estimator_fast(terms, 10, mode='invalid')
+        c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config, mode='invalid')
         assert False, "Should have raised ValueError"
     except ValueError as e:
         assert "Invalid mode" in str(e)
@@ -103,7 +105,7 @@ def test_exact_mode_large_system_raises_error():
         terms.append(QubitOperator(f'{pauli}{qubit}', 1.0))
 
     try:
-        c1, c2 = trotter_error_estimator_fast(terms, 10, mode='exact')
+        c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
         assert False, "Should have raised ValueError"
     except ValueError as e:
         assert "not feasible" in str(e)
@@ -119,7 +121,7 @@ def test_monte_carlo_works_large_system():
         pauli = ['X', 'Y', 'Z'][i % 3]
         terms.append(QubitOperator(f'{pauli}{qubit}', 1.0))
 
-    c1, c2 = trotter_error_estimator_fast(terms, 10, mode='monte_carlo')
+    c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config, mode='monte_carlo')
 
     assert c1 > 0 and c2 >= 0
     print("✓ Test passed: Monte Carlo on large system")
@@ -132,9 +134,9 @@ def test_modes_agree_on_small_system():
     H3 = QubitOperator('Z0', 1.0)
     terms = [H1, H2, H3]
 
-    c1_mc, c2_mc = trotter_error_estimator_fast(terms, 20, mode='monte_carlo', auto_exact=False)
-    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 20, mode='exact')
-    c1_auto, c2_auto = trotter_error_estimator_fast(terms, 60, mode='monte_carlo', auto_exact=True)
+    c1_mc, c2_mc = trotter_error_estimator_fast(terms, 20, mock_config, mode='monte_carlo', auto_exact=False)
+    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 20, mock_config, mode='exact')
+    c1_auto, c2_auto = trotter_error_estimator_fast(terms, 60, mock_config, mode='monte_carlo', auto_exact=True)
 
     # Exact and auto-exact should match perfectly
     assert abs(c1_auto - c1_ex) < 1e-10, "Auto-exact C1 should match exact"
@@ -163,10 +165,10 @@ def test_complete_workflow():
     terms = [H1, H2, H3, H4, H5]
 
     # Test all modes work
-    c1_default, c2_default = trotter_error_estimator_fast(terms, 10)
-    c1_mc, c2_mc = trotter_error_estimator_fast(terms, 10, mode='monte_carlo')
-    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 10, mode='exact')
-    c1_auto, c2_auto = trotter_error_estimator_fast(terms, 60, mode='monte_carlo', auto_exact=True)
+    c1_default, c2_default = trotter_error_estimator_fast(terms, 10, mock_config)
+    c1_mc, c2_mc = trotter_error_estimator_fast(terms, 10, mock_config, mode='monte_carlo')
+    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
+    c1_auto, c2_auto = trotter_error_estimator_fast(terms, 60, mock_config, mode='monte_carlo', auto_exact=True)
 
     # All should return positive values
     assert c1_default > 0 and c2_default > 0
@@ -192,9 +194,9 @@ def test_larger_system_integration():
         terms.append(QubitOperator(f'{pauli}{qubit}', coeff))
 
     # All modes should work
-    c1_mc, c2_mc = trotter_error_estimator_fast(terms, 20, mode='monte_carlo', auto_exact=False)
-    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 20, mode='exact')
-    c1_auto, c2_auto = trotter_error_estimator_fast(terms, 60, mode='monte_carlo', auto_exact=True)
+    c1_mc, c2_mc = trotter_error_estimator_fast(terms, 20, mock_config, mode='monte_carlo', auto_exact=False)
+    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 20, mock_config, mode='exact')
+    c1_auto, c2_auto = trotter_error_estimator_fast(terms, 60, mock_config, mode='monte_carlo', auto_exact=True)
 
     # Exact modes should match
     assert abs(c1_ex - c1_auto) < 1e-10
@@ -207,22 +209,22 @@ def test_edge_case_integration():
     """Test edge cases work in integration."""
     # N=1
     terms = [QubitOperator('X0', 1.0)]
-    c1, c2 = trotter_error_estimator_fast(terms, 10, mode='exact')
+    c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
     assert c1 == 0.0 and c2 == 0.0
 
     # N=2
     terms = [QubitOperator('X0', 1.0), QubitOperator('Y0', 1.0)]
-    c1, c2 = trotter_error_estimator_fast(terms, 10, mode='exact')
+    c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
     assert c1 > 0
 
     # All commuting
     terms = [QubitOperator('X0', 1.0), QubitOperator('X1', 1.0), QubitOperator('X2', 1.0)]
-    c1, c2 = trotter_error_estimator_fast(terms, 10, mode='exact')
+    c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
     assert c1 == 0.0 and c2 == 0.0
 
     # Complex coefficients
     terms = [QubitOperator('X0', 1.0+1.0j), QubitOperator('Y0', 1.0-1.0j)]
-    c1, c2 = trotter_error_estimator_fast(terms, 10, mode='exact')
+    c1, c2 = trotter_error_estimator_fast(terms, 10, mock_config, mode='exact')
     assert c1 > 0
 
     print("✓ Test passed: Edge case integration")

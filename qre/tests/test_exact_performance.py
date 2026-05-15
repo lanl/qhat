@@ -12,6 +12,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from trotter_coefficients_fast import trotter_error_estimator_fast
+from .mock_config import mock_config
+
 
 
 def generate_random_hamiltonian(N, n_qubits=50):
@@ -37,13 +39,13 @@ def test_exact_faster_for_small_N():
     # Time Monte Carlo (without auto-exact to ensure it doesn't switch)
     print("\nTiming Monte Carlo (60s budget)...")
     start = time.time()
-    c1_mc, c2_mc = trotter_error_estimator_fast(terms, 60, mode='monte_carlo', auto_exact=False)
+    c1_mc, c2_mc = trotter_error_estimator_fast(terms, 60, mock_config, mode='monte_carlo', auto_exact=False)
     time_mc = time.time() - start
 
     # Time exact
     print("\nTiming Exact...")
     start = time.time()
-    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 60, mode='exact')
+    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 60, mock_config, mode='exact')
     time_ex = time.time() - start
 
     print("\n" + "-"*70)
@@ -79,13 +81,13 @@ def test_auto_exact_switches():
     # Time auto-exact (should switch to exact)
     print("\nTiming Auto-exact (should switch)...")
     start = time.time()
-    c1_auto, c2_auto = trotter_error_estimator_fast(terms, 60, mode='monte_carlo', auto_exact=True)
+    c1_auto, c2_auto = trotter_error_estimator_fast(terms, 60, mock_config, mode='monte_carlo', auto_exact=True)
     time_auto = time.time() - start
 
     # Time exact directly
     print("\nTiming Exact directly...")
     start = time.time()
-    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 60, mode='exact')
+    c1_ex, c2_ex = trotter_error_estimator_fast(terms, 60, mock_config, mode='exact')
     time_ex = time.time() - start
 
     print("\n" + "-"*70)
@@ -124,7 +126,7 @@ def test_scaling_with_N():
         terms = generate_random_hamiltonian(N)
 
         start = time.time()
-        c1, c2 = trotter_error_estimator_fast(terms, 60, mode='exact')
+        c1, c2 = trotter_error_estimator_fast(terms, 60, mock_config, mode='exact')
         elapsed = time.time() - start
 
         n_pairs = N * (N - 1) // 2
