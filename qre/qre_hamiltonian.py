@@ -153,9 +153,8 @@ class Hamiltonian:
             else:
                 as_tuples = self.get_all_pauli_strings(return_as="tuples")
                 Nq = self.num_qubits()
-                # TODO: Why is the all-identity string excluded?  Isn't that a bug?
                 return {sparse_to_dense_pauli(pauli, Nq) : coef
-                    for pauli, coef in as_tuples.items() if pauli != ()}
+                    for pauli, coef in as_tuples.items()}
         else:
             raise ValueError("  ".join([
                 "The value of return_as must be \"tuples\" or \"strings\".",
