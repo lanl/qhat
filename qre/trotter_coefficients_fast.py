@@ -39,6 +39,73 @@ PROGRESS_INTERVAL_GROWTH = 1.5       # Exponential growth factor (1.5x each time
 MAX_PROGRESS_INTERVAL = 300.0        # Cap at 5 minutes between reports
 
 # --------------------------------------------------
+# Throughput configuration for feasibility estimation
+# --------------------------------------------------
+# These values are empirically derived from benchmarking and can be overridden
+# if you want to calibrate for specific hardware.
+#
+# HOW TO RECALIBRATE:
+# -------------------
+# Method 1: Use the calibration script (RECOMMENDED)
+#   cd qre
+#   python3.11 calibrate_throughput.py --runs 3 --N 50
+#   # This runs 3 calibration runs, measures throughput, and outputs update code
+#
+# Method 2: Manual calibration
+#   1. Run exact computation on a moderately-sized system (N=50 works well)
+#   2. Look at the output for lines like:
+#        "C1 EXACT: 1225 pairs computed in 0.082s (15.0M pairs/sec)"
+#        "C21 EXACT: 19600 triples computed in 2.450s (8.0M triples/sec)"
+#        "C22 EXACT: 1225 pairs computed in 0.111s (11.0M pairs/sec)"
+#   3. The throughput values are shown in parentheses (M = millions per second)
+#   4. Run multiple times and average to account for system load variations
+#
+#   Example manual calibration:
+#     from openfermion import QubitOperator
+#     import numpy as np
+#     np.random.seed(42)
+#     # Generate N=50 random terms
+#     terms = []
+#     for i in range(50):
+#         qubit = i % 20
+#         pauli = np.random.choice(['X', 'Y', 'Z'])
+#         coeff = np.random.uniform(0.5, 2.0)
+#         terms.append(QubitOperator(f'{pauli}{qubit}', coeff))
+#     # Run exact computation and observe throughput in output
+#     c1, c2 = trotter_error_estimator_fast(terms, 60, mode='exact')
+#
+# HOW TO UPDATE THE CONFIGURATION:
+# --------------------------------
+# Option 1: Modify this file directly (affects all future runs)
+#   Change the values in THROUGHPUT_CONFIG below
+#
+# Option 2: Override at runtime (for specific calculations)
+#   from trotter_coefficients_fast import THROUGHPUT_CONFIG
+#   my_config = THROUGHPUT_CONFIG.copy()
+#   my_config['c1_samples_per_sec'] = 20e6   # Your measured value
+#   my_config['c21_samples_per_sec'] = 10e6  # Your measured value
+#   my_config['c22_samples_per_sec'] = 14e6  # Your measured value
+#   # Use in feasibility check:
+#   should_use_exact_tracking(N=100, throughput_config=my_config)
+#
+# Option 3: Set environment-specific defaults in your application
+#   import trotter_coefficients_fast as tcf
+#   tcf.THROUGHPUT_CONFIG['c1_samples_per_sec'] = 20e6  # Modifies global default
+#
+# WHY THESE VALUES MATTER:
+# ------------------------
+# The throughput values are used to estimate whether exact computation will
+# complete within the time budget. If your hardware is faster/slower than
+# the defaults, the feasibility checks may be too conservative/optimistic.
+# Accurate calibration ensures optimal mode selection (exact vs Monte Carlo).
+#
+THROUGHPUT_CONFIG = {
+    'c1_samples_per_sec': 15e6,   # Pair commutators: ||[H_i, H_j]||
+    'c21_samples_per_sec': 8e6,   # Nested triple commutators: ||[H_i, [H_j, H_k]]||
+    'c22_samples_per_sec': 11e6,  # Double commutators: ||[H_k, [H_k, H_j]]||
+}
+
+# --------------------------------------------------
 # Binary encoding for Pauli strings
 # --------------------------------------------------
 # Each Pauli operator is encoded as 2 bits:
@@ -278,7 +345,7 @@ def preprocess_pauli_terms(pauli_terms):
     return x_bits, z_bits, coeffs, n_qubits
 
 
-def should_use_exact_tracking(N, time_budget=None, memory_limit_mb=None):
+def should_use_exact_tracking(N, time_budget=None, memory_limit_mb=None, throughput_config=None):
     """
     Decide whether to use exact computation tracking based on time and memory constraints.
 
@@ -286,6 +353,9 @@ def should_use_exact_tracking(N, time_budget=None, memory_limit_mb=None):
         N: Number of Pauli terms
         time_budget: Time budget in seconds (defaults to EXACT_COMPUTATION_TIME_BUDGET)
         memory_limit_mb: Memory limit in MB (defaults to EXACT_COMPUTATION_MEMORY_LIMIT_MB)
+        throughput_config: Dictionary with throughput rates in samples/sec
+            {'c1_samples_per_sec': float, 'c21_samples_per_sec': float, 'c22_samples_per_sec': float}
+            If None, uses THROUGHPUT_CONFIG defaults (15M/8M/11M samples/sec)
 
     Returns:
         bool: True if exact tracking is feasible and beneficial
@@ -294,6 +364,8 @@ def should_use_exact_tracking(N, time_budget=None, memory_limit_mb=None):
         time_budget = EXACT_COMPUTATION_TIME_BUDGET
     if memory_limit_mb is None:
         memory_limit_mb = EXACT_COMPUTATION_MEMORY_LIMIT_MB
+    if throughput_config is None:
+        throughput_config = THROUGHPUT_CONFIG
 
     # Compute combination counts
     c1_count = N * (N - 1) // 2
@@ -312,10 +384,10 @@ def should_use_exact_tracking(N, time_budget=None, memory_limit_mb=None):
         return False
 
     # Time check (coupon collector: N*ln(N) samples needed on average)
-    # Use throughput estimates: 15M/s for C1, 8M/s for C21, 11M/s for C22
-    c1_time = c1_count * np.log(max(2, c1_count)) / 15e6 if c1_count > 0 else 0
-    c21_time = c21_count * np.log(max(2, c21_count)) / 8e6 if c21_count > 0 else 0
-    c22_time = c22_count * np.log(max(2, c22_count)) / 11e6 if c22_count > 0 else 0
+    # Use throughput estimates from config
+    c1_time = c1_count * np.log(max(2, c1_count)) / throughput_config['c1_samples_per_sec'] if c1_count > 0 else 0
+    c21_time = c21_count * np.log(max(2, c21_count)) / throughput_config['c21_samples_per_sec'] if c21_count > 0 else 0
+    c22_time = c22_count * np.log(max(2, c22_count)) / throughput_config['c22_samples_per_sec'] if c22_count > 0 else 0
     estimated_time = c1_time + c21_time + c22_time
 
     if estimated_time > time_budget:
