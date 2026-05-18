@@ -2,7 +2,7 @@
 Mock configuration for testing.
 
 Provides a simple mock GeneralConfiguration object that can be used
-in tests without requiring the full QRE infrastructure.
+in tests without requiring the full analysis infrastructure.
 """
 
 

@@ -1,6 +1,6 @@
 from common.bosons_binary import BosonicBinaryEncoding
 from common.MixedFermionBosonOperator import MixedFermionBosonOperator
-from qre_types import GeneralConfiguration, HamiltonianConfiguration, value
+from config_types import GeneralConfiguration, HamiltonianConfiguration, value
 
 from functools import cache, reduce
 import h5py

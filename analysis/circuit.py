@@ -28,7 +28,7 @@
 
 import math
 
-from qre_types import GeneralConfiguration, QPEConfiguration
+from config_types import GeneralConfiguration, QPEConfiguration
 
 from pyLIQTR.PhaseEstimation.pe import PhaseEstimation
 from pyLIQTR.qubitization.phase_estimation import QubitizedPhaseEstimation

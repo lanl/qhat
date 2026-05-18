@@ -789,7 +789,7 @@ class TestBackwardCompatibility:
         assert bloq.coefficients == (0.5, 0.5)
 
     def test_build_with_generator(self):
-        """Test old interface with generator input (as from qre Hamiltonian)."""
+        """Test old interface with generator input (as from analysis Hamiltonian)."""
         # Simulate what hamiltonian.get_all_pauli_strings(return_as='strings') returns
         def pauli_generator():
             yield ("XY", 0.5)
@@ -805,9 +805,9 @@ class TestBackwardCompatibility:
         assert bloq.num_terms == 3
         assert bloq.num_steps == 5
 
-    def test_backward_compatible_with_qre_usage(self):
-        """Test the exact usage pattern from qre/qre_unitary.py."""
-        # This simulates the exact call from qre_unitary.py line 122-126
+    def test_backward_compatible_with_analysis_usage(self):
+        """Test the exact usage pattern from analysis/unitary.py."""
+        # This simulates the exact call from unitary.py line 122-126
         pauli_strings = [("XII", 0.5), ("IXI", 0.3), ("IIX", 0.2)]
         method = "second order"
         timestep = 1.0

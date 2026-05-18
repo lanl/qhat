@@ -18,14 +18,14 @@ import numpy as np
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from qre_hamiltonian import (
+from hamiltonian import (
     LinearCombinationOfPauliStrings,
     Hamiltonian,
     load_pauli,
     sparse_to_dense_pauli,
     dense_to_sparse_pauli
 )
-from qre_types import GeneralConfiguration, GeneralConfigurationUser, HamiltonianConfiguration
+from config_types import GeneralConfiguration, GeneralConfigurationUser, HamiltonianConfiguration
 
 
 # ==================================================================================
@@ -460,7 +460,7 @@ class TestHermitianValidation:
 # ==================================================================================
 
 class TestHamiltonianIntegration:
-    """Test integration with Hamiltonian class and QRE pipeline."""
+    """Test integration with Hamiltonian class and analysis pipeline."""
 
     @pytest.fixture
     def config(self, general_config):

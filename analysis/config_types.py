@@ -33,7 +33,7 @@ def value(x, default):
 class GeneralConfigurationUser:
     def __init__(self):
         # Logfile name
-        self.logfile = "qre.log"
+        self.logfile = "analysis.log"
         # How much information to print as the script runs
         self._loglevel = "info"
     def print_default(self):
@@ -261,7 +261,7 @@ class GeneralConfiguration:
         _addLoggingLevel("VERBOSE", (logging.INFO + logging.DEBUG) // 2)
         self.logger = _configure_log(user_config.logfile, get_log_level(user_config._loglevel))
         self.git_hash = _get_git_hash()
-        self.log("\n".join(["", '*' * 99, "QRE_DRIVER START", '*' * 99]))
+        self.log("\n".join(["", '*' * 99, "ANALYSIS DRIVER START", '*' * 99]))
         self.log(f"Logfile: {self.logfile}")
         self.log(f"Running script with git hash {self.git_hash}")
     def log(self, *args, **kwargs):

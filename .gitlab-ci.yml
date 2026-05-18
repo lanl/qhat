@@ -38,29 +38,29 @@ run-hamgen:
       - .venv/
     policy: pull
 
-run-qre-trotter:
+run-analysis-trotter:
   stage: test
   script:
     - hostname
     - source .venv/bin/activate
     - module load gcc/13.2.0
-    - cd qre
-    - python qre_driver.py
+    - cd analysis
+    - python driver.py
   cache:
     key: "${CI_COMMIT_REF_SLUG}"
     paths:
       - .venv/
     policy: pull
 
-run-qre-dbl-fact:
+run-analysis-dbl-fact:
   stage: test
   script:
     - hostname
     - source .venv/bin/activate
     - module load gcc/13.2.0
-    - cd qre
+    - cd analysis
     - sed -e 's/^my_method = "Trotter"/my_method = "double-factorization"/' config.py > config-df.py
-    - python qre_driver.py config-df.py
+    - python driver.py config-df.py
   cache:
     key: "${CI_COMMIT_REF_SLUG}"
     paths:
@@ -80,12 +80,12 @@ run-common-tests:
       - .venv/
     policy: pull
 
-run-qre-tests:
+run-analysis-tests:
   stage: test
   script:
     - hostname
     - source .venv/bin/activate
-    - cd qre
+    - cd analysis
     - python3.11 -m pytest tests/ -v
   cache:
     key: "${CI_COMMIT_REF_SLUG}"

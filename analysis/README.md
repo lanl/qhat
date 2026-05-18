@@ -1,16 +1,16 @@
-# QHAT Quantum Resource Estimation
+# QHAT Analysis
 
 [[_TOC_]]
 
-This directory contains the modules for performing quantum resource estimation (QRE).  This is run
+This directory contains the modules for performing analysis.  This is run
 by
 ```
-python qre_driver.py
+python driver.py
 ```
 By default, this will load the setup from `config.py`, but this can be changed by passing the name
 of a configuration file as a command line argument
 ```
-python qre_driver.py my_configuration_file.py
+python driver.py my_configuration_file.py
 ```
 
 ## Configuration Options
@@ -26,7 +26,7 @@ Configuration is broken down by several parts of the processing script.
 only controls under this heading relate to logging progress of the script.
 
 You can configure the log file that the script will write to by setting **`general.logfile`** to
-the name of the logfile you want to use.  The default is `qre.log`.
+the name of the logfile you want to use.  The default is `analysis.log`.
 
 The other capability under general configuration is to set the log level, which is done by calling
 the following functions.  If you call multiple of these functions, whichever is called last takes

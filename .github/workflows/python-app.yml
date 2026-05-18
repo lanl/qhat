@@ -66,14 +66,14 @@ jobs:
             script: hamgen.py
             config_file: ''
 
-          - name: qre-trotter
-            directory: qre
-            script: qre_driver.py
+          - name: analysis-trotter
+            directory: analysis
+            script: driver.py
             config_file: ''
 
-          - name: qre-dbl-factor
-            directory: qre
-            script: qre_driver.py
+          - name: analysis-dbl-factor
+            directory: analysis
+            script: driver.py
             config_file: config-df.py
             config_setup: 'sed -e ''s/^my_method = "Trotter"/my_method = "double-factorization"/'' config.py > config-df.py'
 
@@ -83,8 +83,8 @@ jobs:
             config_file: ''
             config_setup: ''
 
-          - name: qre-unit-tests
-            directory: qre
+          - name: analysis-unit-tests
+            directory: analysis
             script: pytest
             config_file: ''
             config_setup: ''
