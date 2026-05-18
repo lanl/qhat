@@ -369,13 +369,7 @@ def should_use_exact_tracking(N, time_budget=None, memory_limit_mb=None, through
 
     # Compute combination counts
     c1_count = N * (N - 1) // 2
-
-    # For C21, use approximation for large N to avoid expensive computation
-    if N < 500:
-        c21_count = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
-    else:
-        c21_count = N**3 // 6  # Approximation
-
+    c21_count = N * (N - 1) * (N - 2) // 6  # C(N, 3) - number of ways to choose 3 items from N
     c22_count = N * (N - 1) // 2
 
     # Memory check (12 bytes per triple for set overhead, 8 per pair)
@@ -427,8 +421,8 @@ def generate_all_triples(N):
     Returns:
         Array of shape (total_count, 3) with all triples
     """
-    # Count total first
-    total_count = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
+    # Count total first - this is C(N, 3)
+    total_count = N * (N - 1) * (N - 2) // 6
     indices = np.empty((total_count, 3), dtype=np.int64)
 
     idx = 0
@@ -712,7 +706,7 @@ def _compute_monte_carlo_path(x_bits, z_bits, coeffs, N, time_limit, batch_size,
 
         # Compute total combinations for completion check
         total_c1 = N * (N - 1) // 2
-        total_c21 = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
+        total_c21 = N * (N - 1) * (N - 2) // 6  # C(N, 3)
         total_c22 = N * (N - 1) // 2
 
     # Warmup: trigger Numba JIT compilation before timing
@@ -839,7 +833,7 @@ def _compute_monte_carlo_path(x_bits, z_bits, coeffs, N, time_limit, batch_size,
                 break
 
         if not use_tracking or len(seen_c21) < total_c21:
-            total_C21 = sum(math.comb(N - k - 1, 2) for k in range(N - 1))
+            total_C21 = N * (N - 1) * (N - 2) // 6  # C(N, 3)
             C21_est = C21_sum * (total_C21 / samples_C21) if samples_C21 > 0 else 0.0
             config_general.log_verbose(f"  C21 estimation: {samples_C21} samples in {time.time() - start_time:.3f}s")
             config_general.log_verbose(f"  C21 estimate: {C21_est:.6f}")
