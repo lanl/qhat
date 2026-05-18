@@ -163,6 +163,14 @@ However, this section is still under development and currently has very limited 
   measurements to extract the necessary number of bits of information.  This method only works with
   qubitized encodings such as double-factorization.  The integration of this method into the larger
   workflow has not yet been verified, so use this method with caution.
+- Time Evolution: Setting `circuit.method` to "time evolution" will return the time evolution
+  unitary operator.  This is useful for analyzing the resource requirements of the unitary itself
+  or for building custom circuits.
+- Controlled Time Evolution: Setting `circuit.method` to "controlled time evolution" will return
+  a singly-controlled version of the time evolution unitary.  This adds one control qubit to the
+  circuit and is useful for building custom quantum algorithms that require controlled time
+  evolution operators (for example, when building phase estimation or iterative phase estimation
+  circuits manually).
 
 When performing phase estimation, it is necessary to set the number of phase qubits (which, in the
 qubitized method, translates to the number of measurements of the single phase qubit).  This can be
