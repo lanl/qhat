@@ -77,6 +77,10 @@ class HamiltonianConfiguration(ConfigurationBase):
         self.fermion_to_qubit_transform = fermion_to_qubit_transform
         self.boson_to_qubit_transform = boson_to_qubit_transform
         self.max_bosons_per_state = max_bosons_per_state
+    def load_pauli_strings(self, filename):
+        self._only_once()
+        self.source = "pauli"
+        self.filename = filename
     def set_energy_lower_bound(self, value, exact=False):
         self.lower_bound = value
         self.exact_energy_lower_bound = exact

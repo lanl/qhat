@@ -4,6 +4,7 @@ from qre_types import GeneralConfiguration, HamiltonianConfiguration, value
 
 from functools import cache, reduce
 import h5py
+import json
 import numpy as np
 from openfermion import InteractionOperator, QubitOperator, count_qubits, bravyi_kitaev, \
                         jordan_wigner, binary_code_transform
@@ -27,15 +28,67 @@ bosonic_mapping = {
 
 # -------------------------------------------------------------------------------------------------
 
-# TODO: This is a generally useful utility.  Where should it live?
-def tuple_to_string(pauli_tuple, coef, num_qubits):
-    s = ["I",] * num_qubits
-    for idx, op in pauli_tuple:
-        s[idx] = op
-    s = "".join(s)
-    return (s, coef)
+# TODO: These are generally useful utilities.  Where should they live?
+def sparse_to_dense_pauli(sparse_pauli, num_qubits):
+    dense_pauli = ["I",] * num_qubits
+    for idx, op in sparse_pauli:
+        dense_pauli[idx] = op
+    return "".join(dense_pauli)
+def dense_to_sparse_pauli(dense_pauli):
+    sparse_pauli = tuple()
+    for idx, op in enumerate(dense_pauli):
+        if op in ["X", "Y", "Z"]:
+            sparse_pauli = (*sparse_pauli, (idx,op))
+        elif op != "I":
+            raise ValueError(f"Invalid character in dense pauli string: \"{op}\".")
+    return sparse_pauli
 
 # -------------------------------------------------------------------------------------------------
+
+class LinearCombinationOfPauliStrings:
+    def __init__(self, **kwargs):
+        self._nq = None
+        self._format = None
+        self._data = None
+        self._nq = kwargs["num_qubits"]
+        for f in [ "dense", "sparse" ]:
+            if f in kwargs:
+                if self._format is not None:
+                    raise ValueError(
+                        "Too many formats provided to LinearCombinationOfPauliStrings.")
+                self._format = f
+                self._data = kwargs[f]
+                assert isinstance(self._data, dict)
+        if self._format is None:
+            raise ValueError("No data provided to LinearCombinationOfPauliStrings.")
+    def num_qubits(self):
+        return self._nq
+    def get_dense_pauli_strings(self):
+        if self._format == "dense":
+            return self._data
+        elif self._format == "sparse":
+            return {sparse_to_dense_pauli(pauli, self._nq) : coef
+                    for pauli, coef in self._data.items()}
+        else:
+            raise ValueError("Invalid data format \"{self._format}\".")
+    def get_sparse_pauli_strings(self):
+        if self._format == "dense":
+            return {dense_to_sparse_pauli(pauli) : coef for pauli, coef in self._data.items()}
+        elif self._format == "sparse":
+            return self._data
+        else:
+            raise ValueError("Invalid data format \"{self._format}\".")
+    def energy_shift(self, shift):
+        all_identity = tuple()
+        if self._format == "dense":
+            all_identity = sparse_to_dense_pauli(all_identity, self._nq)
+        identity_coefficient = self._data.get(all_identity, 0.0) + shift
+        self._data[all_identity] = identity_coefficient
+
+# -------------------------------------------------------------------------------------------------
+
+# TODO: The heavy use of isinstance() suggests that perhaps Hamiltonian should be a base class that
+#       other things are built on top of?
 
 class Hamiltonian:
     def __init__(self, hamiltonian):
@@ -45,6 +98,7 @@ class Hamiltonian:
         #       pyLIQTR problem instance.
         return self._H
     def set_fermionic_mapping(self, mapping):
+        # self._fmap is never used for LinearCombinationOfPauliStrings
         if isinstance(mapping, str):
             self._fmap = fermionic_mapping[mapping]
         else:
@@ -52,6 +106,7 @@ class Hamiltonian:
         if isinstance(self._H, MixedFermionBosonOperator):
             self._H.set_fermionic_encoding(self._fmap)
     def set_bosonic_mapping(self, mapping, max_bosons_per_state):
+        # self._bmap is never used for LinearCombinationOfPauliStrings
         if isinstance(mapping, str):
             self._bmap = bosonic_mapping[mapping](max_bosons_per_state)
         else:
@@ -63,9 +118,10 @@ class Hamiltonian:
             return self._H.n_qubits
         elif isinstance(self._H, MixedFermionBosonOperator):
             return self._H.num_qubits()
+        elif isinstance(self._H, LinearCombinationOfPauliStrings):
+            return self._H.num_qubits()
         else:
-            raise TypeError(" ".join(["Unable to determine the number of qubits for types other",
-                                      "than \"InteractionOperator\"."]))
+            raise TypeError("Unable to determine the number of qubits.")
     def get_all_pauli_strings(self, return_as="tuples"):
         # Returns all Pauli strings as a flat data structure, specifically a dictionary where the
         # key is the Pauli string and the value is the coefficient.
@@ -76,6 +132,8 @@ class Hamiltonian:
         # -- If return_as == "strings": The Pauli string is encoded as a character string, where
         #    each character is a Pauli matrix, explicitly including identity entries.  For example,
         #    assuming 6 qubits, "XIIZII".
+        # TODO: I'd prefer that the flag identify not the data structure but the concept: dense vs
+        #       sparse, rather than strings vs tuples.
         if return_as == "tuples":
             if isinstance(self._H, InteractionOperator):
                 return self._fmap(self._H).terms
@@ -84,14 +142,19 @@ class Hamiltonian:
                 #       encodings selected by Hamiltonian.  Clean this up.  Probably by deferring
                 #       the specification of encodings for MixedFermionBosonOperator?
                 return self._H.generate_qubit_operator().terms
+            elif isinstance(self._H, LinearCombinationOfPauliStrings):
+                return self._H.get_sparse_pauli_strings()
             else:
                 raise TypeError(
                     f"Unable to generate Pauli strings from object of type \"{type(self._H)}\".")
         elif return_as == "strings":
-            as_tuples = self.get_all_pauli_strings(return_as="tuples")
-            Nq = self.num_qubits()
-            return (tuple_to_string(pauli, coef, Nq)
-                    for pauli, coef in as_tuples.items() if pauli != ())
+            if isinstance(self._H, LinearCombinationOfPauliStrings):
+                return self._H.get_dense_pauli_strings()
+            else:
+                as_tuples = self.get_all_pauli_strings(return_as="tuples")
+                Nq = self.num_qubits()
+                return {sparse_to_dense_pauli(pauli, Nq) : coef
+                    for pauli, coef in as_tuples.items()}
         else:
             raise ValueError("  ".join([
                 "The value of return_as must be \"tuples\" or \"strings\".",
@@ -125,6 +188,8 @@ class Hamiltonian:
             self._H = InteractionOperator(t0, t1, t2)
         elif isinstance(self._H, MixedFermionBosonOperator):
             self._H.energy_shift(dE)
+        elif isinstance(self._H, LinearCombinationOfPauliStrings):
+            self._H.energy_shift(dE)
         else:
             raise TypeError(
                     f"Unable to shift a fermionic Hamiltonian of type \"{type(self._H)}\".")
@@ -135,7 +200,7 @@ class Hamiltonian:
         config_general.log("Computing initial energy bounds.")
         pauli_sum = self.get_all_pauli_strings()
         config_general.log_verbose(f"-- number of Pauli strings = {len(pauli_sum)}")
-        energy_shift = pauli_sum[()] # the encoding only lists non-identity matrices, so () = I
+        energy_shift = pauli_sum.get(tuple(), 0.0) # identity term (may not exist in all formats)
         dE = sum(abs(coefficient) for coefficient in pauli_sum.values()) - abs(energy_shift)
         Elo0 = energy_shift - dE
         Ehi0 = energy_shift + dE
@@ -154,7 +219,6 @@ class Hamiltonian:
             Ehi1 = config_hamiltonian.upper_bound
         config_general.log_verbose(f"-- initial bounds = [{Elo1}, {Ehi1})")
         return (Elo1, Ehi1)
-    # TODO: Should there be a method to generate a pyLIQTR problem instance?
 
 # -------------------------------------------------------------------------------------------------
 
@@ -246,6 +310,231 @@ def load_numpy(
 
 # -------------------------------------------------------------------------------------------------
 
+def load_hamlib_hdf5(
+        config_general: GeneralConfiguration,
+        config_hamiltonian: HamiltonianConfiguration):
+    """
+    Load Pauli string Hamiltonian from HamLib HDF5 file format.
+
+    HamLib format stores operators as UTF-8 strings in the OpenFermion QubitOperator format:
+    (coefficient+0j) [pauli_string] +
+
+    Example: (1.5+0j) [X0 Z3] +\n(-0.5+0j) [Y1 Y2] +
+    """
+    filename = config_hamiltonian.filename
+    config_general.log(f"Loading HamLib HDF5 Hamiltonian from file \"{filename}\".")
+
+    # Determine the HDF5 key/path - user can specify it or we'll try to find it
+    hdf5_key = getattr(config_hamiltonian, 'hdf5_key', None)
+
+    with h5py.File(filename, 'r') as f:
+        # If no key specified, try to auto-detect
+        if hdf5_key is None:
+            # Get all dataset keys
+            all_keys = []
+            def collect_keys(name, obj):
+                if isinstance(obj, h5py.Dataset):
+                    all_keys.append(name)
+            f.visititems(collect_keys)
+
+            if len(all_keys) == 0:
+                raise ValueError(f"No datasets found in HDF5 file \"{filename}\".")
+            elif len(all_keys) == 1:
+                hdf5_key = all_keys[0]
+                config_general.log(f"Auto-detected HDF5 key: \"{hdf5_key}\"")
+            else:
+                raise ValueError(
+                    f"Multiple datasets found in HDF5 file. Please specify hdf5_key. "
+                    f"Available keys: {all_keys}")
+
+        # Load the dataset
+        dataset = f[hdf5_key]
+
+        # Read metadata if available (HamLib v1.1+)
+        metadata = dict(dataset.attrs.items()) if hasattr(dataset, 'attrs') else {}
+        if metadata:
+            config_general.log(f"HamLib metadata: {metadata}")
+
+        # Read the Pauli string data as UTF-8
+        hamlib_string = dataset[()].decode("utf-8")
+
+    # Parse the HamLib format
+    # Format: (coefficient+0j) [pauli_ops] +\n
+    numq = 0
+    pauli_dict = {}
+
+    # Split into individual terms (separated by ' +\n')
+    terms = hamlib_string.strip().split(' +\n')
+
+    for term_str in terms:
+        term_str = term_str.strip()
+        if not term_str:
+            continue
+
+        # Find the coefficient part (between parentheses)
+        paren_end = term_str.find(')')
+        if paren_end == -1:
+            raise ValueError(f"Invalid HamLib format: missing ')' in term: {term_str}")
+
+        coef_str = term_str[1:paren_end]  # Extract content between ( )
+        coefficient = complex(coef_str)
+
+        # Find the Pauli string part (between brackets)
+        bracket_start = term_str.find('[', paren_end)
+        bracket_end = term_str.find(']', bracket_start)
+
+        if bracket_start == -1 or bracket_end == -1:
+            raise ValueError(f"Invalid HamLib format: missing brackets in term: {term_str}")
+
+        pauli_str = term_str[bracket_start+1:bracket_end].strip()
+
+        # Parse the sparse Pauli string (reusing existing logic)
+        pauli_tokens = pauli_str.split() if pauli_str else []
+        sparse_pauli = tuple()
+
+        for token in pauli_tokens:
+            op = token[0]  # Pauli operator: X, Y, or Z
+            idx = int(token[1:])  # Qubit index
+            numq = max(numq, idx + 1)
+            sparse_pauli = (*sparse_pauli, (idx, op))
+
+        pauli_dict[sparse_pauli] = coefficient
+
+    # Validate that all coefficients are real (Hamiltonians must be Hermitian)
+    # and convert to float
+    for pauli in pauli_dict:
+        coef = pauli_dict[pauli]
+        # Use relative tolerance (scale-invariant)
+        if abs(coef.imag) > abs(coef) * 1e-8:
+            imag_ratio_percent = abs(coef.imag) / abs(coef) * 100
+            raise ValueError(
+                f"Hamiltonian must be Hermitian (real coefficients). "
+                f"Found coefficient {coef} where imaginary part is "
+                f"{imag_ratio_percent:.4g}% of magnitude (max allowed: 1e-6%).")
+        pauli_dict[pauli] = coef.real
+
+    config_general.log(f"Loaded {len(pauli_dict)} Pauli terms on {numq} qubits.")
+
+    return Hamiltonian(LinearCombinationOfPauliStrings(num_qubits=numq, sparse=pauli_dict))
+
+# -------------------------------------------------------------------------------------------------
+
+def load_pauli(
+        config_general: GeneralConfiguration,
+        config_hamiltonian: HamiltonianConfiguration):
+    filename = config_hamiltonian.filename
+    config_general.log(
+            f"Loading Pauli string Hamiltonian from file \"{filename}\".")
+    extension = filename[filename.rfind('.')+1:]
+
+    # Check for HamLib HDF5 format
+    if extension in ["h5", "hdf5"]:
+        return load_hamlib_hdf5(config_general, config_hamiltonian)
+    elif extension in [ "txt", "dat" ]:
+        fmt = None
+        numq = 0
+        pauli_dict = dict()
+        with open(filename, 'r') as file:
+            for line in file:
+                line = line.strip()
+                if not line or line[0] == "#":
+                    continue
+                idx = line.find(' ')
+                coef_str = line[:idx].strip()
+                pauli = line[idx+1:].strip()
+                if pauli[0] == '[':
+                    if fmt is not None and fmt != "sparse":
+                        raise ValueError("Inconsistent Pauli string file format.")
+                    fmt = "sparse"
+                    coefficient = complex(coef_str[1:-1])
+                    if pauli[-1] == '+':
+                        pauli = pauli[:pauli.rfind(']')+1]
+                    pauli = pauli[1:-1]
+                    pauli_tokens = pauli.split()
+                    sparse_pauli = tuple()
+                    for token in pauli_tokens:
+                        op = token[0]
+                        idx = int(token[1:])
+                        numq = max(numq, idx+1)
+                        sparse_pauli = (*sparse_pauli, (idx, op))
+                    pauli_dict[sparse_pauli] = coefficient
+                else:
+                    if fmt is not None and fmt != "dense":
+                        raise ValueError("Inconsistent Pauli string file format.")
+                    fmt = "dense"
+                    coefficient = complex(coef_str)
+                    if numq != 0 and len(pauli) != numq:
+                        raise ValueError("Inconsistent dense Pauli string length.")
+                    numq = len(pauli)
+                    pauli_dict[pauli] = coefficient
+        # Validate that all coefficients are real (Hamiltonians must be Hermitian)
+        # and convert to float
+        for pauli in pauli_dict:
+            coef = pauli_dict[pauli]
+            # Use relative tolerance (scale-invariant)
+            if abs(coef.imag) > abs(coef) * 1e-8:
+                imag_ratio_percent = abs(coef.imag) / abs(coef) * 100
+                raise ValueError(
+                    f"Hamiltonian must be Hermitian (real coefficients). "
+                    f"Found coefficient {coef} where imaginary part is "
+                    f"{imag_ratio_percent:.4g}% of magnitude (max allowed: 1e-6%).")
+            pauli_dict[pauli] = coef.real
+        if fmt == "dense":
+            return Hamiltonian(LinearCombinationOfPauliStrings(num_qubits=numq, dense=pauli_dict))
+        elif fmt == "sparse":
+            return Hamiltonian(LinearCombinationOfPauliStrings(num_qubits=numq, sparse=pauli_dict))
+        else:
+            raise ValueError(f"Invalid Pauli format: \"{fmt}\".")
+    elif extension == "json":
+        with open(filename, 'r') as file:
+            data = json.load(file)
+
+        # Validate structure
+        if "n_qubits" not in data:
+            raise ValueError("JSON Pauli file must contain 'n_qubits' field.")
+        if "terms" not in data:
+            raise ValueError("JSON Pauli file must contain 'terms' field.")
+
+        numq = data["n_qubits"]
+        pauli_dict = dict()
+
+        for term in data["terms"]:
+            if "ops" not in term or "coeff" not in term:
+                raise ValueError("Each term must have 'ops' and 'coeff' fields.")
+
+            # Convert ops list to sparse tuple format
+            # ops is list of [index, operator] pairs
+            sparse_pauli = tuple((idx, op) for idx, op in term["ops"])
+            coefficient = term["coeff"]
+
+            # Convert to complex for validation
+            if isinstance(coefficient, (int, float)):
+                coefficient = complex(coefficient)
+            elif isinstance(coefficient, complex):
+                pass
+            else:
+                raise ValueError(f"Coefficient must be numeric, got {type(coefficient)}.")
+
+            pauli_dict[sparse_pauli] = coefficient
+
+        # Validate Hermitian and convert to float
+        for pauli in pauli_dict:
+            coef = pauli_dict[pauli]
+            if abs(coef.imag) > abs(coef) * 1e-8:
+                imag_ratio_percent = abs(coef.imag) / abs(coef) * 100
+                raise ValueError(
+                    f"Hamiltonian must be Hermitian (real coefficients). "
+                    f"Found coefficient {coef} where imaginary part is "
+                    f"{imag_ratio_percent:.4g}% of magnitude (max allowed: 1e-6%).")
+            pauli_dict[pauli] = coef.real
+
+        return Hamiltonian(LinearCombinationOfPauliStrings(num_qubits=numq, sparse=pauli_dict))
+    else:
+        raise ValueError(
+            f"Invalid file extension for loading a Pauli string file: \"{extension}\".")
+
+# -------------------------------------------------------------------------------------------------
+
 # TODO: Scott and I have both spent time chasing down the types of different things for a variety
 #       of reasons.  If we can get this code to the point where it always returns the same type
 #       regardless of the options passed in, then we should annotate the return type.  If it turns
@@ -265,5 +554,7 @@ def get_physical_hamiltonian(
         return load_LCPS(config_general, config_hamiltonian)
     elif config_hamiltonian.source == "hdf5":
         return load_hdf5(config_general, config_hamiltonian)
+    elif config_hamiltonian.source == "pauli":
+        return load_pauli(config_general, config_hamiltonian)
     else:
         raise ValueError(f"Invalid Hamiltonian source \"{config_hamiltonian.source}\".")

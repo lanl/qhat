@@ -373,6 +373,7 @@ def get_ham2(state):
         # loaded using numpy's `load` function.
         t_filename = ham2_filename[:ham2_filename.rfind('.')] + ".tensors.npz"
         np.savez_compressed(t_filename,
+                            constant=ham2_ActiveSpace.constant,
                             one_body=ham2_ActiveSpace.one_body_tensor,
                             two_body=ham2_ActiveSpace.two_body_tensor)
         return ham2_ActiveSpace
