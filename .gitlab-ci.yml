@@ -79,3 +79,16 @@ run-common-tests:
     paths:
       - .venv/
     policy: pull
+
+run-qre-tests:
+  stage: test
+  script:
+    - hostname
+    - source .venv/bin/activate
+    - cd qre
+    - python3.11 -m pytest tests/ -v
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .venv/
+    policy: pull
