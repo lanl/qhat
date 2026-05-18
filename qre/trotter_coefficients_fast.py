@@ -442,6 +442,70 @@ def generate_all_triples(N):
     return indices
 
 
+def _compute_exact_generic(x_bits, z_bits, coeffs, N, batch_size, config_general,
+                           label, index_generator, batch_compute_fn, unit_name):
+    """
+    Generic function for exact computation of commutator norms.
+
+    This function provides the common implementation for C1, C21, and C22 exact computation,
+    reducing code duplication while maintaining performance.
+
+    Args:
+        x_bits, z_bits: Arrays of X and Z bits for all Pauli strings
+        coeffs: Array of coefficients for all Pauli strings
+        N: Number of Pauli strings
+        batch_size: Batch size for computation. If None, uses EXACT_COMPUTATION_BATCH_SIZE.
+        config_general: GeneralConfiguration object for logging
+        label: Label for logging (e.g., "C1", "C21", "C22")
+        index_generator: Function to generate all indices, called with (N)
+        batch_compute_fn: Function to compute batch norms, called with (x_bits, z_bits, coeffs, batch, N)
+        unit_name: Name of units for progress reporting (e.g., "pairs", "triples")
+
+    Returns:
+        Exact sum of commutator norms
+    """
+    if batch_size is None:
+        batch_size = EXACT_COMPUTATION_BATCH_SIZE
+
+    config_general.log_verbose(f"  Computing {label} exactly (deterministic enumeration)...")
+    start_time = time.time()
+    last_progress_time = start_time
+    progress_interval = INITIAL_PROGRESS_INTERVAL
+
+    # Generate all indices
+    all_indices = index_generator(N)
+    total_count = len(all_indices)
+
+    sum_value = 0.0
+    # Process in batches for efficiency and progress reporting
+    for start_idx in range(0, total_count, batch_size):
+        end_idx = min(start_idx + batch_size, total_count)
+        batch = all_indices[start_idx:end_idx]
+        norms = batch_compute_fn(x_bits, z_bits, coeffs, batch, N)
+        sum_value += np.sum(norms)
+
+        # Adaptive progress reporting: frequent at first, then backs off exponentially
+        current_time = time.time()
+        if current_time - last_progress_time >= progress_interval:
+            percent = 100.0 * end_idx / total_count
+            elapsed = current_time - start_time
+            rate = end_idx / elapsed if elapsed > 0 else 0
+            eta = (total_count - end_idx) / rate if rate > 0 else 0
+            config_general.log_verbose(f"    Progress: {end_idx:,}/{total_count:,} {unit_name} ({percent:.1f}%) - "
+                  f"{rate/1e6:.1f}M {unit_name}/sec - ETA {eta:.1f}s")
+            last_progress_time = current_time
+            # Increase interval for next report (exponential backoff)
+            progress_interval = min(progress_interval * PROGRESS_INTERVAL_GROWTH,
+                                   MAX_PROGRESS_INTERVAL)
+
+    elapsed = time.time() - start_time
+    rate = total_count / elapsed if elapsed > 0 else 0
+    config_general.log_verbose(f"  {label} EXACT: {total_count:,} {unit_name} computed in {elapsed:.3f}s ({rate/1e6:.1f}M {unit_name}/sec)")
+    config_general.log_verbose(f"  {label} exact value: {sum_value:.6f}")
+
+    return sum_value
+
+
 def compute_C1_exact(x_bits, z_bits, coeffs, N, batch_size, config_general):
     """
     Compute C1 exactly by enumerating all pairs deterministically.
@@ -454,46 +518,13 @@ def compute_C1_exact(x_bits, z_bits, coeffs, N, batch_size, config_general):
     Returns:
         Exact value of C1 = Σᵢ<ⱼ ||[Hᵢ, Hⱼ]||
     """
-    if batch_size is None:
-        batch_size = EXACT_COMPUTATION_BATCH_SIZE
-
-    config_general.log_verbose(f"  Computing C1 exactly (deterministic enumeration)...")
-    start_time = time.time()
-    last_progress_time = start_time
-    progress_interval = INITIAL_PROGRESS_INTERVAL
-
-    # Generate all pairs
-    all_indices = generate_all_pairs(N)
-    total_pairs = len(all_indices)
-
-    C1_sum = 0.0
-    # Process in batches for efficiency and progress reporting
-    for start_idx in range(0, total_pairs, batch_size):
-        end_idx = min(start_idx + batch_size, total_pairs)
-        batch = all_indices[start_idx:end_idx]
-        norms = batch_compute_C1(x_bits, z_bits, coeffs, batch, N)
-        C1_sum += np.sum(norms)
-
-        # Adaptive progress reporting: frequent at first, then backs off exponentially
-        current_time = time.time()
-        if current_time - last_progress_time >= progress_interval:
-            percent = 100.0 * end_idx / total_pairs
-            elapsed = current_time - start_time
-            rate = end_idx / elapsed if elapsed > 0 else 0
-            eta = (total_pairs - end_idx) / rate if rate > 0 else 0
-            config_general.log_verbose(f"    Progress: {end_idx:,}/{total_pairs:,} pairs ({percent:.1f}%) - "
-                  f"{rate/1e6:.1f}M pairs/sec - ETA {eta:.1f}s")
-            last_progress_time = current_time
-            # Increase interval for next report (exponential backoff)
-            progress_interval = min(progress_interval * PROGRESS_INTERVAL_GROWTH,
-                                   MAX_PROGRESS_INTERVAL)
-
-    elapsed = time.time() - start_time
-    rate = total_pairs / elapsed if elapsed > 0 else 0
-    config_general.log_verbose(f"  C1 EXACT: {total_pairs:,} pairs computed in {elapsed:.3f}s ({rate/1e6:.1f}M pairs/sec)")
-    config_general.log_verbose(f"  C1 exact value: {C1_sum:.6f}")
-
-    return C1_sum
+    return _compute_exact_generic(
+        x_bits, z_bits, coeffs, N, batch_size, config_general,
+        label="C1",
+        index_generator=generate_all_pairs,
+        batch_compute_fn=batch_compute_C1,
+        unit_name="pairs"
+    )
 
 
 def compute_C21_exact(x_bits, z_bits, coeffs, N, batch_size, config_general):
@@ -507,46 +538,13 @@ def compute_C21_exact(x_bits, z_bits, coeffs, N, batch_size, config_general):
     Returns:
         Exact value of C21 = Σₖ<ᵢ,ₖ<ⱼ ||[Hᵢ, [Hⱼ, Hₖ]]||
     """
-    if batch_size is None:
-        batch_size = EXACT_COMPUTATION_BATCH_SIZE
-
-    config_general.log_verbose(f"  Computing C21 exactly (deterministic enumeration)...")
-    start_time = time.time()
-    last_progress_time = start_time
-    progress_interval = INITIAL_PROGRESS_INTERVAL
-
-    # Generate all triples
-    all_indices = generate_all_triples(N)
-    total_triples = len(all_indices)
-
-    C21_sum = 0.0
-    # Process in batches
-    for start_idx in range(0, total_triples, batch_size):
-        end_idx = min(start_idx + batch_size, total_triples)
-        batch = all_indices[start_idx:end_idx]
-        norms = batch_compute_C21(x_bits, z_bits, coeffs, batch, N)
-        C21_sum += np.sum(norms)
-
-        # Adaptive progress reporting: frequent at first, then backs off exponentially
-        current_time = time.time()
-        if current_time - last_progress_time >= progress_interval:
-            percent = 100.0 * end_idx / total_triples
-            elapsed = current_time - start_time
-            rate = end_idx / elapsed if elapsed > 0 else 0
-            eta = (total_triples - end_idx) / rate if rate > 0 else 0
-            config_general.log_verbose(f"    Progress: {end_idx:,}/{total_triples:,} triples ({percent:.1f}%) - "
-                  f"{rate/1e6:.1f}M triples/sec - ETA {eta:.1f}s")
-            last_progress_time = current_time
-            # Increase interval for next report (exponential backoff)
-            progress_interval = min(progress_interval * PROGRESS_INTERVAL_GROWTH,
-                                   MAX_PROGRESS_INTERVAL)
-
-    elapsed = time.time() - start_time
-    rate = total_triples / elapsed if elapsed > 0 else 0
-    config_general.log_verbose(f"  C21 EXACT: {total_triples:,} triples computed in {elapsed:.3f}s ({rate/1e6:.1f}M triples/sec)")
-    config_general.log_verbose(f"  C21 exact value: {C21_sum:.6f}")
-
-    return C21_sum
+    return _compute_exact_generic(
+        x_bits, z_bits, coeffs, N, batch_size, config_general,
+        label="C21",
+        index_generator=generate_all_triples,
+        batch_compute_fn=batch_compute_C21,
+        unit_name="triples"
+    )
 
 
 def compute_C22_exact(x_bits, z_bits, coeffs, N, batch_size, config_general):
@@ -560,46 +558,13 @@ def compute_C22_exact(x_bits, z_bits, coeffs, N, batch_size, config_general):
     Returns:
         Exact value of C22 = Σₖ<ⱼ ||[Hₖ, [Hₖ, Hⱼ]]||
     """
-    if batch_size is None:
-        batch_size = EXACT_COMPUTATION_BATCH_SIZE
-
-    config_general.log_verbose(f"  Computing C22 exactly (deterministic enumeration)...")
-    start_time = time.time()
-    last_progress_time = start_time
-    progress_interval = INITIAL_PROGRESS_INTERVAL
-
-    # Generate all pairs (same as C1)
-    all_indices = generate_all_pairs(N)
-    total_pairs = len(all_indices)
-
-    C22_sum = 0.0
-    # Process in batches
-    for start_idx in range(0, total_pairs, batch_size):
-        end_idx = min(start_idx + batch_size, total_pairs)
-        batch = all_indices[start_idx:end_idx]
-        norms = batch_compute_C22(x_bits, z_bits, coeffs, batch, N)
-        C22_sum += np.sum(norms)
-
-        # Adaptive progress reporting: frequent at first, then backs off exponentially
-        current_time = time.time()
-        if current_time - last_progress_time >= progress_interval:
-            percent = 100.0 * end_idx / total_pairs
-            elapsed = current_time - start_time
-            rate = end_idx / elapsed if elapsed > 0 else 0
-            eta = (total_pairs - end_idx) / rate if rate > 0 else 0
-            config_general.log_verbose(f"    Progress: {end_idx:,}/{total_pairs:,} pairs ({percent:.1f}%) - "
-                  f"{rate/1e6:.1f}M pairs/sec - ETA {eta:.1f}s")
-            last_progress_time = current_time
-            # Increase interval for next report (exponential backoff)
-            progress_interval = min(progress_interval * PROGRESS_INTERVAL_GROWTH,
-                                   MAX_PROGRESS_INTERVAL)
-
-    elapsed = time.time() - start_time
-    rate = total_pairs / elapsed if elapsed > 0 else 0
-    config_general.log_verbose(f"  C22 EXACT: {total_pairs:,} pairs computed in {elapsed:.3f}s ({rate/1e6:.1f}M pairs/sec)")
-    config_general.log_verbose(f"  C22 exact value: {C22_sum:.6f}")
-
-    return C22_sum
+    return _compute_exact_generic(
+        x_bits, z_bits, coeffs, N, batch_size, config_general,
+        label="C22",
+        index_generator=generate_all_pairs,
+        batch_compute_fn=batch_compute_C22,
+        unit_name="pairs"
+    )
 
 
 def trotter_error_estimator_fast(pauli_terms, time_limit, config_general,
