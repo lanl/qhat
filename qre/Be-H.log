@@ -338,3 +338,123 @@ analysis.resource_estimator = "pyLIQTR"
                         'T_count': 239400268,
                         'qubit_count': 17}}
 2026-05-19 13:43:57,172    INFO | Summary file saved to "11135885076557276024.toml".
+2026-05-19 13:54:13,971    INFO | 
+***************************************************************************************************
+QRE_DRIVER START
+***************************************************************************************************
+2026-05-19 13:54:13,972    INFO | Logfile: Be-H.log
+2026-05-19 13:54:13,973    INFO | Running script with git hash c532571d22c31097619138d422e473b12d477c34
+2026-05-19 13:54:13,973    INFO | Unique hash for Hamiltonian: 8749396733553
+2026-05-19 13:54:13,974    INFO | Unique hash for full analysis: 18216023814848618023
+2026-05-19 13:54:13,974    INFO | Contents of configuration file "config.py":
+my_method = "Trotter"
+#my_method = "double-factorization"
+
+# this configuration file assumes equipartition of energy between Trotterization error and phase
+# estimation error (see usage of energy_error below)
+energy_error = meV_to_Hartree(1e4) # 0.01 keV
+
+# _________________________________________________________________________________________________
+# general
+
+general.print_verbose()
+general.logfile = "Be-H.log"
+
+# _________________________________________________________________________________________________
+# hamiltonian
+
+hamiltonian.load_second_quantization("examples/Be-H_1.30_sto-6g_as-003-003.tensors.npz")
+
+# _________________________________________________________________________________________________
+# unitary encoding
+
+if my_method == "Trotter":
+    unitary.encode_ramped_trotter(
+            energy_error = 0.5 * energy_error,
+            error_scale = 1.0,
+            trotter_implementation = "flattened",
+            trotter_combine_terms = True,
+            ordering_method = "lexicographical"
+            )
+elif my_method == "double-factorization":
+    unitary.encode_double_factorization(energy_error=1.0e-4)
+else:
+    raise ValueError(f"Invalid value for `my_method`: \"{my_method}\"")
+
+# _________________________________________________________________________________________________
+# phase estimation circuit
+
+if my_method == "Trotter":
+    circuit.method = "QPE: qualtran textbook"
+    circuit.energy_error = 0.5 * energy_error
+    circuit.probability_of_failure = 0.01
+elif my_method == "double-factorization":
+    circuit.method = "QPE: pyLIQTR qubitized"
+    circuit.num_phase_qubits = 12
+else:
+    raise ValueError(f"Invalid value for `my_method`: \"{my_method}\"")
+
+# _________________________________________________________________________________________________
+# analysis
+
+analysis.resource_estimator = "pyLIQTR"
+
+2026-05-19 13:54:13,996    INFO | Beginning `get_physical_hamiltonian()` function.
+2026-05-19 13:54:13,996    INFO | Loading second-quantization Hamiltonian from file "examples/Be-H_1.30_sto-6g_as-003-003.tensors.npz".
+2026-05-19 13:54:13,999    INFO | Fermionic second-quantization Hamiltonian uses 6 qubits.
+2026-05-19 13:54:13,999    INFO | Mapping fermionic operators to qubit operaturs using JW method.
+2026-05-19 13:54:13,999    INFO | Computing initial energy bounds.
+2026-05-19 13:54:14,004 VERBOSE | -- number of Pauli strings = 62
+2026-05-19 13:54:14,005 VERBOSE | -- energy shift = -1.629465433169982
+2026-05-19 13:54:14,005 VERBOSE | -- computed bounds = [-3.8456172882071558, 0.5866864218671914)
+2026-05-19 13:54:14,005 VERBOSE | -- limited bounds = [-3.8456172882071558, 0.5866864218671914)
+2026-05-19 13:54:14,006 VERBOSE | -- initial bounds = [-3.8456172882071558, 0.5866864218671914)
+2026-05-19 13:54:14,006 VERBOSE | -- shifted bounds = [0.0, 4.432303710074347)
+2026-05-19 13:54:14,007 VERBOSE | -- preliminary evolution time = 1.4175890729009166 * hbar
+2026-05-19 13:54:14,007    INFO | Computing initial phase qubits.
+2026-05-19 13:54:14,008 VERBOSE | -- initial number of phase qubits = 5
+2026-05-19 13:54:14,008 VERBOSE | -- QPE-optimized bounds = [0.0, 5.879891548112)
+2026-05-19 13:54:14,009 VERBOSE | -- optimized evolution time = 1.0685886390535693 * hbar
+2026-05-19 13:54:14,009    INFO | Beginning to encode the Hamiltonian as a unitary.
+2026-05-19 13:54:14,010 VERBOSE | Encoding with ramped-trotterization method from `common` (flattened QHAT).
+2026-05-19 13:54:14,010    INFO | -- timestep = 1.0685886390535693
+2026-05-19 13:54:14,315    INFO | -- Error coefficient computation mode: monte_carlo
+2026-05-19 13:54:14,315    INFO | -- Error coefficient time limit: 60s
+2026-05-19 13:54:14,322 VERBOSE | Preprocessing 62 Pauli terms...
+2026-05-19 13:54:14,322 VERBOSE |   Preprocessing done in 0.000s (6 qubits)
+2026-05-19 13:54:14,323 VERBOSE |   Using MONTE CARLO with tracking (N=62)
+2026-05-19 13:54:14,324 VERBOSE |   Exact computation is feasible for N=62 - enabling tracking
+2026-05-19 13:54:14,325 VERBOSE | Warming up Numba JIT compilation...
+2026-05-19 13:54:16,909 VERBOSE |   Warmup complete
+2026-05-19 13:54:16,911 VERBOSE | Estimating C1 with batch_size=10000...
+2026-05-19 13:54:16,927 VERBOSE |   C1 EXACT: All 1891 pairs sampled in 0.014s
+2026-05-19 13:54:16,934 VERBOSE |   C1 exact value: 0.643335
+2026-05-19 13:54:16,935 VERBOSE | Estimating C21 with batch_size=10000...
+2026-05-19 13:54:17,828 VERBOSE |   C21 EXACT: All 37820 triples sampled in 0.878s
+2026-05-19 13:54:17,829 VERBOSE |   C21 exact value: 0.382416
+2026-05-19 13:54:17,829 VERBOSE | Estimating C22 with batch_size=10000...
+2026-05-19 13:54:17,849 VERBOSE |   C22 EXACT: All 1891 pairs sampled in 0.018s
+2026-05-19 13:54:17,849 VERBOSE |   C22 exact value: 0.126194
+2026-05-19 13:54:17,850 VERBOSE | 
+======================================================================
+2026-05-19 13:54:17,852 VERBOSE | ✅ EXACT COMPUTATION ACHIEVED
+2026-05-19 13:54:17,852 VERBOSE |    All 1891 C1 pairs sampled
+2026-05-19 13:54:17,853 VERBOSE |    All 37820 C21 triples sampled
+2026-05-19 13:54:17,854 VERBOSE |    All 1891 C22 pairs sampled
+2026-05-19 13:54:17,855 VERBOSE | ======================================================================
+2026-05-19 13:54:17,859    INFO | -- Trotter error coefficients: C1 = 0.3216675744285303, C2 = 0.0371260899142812
+2026-05-19 13:54:17,859    INFO | -- allowable energy error = 0.1837466108785 Hartrees
+2026-05-19 13:54:17,860    INFO | -- effective energy range = 5.879891548112 Hartrees
+2026-05-19 13:54:17,860    INFO | -- allowable fractional Trotter error = 0.03125
+2026-05-19 13:54:17,861    INFO | -- Trotter step count: s1 = 1.870675676372246, s2 = 0.48033086009488807
+2026-05-19 13:54:17,861    INFO | -- using second order Trotter formula with 1 steps (0.48033086009488807)
+2026-05-19 13:54:17,872    INFO | Beginning to construct quantum phase estimation circuit.
+2026-05-19 13:54:17,873 VERBOSE | Build a QPE circuit with Qualtran's "textbook" method.
+2026-05-19 13:54:17,873 VERBOSE | -- extending the phase register by 6 qubits (total = 11)
+2026-05-19 13:54:17,874    INFO | Beginning circuit analysis.
+2026-05-19 13:54:17,875 VERBOSE | Estimating resources with pyLIQTR.
+2026-05-19 13:54:18,456    INFO | results:
+{'resource_estimates': {'Clifford_count': 459976352,
+                        'T_count': 239400268,
+                        'qubit_count': 17}}
+2026-05-19 13:54:18,465    INFO | Summary file saved to "18216023814848618023.toml".

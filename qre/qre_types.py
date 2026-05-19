@@ -133,6 +133,7 @@ class UnitaryConfiguration(ConfigurationBase):
         self.save_if_present(table, "error_scale")
         self.save_if_present(table, "trotter_implementation")
         self.save_if_present(table, "trotter_combine_terms")
+        self.save_if_present(table, "ordering_method")
         return table
 
 # -------------------------------------------------------------------------------------------------
