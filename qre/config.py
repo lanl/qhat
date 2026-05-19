@@ -48,5 +48,13 @@ else:
 # _________________________________________________________________________________________________
 # analysis
 
-analysis.resource_estimator = "pyLIQTR"
+# Resource estimation: set to estimator name to enable, None to disable
+analysis.resource_estimator = "pyLIQTR"  # Options: "pyLIQTR", "cirq", or None
+                                          # Default: None (must be explicitly enabled)
+
+# Matrix generation: set to format to enable, None to disable
+# analysis.matrix_output_format = "numpy"  # Options: "numpy", "hdf5", "text", or None
+# analysis.matrix_output_file = "my_circuit_matrix.npz"  # Optional, auto-generated if not specified
+
+# At least one analysis must be enabled (i.e., not None)
 
