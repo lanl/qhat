@@ -92,28 +92,45 @@ def _save_matrix_hdf5(output_path, unitary_matrix, git_hash, unitarity_error, ma
             dset.attrs['matrix_norm'] = float(matrix_norm)
 
 def _save_matrix_text(output_path, unitary_matrix, git_hash, unitarity_error, matrix_norm, config_general):
-    """Save matrix in human-readable text format (CSV-like)."""
-    if unitary_matrix.size > 1000000:  # Warn for large matrices
-        config_general.log(
-            f"WARNING: Matrix has {unitary_matrix.size} elements. "
-            "Text format may produce a very large file. "
-            "Consider using 'numpy' or 'hdf5' format instead."
-        )
+    """Save matrix in human-readable sparse text format (coordinate format).
+
+    Only non-zero entries are written to save space. This is especially beneficial
+    for large sparse matrices common in quantum chemistry.
+    """
+    # Threshold for considering an entry "zero"
+    # For float64 (machine precision ~2e-16), entries below 1e-15 are likely accumulated
+    # rounding errors from tensor contraction rather than physically meaningful values.
+    # For unitary matrices with ||U||_F = sqrt(N) and entries bounded by 1, this threshold
+    # is conservative: well above numerical noise but below any realistic quantum amplitude.
+    threshold = 1e-15
+
+    # Count non-zero entries for logging
+    nnz = np.sum(np.abs(unitary_matrix) > threshold)
+    sparsity = 1.0 - (nnz / unitary_matrix.size)
+
+    config_general.log_verbose(
+        f"Matrix sparsity: {sparsity*100:.2f}% ({nnz} non-zero of {unitary_matrix.size} total)"
+    )
 
     with open(output_path, 'w') as f:
-        f.write(f"# Unitary Matrix\n")
+        f.write(f"# Unitary Matrix (Sparse Coordinate Format)\n")
         f.write(f"# Shape: {unitary_matrix.shape}\n")
+        f.write(f"# Non-zero entries: {nnz}\n")
         f.write(f"# Git hash: {git_hash}\n")
         f.write(f"# Timestamp: {datetime.now().isoformat()}\n")
         if unitarity_error is not None:
             f.write(f"# Unitarity error: {unitarity_error:.6e}\n")
         if matrix_norm is not None:
             f.write(f"# Matrix norm: {matrix_norm:.6e}\n")
-        f.write(f"# Format: row,col,real,imag\n")
+        f.write(f"# Format: row,col,real,imag (only non-zero entries, |value| > {threshold})\n")
+        f.write(f"#\n")
+
+        # Write only non-zero entries
         for i in range(unitary_matrix.shape[0]):
             for j in range(unitary_matrix.shape[1]):
                 val = unitary_matrix[i, j]
-                f.write(f"{i},{j},{val.real:.16e},{val.imag:.16e}\n")
+                if abs(val) > threshold:
+                    f.write(f"{i},{j},{val.real:.16e},{val.imag:.16e}\n")
 
 def _get_format_from_extension(filename):
     """
