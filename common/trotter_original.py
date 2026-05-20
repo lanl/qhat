@@ -14,7 +14,7 @@
 
 import attrs
 from cirq import LineQubit
-from common.dense_pauli_exp import DensePauliString
+from qhat.common.dense_pauli_exp import DensePauliString
 from functools import cached_property, reduce
 from math import cbrt
 from numpy import exp

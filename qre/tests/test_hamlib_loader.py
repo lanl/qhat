@@ -12,8 +12,8 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from qre_hamiltonian import load_hamlib_hdf5, Hamiltonian, LinearCombinationOfPauliStrings
-from qre_types import GeneralConfiguration, HamiltonianConfiguration
+from qhat.qre.qre_hamiltonian import load_hamlib_hdf5, Hamiltonian, LinearCombinationOfPauliStrings
+from qhat.qre.qre_types import GeneralConfiguration, HamiltonianConfiguration
 
 
 class MockConfig:

@@ -40,8 +40,8 @@ import numpy as np
 from scipy.linalg import expm
 from typing import Dict, List, Tuple
 
-from qre_configuration import load_configuration
-from qre_hamiltonian import get_physical_hamiltonian
+from qhat.qre.qre_configuration import load_configuration
+from qhat.qre.qre_hamiltonian import get_physical_hamiltonian
 
 
 def _load_state_from_config(config_file: str):

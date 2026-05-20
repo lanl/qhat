@@ -16,12 +16,12 @@ import os
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from qre_circuit import build_qpe_circuit
-from qre_types import QPEConfiguration, AnalysisConfiguration
-from qre_analysis import analyze_circuit
+from qhat.qre.qre_circuit import build_qpe_circuit
+from qhat.qre.qre_types import QPEConfiguration, AnalysisConfiguration
+from qhat.qre.qre_analysis import analyze_circuit
 from .mock_config import mock_config
-from common.pauli_string_evolution import PauliStringEvolution
-from common.pauli_utils import analytical_evolution
+from qhat.common.pauli_string_evolution import PauliStringEvolution
+from qhat.common.pauli_utils import analytical_evolution
 
 
 # =============================================================================

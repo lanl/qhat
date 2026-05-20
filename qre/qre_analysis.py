@@ -1,4 +1,4 @@
-from qre_types import GeneralConfiguration, AnalysisConfiguration
+from qhat.qre.qre_types import GeneralConfiguration, AnalysisConfiguration
 
 from pyLIQTR.utils.resource_analysis import estimate_resources as estimate_pyliqtr
 from qualtran.resource_counting import get_cost_value, QubitCount

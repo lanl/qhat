@@ -1,6 +1,6 @@
-from common.bosons_binary import BosonicBinaryEncoding
-from common.MixedFermionBosonOperator import MixedFermionBosonOperator
-from qre_types import GeneralConfiguration, HamiltonianConfiguration, value
+from qhat.common.bosons_binary import BosonicBinaryEncoding
+from qhat.common.MixedFermionBosonOperator import MixedFermionBosonOperator
+from qhat.qre.qre_types import GeneralConfiguration, HamiltonianConfiguration, value
 
 from functools import cache, reduce
 import h5py

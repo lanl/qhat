@@ -14,8 +14,8 @@ from typing import Sequence, Tuple, List
 from qualtran import Bloq, BloqBuilder, Signature, SoquetT
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
 
-from common.commuting_pauli_string_evolution import CommutingPauliStringEvolution
-from common.pauli_utils import validate_pauli_string
+from qhat.common.commuting_pauli_string_evolution import CommutingPauliStringEvolution
+from qhat.common.pauli_utils import validate_pauli_string
 from math import cbrt
 from typing import Union
 

@@ -8,14 +8,14 @@ import numpy as np
 import pytest
 from scipy.linalg import expm
 
-from common.commuting_pauli_string_evolution import (
+from qhat.common.commuting_pauli_string_evolution import (
     CommutingPauliStringEvolution,
     pauli_strings_commute,
     all_commute,
 )
-from common.pauli_string_evolution import PauliStringEvolution
+from qhat.common.pauli_string_evolution import PauliStringEvolution
 from qualtran.cirq_interop.t_complexity_protocol import t_complexity
-from common.pauli_utils import (
+from qhat.common.pauli_utils import (
     get_pauli_matrix,
     pauli_string_to_matrix,
     analytical_commuting_evolution,

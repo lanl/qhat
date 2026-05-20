@@ -1,8 +1,8 @@
-from qre_types import GeneralConfigurationUser, \
-                      HamiltonianConfiguration, \
-                      UnitaryConfiguration, \
-                      QPEConfiguration, \
-                      AnalysisConfiguration, \
+from qhat.qre.qre_types import GeneralConfigurationUser, \
+                               HamiltonianConfiguration, \
+                               UnitaryConfiguration, \
+                               QPEConfiguration, \
+                               AnalysisConfiguration, \
                       State
 
 import argparse

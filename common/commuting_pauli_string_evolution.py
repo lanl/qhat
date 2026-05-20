@@ -17,8 +17,8 @@ from typing import Dict, Sequence, Tuple, TYPE_CHECKING, Iterable
 from qualtran import Bloq, BloqBuilder, Signature, SoquetT, QBit, Register, Side, CompositeBloq
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
 
-from common.pauli_string_evolution import PauliStringEvolution
-from common.pauli_utils import validate_pauli_string
+from qhat.common.pauli_string_evolution import PauliStringEvolution
+from qhat.common.pauli_utils import validate_pauli_string
 
 if TYPE_CHECKING:
     import quimb.tensor as qtn

@@ -18,14 +18,14 @@ import numpy as np
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from qre_hamiltonian import (
+from qhat.qre.qre_hamiltonian import (
     LinearCombinationOfPauliStrings,
     Hamiltonian,
     load_pauli,
     sparse_to_dense_pauli,
     dense_to_sparse_pauli
 )
-from qre_types import GeneralConfiguration, GeneralConfigurationUser, HamiltonianConfiguration
+from qhat.qre.qre_types import GeneralConfiguration, GeneralConfigurationUser, HamiltonianConfiguration
 
 
 # ==================================================================================
