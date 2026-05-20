@@ -117,14 +117,31 @@ def _save_matrix_text(output_path, unitary_matrix, git_hash, unitarity_error, ma
                 val = unitary_matrix[i, j]
                 f.write(f"{i},{j},{val.real:.16e},{val.imag:.16e}\n")
 
-def _get_format_extension(format_name):
-    """Get file extension for a given format."""
-    extensions = {
-        'numpy': '.npz',
-        'hdf5': '.h5',
-        'text': '.txt'
+def _get_format_from_extension(filename):
+    """
+    Infer matrix format from file extension.
+
+    Returns: (format_name, extension) tuple
+    Raises: ValueError if extension is not recognized
+    """
+    extension_map = {
+        '.npz': 'numpy',
+        '.h5': 'hdf5',
+        '.hdf5': 'hdf5',
+        '.txt': 'text',
+        '.csv': 'text',
     }
-    return extensions.get(format_name.lower(), '.dat')
+
+    # Get extension from filename
+    ext = Path(filename).suffix.lower()
+
+    if ext not in extension_map:
+        raise ValueError(
+            f"Cannot determine format from extension '{ext}'. "
+            f"Supported extensions: {', '.join(extension_map.keys())}"
+        )
+
+    return extension_map[ext], ext
 
 def _save_matrix_file(output_path, matrix_format, unitary_matrix, git_hash,
                       unitarity_error, matrix_norm, config_general):
@@ -207,19 +224,11 @@ def output_unitary_matrix(
         matrix_norm = None
         unitarity_error = None
 
-    # Determine output filename
-    if config_analysis.matrix_output_file is not None:
-        output_file = config_analysis.matrix_output_file
-    else:
-        # Auto-generate filename using git hash and timestamp
-        git_hash_short = config_general.git_hash[:8] if config_general.git_hash else "unknown"
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        matrix_format = config_analysis.matrix_output_format.lower()
-        ext = _get_format_extension(matrix_format)
-        output_file = f"matrix_{git_hash_short}_{timestamp}{ext}"
+    # Determine output filename and format from extension
+    output_file = config_analysis.matrix_output_file
+    matrix_format, _ = _get_format_from_extension(output_file)
 
     output_path = Path(output_file)
-    matrix_format = config_analysis.matrix_output_format.lower()
 
     # Save matrix to file
     config_general.log(f"Saving matrix to {output_path} in {matrix_format} format...")
@@ -249,11 +258,11 @@ def analyze_circuit(
 
     # Validate at least one analysis requested
     if (config_analysis.resource_estimator is None and
-        config_analysis.matrix_output_format is None):
+        config_analysis.matrix_output_file is None):
         raise ValueError(
             "No analyses requested. Set at least one of:\n"
             "  - resource_estimator (e.g., 'pyliqtr', 'cirq')\n"
-            "  - matrix_output_format (e.g., 'numpy', 'hdf5', 'text')"
+            "  - matrix_output_file (e.g., 'matrix.npz', 'matrix.h5', 'matrix.txt')"
         )
 
     results = {}
@@ -264,8 +273,8 @@ def analyze_circuit(
         results["resource_estimates"] = estimate_resources(
             config_general, config_analysis, qpe_circuit)
 
-    if config_analysis.matrix_output_format is not None:
-        config_general.log(f"Generating unitary matrix in {config_analysis.matrix_output_format} format.")
+    if config_analysis.matrix_output_file is not None:
+        config_general.log("Generating unitary matrix output.")
         results["matrix_output"] = output_unitary_matrix(
             config_general, config_analysis, qpe_circuit)
 
