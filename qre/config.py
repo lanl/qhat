@@ -53,7 +53,7 @@ analysis.resource_estimator = "pyLIQTR"  # Options: "pyLIQTR", "cirq", or None
                                           # Default: None (must be explicitly enabled)
 
 # Matrix generation: set filename with extension to enable, None to disable
-# Format is inferred from extension: .npz (NumPy), .h5/.hdf5 (HDF5), .txt/.csv (text)
+# Format is inferred from extension: .npz (NumPy), .h5/.hdf5 (HDF5), .dat/.txt/.csv (text)
 # analysis.matrix_output_file = "my_circuit_matrix.npz"
 
 # At least one analysis must be enabled (i.e., not None)
