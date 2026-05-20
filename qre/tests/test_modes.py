@@ -12,9 +12,8 @@ import numpy as np
 
 from openfermion import QubitOperator
 
+from qhat.qre.tests.mock_config import mock_config
 from qhat.qre.trotter_coefficients_fast import trotter_error_estimator_fast
-
-from .mock_config import mock_config
 
 
 
