@@ -85,7 +85,7 @@ class MixedFermionBosonOperator:
         return qo
 
 def main():
-    from common.bosons_binary import BosonicBinaryEncoding
+    from qhat.common.bosons_binary import BosonicBinaryEncoding
     import numpy as np
     from openfermion import jordan_wigner
     Nf = 3

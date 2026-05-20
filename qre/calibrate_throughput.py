@@ -19,7 +19,7 @@ import argparse
 import numpy as np
 from openfermion import QubitOperator
 
-from trotter_coefficients_fast import trotter_error_estimator_fast, THROUGHPUT_CONFIG
+from qhat.qre.trotter_coefficients_fast import trotter_error_estimator_fast, THROUGHPUT_CONFIG
 
 
 def generate_random_hamiltonian(N, n_qubits=20, seed=None):

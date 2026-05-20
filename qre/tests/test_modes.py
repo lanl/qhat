@@ -16,7 +16,7 @@ import os
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from trotter_coefficients_fast import trotter_error_estimator_fast
+from qhat.qre.trotter_coefficients_fast import trotter_error_estimator_fast
 from .mock_config import mock_config
 
 

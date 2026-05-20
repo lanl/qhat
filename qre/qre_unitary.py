@@ -105,7 +105,7 @@ def encode_ramped_trotter(
 
     # Compute the number of Trotter steps based on the Trotter error from arXiv:1912.08854v3
     # Using fast implementation for better performance (100-150x more samples per second)
-    from trotter_coefficients_fast import trotter_error_estimator_fast
+    from qhat.qre.trotter_coefficients_fast import trotter_error_estimator_fast
 
     # Read error coefficient computation mode from config (with backward-compatible defaults)
     error_coeff_mode = getattr(config_unitary, 'error_coeff_mode', 'monte_carlo')

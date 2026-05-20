@@ -681,10 +681,7 @@ def _compute_exact_path(x_bits, z_bits, coeffs, N, batch_size, config_general):
     C22_exact = compute_C22_exact(x_bits, z_bits, coeffs, N, batch_size, config_general)
 
     # Report
-    config_general.log_verbose("\n" + "="*70)
-    config_general.log_verbose("✅ EXACT COMPUTATION COMPLETED")
-    config_general.log_verbose(f"   All combinations enumerated deterministically")
-    config_general.log_verbose("="*70)
+    config_general.log_verbose("Exact computation completed.")
 
     return C1_exact / 2, C21_exact / 12 + C22_exact / 24
 

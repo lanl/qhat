@@ -1,4 +1,4 @@
-from hamgen_types import GeneralConfiguration, GeneralConfigurationUser, \
+from qhat.hamiltonian_generator.hamgen_types import GeneralConfiguration, GeneralConfigurationUser, \
         HamiltonianConfiguration, State
 
 import argparse

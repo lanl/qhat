@@ -469,7 +469,7 @@ def build_ramped_trotterized_unitary(
 
     Example:
         >>> # Old interface (for compatibility)
-        >>> from common.trotter_flattened import build_ramped_trotterized_unitary
+        >>> from qhat.common.trotter_flattened import build_ramped_trotterized_unitary
         >>> bloq = build_ramped_trotterized_unitary(
         ...     [("XY", 0.5), ("YZ", 0.3)],
         ...     "second order",
