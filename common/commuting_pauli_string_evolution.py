@@ -9,12 +9,13 @@ Pauli string Hamiltonians:
 This exact decomposition is valid when all Pauli strings commute with each other.
 """
 
+from functools import cached_property
+from typing import TYPE_CHECKING, Dict, Iterable, Sequence, Tuple
+
 import attrs
 import numpy as np
-from functools import cached_property
-from typing import Dict, Sequence, Tuple, TYPE_CHECKING, Iterable
 
-from qualtran import Bloq, BloqBuilder, Signature, SoquetT, QBit, Register, Side, CompositeBloq
+from qualtran import Bloq, BloqBuilder, CompositeBloq, QBit, Register, Side, Signature, SoquetT
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
 
 from qhat.common.pauli_string_evolution import PauliStringEvolution

@@ -7,11 +7,11 @@ os.environ["QSHARP_PYTHON_TELEMETRY"] = "none"
 
 import math
 
+from qhat.qre.qre_analysis import analyze_circuit
+from qhat.qre.qre_circuit import build_qpe_circuit, compute_initial_phase_qubits
 from qhat.qre.qre_configuration import load_configuration
 from qhat.qre.qre_hamiltonian import get_physical_hamiltonian
 from qhat.qre.qre_unitary import encode_as_unitary
-from qhat.qre.qre_circuit import build_qpe_circuit, compute_initial_phase_qubits
-from qhat.qre.qre_analysis import analyze_circuit
 
 # =================================================================================================
 

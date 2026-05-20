@@ -10,22 +10,27 @@ Tests cover:
 """
 
 import os
-import tempfile
-import pytest
-import numpy as np
-
-# Import from parent directory
 import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import tempfile
+
+import numpy as np
+import pytest
 
 from qhat.qre.qre_hamiltonian import (
-    LinearCombinationOfPauliStrings,
     Hamiltonian,
+    LinearCombinationOfPauliStrings,
+    dense_to_sparse_pauli,
     load_pauli,
     sparse_to_dense_pauli,
-    dense_to_sparse_pauli
 )
-from qhat.qre.qre_types import GeneralConfiguration, GeneralConfigurationUser, HamiltonianConfiguration
+from qhat.qre.qre_types import (
+    GeneralConfiguration,
+    GeneralConfigurationUser,
+    HamiltonianConfiguration,
+)
+
+# Import from parent directory
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 # ==================================================================================

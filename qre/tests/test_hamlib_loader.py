@@ -2,18 +2,19 @@
 Tests for HamLib HDF5 file loading functionality.
 """
 
+import os
+import sys
+import tempfile
+from pathlib import Path
+
 import h5py
 import numpy as np
 import pytest
-import tempfile
-import os
-from pathlib import Path
 
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from qhat.qre.qre_hamiltonian import load_hamlib_hdf5, Hamiltonian, LinearCombinationOfPauliStrings
+from qhat.qre.qre_hamiltonian import Hamiltonian, LinearCombinationOfPauliStrings, load_hamlib_hdf5
 from qhat.qre.qre_types import GeneralConfiguration, HamiltonianConfiguration
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 class MockConfig:

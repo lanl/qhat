@@ -28,11 +28,11 @@
 
 import math
 
-from qhat.qre.qre_types import GeneralConfiguration, QPEConfiguration
-
 from pyLIQTR.PhaseEstimation.pe import PhaseEstimation
 from pyLIQTR.qubitization.phase_estimation import QubitizedPhaseEstimation
 from qualtran.bloqs.phase_estimation import TextbookQPE
+
+from qhat.qre.qre_types import GeneralConfiguration, QPEConfiguration
 
 # -------------------------------------------------------------------------------------------------
 

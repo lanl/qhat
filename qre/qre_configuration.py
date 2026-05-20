@@ -1,11 +1,13 @@
-from qhat.qre.qre_types import GeneralConfigurationUser, \
-                               HamiltonianConfiguration, \
-                               UnitaryConfiguration, \
-                               QPEConfiguration, \
-                               AnalysisConfiguration, \
-                      State
-
 import argparse
+
+from qhat.qre.qre_types import (
+    AnalysisConfiguration,
+    GeneralConfigurationUser,
+    HamiltonianConfiguration,
+    QPEConfiguration,
+    State,
+    UnitaryConfiguration,
+)
 
 # -------------------------------------------------------------------------------------------------
 

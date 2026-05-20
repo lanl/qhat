@@ -1,4 +1,4 @@
-from qhat.qre.qre_types import GeneralConfiguration, UnitaryConfiguration, value
+import math
 
 from openfermion import InteractionOperator, jordan_wigner
 
@@ -7,7 +7,7 @@ from pyLIQTR.BlockEncodings.LinearT import Fermionic_LinearT
 from pyLIQTR.BlockEncodings.PauliStringLCU import PauliStringLCU
 from pyLIQTR.ProblemInstances.ChemicalHamiltonian import ChemicalHamiltonian
 
-import math
+from qhat.qre.qre_types import GeneralConfiguration, UnitaryConfiguration, value
 
 # -------------------------------------------------------------------------------------------------
 

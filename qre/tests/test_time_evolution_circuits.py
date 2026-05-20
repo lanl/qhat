@@ -8,20 +8,22 @@ by verifying:
 3. Resource estimation produces reasonable results
 """
 
-import pytest
-import numpy as np
-import sys
 import os
+import sys
+
+import numpy as np
+import pytest
+
+from qhat.common.pauli_string_evolution import PauliStringEvolution
+from qhat.common.pauli_utils import analytical_evolution
+from qhat.qre.qre_analysis import analyze_circuit
+from qhat.qre.qre_circuit import build_qpe_circuit
+from qhat.qre.qre_types import AnalysisConfiguration, QPEConfiguration
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from qhat.qre.qre_circuit import build_qpe_circuit
-from qhat.qre.qre_types import QPEConfiguration, AnalysisConfiguration
-from qhat.qre.qre_analysis import analyze_circuit
 from .mock_config import mock_config
-from qhat.common.pauli_string_evolution import PauliStringEvolution
-from qhat.common.pauli_utils import analytical_evolution
 
 
 # =============================================================================

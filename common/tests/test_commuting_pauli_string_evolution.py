@@ -8,17 +8,18 @@ import numpy as np
 import pytest
 from scipy.linalg import expm
 
+from qualtran.cirq_interop.t_complexity_protocol import t_complexity
+
 from qhat.common.commuting_pauli_string_evolution import (
     CommutingPauliStringEvolution,
-    pauli_strings_commute,
     all_commute,
+    pauli_strings_commute,
 )
 from qhat.common.pauli_string_evolution import PauliStringEvolution
-from qualtran.cirq_interop.t_complexity_protocol import t_complexity
 from qhat.common.pauli_utils import (
+    analytical_commuting_evolution,
     get_pauli_matrix,
     pauli_string_to_matrix,
-    analytical_commuting_evolution,
 )
 
 
