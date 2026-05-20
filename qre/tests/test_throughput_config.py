@@ -2,13 +2,7 @@
 Test that throughput_config parameter works correctly for should_use_exact_tracking.
 """
 
-import sys
-import os
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from qhat.qre.trotter_coefficients_fast import should_use_exact_tracking, THROUGHPUT_CONFIG
+from qhat.qre.trotter_coefficients_fast import THROUGHPUT_CONFIG, should_use_exact_tracking
 
 
 def test_default_config():

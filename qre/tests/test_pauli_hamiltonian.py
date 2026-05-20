@@ -10,7 +10,6 @@ Tests cover:
 """
 
 import os
-import sys
 import tempfile
 
 import numpy as np
@@ -28,9 +27,6 @@ from qhat.qre.qre_types import (
     GeneralConfigurationUser,
     HamiltonianConfiguration,
 )
-
-# Import from parent directory
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 # ==================================================================================

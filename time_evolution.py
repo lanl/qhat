@@ -26,19 +26,12 @@ Usage
     python time_evolution.py qre/config.py --psi0 file --psi0-file my_state.npy --fidelity
 """
 
-import os as _os
-import sys as _sys
-
-_HERE    = _os.path.dirname(_os.path.abspath(__file__))
-_QRE_DIR = _os.path.join(_HERE, "qre")
-if _QRE_DIR not in _sys.path:
-    _sys.path.insert(0, _QRE_DIR)
-
 import argparse
 import sys
+from typing import Dict, List, Tuple
+
 import numpy as np
 from scipy.linalg import expm
-from typing import Dict, List, Tuple
 
 from qhat.qre.qre_configuration import load_configuration
 from qhat.qre.qre_hamiltonian import get_physical_hamiltonian
