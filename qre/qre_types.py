@@ -156,8 +156,8 @@ class QPEConfiguration(ConfigurationBase):
 
 class AnalysisConfiguration(ConfigurationBase):
     def __init__(self):
-        self.resource_estimator = None  # Options: "pyliqtr", "cirq", or None
-        self.matrix_output_file = None  # Filename with extension (.npz, .h5, .txt); auto-generated if None
+        self.resource_estimator = None
+        self.matrix_output_file = None
 
     def _generate_TOML_table(self):
         table = tomlkit.table()

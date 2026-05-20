@@ -79,9 +79,7 @@ def _save_matrix_hdf5(output_path, unitary_matrix, git_hash, unitarity_error, ma
     try:
         import h5py
     except ImportError:
-        raise ImportError(
-            "h5py is required for HDF5 output. Install with: pip install h5py"
-        )
+        raise ImportError("h5py is required for HDF5 output")
 
     with h5py.File(output_path, 'w') as f:
         dset = f.create_dataset('matrix', data=unitary_matrix, compression='gzip')
@@ -142,7 +140,7 @@ def _get_format_from_extension(filename):
             f"Supported extensions: {', '.join(extension_map.keys())}"
         )
 
-    return extension_map[ext], ext
+    return extension_map[ext]
 
 def _save_matrix_file(output_path, matrix_format, unitary_matrix, git_hash,
                       unitarity_error, matrix_norm, config_general):
@@ -227,7 +225,7 @@ def output_unitary_matrix(
 
     # Determine output filename and format from extension
     output_file = config_analysis.matrix_output_file
-    matrix_format, _ = _get_format_from_extension(output_file)
+    matrix_format = _get_format_from_extension(output_file)
 
     output_path = Path(output_file)
 
