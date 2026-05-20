@@ -129,6 +129,7 @@ def _get_format_from_extension(filename):
         '.h5': 'hdf5',
         '.hdf5': 'hdf5',
         '.txt': 'text',
+        '.dat': 'text',
         '.csv': 'text',
     }
 
