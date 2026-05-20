@@ -1,0 +1,122 @@
+2026-05-20 12:12:31,304    INFO | Running script with git hash 9cba091e6d5222b8fbb5e6f6aa80b43c0364146b
+2026-05-20 12:12:31,304    INFO | Writing to file stub "diatomic_lithium" in format "default".
+2026-05-20 12:12:31,304    INFO | Contents of configuration file "config.py":
+# _________________________________________________________________________________________________
+# General configuration
+
+general.print_verbose()                         # Additional information printed out
+general.file_stub = "diatomic_lithium"          # Base name that all filenames are built from
+general.file_format = "default"                 # Use default Pauli string style (not HamLib style)
+
+# _________________________________________________________________________________________________
+# Describe the Hamiltonian
+
+L = 2.0
+for i in range(2):
+    hamiltonian.add_atom("Li", i * L, 0, 0)     # Add two lithium atoms at (0,0,0) and (L,0,0)
+
+hamiltonian.basis = "sto-3g"                    # Select the atomic basis functions
+
+hamiltonian.num_active_occupied = 4             # Specify the active space
+hamiltonian.num_active_vacant = 6
+
+2026-05-20 12:12:31,304    INFO | Trying to load "diatomic_lithium_as-004-006.pickle".
+2026-05-20 12:12:31,305    INFO | Could not load "diatomic_lithium_as-004-006.pickle". Trying to load "diatomic_lithium.pickle".
+2026-05-20 12:12:31,305    INFO | Could not load "diatomic_lithium.pickle".  Recomputing from the beginning.
+2026-05-20 12:12:31,305    INFO | Perform Hartree-Fock calculation.
+2026-05-20 12:12:31,305 VERBOSE | Construct instance of MolecularData.
+2026-05-20 12:12:31,902 VERBOSE | geometry: 
+           ('Li', (0.0, 0.0, 0.0))
+           ('Li', (2.0, 0.0, 0.0))
+2026-05-20 12:12:31,902 VERBOSE | Construct instance of PyscfMolecularData.
+2026-05-20 12:12:32,333    INFO | Hartree-Fock energy from run_pyscf = -14.609744737995712
+2026-05-20 12:12:32,333    INFO | Pickle to "diatomic_lithium.pickle" file.
+2026-05-20 12:12:32,337    INFO | Apply active space.
+2026-05-20 12:12:32,337 VERBOSE | Define active space.
+2026-05-20 12:12:32,337    INFO | single-occupancy (spin) orbital counts:
+                 total   active  frozen
+   num orbitals      20      10      10
+   num occupied       6       4       2
+   num vacant        14       6       8
+2026-05-20 12:12:32,338 VERBOSE | single-occupancy (spin) orbital indices:
+   frozen occupied  [ 0,  2)
+   active occupied  [ 2,  6)
+   active vacant    [ 6, 12)
+   frozen vacant    [12, 20)
+2026-05-20 12:12:32,338 VERBOSE | double-occupancy (spatial) orbital indices:
+   frozen occupied  [ 0,  1)
+   active total     [ 1,  6)
+2026-05-20 12:12:32,338 VERBOSE | Build instance of InteractionOperator.
+2026-05-20 12:12:32,339    INFO | Pickle to "diatomic_lithium_as-004-006.pickle" file.
+2026-05-20 12:12:32,348    INFO | Map fermionic operators to qubit operators.
+2026-05-20 12:12:32,376    INFO | Generate sum of Pauli strings.
+2026-05-20 12:12:32,376    INFO | Generate initial state vector.
+2026-05-20 12:12:32,377    INFO | metadata:
+{  'Hartree-Fock energy (Hartrees)': -14.609744737995712,
+   'basis set': 'sto-3g',
+   'eigenvalue lower bound from shifted one-norm (Hartrees)': -18.125380876421513,
+   'eigenvalue upper bound from shifted one-norm (Hartrees)': -5.618847027731313,
+   'fermion-to-qubit operator mapping': 'jordan-wigner',
+   'interatomic separation (angstroms)': 2.0,
+   'number of active, occupied, single-occupancy orbitals': 4,
+   'number of active, vacant, single-occupancy orbitals': 6,
+   'number of frozen, occupied, single-occupancy orbitals': 2,
+   'number of frozen, vacant, single-occupancy orbitals': 8,
+   'number of qubits': 10,
+   'number of terms in sum of Pauli strings': 156,
+   'one-norm of sum of Pauli strings (Hartrees)': 18.125380876421513,
+   'runtime for Hartree-Fock calculation (seconds)': 1.0276412963867188,
+   'runtime for active space calculation (seconds)': 0.001811981201171875,
+   'runtime for fermion-to-qubit calculation (seconds)': 0.02847146987915039,
+   'size of active space': 10}
+2026-05-20 12:12:32,377    INFO | Save sum of Pauli strings to data file "diatomic_lithium_as-004-006_jw.dat".
+2026-05-20 12:12:32,381    INFO | Save initial state to data file "diatomic_lithium_as-004-006_jw.npy".
+2026-05-20 12:12:32,388    INFO | Hamiltonian generation complete.
+2026-05-20 12:13:05,877    INFO | Running script with git hash 9cba091e6d5222b8fbb5e6f6aa80b43c0364146b
+2026-05-20 12:13:05,877    INFO | Writing to file stub "diatomic_lithium" in format "default".
+2026-05-20 12:13:05,877    INFO | Contents of configuration file "config.py":
+# _________________________________________________________________________________________________
+# General configuration
+
+general.print_verbose()                         # Additional information printed out
+general.file_stub = "diatomic_lithium"          # Base name that all filenames are built from
+general.file_format = "default"                 # Use default Pauli string style (not HamLib style)
+
+# _________________________________________________________________________________________________
+# Describe the Hamiltonian
+
+L = 2.0
+for i in range(2):
+    hamiltonian.add_atom("Li", i * L, 0, 0)     # Add two lithium atoms at (0,0,0) and (L,0,0)
+
+hamiltonian.basis = "sto-3g"                    # Select the atomic basis functions
+
+hamiltonian.num_active_occupied = 4             # Specify the active space
+hamiltonian.num_active_vacant = 6
+
+2026-05-20 12:13:05,877    INFO | Trying to load "diatomic_lithium_as-004-006.pickle".
+2026-05-20 12:13:05,878    INFO | Loaded "diatomic_lithium_as-004-006.pickle". Continuing from after the active space is applied.
+2026-05-20 12:13:05,879    INFO | Map fermionic operators to qubit operators.
+2026-05-20 12:13:05,914    INFO | Generate sum of Pauli strings.
+2026-05-20 12:13:05,914    INFO | Generate initial state vector.
+2026-05-20 12:13:05,914    INFO | metadata:
+{  'Hartree-Fock energy (Hartrees)': -14.609744737995712,
+   'basis set': 'sto-3g',
+   'eigenvalue lower bound from shifted one-norm (Hartrees)': -18.125380876421513,
+   'eigenvalue upper bound from shifted one-norm (Hartrees)': -5.618847027731313,
+   'fermion-to-qubit operator mapping': 'jordan-wigner',
+   'interatomic separation (angstroms)': 2.0,
+   'number of active, occupied, single-occupancy orbitals': 4,
+   'number of active, vacant, single-occupancy orbitals': 6,
+   'number of frozen, occupied, single-occupancy orbitals': 2,
+   'number of frozen, vacant, single-occupancy orbitals': 8,
+   'number of qubits': 10,
+   'number of terms in sum of Pauli strings': 156,
+   'one-norm of sum of Pauli strings (Hartrees)': 18.125380876421513,
+   'runtime for Hartree-Fock calculation (seconds)': 1.0276412963867188,
+   'runtime for active space calculation (seconds)': 0.001811981201171875,
+   'runtime for fermion-to-qubit calculation (seconds)': 0.03494119644165039,
+   'size of active space': 10}
+2026-05-20 12:13:05,914    INFO | Save sum of Pauli strings to data file "diatomic_lithium_as-004-006_jw.dat".
+2026-05-20 12:13:05,925    INFO | Save initial state to data file "diatomic_lithium_as-004-006_jw.npy".
+2026-05-20 12:13:05,931    INFO | Hamiltonian generation complete.

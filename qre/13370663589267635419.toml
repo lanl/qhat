@@ -1,0 +1,39 @@
+# CONFIGURATION ===============================================================
+
+configuration_file = "my_method = \"Trotter\"\n#my_method = \"double-factorization\"\n\n# this configuration file assumes equipartition of energy between Trotterization error and phase\n# estimation error (see usage of energy_error below)\nenergy_error = meV_to_Hartree(1e4) # 0.01 keV\n\n# _________________________________________________________________________________________________\n# general\n\ngeneral.print_verbose()\ngeneral.logfile = \"Be-H.log\"\n\n# _________________________________________________________________________________________________\n# hamiltonian\n\nhamiltonian.load_second_quantization(\"examples/Be-H_1.30_sto-6g_as-003-003.tensors.npz\")\n\n# _________________________________________________________________________________________________\n# unitary encoding\n\nif my_method == \"Trotter\":\n    unitary.encode_ramped_trotter(\n            energy_error = 0.5 * energy_error,\n            error_scale = 1.0,\n            trotter_implementation = \"flattened\",\n            trotter_combine_terms = True,\n            )\nelif my_method == \"double-factorization\":\n    unitary.encode_double_factorization(energy_error=1.0e-4)\nelse:\n    raise ValueError(f\"Invalid value for `my_method`: \\\"{my_method}\\\"\")\n\n# _________________________________________________________________________________________________\n# phase estimation circuit\n\nif my_method == \"Trotter\":\n    circuit.method = \"QPE: qualtran textbook\"\n    circuit.energy_error = 0.5 * energy_error\n    circuit.probability_of_failure = 0.01\nelif my_method == \"double-factorization\":\n    circuit.method = \"QPE: pyLIQTR qubitized\"\n    circuit.num_phase_qubits = 12\nelse:\n    raise ValueError(f\"Invalid value for `my_method`: \\\"{my_method}\\\"\")\n\n# _________________________________________________________________________________________________\n# analysis\n\nanalysis.resource_estimator = \"pyLIQTR\"\n# The matrix analysis doesn't work with textbook QPE and is untested with qubitized QPE.  It should\n# work with time evolution (controlled or not).\n#analysis.matrix_output_file = \"my_circuit_matrix.npz\"\n"
+
+[general]
+logfile = "Be-H.log"
+git_hash = "9cba091e6d5222b8fbb5e6f6aa80b43c0364146b"
+
+[hamiltonian]
+source = "numpy"
+filename = "examples/Be-H_1.30_sto-6g_as-003-003.tensors.npz"
+fermion_to_qubit_transform = "JW"
+boson_to_qubit_transform = "binary"
+lower_bound = -inf
+exact_energy_lower_bound = false
+upper_bound = -inf
+exact_energy_upper_bound = false
+
+[unitary]
+method = "ramped trotter"
+energy_error = 0.1837466108785
+error_scale = 1.0
+trotter_implementation = "flattened"
+trotter_combine_terms = true
+
+[circuit]
+method = "QPE: qualtran textbook"
+probability_of_failure = 0.01
+energy_error = 0.1837466108785
+
+[analysis]
+resource_estimator = "pyLIQTR"
+
+# RESULTS =====================================================================
+
+[resource_estimates]
+Clifford_count = 453192594
+T_count = 236010436
+qubit_count = 17

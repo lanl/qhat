@@ -1,0 +1,158 @@
+2026-05-20 12:11:59,094    INFO | 
+***************************************************************************************************
+QRE_DRIVER START
+***************************************************************************************************
+2026-05-20 12:11:59,094    INFO | Logfile: qre.log
+2026-05-20 12:11:59,094    INFO | Running script with git hash 9cba091e6d5222b8fbb5e6f6aa80b43c0364146b
+2026-05-20 12:11:59,104    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_load_dense_format0/test_dense.txt".
+2026-05-20 12:11:59,106    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_load_sparse_format0/test_sparse.dat".
+2026-05-20 12:11:59,108    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_load_empty_lines_and_comm0/test_comments.txt".
+2026-05-20 12:11:59,110    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_inconsistent_qubit_count_0/test_inconsistent.txt".
+2026-05-20 12:11:59,112    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_mixed_format_raises_error0/test_mixed.txt".
+2026-05-20 12:11:59,114    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_load_json_format0/test.json".
+2026-05-20 12:11:59,116    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_json_missing_n_qubits0/test.json".
+2026-05-20 12:11:59,118    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_json_missing_terms0/test.json".
+2026-05-20 12:11:59,120    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_json_term_missing_fields0/test.json".
+2026-05-20 12:11:59,122    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_real_coefficients_pass0/test_real.txt".
+2026-05-20 12:11:59,123    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_small_imaginary_passes0/test_small_imag.txt".
+2026-05-20 12:11:59,125    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_large_imaginary_fails0/test_large_imag.txt".
+2026-05-20 12:11:59,127    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_relative_tolerance_small_0/test_small_coef.txt".
+2026-05-20 12:11:59,129    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_converted_to_float0/test_float.txt".
+2026-05-20 12:11:59,131    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_get_all_pauli_strings_tup0/test_ham.txt".
+2026-05-20 12:11:59,133    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_get_all_pauli_strings_str0/test_ham.txt".
+2026-05-20 12:11:59,134    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_energy_bounds0/test_ham.txt".
+2026-05-20 12:11:59,135    INFO | Computing initial energy bounds.
+2026-05-20 12:11:59,136    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_energy_shift0/test_ham.txt".
+2026-05-20 12:11:59,138    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_get_grouped_terms0/test_ham.txt".
+2026-05-20 12:11:59,140    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_get_core_operator0/test_ham.txt".
+2026-05-20 12:11:59,142    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_single_qubit0/test_1q.txt".
+2026-05-20 12:11:59,144    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_large_qubit_count0/test_10q.txt".
+2026-05-20 12:11:59,146    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_only_identity0/test_identity.txt".
+2026-05-20 12:11:59,148    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_no_identity_term0/test_no_identity.txt".
+2026-05-20 12:11:59,149    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_json_complex_hamiltonian0/test_complex.json".
+2026-05-20 12:11:59,151    INFO | Loading Pauli string Hamiltonian from file "/ram/tmp/pytest-of-bkkrueger/pytest-1/test_invalid_extension0/test.xyz".
+2026-05-20 12:11:59,152    INFO | Loading Pauli string Hamiltonian from file "/vast/home/bkkrueger/qc4ws/lisdi-git/qhat/worktrees/bkk_py_pkg/qre/tests/data_pauli.json".
+2026-05-20 12:12:00,077    INFO | Computing qubit count for exp(-i * 1.0 * XY * 1.0 / 1.0) from its decomposition
+2026-05-20 12:12:00,087    INFO | Computing qubit count for (+XY)**0.6366197723675814 from its decomposition
+2026-05-20 12:12:00,089    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,090    INFO | Computing qubit count for Y**-0.5 from signature
+2026-05-20 12:12:00,090    INFO | Computed qubit count for Y**-0.5 in 0.000197521 s
+2026-05-20 12:12:00,090    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) in 0.00301459 s
+2026-05-20 12:12:00,093    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,093    INFO | Computing qubit count for X**0.5 from signature
+2026-05-20 12:12:00,094    INFO | Computed qubit count for X**0.5 in 0.000191199 s
+2026-05-20 12:12:00,094    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) in 0.00293068 s
+2026-05-20 12:12:00,094    INFO | Computing qubit count for CNOT from signature
+2026-05-20 12:12:00,094    INFO | Computed qubit count for CNOT in 0.000191051 s
+2026-05-20 12:12:00,095    INFO | Computing qubit count for Z**0.6366197723675814 from signature
+2026-05-20 12:12:00,095    INFO | Computed qubit count for Z**0.6366197723675814 in 0.00017884 s
+2026-05-20 12:12:00,096    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, False], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,097    INFO | Computing qubit count for X**-0.5 from signature
+2026-05-20 12:12:00,097    INFO | Computed qubit count for X**-0.5 in 0.000185685 s
+2026-05-20 12:12:00,097    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, False], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) in 0.00247128 s
+2026-05-20 12:12:00,099    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([True, False], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,100    INFO | Computing qubit count for Y**0.5 from signature
+2026-05-20 12:12:00,100    INFO | Computed qubit count for Y**0.5 in 0.000188828 s
+2026-05-20 12:12:00,100    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([True, False], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) in 0.00234609 s
+2026-05-20 12:12:00,101    INFO | Computed qubit count for (+XY)**0.6366197723675814 in 0.023054 s
+2026-05-20 12:12:00,101    INFO | Computed qubit count for exp(-i * 1.0 * XY * 1.0 / 1.0) in 0.0245653 s
+2026-05-20 12:12:00,140    INFO | Computing qubit count for exp(-i * 1.0 * XY * 1.0 / 1.0) from its decomposition
+2026-05-20 12:12:00,149    INFO | Computing qubit count for (+XY)**0.6366197723675814 from its decomposition
+2026-05-20 12:12:00,151    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,152    INFO | Computing qubit count for Y**-0.5 from signature
+2026-05-20 12:12:00,152    INFO | Computed qubit count for Y**-0.5 in 0.000179333 s
+2026-05-20 12:12:00,152    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) in 0.00239708 s
+2026-05-20 12:12:00,154    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,154    INFO | Computing qubit count for X**0.5 from signature
+2026-05-20 12:12:00,155    INFO | Computed qubit count for X**0.5 in 0.000183 s
+2026-05-20 12:12:00,155    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) in 0.0023751 s
+2026-05-20 12:12:00,155    INFO | Computing qubit count for CNOT from signature
+2026-05-20 12:12:00,155    INFO | Computed qubit count for CNOT in 0.000194661 s
+2026-05-20 12:12:00,156    INFO | Computing qubit count for Z**0.6366197723675814 from signature
+2026-05-20 12:12:00,156    INFO | Computed qubit count for Z**0.6366197723675814 in 0.000176207 s
+2026-05-20 12:12:00,157    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, False], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,158    INFO | Computing qubit count for X**-0.5 from signature
+2026-05-20 12:12:00,158    INFO | Computed qubit count for X**-0.5 in 0.00019507 s
+2026-05-20 12:12:00,158    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, False], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) in 0.00247907 s
+2026-05-20 12:12:00,160    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([True, False], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,161    INFO | Computing qubit count for Y**0.5 from signature
+2026-05-20 12:12:00,161    INFO | Computed qubit count for Y**0.5 in 0.000202729 s
+2026-05-20 12:12:00,161    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([True, False], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) in 0.00239876 s
+2026-05-20 12:12:00,162    INFO | Computed qubit count for (+XY)**0.6366197723675814 in 0.0208194 s
+2026-05-20 12:12:00,162    INFO | Computed qubit count for exp(-i * 1.0 * XY * 1.0 / 1.0) in 0.0219001 s
+2026-05-20 12:12:00,164    INFO | Computing qubit count for exp(-i * 1.0 * XY * 1.0 / 1.0) from its decomposition
+2026-05-20 12:12:00,171    INFO | Computing qubit count for (+XY)**0.6366197723675814 from its decomposition
+2026-05-20 12:12:00,173    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,174    INFO | Computing qubit count for Y**-0.5 from signature
+2026-05-20 12:12:00,174    INFO | Computed qubit count for Y**-0.5 in 0.000190958 s
+2026-05-20 12:12:00,174    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) in 0.00230459 s
+2026-05-20 12:12:00,176    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,177    INFO | Computing qubit count for X**0.5 from signature
+2026-05-20 12:12:00,177    INFO | Computed qubit count for X**0.5 in 0.00017911 s
+2026-05-20 12:12:00,177    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) in 0.00246112 s
+2026-05-20 12:12:00,177    INFO | Computing qubit count for CNOT from signature
+2026-05-20 12:12:00,178    INFO | Computed qubit count for CNOT in 0.000178306 s
+2026-05-20 12:12:00,178    INFO | Computing qubit count for Z**0.6366197723675814 from signature
+2026-05-20 12:12:00,178    INFO | Computed qubit count for Z**0.6366197723675814 in 0.000166541 s
+2026-05-20 12:12:00,180    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, False], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,180    INFO | Computing qubit count for X**-0.5 from signature
+2026-05-20 12:12:00,180    INFO | Computed qubit count for X**-0.5 in 0.00018194 s
+2026-05-20 12:12:00,180    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, False], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) in 0.00229526 s
+2026-05-20 12:12:00,182    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([True, False], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,183    INFO | Computing qubit count for Y**0.5 from signature
+2026-05-20 12:12:00,183    INFO | Computed qubit count for Y**0.5 in 0.000180798 s
+2026-05-20 12:12:00,183    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([True, False], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) in 0.00229496 s
+2026-05-20 12:12:00,183    INFO | Computed qubit count for (+XY)**0.6366197723675814 in 0.0195554 s
+2026-05-20 12:12:00,184    INFO | Computed qubit count for exp(-i * 1.0 * XY * 1.0 / 1.0) in 0.0205312 s
+2026-05-20 12:12:00,186    INFO | Computing qubit count for exp(-i * 1.0 * XYZ * 1.0 / 1.0) from its decomposition
+2026-05-20 12:12:00,197    INFO | Computing qubit count for (+XYZ)**0.6366197723675814 from its decomposition
+2026-05-20 12:12:00,199    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,200    INFO | Computing qubit count for Y**-0.5 from signature
+2026-05-20 12:12:00,200    INFO | Computed qubit count for Y**-0.5 in 0.000189721 s
+2026-05-20 12:12:00,200    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) in 0.00229381 s
+2026-05-20 12:12:00,203    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,203    INFO | Computing qubit count for X**0.5 from signature
+2026-05-20 12:12:00,203    INFO | Computed qubit count for X**0.5 in 0.000180098 s
+2026-05-20 12:12:00,204    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) in 0.00290455 s
+2026-05-20 12:12:00,205    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, False], dtype=np.dtype('bool')), xs=np.array([[True], [False]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) from signature
+2026-05-20 12:12:00,205    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, False], dtype=np.dtype('bool')), xs=np.array([[True], [False]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) in 0.0010335 s
+2026-05-20 12:12:00,205    INFO | Computing qubit count for CNOT from signature
+2026-05-20 12:12:00,205    INFO | Computed qubit count for CNOT in 0.000181255 s
+2026-05-20 12:12:00,206    INFO | Computing qubit count for Z**0.6366197723675814 from signature
+2026-05-20 12:12:00,206    INFO | Computed qubit count for Z**0.6366197723675814 in 0.000166935 s
+2026-05-20 12:12:00,208    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, False], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,208    INFO | Computing qubit count for X**-0.5 from signature
+2026-05-20 12:12:00,208    INFO | Computed qubit count for X**-0.5 in 0.000187973 s
+2026-05-20 12:12:00,208    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, False], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) in 0.00231709 s
+2026-05-20 12:12:00,210    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([True, False], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,211    INFO | Computing qubit count for Y**0.5 from signature
+2026-05-20 12:12:00,211    INFO | Computed qubit count for Y**0.5 in 0.000181554 s
+2026-05-20 12:12:00,211    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([True, False], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) in 0.00229229 s
+2026-05-20 12:12:00,212    INFO | Computed qubit count for (+XYZ)**0.6366197723675814 in 0.0252527 s
+2026-05-20 12:12:00,212    INFO | Computed qubit count for exp(-i * 1.0 * XYZ * 1.0 / 1.0) in 0.0262648 s
+2026-05-20 12:12:00,214    INFO | Computing qubit count for exp(-i * 1.0 * XYZI * 1.0 / 1.0) from its decomposition
+2026-05-20 12:12:00,227    INFO | Computing qubit count for (+XYZI)**0.6366197723675814 from its decomposition
+2026-05-20 12:12:00,229    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,230    INFO | Computing qubit count for Y**-0.5 from signature
+2026-05-20 12:12:00,230    INFO | Computed qubit count for Y**-0.5 in 0.000189509 s
+2026-05-20 12:12:00,230    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) in 0.00243813 s
+2026-05-20 12:12:00,232    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,233    INFO | Computing qubit count for X**0.5 from signature
+2026-05-20 12:12:00,233    INFO | Computed qubit count for X**0.5 in 0.000179558 s
+2026-05-20 12:12:00,233    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, True], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) in 0.0022881 s
+2026-05-20 12:12:00,234    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, False], dtype=np.dtype('bool')), xs=np.array([[True], [False]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) from signature
+2026-05-20 12:12:00,234    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, False], dtype=np.dtype('bool')), xs=np.array([[True], [False]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) in 0.000787907 s
+2026-05-20 12:12:00,234    INFO | Computing qubit count for CNOT from signature
+2026-05-20 12:12:00,235    INFO | Computed qubit count for CNOT in 0.000178606 s
+2026-05-20 12:12:00,235    INFO | Computing qubit count for Z**0.6366197723675814 from signature
+2026-05-20 12:12:00,235    INFO | Computed qubit count for Z**0.6366197723675814 in 0.000181018 s
+2026-05-20 12:12:00,237    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, False], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,237    INFO | Computing qubit count for X**-0.5 from signature
+2026-05-20 12:12:00,237    INFO | Computed qubit count for X**-0.5 in 0.000182484 s
+2026-05-20 12:12:00,238    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([False, False], dtype=np.dtype('bool')), xs=np.array([[True], [True]], dtype=np.dtype('bool')),zs=np.array([[False], [True]], dtype=np.dtype('bool')), initial_state=0)) in 0.00232003 s
+2026-05-20 12:12:00,239    INFO | Computing qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([True, False], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) from its decomposition
+2026-05-20 12:12:00,240    INFO | Computing qubit count for Y**0.5 from signature
+2026-05-20 12:12:00,240    INFO | Computed qubit count for Y**0.5 in 0.000188551 s
+2026-05-20 12:12:00,240    INFO | Computed qubit count for cirq.CliffordGate.from_clifford_tableau(cirq.CliffordTableau(1,rs=np.array([True, False], dtype=np.dtype('bool')), xs=np.array([[False], [True]], dtype=np.dtype('bool')),zs=np.array([[True], [False]], dtype=np.dtype('bool')), initial_state=0)) in 0.00230511 s
+2026-05-20 12:12:00,241    INFO | Computed qubit count for (+XYZI)**0.6366197723675814 in 0.0262379 s
+2026-05-20 12:12:00,241    INFO | Computed qubit count for exp(-i * 1.0 * XYZI * 1.0 / 1.0) in 0.0272904 s

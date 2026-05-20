@@ -16,7 +16,8 @@ from qhat.common.pauli_utils import analytical_evolution
 from qhat.qre.qre_analysis import analyze_circuit
 from qhat.qre.qre_circuit import build_qpe_circuit
 from qhat.qre.qre_types import AnalysisConfiguration, QPEConfiguration
-from qhat.qre.tests.mock_config import mock_config
+
+from .mock_config import mock_config
 
 
 # =============================================================================
