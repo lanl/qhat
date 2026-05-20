@@ -48,5 +48,7 @@ else:
 # analysis
 
 analysis.resource_estimator = "pyLIQTR"
-analysis.matrix_output_file = "my_circuit_matrix.npz"
+# The matrix analysis doesn't work with textbook QPE and is untested with qubitized QPE.  It should
+# work with time evolution (controlled or not).
+#analysis.matrix_output_file = "my_circuit_matrix.npz"
 
