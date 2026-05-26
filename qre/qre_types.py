@@ -154,12 +154,15 @@ class QPEConfiguration(ConfigurationBase):
 
 # -------------------------------------------------------------------------------------------------
 
-class AnalysisConfiguration:
+class AnalysisConfiguration(ConfigurationBase):
     def __init__(self):
-        self.resource_estimator = "pyliqtr"
+        self.resource_estimator = None
+        self.matrix_output_file = None
+
     def _generate_TOML_table(self):
         table = tomlkit.table()
-        table["resource_estimator"] = self.resource_estimator
+        self.save_if_present(table, "resource_estimator")
+        self.save_if_present(table, "matrix_output_file")
         return table
 
 # -------------------------------------------------------------------------------------------------
