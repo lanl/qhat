@@ -25,6 +25,7 @@ if my_method == "Trotter":
             error_scale = 1.0,
             trotter_implementation = "flattened",
             trotter_combine_terms = True,
+            ordering_method = "lexicographical"
             )
 elif my_method == "double-factorization":
     unitary.encode_double_factorization(energy_error=1.0e-4)

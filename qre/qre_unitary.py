@@ -8,6 +8,7 @@ from pyLIQTR.BlockEncodings.PauliStringLCU import PauliStringLCU
 from pyLIQTR.ProblemInstances.ChemicalHamiltonian import ChemicalHamiltonian
 
 import math
+from ordering import reorder_paulis
 
 # -------------------------------------------------------------------------------------------------
 
@@ -154,12 +155,15 @@ def encode_ramped_trotter(
     Nsteps = max(1, math.ceil(Nsteps0))
     config_general.log(f"-- using {method} Trotter formula with {Nsteps} steps ({Nsteps0})")
 
+    pauli_strings = hamiltonian.get_all_pauli_strings(return_as='strings')
+    pauli_strings = reorder_paulis(pauli_strings, config_unitary.ordering_method)
+
     # Import the appropriate implementation
     if trotter_impl == 'flattened':
         from common.trotter_flattened import build_ramped_trotterized_unitary
         # Pass combine_terms parameter only for flattened implementation
         return build_ramped_trotterized_unitary(
-                hamiltonian.get_all_pauli_strings(return_as='strings').items(),
+                pauli_strings.items(),
                 method,
                 timestep,
                 Nsteps,
@@ -168,7 +172,7 @@ def encode_ramped_trotter(
         from common.trotter_original import build_ramped_trotterized_unitary
         # Original implementation doesn't support combine_terms parameter
         return build_ramped_trotterized_unitary(
-                hamiltonian.get_all_pauli_strings(return_as='strings').items(),
+                pauli_strings.items(),
                 method,
                 timestep,
                 Nsteps)
