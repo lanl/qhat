@@ -1,9 +1,9 @@
-from qre_types import GeneralConfigurationUser, \
-                      HamiltonianConfiguration, \
-                      UnitaryConfiguration, \
-                      QPEConfiguration, \
-                      AnalysisConfiguration, \
-                      State
+from config_types import GeneralConfigurationUser, \
+                         HamiltonianConfiguration, \
+                         UnitaryConfiguration, \
+                         AlgorithmConfiguration, \
+                         AnalysisConfiguration, \
+                         State
 
 import argparse
 
@@ -31,14 +31,14 @@ def load_configuration() -> State:
     general = GeneralConfigurationUser()
     hamiltonian = HamiltonianConfiguration()
     unitary = UnitaryConfiguration()
-    circuit = QPEConfiguration()
+    algorithm = AlgorithmConfiguration()
     analysis = AnalysisConfiguration()
     def meV_to_Hartree(meV):
         return 3.67493221757e-5 * meV
     exec(config_script)
 
     # Build the state (does some post-processing of user configuration)
-    state = State(config_script, general, hamiltonian, unitary, circuit, analysis)
+    state = State(config_script, general, hamiltonian, unitary, algorithm, analysis)
 
     state.config_general.log("\n".join([
         f"Contents of configuration file \"{args.configuration_file}\":",

@@ -454,7 +454,7 @@ def build_ramped_trotterized_unitary(
     """Build a Trotterization using the old interface for backward compatibility.
 
     This function provides compatibility with the old `common.trotter` module interface
-    used by QPE code in the qre/ directory.
+    used by QPE code in the analysis/ directory.
 
     Args:
         pauli_strings: Iterable of (pauli_string, coefficient) tuples.

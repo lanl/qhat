@@ -1,16 +1,16 @@
-# QHAT Quantum Resource Estimation
+# QHAT Analysis
 
 [[_TOC_]]
 
-This directory contains the modules for performing quantum resource estimation (QRE).  This is run
+This directory contains the modules for performing analysis.  This is run
 by
 ```
-python qre_driver.py
+python driver.py
 ```
 By default, this will load the setup from `config.py`, but this can be changed by passing the name
 of a configuration file as a command line argument
 ```
-python qre_driver.py my_configuration_file.py
+python driver.py my_configuration_file.py
 ```
 
 ## Configuration Options
@@ -26,7 +26,7 @@ Configuration is broken down by several parts of the processing script.
 only controls under this heading relate to logging progress of the script.
 
 You can configure the log file that the script will write to by setting **`general.logfile`** to
-the name of the logfile you want to use.  The default is `qre.log`.
+the name of the logfile you want to use.  The default is `analysis.log`.
 
 The other capability under general configuration is to set the log level, which is done by calling
 the following functions.  If you call multiple of these functions, whichever is called last takes
@@ -92,7 +92,7 @@ when calling `load_second_quantization()`. The available parameters are:
   bosonic state.  Formally an infinite number of bosons is permitted in each bosonic state, but
   this must be truncated to a finite value for computation.  For encodings such as "binary" that
   cannot provide an arbitrary upper limit on the number of bosons, this will be rounded up if
-  necessary.  That is, the circuit will be able to represent _at least_ this many bosons per
+  necessary.  That is, the algorithm will be able to represent _at least_ this many bosons per
   bosonic state.  **This parameter is required for systems containing bosons** and has no default
   value -- the script will raise an error if bosons are present and this is not specified.
 
@@ -119,7 +119,7 @@ supports
 - Trotterization: The function **`unitary.encode_ramped_trotter()`** uses a Trotter formula to
   encode the Hamiltonian into a time-evolution unitary.  It takes the following arguments:
   - `timestep`: If not provided, QHAT will attempt to pick the timestep that provides the most
-    efficient circuit while still preventing aliasing of phases.  Providing a timestep will
+    efficient algorithm while still preventing aliasing of phases.  Providing a timestep will
     override this with a user-selected value.
   - `energy_error`: The maximum error allowed from the Trotterization process.  If not provided,
     the script will generate an error.
@@ -148,42 +148,42 @@ supports
 
 Calling more than one of these functions will generate an error.
 
-### Generating a Circuit
+### Generating an Algorithm
 
-A variety of circuits can be generated and analyzed based on the time-evolution unitary operator.
+A variety of algorithms can be generated and analyzed based on the time-evolution unitary operator.
 However, this section is still under development and currently has very limited options:
 
-- Textbook Phase Estimation: Setting `circuit.method` to "QPE: qualtran textbook" will embed the
-  unitary encoding of the Hamiltonian into a phase estimation circuit that uses the classic
+- Textbook Phase Estimation: Setting `algorithm.method` to "QPE: qualtran textbook" will embed the
+  unitary encoding of the Hamiltonian into a phase estimation algorithm that uses the classic
   "textbook" method (see, for example, Nielson and Chuang's "Quantum Computation and Quantum
   Information").
-- Qubitized Phase Estimation: Setting `circuit.method` to "QPE: pyliqtr qubitized" will embed the
-  unitary encoding of the Hamiltonian into a phase estimation circuit that uses pyLIQTR's qubitized
-  phase estimation.  This uses only a single ancilla qubit for the phase, with multiple
+- Qubitized Phase Estimation: Setting `algorithm.method` to "QPE: pyliqtr qubitized" will embed the
+  unitary encoding of the Hamiltonian into a phase estimation algorithm that uses pyLIQTR's
+  qubitized phase estimation.  This uses only a single ancilla qubit for the phase, with multiple
   measurements to extract the necessary number of bits of information.  This method only works with
   qubitized encodings such as double-factorization.  The integration of this method into the larger
   workflow has not yet been verified, so use this method with caution.
-- Time Evolution: Setting `circuit.method` to "time evolution" will return the time evolution
+- Time Evolution: Setting `algorithm.method` to "time evolution" will return the time evolution
   unitary operator.  This is useful for analyzing the resource requirements of the unitary itself
-  or for building custom circuits.
-- Controlled Time Evolution: Setting `circuit.method` to "controlled time evolution" will return
+  or for building custom algorithms.
+- Controlled Time Evolution: Setting `algorithm.method` to "controlled time evolution" will return
   a singly-controlled version of the time evolution unitary.  This adds one control qubit to the
-  circuit and is useful for building custom quantum algorithms that require controlled time
+  algorithm and is useful for building custom quantum algorithms that require controlled time
   evolution operators (for example, when building phase estimation or iterative phase estimation
-  circuits manually).
+  algorithms manually).
 
 When performing phase estimation, it is necessary to set the number of phase qubits (which, in the
 qubitized method, translates to the number of measurements of the single phase qubit).  This can be
-controlled directly by the user by setting `circuit.num_phase_qubits`.  But this can also be
+controlled directly by the user by setting `algorithm.num_phase_qubits`.  But this can also be
 computed by the script by setting
 
-- `circuit.energy_error`: The maximum energy error permitted from phase estimation.
-- `circuit.probability_of_failure`: The maximum probability of measuring the wrong phase at the end
-  of the circuit.
+- `algorithm.energy_error`: The maximum energy error permitted from phase estimation.
+- `algorithm.probability_of_failure`: The maximum probability of measuring the wrong phase at the
+  end of the algorithm.
 
-### Analyzing a Circuit
+### Analyzing an Algorithm
 
-There are many details of the circuit that may be worth analyzing.  At this point, this script is
+There are many details of the algorithm that may be worth analyzing.  At this point, this script is
 focused on resource estimation.
 
 - pyLIQTR Resource Estimation: Setting `analysis.resource_estimator` to "pyLIQTR" will use the

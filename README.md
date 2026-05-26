@@ -4,7 +4,7 @@ QHAT ("Q-hat") supports research into Hamiltonian simulation on quantum computer
 pieces are
 
 - [`hamiltonian_generator`](/hamiltonian_generator): generate a Hamiltonian from a description of a molecule
-- [`qre`](/qre): resource estimation for quantum circuits involving Hamiltonians
+- [`analysis`](/analysis): analysis of quantum algorithms involving Hamiltonians
 - [`common`](/common): modules used by other parts of QHAT
 
 See the README file in each directory for component-specific documentation.

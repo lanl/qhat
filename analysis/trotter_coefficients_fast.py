@@ -47,7 +47,7 @@ MAX_PROGRESS_INTERVAL = 300.0        # Cap at 5 minutes between reports
 # HOW TO RECALIBRATE:
 # -------------------
 # Method 1: Use the calibration script (RECOMMENDED)
-#   cd qre
+#   cd analysis
 #   python3.11 calibrate_throughput.py --runs 3 --N 50
 #   # This runs 3 calibration runs, measures throughput, and outputs update code
 #

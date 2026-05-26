@@ -7,11 +7,11 @@ os.environ["QSHARP_PYTHON_TELEMETRY"] = "none"
 
 import math
 
-from qre_configuration import load_configuration
-from qre_hamiltonian import get_physical_hamiltonian
-from qre_unitary import encode_as_unitary
-from qre_circuit import build_qpe_circuit, compute_initial_phase_qubits
-from qre_analysis import analyze_circuit
+from configuration import load_configuration
+from hamiltonian import get_physical_hamiltonian
+from unitary import encode_as_unitary
+from algorithm import build_algorithm, compute_initial_phase_qubits
+from analysis import analyze_algorithm
 
 # =================================================================================================
 
@@ -49,7 +49,7 @@ def run():
         # preliminiary number of phase qubits, with upper bound correction
         P0, Elo3, Ehi3 = compute_initial_phase_qubits(
                 state.config_general,
-                state.config_circuit,
+                state.config_algorithm,
                 Elo2, Ehi2)
         tevol_hbar = 2 * math.pi / (Ehi3 - Elo3)
         state.config_general.log_verbose(f"-- optimized evolution time = {tevol_hbar} * hbar")
@@ -62,17 +62,17 @@ def run():
             physical_hamiltonian,
             tevol_hbar)
 
-    # QPE Circuit _________________________________________________________________________________
+    # Algorithm ___________________________________________________________________________________
 
-    qpe_circuit = build_qpe_circuit(
+    algorithm = build_algorithm(
             state.config_general,
-            state.config_circuit,
+            state.config_algorithm,
             unitary_hamiltonian,
             P0)
 
     # Analysis ____________________________________________________________________________________
 
-    state.store_results(analyze_circuit(state.config_general, state.config_analysis, qpe_circuit))
+    state.store_results(analyze_algorithm(state.config_general, state.config_analysis, algorithm))
 
     # Save Results ________________________________________________________________________________
 

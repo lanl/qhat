@@ -1,13 +1,13 @@
 """
-An implementation of the "standard" quantum phase estimation circuit, originally introduced by
+An implementation of the "standard" quantum phase estimation algorithm, originally introduced by
 Alexei Kitaev in https://arxiv.org/abs/quant-ph/9511026.  Also discussed and illustrated at
 https://en.wikipedia.org/wiki/Quantum_phase_estimation_algorithm#cite_note-kitaev-1.
 """
 
 # TODO: Compare qualtran.bloqs.phase_estimation.TextbookQPE.  It may be that this is an interesting
 #       exercise to learn about building things in Qualtran, but not something we'll actually use.
-#       -- Note that in the same directory Qualtran has a variety of phase estimation circuits that
-#          we could use in addition to / instead of what pyLIQTR provides.
+#       -- Note that in the same directory Qualtran has a variety of phase estimation algorithms
+#          that we could use in addition to / instead of what pyLIQTR provides.
 
 from attrs import frozen
 from qualtran import Bloq, BloqBuilder, QBit, Register, Signature, SoquetT

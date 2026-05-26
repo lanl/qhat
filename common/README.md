@@ -71,9 +71,9 @@ be used directly by users.
 
 ## Quantum Phase Estimation
 
-- **`QPE_Kitaev.py`**: Implementation of Kitaev's "standard" quantum phase estimation circuit.
+- **`QPE_Kitaev.py`**: Implementation of Kitaev's "standard" quantum phase estimation algorithm.
   - Based on Kitaev's original algorithm from arXiv:quant-ph/9511026
-  - Builds QPE circuit using Hadamard gates, controlled unitaries, and inverse QFT
+  - Builds QPE algorithm using Hadamard gates, controlled unitaries, and inverse QFT
   - ⚠️ **Note:** May be superseded by Qualtran's TextbookQPE and other QPE implementations
   - Currently used for educational/exploratory purposes
 

@@ -10,9 +10,10 @@
 #       -- QubitizedReflection
 #       -- QubitizedWalkOperator (2^n times)
 #       -- QubitizedReflection
-# I once traced PhaseEstimation and it does not follow the "usual" phase estimation circuit design.
-# The QubitizedPhaseEstimation involves quantum walk operators (add that to my list of things to
-# learn about), and it's not clear if it follows the usual phase estimation circuit or not.
+# I once traced PhaseEstimation and it does not follow the "usual" phase estimation algorithm
+# design.  The QubitizedPhaseEstimation involves quantum walk operators (add that to my list of
+# things to learn about), and it's not clear if it follows the usual phase estimation algorithm or
+# not.
 # 
 # This Qualtran issue provides nice links to the "standard" version and the "walk" version
 # (although at a quick glance it looks as though both use multiple ancilla qubits, while both
@@ -20,15 +21,15 @@
 # This brings us to a total of four versions of QPE, and it's not clear to me how much overlap
 # there is between the methods.
 # 
-# I can probably implement the "standard" QPE circuit in a useful framework, but I will have to
+# I can probably implement the "standard" QPE algorithm in a useful framework, but I will have to
 # read more to understand all the variations and figure out how to implement them.
 # 
-# Addendum: Qualtran provides QPE circuits, including TextbookQPE.  It may not be the most
+# Addendum: Qualtran provides QPE algorithms, including TextbookQPE.  It may not be the most
 # efficient (?) but it may be a reliable starting point.
 
 import math
 
-from qre_types import GeneralConfiguration, QPEConfiguration
+from config_types import GeneralConfiguration, AlgorithmConfiguration
 
 from pyLIQTR.PhaseEstimation.pe import PhaseEstimation
 from pyLIQTR.qubitization.phase_estimation import QubitizedPhaseEstimation
@@ -38,17 +39,17 @@ from qualtran.bloqs.phase_estimation import TextbookQPE
 
 def build_qpe_qualtran_textbook(
         config_general: GeneralConfiguration,
-        config_qpe: QPEConfiguration,
+        config_algorithm: AlgorithmConfiguration,
         unitary,
         P0):
 
-    config_general.log_verbose("Build a QPE circuit with Qualtran's \"textbook\" method.")
+    config_general.log_verbose("Build a QPE algorithm with Qualtran's \"textbook\" method.")
 
-    P = config_qpe.num_phase_qubits
+    P = config_algorithm.num_phase_qubits
     if P is None:
         assert P0 is not None
-        assert config_qpe.probability_of_failure is not None
-        Pextra = math.ceil(math.log2(2.0 + 0.5 / config_qpe.probability_of_failure))
+        assert config_algorithm.probability_of_failure is not None
+        Pextra = math.ceil(math.log2(2.0 + 0.5 / config_algorithm.probability_of_failure))
         P = P0 + Pextra
         config_general.log_verbose(
                 f"-- extending the phase register by {Pextra} qubits (total = {P})")
@@ -75,7 +76,7 @@ def build_qpe_qualtran_textbook(
     #          -- It looks like pyLIQTR eventually gets down to OpenFermion, which builds on a base
     #             class that does implement __pow__: https://github.com/quantumlib/OpenFermion/blob/master/src/openfermion/ops/operators/symbolic_operator.py#L577
     #          -- pyLIQTR _may_ be getting the fast-forward behavior when using Trotterization and
-    #             generating the circuit:
+    #             generating the algorithm:
     #             https://github.com/quantumlib/OpenFermion/blob/master/src/openfermion/ops/operators/symbolic_operator.py#L577
     #          -- When using an arbitrary unitary, pyLIQTR appears to just add the unitary 2^i
     #             times, so it probably is not getting the fast-forward behavior.
@@ -107,24 +108,24 @@ def build_qpe_qualtran_textbook(
 
 def build_qpe_pyliqtr_qubitized(
         config_general: GeneralConfiguration,
-        config_qpe: QPEConfiguration,
+        config_algorithm: AlgorithmConfiguration,
         unitary):
 
     config_general.log_verbose(
-            "Build a QPE circuit with pyLIQTR's \"QubitizedPhaseEstimation\" method.")
+            "Build a QPE algorithm with pyLIQTR's \"QubitizedPhaseEstimation\" method.")
 
     # TODO: The name and signature suggest that this may _only_ be valid for block-encoded
     #       unitaries.  Is that true?
-    return QubitizedPhaseEstimation(block_encoding=unitary, prec=config_qpe.num_phase_qubits)
+    return QubitizedPhaseEstimation(block_encoding=unitary, prec=config_algorithm.num_phase_qubits)
 
 # -------------------------------------------------------------------------------------------------
 
 def build_time_evolution(
         config_general: GeneralConfiguration,
-        config_qpe: QPEConfiguration,
+        config_algorithm: AlgorithmConfiguration,
         unitary):
 
-    config_general.log_verbose("Build a time evolution circuit.")
+    config_general.log_verbose("Build a time evolution algorithm.")
 
     return unitary
 
@@ -132,54 +133,54 @@ def build_time_evolution(
 
 def build_controlled_time_evolution(
         config_general: GeneralConfiguration,
-        config_qpe: QPEConfiguration,
+        config_algorithm: AlgorithmConfiguration,
         unitary):
 
-    config_general.log_verbose("Build a singly-controlled time evolution circuit.")
+    config_general.log_verbose("Build a singly-controlled time evolution algorithm.")
 
     return unitary.controlled()
 
 # -------------------------------------------------------------------------------------------------
 
-def build_qpe_circuit(
+def build_algorithm(
         config_general: GeneralConfiguration,
-        config_qpe: QPEConfiguration,
+        config_algorithm: AlgorithmConfiguration,
         unitary,
         P0):
 
-    config_general.log("Beginning to construct quantum phase estimation circuit.")
+    config_general.log("Beginning to construct quantum algorithm.")
 
-    if config_qpe.method.lower() in ("qpe: qualtran textbook",):
-        return build_qpe_qualtran_textbook(config_general, config_qpe, unitary, P0)
-    elif config_qpe.method.lower() in ("qpe: qualtran qubitization",):
+    if config_algorithm.method.lower() in ("qpe: qualtran textbook",):
+        return build_qpe_qualtran_textbook(config_general, config_algorithm, unitary, P0)
+    elif config_algorithm.method.lower() in ("qpe: qualtran qubitization",):
         # TODO: This may be more specialized (for LCU only?), but I'm not yet sure of the details.
         raise NotImplementedError()
-    elif config_qpe.method.lower() in ("qpe: pyliqtr qubitized",):
-        return build_qpe_pyliqtr_qubitized(config_general, config_qpe, unitary)
-    elif config_qpe.method.lower() in ("time evolution",):
-        return build_time_evolution(config_general, config_qpe, unitary)
-    elif config_qpe.method.lower() in ("controlled time evolution",):
-        return build_controlled_time_evolution(config_general, config_qpe, unitary)
+    elif config_algorithm.method.lower() in ("qpe: pyliqtr qubitized",):
+        return build_qpe_pyliqtr_qubitized(config_general, config_algorithm, unitary)
+    elif config_algorithm.method.lower() in ("time evolution",):
+        return build_time_evolution(config_general, config_algorithm, unitary)
+    elif config_algorithm.method.lower() in ("controlled time evolution",):
+        return build_controlled_time_evolution(config_general, config_algorithm, unitary)
     else:
-        raise ValueError(f"Invalid QPE circuit method \"{config_qpe.method}\".")
+        raise ValueError(f"Invalid algorithm method \"{config_algorithm.method}\".")
 
 # -------------------------------------------------------------------------------------------------
 
 def compute_initial_phase_qubits(
         config_general: GeneralConfiguration,
-        config_qpe: QPEConfiguration,
+        config_algorithm: AlgorithmConfiguration,
         Elo2, Ehi2):
 
     config_general.log("Computing initial phase qubits.")
 
-    if config_qpe.energy_error is None:
+    if config_algorithm.energy_error is None:
         Elo3 = Elo2
         Ehi3 = Ehi2
         P0 = None
     else:
-        P0 = math.ceil(math.log2((Ehi2 - Elo2) / config_qpe.energy_error))
+        P0 = math.ceil(math.log2((Ehi2 - Elo2) / config_algorithm.energy_error))
         config_general.log_verbose(f"-- initial number of phase qubits = {P0}")
-        dE_new = 2**P0 * config_qpe.energy_error
+        dE_new = 2**P0 * config_algorithm.energy_error
         Elo3 = Elo2
         Ehi3 = Elo3 + dE_new
         config_general.log_verbose(f"-- QPE-optimized bounds = [{Elo3}, {Ehi3})")

@@ -1,4 +1,4 @@
-from qre_types import GeneralConfiguration, UnitaryConfiguration, value
+from config_types import GeneralConfiguration, UnitaryConfiguration, value
 
 from openfermion import InteractionOperator, jordan_wigner
 

@@ -33,7 +33,7 @@ def value(x, default):
 class GeneralConfigurationUser:
     def __init__(self):
         # Logfile name
-        self.logfile = "qre.log"
+        self.logfile = "analysis.log"
         # How much information to print as the script runs
         self._loglevel = "info"
     def print_default(self):
@@ -138,7 +138,7 @@ class UnitaryConfiguration(ConfigurationBase):
 
 # -------------------------------------------------------------------------------------------------
 
-class QPEConfiguration(ConfigurationBase):
+class AlgorithmConfiguration(ConfigurationBase):
     def __init__(self):
         self.method = "qualtran textbook"
         self.num_phase_qubits = None
@@ -266,7 +266,7 @@ class GeneralConfiguration:
         _addLoggingLevel("VERBOSE", (logging.INFO + logging.DEBUG) // 2)
         self.logger = _configure_log(user_config.logfile, get_log_level(user_config._loglevel))
         self.git_hash = _get_git_hash()
-        self.log("\n".join(["", '*' * 99, "QRE_DRIVER START", '*' * 99]))
+        self.log("\n".join(["", '*' * 99, "ANALYSIS DRIVER START", '*' * 99]))
         self.log(f"Logfile: {self.logfile}")
         self.log(f"Running script with git hash {self.git_hash}")
     def log(self, *args, **kwargs):
@@ -289,13 +289,13 @@ class State:
                  general: GeneralConfigurationUser,
                  hamiltonian: HamiltonianConfiguration,
                  unitary: UnitaryConfiguration,
-                 circuit: QPEConfiguration,     # Which name: "circuit", "qpe", or other?
+                 algorithm: AlgorithmConfiguration,
                  analysis: AnalysisConfiguration):
         self.config_script = config_script
         self.config_general = GeneralConfiguration(general)
         self.config_hamiltonian = hamiltonian
         self.config_unitary = unitary
-        self.config_circuit = circuit
+        self.config_algorithm = algorithm
         self.config_analysis = analysis
         self.results = {}
         # Generate hashes
@@ -353,7 +353,7 @@ class State:
         document.add("general", self.config_general._generate_TOML_table())
         document.add("hamiltonian", self.config_hamiltonian._generate_TOML_table())
         document.add("unitary", self.config_unitary._generate_TOML_table())
-        document.add("circuit", self.config_circuit._generate_TOML_table())
+        document.add("algorithm", self.config_algorithm._generate_TOML_table())
         document.add("analysis", self.config_analysis._generate_TOML_table())
         document.add(tomlkit.nl())
         document.add(tomlkit.comment("RESULTS " + 69 * "="))
