@@ -29,11 +29,11 @@
 
 import math
 
-from config_types import GeneralConfiguration, AlgorithmConfiguration
-
 from pyLIQTR.PhaseEstimation.pe import PhaseEstimation
 from pyLIQTR.qubitization.phase_estimation import QubitizedPhaseEstimation
 from qualtran.bloqs.phase_estimation import TextbookQPE
+
+from qhat.analysis.config_types import AlgorithmConfiguration, GeneralConfiguration
 
 # -------------------------------------------------------------------------------------------------
 

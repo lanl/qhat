@@ -12,19 +12,16 @@ from openfermion import QubitOperator
 import sys
 import os
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from trotter_coefficients_fast import (
-    trotter_error_estimator_fast,
-    preprocess_pauli_terms,
-    generate_all_pairs,
-    generate_all_triples,
+from .mock_config import mock_config
+from qhat.analysis.trotter_coefficients_fast import (
     compute_C1_exact,
     compute_C21_exact,
-    compute_C22_exact
+    compute_C22_exact,
+    generate_all_pairs,
+    generate_all_triples,
+    preprocess_pauli_terms,
+    trotter_error_estimator_fast,
 )
-from .mock_config import mock_config
 
 
 # =============================================================================

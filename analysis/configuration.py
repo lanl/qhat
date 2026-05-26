@@ -1,11 +1,13 @@
-from config_types import GeneralConfigurationUser, \
-                         HamiltonianConfiguration, \
-                         UnitaryConfiguration, \
-                         AlgorithmConfiguration, \
-                         AnalysisConfiguration, \
-                         State
-
 import argparse
+
+from qhat.analysis.config_types import (
+    AnalysisConfiguration,
+    AlgorithmConfiguration,
+    GeneralConfigurationUser,
+    HamiltonianConfiguration,
+    State,
+    UnitaryConfiguration,
+)
 
 # -------------------------------------------------------------------------------------------------
 

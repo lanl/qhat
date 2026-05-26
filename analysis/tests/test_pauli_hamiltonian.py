@@ -14,18 +14,18 @@ import tempfile
 import pytest
 import numpy as np
 
-# Import from parent directory
-import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from hamiltonian import (
-    LinearCombinationOfPauliStrings,
+from qhat.analysis.config_types import (
+    GeneralConfiguration,
+    GeneralConfigurationUser,
+    HamiltonianConfiguration,
+)
+from qhat.analysis.hamiltonian import (
     Hamiltonian,
+    LinearCombinationOfPauliStrings,
+    dense_to_sparse_pauli,
     load_pauli,
     sparse_to_dense_pauli,
-    dense_to_sparse_pauli
 )
-from config_types import GeneralConfiguration, GeneralConfigurationUser, HamiltonianConfiguration
 
 
 # ==================================================================================

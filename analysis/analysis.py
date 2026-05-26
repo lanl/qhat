@@ -1,11 +1,11 @@
-from config_types import GeneralConfiguration, AnalysisConfiguration
+import numpy as np
+from datetime import datetime
+from pathlib import Path
 
 from pyLIQTR.utils.resource_analysis import estimate_resources as estimate_pyliqtr
 from qualtran.resource_counting import get_cost_value, QubitCount
 
-import numpy as np
-from datetime import datetime
-from pathlib import Path
+from qhat.analysis.config_types import AnalysisConfiguration, GeneralConfiguration
 
 # -------------------------------------------------------------------------------------------------
 

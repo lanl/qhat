@@ -1,4 +1,4 @@
-from config_types import GeneralConfiguration, UnitaryConfiguration, value
+import math
 
 from openfermion import InteractionOperator, jordan_wigner
 
@@ -7,8 +7,8 @@ from pyLIQTR.BlockEncodings.LinearT import Fermionic_LinearT
 from pyLIQTR.BlockEncodings.PauliStringLCU import PauliStringLCU
 from pyLIQTR.ProblemInstances.ChemicalHamiltonian import ChemicalHamiltonian
 
-import math
-from ordering import reorder_paulis
+from qhat.analysis.config_types import GeneralConfiguration, UnitaryConfiguration, value
+from qhat.analysis.ordering import reorder_paulis
 
 # -------------------------------------------------------------------------------------------------
 
@@ -106,7 +106,7 @@ def encode_ramped_trotter(
 
     # Compute the number of Trotter steps based on the Trotter error from arXiv:1912.08854v3
     # Using fast implementation for better performance (100-150x more samples per second)
-    from trotter_coefficients_fast import trotter_error_estimator_fast
+    from qhat.analysis.trotter_coefficients_fast import trotter_error_estimator_fast
 
     # Read error coefficient computation mode from config (with backward-compatible defaults)
     error_coeff_mode = getattr(config_unitary, 'error_coeff_mode', 'monte_carlo')
@@ -160,7 +160,7 @@ def encode_ramped_trotter(
 
     # Import the appropriate implementation
     if trotter_impl == 'flattened':
-        from common.trotter_flattened import build_ramped_trotterized_unitary
+        from qhat.common.trotter_flattened import build_ramped_trotterized_unitary
         # Pass combine_terms parameter only for flattened implementation
         return build_ramped_trotterized_unitary(
                 pauli_strings.items(),
@@ -169,7 +169,7 @@ def encode_ramped_trotter(
                 Nsteps,
                 combine_terms=config_unitary.trotter_combine_terms)
     else:  # 'original'
-        from common.trotter_original import build_ramped_trotterized_unitary
+        from qhat.common.trotter_original import build_ramped_trotterized_unitary
         # Original implementation doesn't support combine_terms parameter
         return build_ramped_trotterized_unitary(
                 pauli_strings.items(),

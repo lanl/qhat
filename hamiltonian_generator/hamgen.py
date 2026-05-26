@@ -1,17 +1,23 @@
-from hamgen_types import GeneralConfiguration, GeneralConfigurationUser, \
-        HamiltonianConfiguration, State
-
 import argparse
 import math
-import mendeleev
-import numpy as np
-from openfermion import InteractionOperator, MolecularData, jordan_wigner, bravyi_kitaev
-from openfermion.transforms.opconversions.binary_codes import _encoder_bk
-from openfermionpyscf import PyscfMolecularData
-from openfermionpyscf._run_pyscf import compute_integrals, compute_scf, prepare_pyscf_molecule
 import pickle
 import pprint
 import time
+
+import mendeleev
+import numpy as np
+
+from openfermion import InteractionOperator, MolecularData, bravyi_kitaev, jordan_wigner
+from openfermion.transforms.opconversions.binary_codes import _encoder_bk
+from openfermionpyscf import PyscfMolecularData
+from openfermionpyscf._run_pyscf import compute_integrals, compute_scf, prepare_pyscf_molecule
+
+from qhat.hamiltonian_generator.hamgen_types import (
+    GeneralConfiguration,
+    GeneralConfigurationUser,
+    HamiltonianConfiguration,
+    State,
+)
 
 # -------------------------------------------------------------------------------------------------
 

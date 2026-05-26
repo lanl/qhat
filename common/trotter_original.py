@@ -12,18 +12,21 @@
 
 # =================================================================================================
 
-import attrs
-from cirq import LineQubit
-from common.dense_pauli_exp import DensePauliString
 from functools import cached_property, reduce
 from math import cbrt
+from typing import Dict, Sequence
+
+import attrs
+from cirq import LineQubit
 from numpy import exp
+
 from pyLIQTR.utils.pauli_string_manip import convert_to_dense_pauli_string
 from qualtran import Bloq, BloqBuilder, Signature, SoquetT
 from qualtran.cirq_interop import CirqGateAsBloq
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
 from qualtran.symbolics import SymbolicFloat
-from typing import Dict, Sequence
+
+from qhat.common.dense_pauli_exp import DensePauliString
 
 # =================================================================================================
 

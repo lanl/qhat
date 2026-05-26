@@ -7,11 +7,11 @@ os.environ["QSHARP_PYTHON_TELEMETRY"] = "none"
 
 import math
 
-from configuration import load_configuration
-from hamiltonian import get_physical_hamiltonian
-from unitary import encode_as_unitary
-from algorithm import build_algorithm, compute_initial_phase_qubits
-from analysis import analyze_algorithm
+from qhat.analysis.algorithm import build_algorithm, compute_initial_phase_qubits
+from qhat.analysis.analysis import analyze_algorithm
+from qhat.analysis.configuration import load_configuration
+from qhat.analysis.hamiltonian import get_physical_hamiltonian
+from qhat.analysis.unitary import encode_as_unitary
 
 # =================================================================================================
 
