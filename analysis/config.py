@@ -33,15 +33,15 @@ else:
     raise ValueError(f"Invalid value for `my_method`: \"{my_method}\"")
 
 # _________________________________________________________________________________________________
-# phase estimation circuit
+# phase estimation algorithm
 
 if my_method == "Trotter":
-    circuit.method = "QPE: qualtran textbook"
-    circuit.energy_error = 0.5 * energy_error
-    circuit.probability_of_failure = 0.01
+    algorithm.method = "QPE: qualtran textbook"
+    algorithm.energy_error = 0.5 * energy_error
+    algorithm.probability_of_failure = 0.01
 elif my_method == "double-factorization":
-    circuit.method = "QPE: pyLIQTR qubitized"
-    circuit.num_phase_qubits = 12
+    algorithm.method = "QPE: pyLIQTR qubitized"
+    algorithm.num_phase_qubits = 12
 else:
     raise ValueError(f"Invalid value for `my_method`: \"{my_method}\"")
 

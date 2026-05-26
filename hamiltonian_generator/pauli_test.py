@@ -67,11 +67,11 @@ def build_ramp(terms, coefficient, time, reverse):
 
 def Trotterize(terms, coefficients, time):
     reverse = True
-    circuit = cirq.Circuit()
+    algorithm = cirq.Circuit()
     for coef in coefficients:
         reverse = not reverse
-        circuit.append(build_ramp(terms, coef, time, reverse))
-    return circuit
+        algorithm.append(build_ramp(terms, coef, time, reverse))
+    return algorithm
 
 # =================================================================================================
 

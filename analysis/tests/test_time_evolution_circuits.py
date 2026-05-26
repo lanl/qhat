@@ -1,7 +1,7 @@
 """
-Tests for time evolution circuit methods.
+Tests for time evolution algorithm methods.
 
-Tests both "time evolution" and "controlled time evolution" circuit methods
+Tests both "time evolution" and "controlled time evolution" algorithm methods
 by verifying:
 1. Basic routing and method selection
 2. Correctness via matrix comparison against analytical results
@@ -16,9 +16,9 @@ import os
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from circuit import build_qpe_circuit
-from config_types import QPEConfiguration, AnalysisConfiguration
-from analysis import analyze_circuit
+from algorithm import build_algorithm
+from config_types import AlgorithmConfiguration, AnalysisConfiguration
+from analysis import analyze_algorithm
 from .mock_config import mock_config
 from common.pauli_string_evolution import PauliStringEvolution
 from common.pauli_utils import analytical_evolution
@@ -28,49 +28,49 @@ from common.pauli_utils import analytical_evolution
 # Test: Basic Functionality and Routing
 # =============================================================================
 
-class TestCircuitRouting:
-    """Test that circuit methods are correctly routed."""
+class TestAlgorithmRouting:
+    """Test that algorithm methods are correctly routed."""
 
     def test_time_evolution_returns_unitary(self):
         """Time evolution method should return unitary unchanged."""
         unitary = PauliStringEvolution("XYZ", coefficient=1.0, time=0.5)
-        config = QPEConfiguration()
+        config = AlgorithmConfiguration()
         config.method = "time evolution"
 
-        circuit = build_qpe_circuit(mock_config, config, unitary, P0=None)
+        algorithm = build_algorithm(mock_config, config, unitary, P0=None)
 
-        assert circuit is unitary
+        assert algorithm is unitary
 
     def test_controlled_time_evolution_adds_control(self):
         """Controlled time evolution should add exactly one control qubit."""
         unitary = PauliStringEvolution("XY", coefficient=1.0, time=1.0)
-        config = QPEConfiguration()
+        config = AlgorithmConfiguration()
         config.method = "controlled time evolution"
 
         original_qubits = unitary.num_qubits
-        circuit = build_qpe_circuit(mock_config, config, unitary, P0=None)
+        algorithm = build_algorithm(mock_config, config, unitary, P0=None)
 
-        assert circuit is not unitary
-        assert circuit.signature.n_qubits() == original_qubits + 1
+        assert algorithm is not unitary
+        assert algorithm.signature.n_qubits() == original_qubits + 1
 
     def test_case_insensitive_routing(self):
         """Method names should be case-insensitive."""
         unitary = PauliStringEvolution("Z", coefficient=1.0, time=1.0)
 
         for method in ["time evolution", "TIME EVOLUTION", "Time Evolution"]:
-            config = QPEConfiguration()
+            config = AlgorithmConfiguration()
             config.method = method
-            circuit = build_qpe_circuit(mock_config, config, unitary, P0=None)
-            assert circuit is unitary
+            algorithm = build_algorithm(mock_config, config, unitary, P0=None)
+            assert algorithm is unitary
 
     def test_invalid_method_raises_error(self):
         """Invalid method names should raise ValueError."""
         unitary = PauliStringEvolution("X", coefficient=1.0, time=1.0)
-        config = QPEConfiguration()
+        config = AlgorithmConfiguration()
         config.method = "invalid method"
 
-        with pytest.raises(ValueError, match="Invalid QPE circuit method"):
-            build_qpe_circuit(mock_config, config, unitary, P0=None)
+        with pytest.raises(ValueError, match="Invalid QPE algorithm method"):
+            build_algorithm(mock_config, config, unitary, P0=None)
 
 
 # =============================================================================
@@ -78,7 +78,7 @@ class TestCircuitRouting:
 # =============================================================================
 
 class TestMatrixCorrectness:
-    """Verify circuit matrices match analytical results."""
+    """Verify algorithm matrices match analytical results."""
 
     def test_time_evolution_single_pauli(self):
         """Test time evolution produces correct matrix for single Pauli."""
@@ -86,12 +86,12 @@ class TestMatrixCorrectness:
         time = 1.0
         unitary = PauliStringEvolution("X", coefficient=coef, time=time)
 
-        config = QPEConfiguration()
+        config = AlgorithmConfiguration()
         config.method = "time evolution"
-        circuit = build_qpe_circuit(mock_config, config, unitary, P0=None)
+        algorithm = build_algorithm(mock_config, config, unitary, P0=None)
 
         # Get actual matrix
-        U_actual = circuit.tensor_contract()
+        U_actual = algorithm.tensor_contract()
 
         # Get expected matrix
         U_expected = analytical_evolution("X", coef, time)
@@ -105,11 +105,11 @@ class TestMatrixCorrectness:
         time = 2.0
         unitary = PauliStringEvolution("XY", coefficient=coef, time=time)
 
-        config = QPEConfiguration()
+        config = AlgorithmConfiguration()
         config.method = "time evolution"
-        circuit = build_qpe_circuit(mock_config, config, unitary, P0=None)
+        algorithm = build_algorithm(mock_config, config, unitary, P0=None)
 
-        U_actual = circuit.tensor_contract()
+        U_actual = algorithm.tensor_contract()
         U_expected = analytical_evolution("XY", coef, time)
 
         assert np.allclose(U_actual, U_expected)
@@ -120,11 +120,11 @@ class TestMatrixCorrectness:
         time = 1.5
         unitary = PauliStringEvolution("XYZ", coefficient=coef, time=time)
 
-        config = QPEConfiguration()
+        config = AlgorithmConfiguration()
         config.method = "time evolution"
-        circuit = build_qpe_circuit(mock_config, config, unitary, P0=None)
+        algorithm = build_algorithm(mock_config, config, unitary, P0=None)
 
-        U_actual = circuit.tensor_contract()
+        U_actual = algorithm.tensor_contract()
         U_expected = analytical_evolution("XYZ", coef, time)
 
         assert np.allclose(U_actual, U_expected)
@@ -135,12 +135,12 @@ class TestMatrixCorrectness:
         time = 1.0
         unitary = PauliStringEvolution("X", coefficient=coef, time=time)
 
-        config = QPEConfiguration()
+        config = AlgorithmConfiguration()
         config.method = "controlled time evolution"
-        circuit = build_qpe_circuit(mock_config, config, unitary, P0=None)
+        algorithm = build_algorithm(mock_config, config, unitary, P0=None)
 
         # Get matrices
-        U_controlled = circuit.tensor_contract()
+        U_controlled = algorithm.tensor_contract()
         U_base = analytical_evolution("X", coef, time)
 
         # Controlled-U should have structure:
@@ -174,19 +174,19 @@ class TestMatrixCorrectness:
         unitary = PauliStringEvolution("XZ", coefficient=0.7, time=1.2)
 
         # Test time evolution
-        config_te = QPEConfiguration()
+        config_te = AlgorithmConfiguration()
         config_te.method = "time evolution"
-        circuit_te = build_qpe_circuit(mock_config, config_te, unitary, P0=None)
-        U_te = circuit_te.tensor_contract()
+        algorithm_te = build_algorithm(mock_config, config_te, unitary, P0=None)
+        U_te = algorithm_te.tensor_contract()
         U_te_dag_U = U_te.conj().T @ U_te
         assert np.allclose(U_te_dag_U, np.eye(U_te.shape[0])), \
             "Time evolution doesn't preserve unitarity"
 
         # Test controlled time evolution
-        config_cte = QPEConfiguration()
+        config_cte = AlgorithmConfiguration()
         config_cte.method = "controlled time evolution"
-        circuit_cte = build_qpe_circuit(mock_config, config_cte, unitary, P0=None)
-        U_cte = circuit_cte.tensor_contract()
+        algorithm_cte = build_algorithm(mock_config, config_cte, unitary, P0=None)
+        U_cte = algorithm_cte.tensor_contract()
         U_cte_dag_U = U_cte.conj().T @ U_cte
         assert np.allclose(U_cte_dag_U, np.eye(U_cte.shape[0])), \
             "Controlled time evolution doesn't preserve unitarity"
@@ -197,11 +197,11 @@ class TestMatrixCorrectness:
         time = 1.0
         unitary = PauliStringEvolution("I", coefficient=coef, time=time)
 
-        config = QPEConfiguration()
+        config = AlgorithmConfiguration()
         config.method = "time evolution"
-        circuit = build_qpe_circuit(mock_config, config, unitary, P0=None)
+        algorithm = build_algorithm(mock_config, config, unitary, P0=None)
 
-        U_actual = circuit.tensor_contract()
+        U_actual = algorithm.tensor_contract()
         # exp(-i c t I) = exp(-i c t) * I (global phase)
         U_expected = np.exp(-1j * coef * time) * np.eye(2)
 
@@ -213,20 +213,20 @@ class TestMatrixCorrectness:
 # =============================================================================
 
 class TestResourceEstimation:
-    """Test resource estimation on time evolution circuits."""
+    """Test resource estimation on time evolution algorithms."""
 
     def test_time_evolution_resource_estimation(self):
-        """Resource estimation should work on time evolution circuits."""
+        """Resource estimation should work on time evolution algorithms."""
         unitary = PauliStringEvolution("XY", coefficient=1.0, time=1.0)
 
-        circuit_config = QPEConfiguration()
-        circuit_config.method = "time evolution"
-        circuit = build_qpe_circuit(mock_config, circuit_config, unitary, P0=None)
+        algorithm_config = AlgorithmConfiguration()
+        algorithm_config.method = "time evolution"
+        algorithm = build_algorithm(mock_config, algorithm_config, unitary, P0=None)
 
         analysis_config = AnalysisConfiguration()
         analysis_config.resource_estimator = "pyLIQTR"
 
-        results = analyze_circuit(mock_config, analysis_config, circuit)
+        results = analyze_algorithm(mock_config, analysis_config, algorithm)
 
         assert "resource_estimates" in results
         resources = results["resource_estimates"]
@@ -238,17 +238,17 @@ class TestResourceEstimation:
         assert resources["Clifford_count"] >= 0
 
     def test_controlled_time_evolution_resource_estimation(self):
-        """Resource estimation should work on controlled time evolution circuits."""
+        """Resource estimation should work on controlled time evolution algorithms."""
         unitary = PauliStringEvolution("XY", coefficient=1.0, time=1.0)
 
-        circuit_config = QPEConfiguration()
-        circuit_config.method = "controlled time evolution"
-        circuit = build_qpe_circuit(mock_config, circuit_config, unitary, P0=None)
+        algorithm_config = AlgorithmConfiguration()
+        algorithm_config.method = "controlled time evolution"
+        algorithm = build_algorithm(mock_config, algorithm_config, unitary, P0=None)
 
         analysis_config = AnalysisConfiguration()
         analysis_config.resource_estimator = "pyLIQTR"
 
-        results = analyze_circuit(mock_config, analysis_config, circuit)
+        results = analyze_algorithm(mock_config, analysis_config, algorithm)
 
         assert "resource_estimates" in results
         resources = results["resource_estimates"]
@@ -264,17 +264,17 @@ class TestResourceEstimation:
         analysis_config.resource_estimator = "pyLIQTR"
 
         # Time evolution resources
-        config_te = QPEConfiguration()
+        config_te = AlgorithmConfiguration()
         config_te.method = "time evolution"
-        circuit_te = build_qpe_circuit(mock_config, config_te, unitary, P0=None)
-        results_te = analyze_circuit(mock_config, analysis_config, circuit_te)
+        algorithm_te = build_algorithm(mock_config, config_te, unitary, P0=None)
+        results_te = analyze_algorithm(mock_config, analysis_config, algorithm_te)
         resources_te = results_te["resource_estimates"]
 
         # Controlled time evolution resources
-        config_cte = QPEConfiguration()
+        config_cte = AlgorithmConfiguration()
         config_cte.method = "controlled time evolution"
-        circuit_cte = build_qpe_circuit(mock_config, config_cte, unitary, P0=None)
-        results_cte = analyze_circuit(mock_config, analysis_config, circuit_cte)
+        algorithm_cte = build_algorithm(mock_config, config_cte, unitary, P0=None)
+        results_cte = analyze_algorithm(mock_config, analysis_config, algorithm_cte)
         resources_cte = results_cte["resource_estimates"]
 
         # Controlled should have at least as many gates
@@ -285,14 +285,14 @@ class TestResourceEstimation:
         """Resource counts should be finite and non-negative."""
         analysis_config = AnalysisConfiguration()
         analysis_config.resource_estimator = "pyLIQTR"
-        circuit_config = QPEConfiguration()
-        circuit_config.method = "time evolution"
+        algorithm_config = AlgorithmConfiguration()
+        algorithm_config.method = "time evolution"
 
-        # Test with a few different circuit sizes
+        # Test with a few different algorithm sizes
         for pauli_string in ["XY", "XYZ", "XYZI"]:
             unitary = PauliStringEvolution(pauli_string, coefficient=1.0, time=1.0)
-            circuit = build_qpe_circuit(mock_config, circuit_config, unitary, P0=None)
-            results = analyze_circuit(mock_config, analysis_config, circuit)
+            algorithm = build_algorithm(mock_config, algorithm_config, unitary, P0=None)
+            results = analyze_algorithm(mock_config, analysis_config, algorithm)
 
             t_count = results["resource_estimates"]["T_count"]
             clifford_count = results["resource_estimates"]["Clifford_count"]
@@ -312,22 +312,22 @@ class TestEdgeCases:
     def test_zero_coefficient(self):
         """Zero coefficient should give identity evolution."""
         unitary = PauliStringEvolution("XY", coefficient=0.0, time=1.0)
-        config = QPEConfiguration()
+        config = AlgorithmConfiguration()
         config.method = "time evolution"
-        circuit = build_qpe_circuit(mock_config, config, unitary, P0=None)
+        algorithm = build_algorithm(mock_config, config, unitary, P0=None)
 
-        U = circuit.tensor_contract()
+        U = algorithm.tensor_contract()
         # exp(-i * 0 * XY * t) = I
         assert np.allclose(U, np.eye(U.shape[0]))
 
     def test_zero_time(self):
         """Zero time should give identity evolution."""
         unitary = PauliStringEvolution("XY", coefficient=1.0, time=0.0)
-        config = QPEConfiguration()
+        config = AlgorithmConfiguration()
         config.method = "time evolution"
-        circuit = build_qpe_circuit(mock_config, config, unitary, P0=None)
+        algorithm = build_algorithm(mock_config, config, unitary, P0=None)
 
-        U = circuit.tensor_contract()
+        U = algorithm.tensor_contract()
         assert np.allclose(U, np.eye(U.shape[0]))
 
     def test_large_time(self):
@@ -335,11 +335,11 @@ class TestEdgeCases:
         coef = 0.5
         time = 10.0  # Large time
         unitary = PauliStringEvolution("Z", coefficient=coef, time=time)
-        config = QPEConfiguration()
+        config = AlgorithmConfiguration()
         config.method = "time evolution"
-        circuit = build_qpe_circuit(mock_config, config, unitary, P0=None)
+        algorithm = build_algorithm(mock_config, config, unitary, P0=None)
 
-        U_actual = circuit.tensor_contract()
+        U_actual = algorithm.tensor_contract()
         U_expected = analytical_evolution("Z", coef, time)
 
         assert np.allclose(U_actual, U_expected)
@@ -351,7 +351,7 @@ class TestEdgeCases:
 
 if __name__ == "__main__":
     print("="*70)
-    print("TIME EVOLUTION CIRCUIT TESTS")
+    print("TIME EVOLUTION ALGORITHM TESTS")
     print("="*70)
     print()
 

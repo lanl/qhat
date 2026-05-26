@@ -340,7 +340,7 @@ class TestResourceEstimation:
         tc3 = t_complexity(pse3)
 
         # Complexity should generally increase (though not necessarily strictly)
-        # Check that more Paulis don't result in simpler circuits
+        # Check that more Paulis don't result in simpler algorithms
         # Compare consecutive pairs (transitivity implies 1 vs 3)
         assert tc2.rotations >= tc1.rotations or tc2.t >= tc1.t
         assert tc3.rotations >= tc2.rotations or tc3.t >= tc2.t

@@ -138,7 +138,7 @@ class UnitaryConfiguration(ConfigurationBase):
 
 # -------------------------------------------------------------------------------------------------
 
-class QPEConfiguration(ConfigurationBase):
+class AlgorithmConfiguration(ConfigurationBase):
     def __init__(self):
         self.method = "qualtran textbook"
         self.num_phase_qubits = None
@@ -289,13 +289,13 @@ class State:
                  general: GeneralConfigurationUser,
                  hamiltonian: HamiltonianConfiguration,
                  unitary: UnitaryConfiguration,
-                 circuit: QPEConfiguration,     # Which name: "circuit", "qpe", or other?
+                 algorithm: AlgorithmConfiguration,
                  analysis: AnalysisConfiguration):
         self.config_script = config_script
         self.config_general = GeneralConfiguration(general)
         self.config_hamiltonian = hamiltonian
         self.config_unitary = unitary
-        self.config_circuit = circuit
+        self.config_algorithm = algorithm
         self.config_analysis = analysis
         self.results = {}
         # Generate hashes
@@ -353,7 +353,7 @@ class State:
         document.add("general", self.config_general._generate_TOML_table())
         document.add("hamiltonian", self.config_hamiltonian._generate_TOML_table())
         document.add("unitary", self.config_unitary._generate_TOML_table())
-        document.add("circuit", self.config_circuit._generate_TOML_table())
+        document.add("algorithm", self.config_algorithm._generate_TOML_table())
         document.add("analysis", self.config_analysis._generate_TOML_table())
         document.add(tomlkit.nl())
         document.add(tomlkit.comment("RESULTS " + 69 * "="))

@@ -24,13 +24,13 @@ unitary.encode_ramped_trotter(
         )
 
 # _________________________________________________________________________________________________
-# phase estimation circuit
+# algorithm
 
-circuit.method = "time evolution"
+algorithm.method = "time evolution"
 
 # _________________________________________________________________________________________________
 # analysis
 
 analysis.resource_estimator = "pyLIQTR"
-analysis.matrix_output_file = "my_circuit_matrix.npz"
+analysis.matrix_output_file = "my_algorithm_matrix.npz"
 

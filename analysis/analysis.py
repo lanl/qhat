@@ -12,7 +12,7 @@ from pathlib import Path
 def resource_estimation_cirq(
         config_general: GeneralConfiguration,
         config_analysis: AnalysisConfiguration,
-        qpe_circuit) -> dict:
+        algorithm) -> dict:
     raise NotImplementedError
 
 # -------------------------------------------------------------------------------------------------
@@ -20,18 +20,18 @@ def resource_estimation_cirq(
 def resource_estimation_pyliqtr(
         config_general: GeneralConfiguration,
         config_analysis: AnalysisConfiguration,
-        qpe_circuit) -> dict:
+        algorithm) -> dict:
 
     config_general.log_verbose("Estimating resources with pyLIQTR.")
 
     # TODO: rotation error
     #       -- argument rotation_gate_precision sets the precision for a single rotation gate
-    #       -- argument circuit_precision sets the precision for the whole circuit (i.e., it sets
-    #          rotation_gate_precision to circuit_precision / number of rotations)
+    #       -- argument algorithm_precision sets the precision for the whole algorithm (i.e., it
+    #          sets rotation_gate_precision to algorithm_precision / number of rotations)
     # TODO: profile?
     #       -- argument profile = True: keep rotations as a separate count
     #       -- argument profile = False: estimate rotations as Clifford+T
-    resources = estimate_pyliqtr(qpe_circuit)
+    resources = estimate_pyliqtr(algorithm)
 
     resource_dict = {
         "Clifford_count" : resources["Clifford"],
@@ -40,7 +40,7 @@ def resource_estimation_pyliqtr(
     if "LogicalQubits" in resources:
         resource_dict["qubit_count"] = resources["LogicalQubits"]
     else:
-        get_cost_value(qpe_circuit, QubitCount())
+        get_cost_value(algorithm, QubitCount())
     return resource_dict
 
 # -------------------------------------------------------------------------------------------------
@@ -48,12 +48,12 @@ def resource_estimation_pyliqtr(
 def estimate_resources(
         config_general: GeneralConfiguration,
         config_analysis: AnalysisConfiguration,
-        qpe_circuit) -> dict:
+        algorithm) -> dict:
 
     if config_analysis.resource_estimator.lower() == "pyliqtr":
-        return resource_estimation_pyliqtr(config_general, config_analysis, qpe_circuit)
+        return resource_estimation_pyliqtr(config_general, config_analysis, algorithm)
     elif config_analysis.resource_estimator.lower() == "cirq":
-        return resource_estimation_cirq(config_general, config_analysis, qpe_circuit)
+        return resource_estimation_cirq(config_general, config_analysis, algorithm)
     else:
         raise ValueError(
                 f"Invalid resource estimator method \"{config_analysis.resource_estimator}\".")
@@ -192,34 +192,34 @@ def _save_matrix_file(output_path, matrix_format, unitary_matrix, git_hash,
 def output_unitary_matrix(
         config_general: GeneralConfiguration,
         config_analysis: AnalysisConfiguration,
-        qpe_circuit) -> dict:
+        algorithm) -> dict:
     """
-    Generate and save the unitary matrix representation of the circuit.
+    Generate and save the unitary matrix representation of the algorithm.
 
     Parameters:
         config_general: General configuration
         config_analysis: Analysis configuration with matrix_output_format and matrix_output_file
-        qpe_circuit: The circuit bloq to analyze
+        algorithm: The algorithm bloq to analyze
 
     Returns:
         Dictionary with matrix metadata: shape, file, format, unitarity_error, norm
     """
 
-    # Check if the circuit has tensor_contract method
-    if not hasattr(qpe_circuit, 'tensor_contract'):
+    # Check if the algorithm has tensor_contract method
+    if not hasattr(algorithm, 'tensor_contract'):
         raise AttributeError(
-            f"Circuit of type {type(qpe_circuit).__name__} does not have a "
+            f"Algorithm of type {type(algorithm).__name__} does not have a "
             "'tensor_contract()' method. Cannot generate unitary matrix."
         )
 
     # Extract the unitary matrix
     config_general.log_verbose("Computing unitary matrix via tensor contraction...")
     try:
-        unitary_matrix = qpe_circuit.tensor_contract()
+        unitary_matrix = algorithm.tensor_contract()
     except Exception as e:
         config_general.log(
             f"ERROR: Failed to compute unitary matrix: {e}\n"
-            "This may indicate a bug in the circuit's tensor_contract() implementation."
+            "This may indicate a bug in the algorithm's tensor_contract() implementation."
         )
         raise
 
@@ -265,12 +265,12 @@ def output_unitary_matrix(
 
 # -------------------------------------------------------------------------------------------------
 
-def analyze_circuit(
+def analyze_algorithm(
         config_general: GeneralConfiguration,
         config_analysis: AnalysisConfiguration,
-        qpe_circuit) -> dict:
+        algorithm) -> dict:
 
-    config_general.log("Beginning circuit analysis.")
+    config_general.log("Beginning algorithm analysis.")
 
     # Validate at least one analysis requested
     if (config_analysis.resource_estimator is None and
@@ -287,12 +287,12 @@ def analyze_circuit(
     if config_analysis.resource_estimator is not None:
         config_general.log(f"Performing resource estimation using {config_analysis.resource_estimator}.")
         results["resource_estimates"] = estimate_resources(
-            config_general, config_analysis, qpe_circuit)
+            config_general, config_analysis, algorithm)
 
     if config_analysis.matrix_output_file is not None:
         config_general.log("Generating unitary matrix output.")
         results["matrix_output"] = output_unitary_matrix(
-            config_general, config_analysis, qpe_circuit)
+            config_general, config_analysis, algorithm)
 
     # TODO: Add error estimation
     # TODO: Add an option for detailed error analysis (explicitly compute the eigenvalues of the
@@ -301,6 +301,6 @@ def analyze_circuit(
     # TODO: Add gate parallelism / gate depth analysis
     # TODO: Would it be useful to analyze in terms of a different basis (e.g., Toffoli gates)?
 
-    config_general.log("Circuit analysis complete.")
+    config_general.log("Algorithm analysis complete.")
 
     return results
