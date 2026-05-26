@@ -16,7 +16,7 @@ import os
 from qhat.analysis.algorithm import build_algorithm
 from qhat.analysis.analysis import analyze_algorithm
 from qhat.analysis.config_types import AlgorithmConfiguration, AnalysisConfiguration
-from qhat.analysis.tests.mock_config import mock_config
+from .mock_config import mock_config
 from qhat.common.pauli_string_evolution import PauliStringEvolution
 from qhat.common.pauli_utils import analytical_evolution
 

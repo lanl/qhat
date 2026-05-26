@@ -12,7 +12,7 @@ from openfermion import QubitOperator
 import sys
 import os
 
-from qhat.analysis.tests.mock_config import mock_config
+from .mock_config import mock_config
 from qhat.analysis.trotter_coefficients_fast import (
     compute_C1_exact,
     compute_C21_exact,
