@@ -69,7 +69,7 @@ class TestAlgorithmRouting:
         config = AlgorithmConfiguration()
         config.method = "invalid method"
 
-        with pytest.raises(ValueError, match="Invalid QPE algorithm method"):
+        with pytest.raises(ValueError, match="Invalid algorithm method"):
             build_algorithm(mock_config, config, unitary, P0=None)
 
 
