@@ -13,15 +13,12 @@ import numpy as np
 import sys
 import os
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from algorithm import build_algorithm
-from config_types import AlgorithmConfiguration, AnalysisConfiguration
-from analysis import analyze_algorithm
-from .mock_config import mock_config
-from common.pauli_string_evolution import PauliStringEvolution
-from common.pauli_utils import analytical_evolution
+from qhat.analysis.algorithm import build_algorithm
+from qhat.analysis.analysis import analyze_algorithm
+from qhat.analysis.config_types import AlgorithmConfiguration, AnalysisConfiguration
+from qhat.analysis.tests.mock_config import mock_config
+from qhat.common.pauli_string_evolution import PauliStringEvolution
+from qhat.common.pauli_utils import analytical_evolution
 
 
 # =============================================================================

@@ -9,11 +9,8 @@ import tempfile
 import os
 from pathlib import Path
 
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from hamiltonian import load_hamlib_hdf5, Hamiltonian, LinearCombinationOfPauliStrings
-from config_types import GeneralConfiguration, HamiltonianConfiguration
+from qhat.analysis.config_types import GeneralConfiguration, HamiltonianConfiguration
+from qhat.analysis.hamiltonian import Hamiltonian, LinearCombinationOfPauliStrings, load_hamlib_hdf5
 
 
 class MockConfig:

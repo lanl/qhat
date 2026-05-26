@@ -11,17 +11,20 @@ where:
     - ℏ is the reduced Planck constant (defaults to 1 in natural units)
 """
 
+from functools import cached_property
+from typing import TYPE_CHECKING, Dict
+
 import attrs
 import numpy as np
-from functools import cached_property
-from typing import Dict, TYPE_CHECKING
 from scipy.linalg import expm
 
-from cirq import LineQubit, PauliStringPhasorGate, DensePauliString as CirqDensePauliString
-from qualtran import Bloq, BloqBuilder, Signature, SoquetT, QBit, Register, Side
+from cirq import DensePauliString as CirqDensePauliString
+from cirq import LineQubit, PauliStringPhasorGate
+from qualtran import Bloq, BloqBuilder, QBit, Register, Side, Signature, SoquetT
 from qualtran.cirq_interop import CirqGateAsBloq
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
-from common.pauli_utils import validate_pauli_string
+
+from qhat.common.pauli_utils import validate_pauli_string
 
 if TYPE_CHECKING:
     import quimb.tensor as qtn

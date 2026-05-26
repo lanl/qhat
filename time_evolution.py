@@ -26,22 +26,15 @@ Usage
     python time_evolution.py analysis/config.py --psi0 file --psi0-file my_state.npy --fidelity
 """
 
-import os as _os
-import sys as _sys
-
-_HERE         = _os.path.dirname(_os.path.abspath(__file__))
-_ANALYSIS_DIR = _os.path.join(_HERE, "analysis")
-if _ANALYSIS_DIR not in _sys.path:
-    _sys.path.insert(0, _ANALYSIS_DIR)
-
 import argparse
 import sys
-import numpy as np
-from scipy.linalg import expm
 from typing import Dict, List, Tuple
 
-from configuration import load_configuration
-from hamiltonian import get_physical_hamiltonian
+import numpy as np
+from scipy.linalg import expm
+
+from qhat.analysis.configuration import load_configuration
+from qhat.analysis.hamiltonian import get_physical_hamiltonian
 
 
 def _load_state_from_config(config_file: str):

@@ -1,4 +1,4 @@
-from config_types import GeneralConfiguration, UnitaryConfiguration, value
+import math
 
 from openfermion import InteractionOperator, jordan_wigner
 
@@ -7,8 +7,8 @@ from pyLIQTR.BlockEncodings.LinearT import Fermionic_LinearT
 from pyLIQTR.BlockEncodings.PauliStringLCU import PauliStringLCU
 from pyLIQTR.ProblemInstances.ChemicalHamiltonian import ChemicalHamiltonian
 
-import math
-from ordering import reorder_paulis
+from qhat.analysis.config_types import GeneralConfiguration, UnitaryConfiguration, value
+from qhat.analysis.ordering import reorder_paulis
 
 # -------------------------------------------------------------------------------------------------
 
