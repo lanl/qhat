@@ -172,11 +172,16 @@ def compute_initial_phase_qubits(
 
     config_general.log("Computing initial phase qubits.")
 
-    P0 = math.ceil(math.log2((Ehi2 - Elo2) / config_qpe.energy_error))
-    config_general.log_verbose(f"-- initial number of phase qubits = {P0}")
-    dE_new = 2**P0 * config_qpe.energy_error
-    Elo3 = Elo2
-    Ehi3 = Elo3 + dE_new
-    config_general.log_verbose(f"-- QPE-optimized bounds = [{Elo3}, {Ehi3})")
+    if config_qpe.energy_error is None:
+        Elo3 = Elo2
+        Ehi3 = Ehi2
+        P0 = None
+    else:
+        P0 = math.ceil(math.log2((Ehi2 - Elo2) / config_qpe.energy_error))
+        config_general.log_verbose(f"-- initial number of phase qubits = {P0}")
+        dE_new = 2**P0 * config_qpe.energy_error
+        Elo3 = Elo2
+        Ehi3 = Elo3 + dE_new
+        config_general.log_verbose(f"-- QPE-optimized bounds = [{Elo3}, {Ehi3})")
 
     return (P0, Elo3, Ehi3)
