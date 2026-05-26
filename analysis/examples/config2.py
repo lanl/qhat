@@ -32,5 +32,5 @@ algorithm.method = "time evolution"
 # analysis
 
 analysis.resource_estimator = "pyLIQTR"
-analysis.matrix_output_file = "my_algorithm_matrix.npz"
+analysis.matrix_output_file = "my_matrix.npz"
 

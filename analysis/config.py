@@ -33,7 +33,7 @@ else:
     raise ValueError(f"Invalid value for `my_method`: \"{my_method}\"")
 
 # _________________________________________________________________________________________________
-# phase estimation algorithm
+# algorithm
 
 if my_method == "Trotter":
     algorithm.method = "QPE: qualtran textbook"

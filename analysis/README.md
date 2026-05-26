@@ -158,8 +158,8 @@ However, this section is still under development and currently has very limited 
   "textbook" method (see, for example, Nielson and Chuang's "Quantum Computation and Quantum
   Information").
 - Qubitized Phase Estimation: Setting `algorithm.method` to "QPE: pyliqtr qubitized" will embed the
-  unitary encoding of the Hamiltonian into a phase estimation algorithm that uses pyLIQTR's qubitized
-  phase estimation.  This uses only a single ancilla qubit for the phase, with multiple
+  unitary encoding of the Hamiltonian into a phase estimation algorithm that uses pyLIQTR's
+  qubitized phase estimation.  This uses only a single ancilla qubit for the phase, with multiple
   measurements to extract the necessary number of bits of information.  This method only works with
   qubitized encodings such as double-factorization.  The integration of this method into the larger
   workflow has not yet been verified, so use this method with caution.
