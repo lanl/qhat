@@ -1,15 +1,15 @@
 """
 time_evolution.py -- Pauli-string Hamiltonian time evolution for QHAT.
 
-Loads a Hamiltonian via the QRE configuration system and performs:
+Loads a Hamiltonian via the analysis configuration system and performs:
   exact     -- U = exp(-i H t)
   trotter1  -- 1st-order Lie-Trotter product formula
   trotter2  -- 2nd-order Suzuki-Trotter product formula
 
-Place at the qhat-main/ root. Defaults to qre/config.py if no config is given.
+Place at the qhat-main/ root. Defaults to analysis/config.py if no config is given.
 
 Hamiltonians can be supplied in two ways (mutually exclusive):
-  config file  -- QRE .py config (fermionic tensors via qre_hamiltonian)
+  config file  -- analysis .py config (fermionic tensors via hamiltonian)
   --pauli-file -- JSON file with Pauli strings directly (spin models, custom H)
 
 Initial state notes:
@@ -20,19 +20,19 @@ Initial state notes:
 
 Usage
 -----
-    python time_evolution.py qre/config.py --psi0 hf --n-electrons 3 --fidelity
-    python time_evolution.py qre/config.py --psi0 zero --fidelity
+    python time_evolution.py analysis/config.py --psi0 hf --n-electrons 3 --fidelity
+    python time_evolution.py analysis/config.py --psi0 zero --fidelity
     python time_evolution.py --pauli-file xxz_cs2cocl4_10.json --psi0 zero --fidelity
-    python time_evolution.py qre/config.py --psi0 file --psi0-file my_state.npy --fidelity
+    python time_evolution.py analysis/config.py --psi0 file --psi0-file my_state.npy --fidelity
 """
 
 import os as _os
 import sys as _sys
 
-_HERE    = _os.path.dirname(_os.path.abspath(__file__))
-_QRE_DIR = _os.path.join(_HERE, "qre")
-if _QRE_DIR not in _sys.path:
-    _sys.path.insert(0, _QRE_DIR)
+_HERE         = _os.path.dirname(_os.path.abspath(__file__))
+_ANALYSIS_DIR = _os.path.join(_HERE, "analysis")
+if _ANALYSIS_DIR not in _sys.path:
+    _sys.path.insert(0, _ANALYSIS_DIR)
 
 import argparse
 import sys
@@ -40,8 +40,8 @@ import numpy as np
 from scipy.linalg import expm
 from typing import Dict, List, Tuple
 
-from qre_configuration import load_configuration
-from qre_hamiltonian import get_physical_hamiltonian
+from configuration import load_configuration
+from hamiltonian import get_physical_hamiltonian
 
 
 def _load_state_from_config(config_file: str):
@@ -303,7 +303,7 @@ def _parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("configuration_file", nargs="?", default=None,
-                        help="QRE config file (default: qre/config.py)")
+                        help="Analysis config file (default: analysis/config.py)")
     parser.add_argument("--method", choices=["exact", "trotter1", "trotter2", "all"],
                         default="all", help="Evolution method (default: all)")
     parser.add_argument("--time", type=float, default=1.0, metavar="T",
@@ -326,7 +326,7 @@ def _parse_args() -> argparse.Namespace:
                         help="Suppress per-method unitary summary blocks")
     parser.add_argument("--pauli-file", type=str, default=None, metavar="PATH",
                         dest="pauli_file",
-                        help="JSON file with Pauli strings (skips QRE config loading)")
+                        help="JSON file with Pauli strings (skips analysis config loading)")
     return parser.parse_args()
 
 
@@ -343,7 +343,7 @@ if __name__ == "__main__":
         pauli_dict, n_qubits = load_pauli_file(args.pauli_file)
         using_pauli_file = True
     else:
-        config_file = args.configuration_file or _os.path.join(_QRE_DIR, "config.py")
+        config_file = args.configuration_file or _os.path.join(_ANALYSIS_DIR, "config.py")
         print(f'\nLoading Hamiltonian from config file "{config_file}" ...')
         state                = _load_state_from_config(config_file)
         physical_hamiltonian = get_physical_hamiltonian(state.config_general,

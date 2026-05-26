@@ -1,9 +1,9 @@
-from qre_types import GeneralConfigurationUser, \
-                      HamiltonianConfiguration, \
-                      UnitaryConfiguration, \
-                      QPEConfiguration, \
-                      AnalysisConfiguration, \
-                      State
+from config_types import GeneralConfigurationUser, \
+                         HamiltonianConfiguration, \
+                         UnitaryConfiguration, \
+                         QPEConfiguration, \
+                         AnalysisConfiguration, \
+                         State
 
 import argparse
 
