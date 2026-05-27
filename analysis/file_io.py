@@ -1,7 +1,10 @@
 """
 File I/O utilities for quantum algorithm analysis.
 
-This module provides interfaces for writing unitary matrices in multiple formats.
+This module provides clean interfaces for reading and writing:
+- Unitary matrices (NumPy .npz, HDF5 .h5/.hdf5, text .txt/.dat/.csv)
+- Quantum state vectors (NumPy .npy)
+
 Format is automatically detected from file extension.
 """
 
@@ -61,6 +64,7 @@ def _save_matrix_text(output_path, unitary_matrix, unitarity_error, matrix_norm)
 
     # Count non-zero entries
     nnz = np.sum(np.abs(unitary_matrix) > threshold)
+    sparsity = 1.0 - (nnz / unitary_matrix.size)
 
     with open(output_path, 'w') as f:
         f.write(f"# Unitary Matrix (Sparse Coordinate Format)\n")
@@ -147,3 +151,132 @@ def save_matrix(output_path, unitary_matrix, unitarity_error=None, matrix_norm=N
 
     handler(output_path, unitary_matrix, unitarity_error, matrix_norm)
     logger.info(f"Matrix saved to {output_path}")
+
+
+# =================================================================================================
+# State Vector I/O Functions
+# =================================================================================================
+
+def _load_state_numpy(path):
+    """Load state vector from NumPy .npy format."""
+    return np.load(path, allow_pickle=False)
+
+
+def _save_state_numpy(path, vec):
+    """Save state vector to NumPy .npy format."""
+    np.save(path, vec, allow_pickle=False)
+
+
+def _get_state_format_from_extension(filename):
+    """
+    Infer state vector format from file extension.
+
+    Returns: format_name
+    Raises: ValueError if extension is not recognized
+    """
+    extension_map = {
+        '.npy': 'numpy',
+    }
+
+    # Get extension from filename
+    ext = Path(filename).suffix.lower()
+
+    if ext not in extension_map:
+        raise ValueError(
+            f"Cannot determine format from extension '{ext}'. "
+            f"Supported extensions: {', '.join(extension_map.keys())}"
+        )
+
+    return extension_map[ext]
+
+
+def load_state(path):
+    """
+    Load quantum state vector from file with automatic format detection.
+
+    Parameters:
+        path: Path to state vector file (format inferred from extension)
+
+    Returns:
+        numpy array containing the state vector (1D complex array)
+
+    Supported formats:
+        - .npy: NumPy binary format
+
+    Validation:
+        - Converts to complex dtype if needed
+        - Checks dimension is power of 2
+        - Ensures 1D array
+
+    Raises:
+        ValueError: If format not recognized or vector invalid
+        FileNotFoundError: If file doesn't exist
+    """
+    format_handlers = {
+        'numpy': _load_state_numpy,
+    }
+
+    # Determine format from extension
+    state_format = _get_state_format_from_extension(path)
+
+    handler = format_handlers.get(state_format)
+    if handler is None:
+        raise ValueError(
+            f"Invalid state format: {state_format}. "
+            f"Valid options are: {', '.join(repr(k) for k in format_handlers.keys())}"
+        )
+
+    # Load the state
+    logger.verbose(f"Loading state vector from {path}")
+    vec = handler(path)
+
+    # Validate
+    if not isinstance(vec, np.ndarray):
+        raise ValueError(f"Loaded state is not a numpy array (got {type(vec)})")
+    if vec.ndim != 1:
+        raise ValueError(f"State vector must be 1-dimensional (got shape {vec.shape})")
+    if not np.iscomplexobj(vec):
+        vec = vec.astype(complex)
+        logger.verbose("Converted state vector to complex dtype")
+
+    # Check if dimension is a power of 2
+    n = vec.shape[0]
+    if n == 0 or (n & (n - 1)) != 0:
+        raise ValueError(f"State vector dimension {n} is not a power of 2")
+
+    logger.verbose(f"Loaded state vector with dimension {n} (n_qubits={int(np.log2(n))})")
+
+    return vec
+
+
+def save_state(path, vec):
+    """
+    Save quantum state vector to file with automatic format detection.
+
+    Parameters:
+        path: Output file path (format inferred from extension)
+        vec: State vector (numpy array)
+
+    Supported formats:
+        - .npy: NumPy binary format
+
+    Raises:
+        ValueError: If format not recognized
+    """
+    format_handlers = {
+        'numpy': _save_state_numpy,
+    }
+
+    # Determine format from extension
+    state_format = _get_state_format_from_extension(path)
+
+    handler = format_handlers.get(state_format)
+    if handler is None:
+        raise ValueError(
+            f"Invalid state format: {state_format}. "
+            f"Valid options are: {', '.join(repr(k) for k in format_handlers.keys())}"
+        )
+
+    logger.verbose(f"Saving state vector to {path}")
+    handler(path, vec)
+    logger.verbose(f"State vector saved successfully")

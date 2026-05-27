@@ -339,8 +339,7 @@ if __name__ == "__main__":
         config_file = args.configuration_file or _os.path.join(_ANALYSIS_DIR, "config.py")
         print(f'\nLoading Hamiltonian from config file "{config_file}" ...')
         state                = _load_state_from_config(config_file)
-        physical_hamiltonian = get_physical_hamiltonian(state.config_general,
-                                                        state.config_hamiltonian)
+        physical_hamiltonian = get_physical_hamiltonian(state.config_hamiltonian)
         n_qubits         = physical_hamiltonian.num_qubits()
         pauli_dict       = physical_hamiltonian.get_all_pauli_strings(return_as="tuples")
         using_pauli_file = False

@@ -183,21 +183,83 @@ computed by the script by setting
 
 ### Analyzing an Algorithm
 
-There are many details of the algorithm that may be worth analyzing.  At this point, this script is
-focused on resource estimation.
+There are many details of the algorithm that may be worth analyzing. The available analyses include:
 
-- pyLIQTR Resource Estimation: Setting `analysis.resource_estimator` to "pyLIQTR" will use the
+#### Resource Estimation
+
+- **pyLIQTR Resource Estimation**: Setting `analysis.resource_estimator` to "pyLIQTR" will use the
   resource estimation capability from pyLIQTR, which is in turn based on the resource estimation
   capability from Qualtran.
-- Cirq Resource Estimation: Setting `analysis.resource_estimator` to "Cirq"is available but
+- **Cirq Resource Estimation**: Setting `analysis.resource_estimator` to "Cirq" is available but
   deprecated and may not work correctly.
 
+#### Matrix Output
+
+- **Unitary Matrix Output**: Setting `analysis.matrix_output_file` to a filename will compute and
+  save the full unitary matrix representation of the algorithm. Supported formats:
+  - `.npz`: NumPy compressed format
+  - `.h5` or `.hdf5`: HDF5 format with compression
+  - `.txt`, `.dat`, or `.csv`: Human-readable sparse text format
+  
+  The matrix file includes metadata such as git hash, timestamp, unitarity error, and matrix norm.
+  
+  **Example**:
+  ```python
+  analysis.matrix_output_file = "unitary_matrix.npz"
+  ```
+
+#### Numerical Simulation
+
+- **Numerical Simulation**: Setting `analysis.numerical_simulation_inputs` to one or more state
+  vector files will apply the algorithm to the input state(s) via numerical simulation, producing
+  output state(s).
+  
+  **Input format**: NumPy `.npy` format (compatible with `hamgen.py` output). Input can be:
+  - Single filename (string): `"initial_state.npy"`
+  - Multiple filenames (list): `["state1.npy", "state2.npy", "state3.npy"]`
+  
+  **Output naming**: Automatic suffix `_final` is added to input filename:
+  - `initial_state.npy` → `initial_state_final.npy`
+  
+  **Example**:
+  ```python
+  # Single state simulation
+  analysis.numerical_simulation_inputs = "initial_state.npy"
+  
+  # Multiple states
+  analysis.numerical_simulation_inputs = [
+      "ground_state.npy",
+      "excited_state.npy",
+      "superposition.npy"
+  ]
+  ```
+  
+  **Creating input states**: State vectors must be 1D complex NumPy arrays with dimension 2^n
+  (where n is the number of qubits):
+  ```python
+  import numpy as np
+  
+  # Create 4-qubit state |0000⟩
+  n_qubits = 4
+  psi = np.zeros(2**n_qubits, dtype=complex)
+  psi[0] = 1.0
+  np.save("initial_state.npy", psi)
+  ```
+  
 ## Generated Files
 
-The script will print a log both to the screen and to a logfile.  It also generates a TOML file
-that summarizes the inputs and results.  The TOML file is based on a hash, so the filename will
-likely be a long string of numbers with the `.toml` extension.  The TOML file only shows the final
-results and does not report the intermediate values, so the logfile will typically be more useful.
+The script will print a log both to the screen and to a logfile. It also generates output files
+depending on the analyses requested:
+
+- **Log file**: Default `analysis.log`, configurable via `general.logfile`
+- **TOML summary**: Hash-based filename (e.g., `12345678901234567890.toml`) containing inputs and
+  results. Shows final results but not intermediate values.
+- **Matrix file** (if `matrix_output_file` specified): Unitary matrix in specified format (`.npz`,
+  `.h5`, or `.txt`)
+- **Final state files** (if `numerical_simulation_inputs` specified): Evolved quantum states with
+  `_final` suffix (e.g., `initial_state.npy` → `initial_state_final.npy`)
+
+The logfile is typically most useful for understanding the analysis process and intermediate values.
 
 ## Example
 
