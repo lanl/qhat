@@ -210,7 +210,7 @@ def test_real_hamlib_file():
     config_hamiltonian.filename = str(test_file)
     config_hamiltonian.hdf5_key = 'ham_JW'
 
-    H = load_hamlib_hdf5(config_general, config_hamiltonian)
+    H = load_hamlib_hdf5(config_hamiltonian)
 
     # Verify basic properties
     assert isinstance(H, Hamiltonian)

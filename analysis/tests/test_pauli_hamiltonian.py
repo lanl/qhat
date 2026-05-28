@@ -509,7 +509,7 @@ class TestHamiltonianIntegration:
     def test_energy_bounds(self, sample_hamiltonian):
         """Test energy bounds computation."""
         H, config_gen, config_ham = sample_hamiltonian
-        bounds = H.compute_initial_energy_bounds(config_gen, config_ham)
+        bounds = H.compute_initial_energy_bounds(config_ham)
 
         # Bounds should be [E_0 - sum|c_i|, E_0 + sum|c_i|]
         # where E_0 is the identity coefficient
