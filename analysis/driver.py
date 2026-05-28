@@ -39,8 +39,7 @@ def run():
 
     # Hamiltonian _________________________________________________________________________________
 
-    physical_hamiltonian = get_physical_hamiltonian(
-            state.config_hamiltonian)
+    physical_hamiltonian = get_physical_hamiltonian(state.config_hamiltonian)
 
     # Compute Trotterization parameters ___________________________________________________________
 
@@ -50,8 +49,7 @@ def run():
     if state.config_unitary.method == "ramped trotter":
 
         # first-pass computation of energy bounds
-        Elo1, Ehi1 = physical_hamiltonian.compute_initial_energy_bounds(
-                state.config_hamiltonian)
+        Elo1, Ehi1 = physical_hamiltonian.compute_initial_energy_bounds(state.config_hamiltonian)
 
         # energy-shift Hamiltonian
         physical_hamiltonian.energy_shift(-1 * Elo1)
@@ -62,9 +60,7 @@ def run():
         logger.verbose(f"-- preliminary evolution time = {tevol_hbar} * hbar")
 
         # preliminiary number of phase qubits, with upper bound correction
-        P0, Elo3, Ehi3 = compute_initial_phase_qubits(
-                state.config_algorithm,
-                Elo2, Ehi2)
+        P0, Elo3, Ehi3 = compute_initial_phase_qubits(state.config_algorithm, Elo2, Ehi2)
         tevol_hbar = 2 * math.pi / (Ehi3 - Elo3)
         logger.verbose(f"-- optimized evolution time = {tevol_hbar} * hbar")
 

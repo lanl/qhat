@@ -203,8 +203,7 @@ class Hamiltonian:
         else:
             raise TypeError(
                     f"Unable to shift a fermionic Hamiltonian of type \"{type(self._H)}\".")
-    def compute_initial_energy_bounds(
-            self,            config_hamiltonian: HamiltonianConfiguration):
+    def compute_initial_energy_bounds(self, config_hamiltonian: HamiltonianConfiguration):
         logger.info("Computing initial energy bounds.")
         pauli_sum = self.get_all_pauli_strings()
         logger.verbose(f"-- number of Pauli strings = {len(pauli_sum)}")
@@ -230,8 +229,7 @@ class Hamiltonian:
 
 # -------------------------------------------------------------------------------------------------
 
-def _verify_and_construct_second_quantization(
-        config_hamiltonian, f0, f1, f2, bs, fb):
+def _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, bs, fb):
     assert len(f1.shape) == 2
     Nf = f1.shape[0]
     assert f1.shape[1] == Nf
@@ -248,8 +246,7 @@ def _verify_and_construct_second_quantization(
         Nb = fb.shape[2]
     if bs is None and fb is None:
         H = Hamiltonian(InteractionOperator(f0, f1, f2))
-        logger.info(
-                f"Fermionic second-quantization Hamiltonian uses {H.num_qubits()} qubits.")
+        logger.info(f"Fermionic second-quantization Hamiltonian uses {H.num_qubits()} qubits.")
         H.set_fermionic_mapping(config_hamiltonian.fermion_to_qubit_transform)
         logger.info(" ".join(["Mapping fermionic operators to qubit operaturs using",
                                      f"{config_hamiltonian.fermion_to_qubit_transform} method."]))
@@ -278,10 +275,9 @@ def _verify_and_construct_second_quantization(
 
 # -------------------------------------------------------------------------------------------------
 
-def load_hdf5(        config_hamiltonian: HamiltonianConfiguration):
+def load_hdf5(config_hamiltonian: HamiltonianConfiguration):
     filename = config_hamiltonian.filename
-    logger.info(
-            f"Loading second-quantization Hamiltonian from HDF5 file \"{filename}\".")
+    logger.info(f"Loading second-quantization Hamiltonian from HDF5 file \"{filename}\".")
     data = h5py.File(filename)
     f0 = 0      # Currently don't support constant terms in HDF5
     f1 = data["1e"]
@@ -293,10 +289,9 @@ def load_hdf5(        config_hamiltonian: HamiltonianConfiguration):
 
 # -------------------------------------------------------------------------------------------------
 
-def load_numpy(        config_hamiltonian: HamiltonianConfiguration):
+def load_numpy(config_hamiltonian: HamiltonianConfiguration):
     filename = config_hamiltonian.filename
-    logger.info(
-            f"Loading second-quantization Hamiltonian from file \"{filename}\".")
+    logger.info(f"Loading second-quantization Hamiltonian from file \"{filename}\".")
     data = np.load(filename)
     def get_optional_scalar(name, default_value):
         x = data.get(name, None)
@@ -314,7 +309,7 @@ def load_numpy(        config_hamiltonian: HamiltonianConfiguration):
 
 # -------------------------------------------------------------------------------------------------
 
-def load_hamlib_hdf5(        config_hamiltonian: HamiltonianConfiguration):
+def load_hamlib_hdf5(config_hamiltonian: HamiltonianConfiguration):
     """
     Load Pauli string Hamiltonian from HamLib HDF5 file format.
 
@@ -421,10 +416,9 @@ def load_hamlib_hdf5(        config_hamiltonian: HamiltonianConfiguration):
 
 # -------------------------------------------------------------------------------------------------
 
-def load_pauli(        config_hamiltonian: HamiltonianConfiguration):
+def load_pauli(config_hamiltonian: HamiltonianConfiguration):
     filename = config_hamiltonian.filename
-    logger.info(
-            f"Loading Pauli string Hamiltonian from file \"{filename}\".")
+    logger.info(f"Loading Pauli string Hamiltonian from file \"{filename}\".")
     extension = filename[filename.rfind('.')+1:]
 
     # Check for HamLib HDF5 format
@@ -542,7 +536,7 @@ def load_pauli(        config_hamiltonian: HamiltonianConfiguration):
 #       on duck typing, then any annotation would at best be a comment listing the different types,
 #       and that may or may not be as useful.
 #           `-> tuple[???,???]`
-def get_physical_hamiltonian(        config_hamiltonian: HamiltonianConfiguration):
+def get_physical_hamiltonian(config_hamiltonian: HamiltonianConfiguration):
 
     logger.info("Beginning `get_physical_hamiltonian()` function.")
 

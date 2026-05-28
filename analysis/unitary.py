@@ -15,9 +15,7 @@ logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------------------------------
 
-def encode_linear_t(
-        config_unitary: UnitaryConfiguration,
-        hamiltonian):
+def encode_linear_t(config_unitary: UnitaryConfiguration, hamiltonian):
 
     logger.verbose("Encoding with fermionic linear-T block encoding from pyLIQTR.")
 
@@ -35,9 +33,7 @@ def encode_linear_t(
 
 # -------------------------------------------------------------------------------------------------
 
-def encode_pauli_lcu(
-        config_unitary: UnitaryConfiguration,
-        hamiltonian):
+def encode_pauli_lcu(config_unitary: UnitaryConfiguration, hamiltonian):
 
     logger.verbose(
             "Encoding with Pauli linear-combination-of-unitaries block encoding from pyLIQTR.")
@@ -83,7 +79,6 @@ def encode_ramped_trotter(
         config_unitary: UnitaryConfiguration,
         hamiltonian,
         tevol_hbar):
-        #tevol_hbar) -> RampedTrotterizedUnitary:
 
     # Get the implementation choice from config
     trotter_impl = config_unitary.trotter_implementation

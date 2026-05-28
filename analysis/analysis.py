@@ -13,14 +13,12 @@ logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------------------------------
 
-def resource_estimation_cirq(        config_analysis: AnalysisConfiguration,
-        algorithm) -> dict:
+def resource_estimation_cirq(config_analysis: AnalysisConfiguration, algorithm) -> dict:
     raise NotImplementedError
 
 # -------------------------------------------------------------------------------------------------
 
-def resource_estimation_pyliqtr(        config_analysis: AnalysisConfiguration,
-        algorithm) -> dict:
+def resource_estimation_pyliqtr(config_analysis: AnalysisConfiguration, algorithm) -> dict:
 
     logger.verbose("Estimating resources with pyLIQTR.")
 
@@ -45,8 +43,7 @@ def resource_estimation_pyliqtr(        config_analysis: AnalysisConfiguration,
 
 # -------------------------------------------------------------------------------------------------
 
-def estimate_resources(        config_analysis: AnalysisConfiguration,
-        algorithm) -> dict:
+def estimate_resources(config_analysis: AnalysisConfiguration, algorithm) -> dict:
 
     if config_analysis.resource_estimator.lower() == "pyliqtr":
         return resource_estimation_pyliqtr(config_general, config_analysis, algorithm)
@@ -58,8 +55,7 @@ def estimate_resources(        config_analysis: AnalysisConfiguration,
 
 # -------------------------------------------------------------------------------------------------
 
-def output_unitary_matrix(        config_analysis: AnalysisConfiguration,
-        algorithm) -> dict:
+def output_unitary_matrix(config_analysis: AnalysisConfiguration, algorithm) -> dict:
     """
     Generate and save the unitary matrix representation of the algorithm.
 
@@ -127,8 +123,7 @@ def output_unitary_matrix(        config_analysis: AnalysisConfiguration,
 
 # -------------------------------------------------------------------------------------------------
 
-def analyze_algorithm(        config_analysis: AnalysisConfiguration,
-        algorithm) -> dict:
+def analyze_algorithm(config_analysis: AnalysisConfiguration, algorithm) -> dict:
 
     logger.info("Beginning algorithm analysis.")
 

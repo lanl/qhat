@@ -640,7 +640,8 @@ def trotter_error_estimator_fast(pauli_terms, time_limit,
         # Path A/C: Monte Carlo, with optional auto-switch
         if auto_exact and is_exact_feasible:
             # Auto-switch to exact computation
-            logger.verbose(f"  Auto-switching to EXACT computation (N={N}, feasible within limits)")
+            logger.verbose(
+                    f"  Auto-switching to EXACT computation (N={N}, feasible within limits)")
             return _compute_exact_path(x_bits, z_bits, coeffs, N, batch_size)
         else:
             # Use Monte Carlo

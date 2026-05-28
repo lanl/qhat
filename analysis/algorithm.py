@@ -53,8 +53,7 @@ def build_qpe_qualtran_textbook(
         assert config_algorithm.probability_of_failure is not None
         Pextra = math.ceil(math.log2(2.0 + 0.5 / config_algorithm.probability_of_failure))
         P = P0 + Pextra
-        logger.verbose(
-                f"-- extending the phase register by {Pextra} qubits (total = {P})")
+        logger.verbose(f"-- extending the phase register by {Pextra} qubits (total = {P})")
 
     # TODO: There is a note in the documentation (see link below) that a fast-forwardable unitary
     #       can lower the cost from (2^m - 1) * cost(C-U) to m * cost(C-U).  If we have a
