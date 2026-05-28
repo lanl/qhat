@@ -190,6 +190,44 @@ class Hamiltonian:
         for pauli, coef in self.get_all_pauli_strings().items():
             groups.append(QubitOperator(pauli, coef))
         return groups
+    def to_matrix(self, force_dense=None, force_sparse=None):
+        """
+        Convert the Hamiltonian to its exact matrix representation.
+
+        For small systems (≤15 qubits), returns a dense numpy array.
+        For large systems (>15 qubits), returns a matrix-free PauliStringOperator.
+
+        Parameters:
+            force_dense: bool or None, force dense matrix representation
+            force_sparse: bool or None, force matrix-free operator
+
+        Returns:
+            numpy array (dense) or PauliStringOperator (sparse/matrix-free)
+
+        Raises:
+            ValueError: If both force_dense and force_sparse are True
+
+        Example:
+            >>> hamiltonian = Hamiltonian(...)
+            >>> H_exact = hamiltonian.to_matrix()
+            >>> # For small systems: H_exact is numpy array
+            >>> # For large systems: H_exact is PauliStringOperator
+        """
+        from qhat.analysis.matrix_operations import create_hamiltonian_operator
+
+        # Get Pauli strings as dense format (full string per term)
+        pauli_dict = self.get_all_pauli_strings(return_as="strings")
+        num_qubits = self.num_qubits()
+
+        logger.verbose(f"Converting Hamiltonian to matrix for {num_qubits} qubits")
+        logger.verbose(f"Hamiltonian has {len(pauli_dict)} Pauli terms")
+
+        # Create operator (dense or sparse based on system size)
+        return create_hamiltonian_operator(
+            pauli_dict, num_qubits,
+            force_dense=force_dense,
+            force_sparse=force_sparse
+        )
     def energy_shift(self, dE):
         if isinstance(self._H, InteractionOperator):
             t0 = self._H.constant + dE
