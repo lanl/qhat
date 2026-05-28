@@ -40,7 +40,6 @@ def run():
     # Hamiltonian _________________________________________________________________________________
 
     physical_hamiltonian = get_physical_hamiltonian(
-            state.config_general,
             state.config_hamiltonian)
 
     # Compute Trotterization parameters ___________________________________________________________
@@ -52,28 +51,26 @@ def run():
 
         # first-pass computation of energy bounds
         Elo1, Ehi1 = physical_hamiltonian.compute_initial_energy_bounds(
-                state.config_general, state.config_hamiltonian)
+                state.config_hamiltonian)
 
         # energy-shift Hamiltonian
         physical_hamiltonian.energy_shift(-1 * Elo1)
         Elo2 = Elo1 - Elo1
         Ehi2 = Ehi1 - Elo1
-        state.config_general.log_verbose(f"-- shifted bounds = [{Elo2}, {Ehi2})")
+        logger.verbose(f"-- shifted bounds = [{Elo2}, {Ehi2})")
         tevol_hbar = 2 * math.pi / (Ehi2 - Elo2)
-        state.config_general.log_verbose(f"-- preliminary evolution time = {tevol_hbar} * hbar")
+        logger.verbose(f"-- preliminary evolution time = {tevol_hbar} * hbar")
 
         # preliminiary number of phase qubits, with upper bound correction
         P0, Elo3, Ehi3 = compute_initial_phase_qubits(
-                state.config_general,
                 state.config_algorithm,
                 Elo2, Ehi2)
         tevol_hbar = 2 * math.pi / (Ehi3 - Elo3)
-        state.config_general.log_verbose(f"-- optimized evolution time = {tevol_hbar} * hbar")
+        logger.verbose(f"-- optimized evolution time = {tevol_hbar} * hbar")
 
     # Unitary _____________________________________________________________________________________
 
     unitary_hamiltonian = encode_as_unitary(
-            state.config_general,
             state.config_unitary,
             physical_hamiltonian,
             tevol_hbar)
@@ -81,14 +78,13 @@ def run():
     # Algorithm ___________________________________________________________________________________
 
     algorithm = build_algorithm(
-            state.config_general,
             state.config_algorithm,
             unitary_hamiltonian,
             P0)
 
     # Analysis ____________________________________________________________________________________
 
-    state.store_results(analyze_algorithm(state.config_general, state.config_analysis, algorithm))
+    state.store_results(analyze_algorithm(state.config_analysis, algorithm))
 
     # Save Results ________________________________________________________________________________
 

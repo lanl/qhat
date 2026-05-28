@@ -6,6 +6,8 @@ import pprint
 import subprocess
 import sys
 
+logger = logging.getLogger(__name__)
+
 # -------------------------------------------------------------------------------------------------
 # user types
 # -------------------------------------------------------------------------------------------------
@@ -211,11 +213,11 @@ class State:
         self.config_hamiltonian = hamiltonian
         self.metadata = dict()
     def log(self, *args, **kwargs):
-        self.config_general.log(*args, **kwargs)
+        logger.info(*args, **kwargs)
     def log_verbose(self, *args, **kwargs):
-        self.config_general.log_verbose(*args, **kwargs)
+        logger.verbose(*args, **kwargs)
     def log_debug(self, *args, **kwargs):
-        self.config_general.log_debug(*args, **kwargs)
+        logger.debug(*args, **kwargs)
     def filename_ham1(self):
         return "{stub}.pickle".format(stub=self.config_general.file_stub)
     def filename_ham2(self):

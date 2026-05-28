@@ -113,7 +113,7 @@ def _get_matrix_format_from_extension(filename):
     return extension_map[ext]
 
 
-def save_matrix(output_path, unitary_matrix, config_general=None, git_hash=None,
+def save_matrix(output_path, unitary_matrix, git_hash=None,
                 unitarity_error=None, matrix_norm=None):
     """
     Save unitary matrix to file with automatic format detection.
@@ -121,7 +121,6 @@ def save_matrix(output_path, unitary_matrix, config_general=None, git_hash=None,
     Parameters:
         output_path: Output file path (format inferred from extension)
         unitary_matrix: The matrix to save (numpy array)
-        config_general: DEPRECATED - kept for backward compatibility, use logging instead
         git_hash: Optional git hash for metadata
         unitarity_error: Optional unitarity error for metadata
         matrix_norm: Optional matrix norm for metadata

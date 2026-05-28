@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 # -------------------------------------------------------------------------------------------------
 
 def encode_linear_t(
-        config_general: GeneralConfiguration,
         config_unitary: UnitaryConfiguration,
         hamiltonian):
 
@@ -37,7 +36,6 @@ def encode_linear_t(
 # -------------------------------------------------------------------------------------------------
 
 def encode_pauli_lcu(
-        config_general: GeneralConfiguration,
         config_unitary: UnitaryConfiguration,
         hamiltonian):
 
@@ -63,7 +61,6 @@ def encode_pauli_lcu(
 # -------------------------------------------------------------------------------------------------
 
 def encode_double_factorization(
-        config_general: GeneralConfiguration,
         config_unitary: UnitaryConfiguration,
         hamiltonian) -> DoubleFactorized:
 
@@ -83,7 +80,6 @@ def encode_double_factorization(
 # -------------------------------------------------------------------------------------------------
 
 def encode_ramped_trotter(
-        config_general: GeneralConfiguration,
         config_unitary: UnitaryConfiguration,
         hamiltonian,
         tevol_hbar):
@@ -105,7 +101,6 @@ def encode_ramped_trotter(
     timestep = value(config_unitary.timestep, tevol_hbar)
     assert timestep >= 0.0
     logger.info(f"-- timestep = {timestep}")
-    config_general.t_hbar = timestep
 
     # Compute the number of Trotter steps based on the Trotter error from arXiv:1912.08854v3
     # Using fast implementation for better performance (100-150x more samples per second)
@@ -130,7 +125,6 @@ def encode_ramped_trotter(
     c1, c2 = trotter_error_estimator_fast(
         hamiltonian.get_grouped_terms(),
         error_coeff_time_limit,
-        config_general,
         mode=error_coeff_mode,
         auto_exact=error_coeff_auto_exact
     )
@@ -183,7 +177,6 @@ def encode_ramped_trotter(
 # -------------------------------------------------------------------------------------------------
 
 def encode_as_unitary(
-        config_general: GeneralConfiguration,
         config_unitary: UnitaryConfiguration,
         hamiltonian,
         tevol_hbar):
@@ -191,11 +184,11 @@ def encode_as_unitary(
     logger.info("Beginning to encode the Hamiltonian as a unitary.")
 
     if config_unitary.method.lower() in ("double factorization", "double-factorization"):
-        return encode_double_factorization(config_general, config_unitary, hamiltonian)
+        return encode_double_factorization(config_unitary, hamiltonian)
     elif config_unitary.method.lower() in ("pauli lcu", "pauli-lcu", "paulilcu",):
-        return encode_pauli_lcu(config_general, config_unitary, hamiltonian)
+        return encode_pauli_lcu(config_unitary, hamiltonian)
     elif config_unitary.method.lower() in ("linear t", "linear-t", "lineart",):
-        return encode_linear_t(config_general, config_unitary, hamiltonian)
+        return encode_linear_t(config_unitary, hamiltonian)
     elif config_unitary.method.lower() in ("first quantization",):
         # TODO: This will be important for Marian's team.  Something is available in pyLIQTR, but
         #       I've not yet looked to see how it works.
@@ -205,6 +198,6 @@ def encode_as_unitary(
         #          unitaries.  But I've not confirmed this.
         raise NotImplementedError()
     elif config_unitary.method.lower() in ("ramped trotter"):
-        return encode_ramped_trotter(config_general, config_unitary, hamiltonian, tevol_hbar)
+        return encode_ramped_trotter(config_unitary, hamiltonian, tevol_hbar)
     else:
         raise ValueError(f"Invalid unitary encoding method \"{config_unitary.method}\".")

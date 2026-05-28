@@ -5,6 +5,9 @@ import numpy as np
 import scipy.constants as sc
 
 from openfermion import (
+import logging
+
+logger = logging.getLogger(__name__)
     InteractionOperator,
     QubitOperator,
     binary_code_transform,
@@ -201,36 +204,34 @@ class Hamiltonian:
             raise TypeError(
                     f"Unable to shift a fermionic Hamiltonian of type \"{type(self._H)}\".")
     def compute_initial_energy_bounds(
-            self,
-            config_general: GeneralConfiguration,
-            config_hamiltonian: HamiltonianConfiguration):
-        config_general.log("Computing initial energy bounds.")
+            self,            config_hamiltonian: HamiltonianConfiguration):
+        logger.info("Computing initial energy bounds.")
         pauli_sum = self.get_all_pauli_strings()
-        config_general.log_verbose(f"-- number of Pauli strings = {len(pauli_sum)}")
+        logger.verbose(f"-- number of Pauli strings = {len(pauli_sum)}")
         energy_shift = pauli_sum.get(tuple(), 0.0) # identity term (may not exist in all formats)
         dE = sum(abs(coefficient) for coefficient in pauli_sum.values()) - abs(energy_shift)
         Elo0 = energy_shift - dE
         Ehi0 = energy_shift + dE
-        config_general.log_verbose(f"-- energy shift = {energy_shift}")
-        config_general.log_verbose(f"-- computed bounds = [{Elo0}, {Ehi0})")
+        logger.verbose(f"-- energy shift = {energy_shift}")
+        logger.verbose(f"-- computed bounds = [{Elo0}, {Ehi0})")
         EloU = value(config_hamiltonian.lower_bound, float('-inf'))
         EhiU = value(config_hamiltonian.upper_bound, float('inf'))
         Elo1 = max(Elo0, EloU)
         Ehi1 = min(Ehi0, EhiU)
-        config_general.log_verbose(f"-- limited bounds = [{Elo1}, {Ehi1})")
+        logger.verbose(f"-- limited bounds = [{Elo1}, {Ehi1})")
         if config_hamiltonian.exact_energy_lower_bound:
             assert config_hamiltonian.lower_bound is not None
             Elo1 = config_hamiltonian.lower_bound
         if config_hamiltonian.exact_energy_upper_bound:
             assert config_hamiltonian.upper_bound is not None
             Ehi1 = config_hamiltonian.upper_bound
-        config_general.log_verbose(f"-- initial bounds = [{Elo1}, {Ehi1})")
+        logger.verbose(f"-- initial bounds = [{Elo1}, {Ehi1})")
         return (Elo1, Ehi1)
 
 # -------------------------------------------------------------------------------------------------
 
 def _verify_and_construct_second_quantization(
-        config_general, config_hamiltonian, f0, f1, f2, bs, fb):
+        config_hamiltonian, f0, f1, f2, bs, fb):
     assert len(f1.shape) == 2
     Nf = f1.shape[0]
     assert f1.shape[1] == Nf
@@ -247,10 +248,10 @@ def _verify_and_construct_second_quantization(
         Nb = fb.shape[2]
     if bs is None and fb is None:
         H = Hamiltonian(InteractionOperator(f0, f1, f2))
-        config_general.log(
+        logger.info(
                 f"Fermionic second-quantization Hamiltonian uses {H.num_qubits()} qubits.")
         H.set_fermionic_mapping(config_hamiltonian.fermion_to_qubit_transform)
-        config_general.log(" ".join(["Mapping fermionic operators to qubit operaturs using",
+        logger.info(" ".join(["Mapping fermionic operators to qubit operaturs using",
                                      f"{config_hamiltonian.fermion_to_qubit_transform} method."]))
         return H
     else:
@@ -258,18 +259,18 @@ def _verify_and_construct_second_quantization(
         assert fb is not None
         assert Nb > 0
         H = Hamiltonian(MixedFermionBosonOperator(f0, f1, f2, bs, fb))
-        config_general.log(" ".join([
+        logger.info(" ".join([
             "mixed fermionic-bosonic second-quantization Hamiltonian",
             f"uses {H.num_qubits()} qubits."]))
         H.set_fermionic_mapping(config_hamiltonian.fermion_to_qubit_transform)
-        config_general.log(" ".join(["Mapping fermionic operators to qubit operaturs using",
+        logger.info(" ".join(["Mapping fermionic operators to qubit operaturs using",
                                      f"{config_hamiltonian.fermion_to_qubit_transform} method."]))
         if config_hamiltonian.max_bosons_per_state is None:
             raise ValueError("User did not specify maximum bosons per state.")
         H.set_bosonic_mapping(
                 config_hamiltonian.boson_to_qubit_transform,
                 config_hamiltonian.max_bosons_per_state)
-        config_general.log(" ".join(["Mapping bosonic operators to qubit operaturs using",
+        logger.info(" ".join(["Mapping bosonic operators to qubit operaturs using",
                                      f"{config_hamiltonian.boson_to_qubit_transform} method",
                                      f"with {config_hamiltonian.max_bosons_per_state} maximum",
                                      "bosons per state."]))
@@ -277,11 +278,9 @@ def _verify_and_construct_second_quantization(
 
 # -------------------------------------------------------------------------------------------------
 
-def load_hdf5(
-        config_general: GeneralConfiguration,
-        config_hamiltonian: HamiltonianConfiguration):
+def load_hdf5(        config_hamiltonian: HamiltonianConfiguration):
     filename = config_hamiltonian.filename
-    config_general.log(
+    logger.info(
             f"Loading second-quantization Hamiltonian from HDF5 file \"{filename}\".")
     data = h5py.File(filename)
     f0 = 0      # Currently don't support constant terms in HDF5
@@ -294,11 +293,9 @@ def load_hdf5(
 
 # -------------------------------------------------------------------------------------------------
 
-def load_numpy(
-        config_general: GeneralConfiguration,
-        config_hamiltonian: HamiltonianConfiguration):
+def load_numpy(        config_hamiltonian: HamiltonianConfiguration):
     filename = config_hamiltonian.filename
-    config_general.log(
+    logger.info(
             f"Loading second-quantization Hamiltonian from file \"{filename}\".")
     data = np.load(filename)
     def get_optional_scalar(name, default_value):
@@ -317,9 +314,7 @@ def load_numpy(
 
 # -------------------------------------------------------------------------------------------------
 
-def load_hamlib_hdf5(
-        config_general: GeneralConfiguration,
-        config_hamiltonian: HamiltonianConfiguration):
+def load_hamlib_hdf5(        config_hamiltonian: HamiltonianConfiguration):
     """
     Load Pauli string Hamiltonian from HamLib HDF5 file format.
 
@@ -329,7 +324,7 @@ def load_hamlib_hdf5(
     Example: (1.5+0j) [X0 Z3] +\n(-0.5+0j) [Y1 Y2] +
     """
     filename = config_hamiltonian.filename
-    config_general.log(f"Loading HamLib HDF5 Hamiltonian from file \"{filename}\".")
+    logger.info(f"Loading HamLib HDF5 Hamiltonian from file \"{filename}\".")
 
     # Determine the HDF5 key/path - user can specify it or we'll try to find it
     hdf5_key = getattr(config_hamiltonian, 'hdf5_key', None)
@@ -348,7 +343,7 @@ def load_hamlib_hdf5(
                 raise ValueError(f"No datasets found in HDF5 file \"{filename}\".")
             elif len(all_keys) == 1:
                 hdf5_key = all_keys[0]
-                config_general.log(f"Auto-detected HDF5 key: \"{hdf5_key}\"")
+                logger.info(f"Auto-detected HDF5 key: \"{hdf5_key}\"")
             else:
                 raise ValueError(
                     f"Multiple datasets found in HDF5 file. Please specify hdf5_key. "
@@ -360,7 +355,7 @@ def load_hamlib_hdf5(
         # Read metadata if available (HamLib v1.1+)
         metadata = dict(dataset.attrs.items()) if hasattr(dataset, 'attrs') else {}
         if metadata:
-            config_general.log(f"HamLib metadata: {metadata}")
+            logger.info(f"HamLib metadata: {metadata}")
 
         # Read the Pauli string data as UTF-8
         hamlib_string = dataset[()].decode("utf-8")
@@ -420,23 +415,21 @@ def load_hamlib_hdf5(
                 f"{imag_ratio_percent:.4g}% of magnitude (max allowed: 1e-6%).")
         pauli_dict[pauli] = coef.real
 
-    config_general.log(f"Loaded {len(pauli_dict)} Pauli terms on {numq} qubits.")
+    logger.info(f"Loaded {len(pauli_dict)} Pauli terms on {numq} qubits.")
 
     return Hamiltonian(LinearCombinationOfPauliStrings(num_qubits=numq, sparse=pauli_dict))
 
 # -------------------------------------------------------------------------------------------------
 
-def load_pauli(
-        config_general: GeneralConfiguration,
-        config_hamiltonian: HamiltonianConfiguration):
+def load_pauli(        config_hamiltonian: HamiltonianConfiguration):
     filename = config_hamiltonian.filename
-    config_general.log(
+    logger.info(
             f"Loading Pauli string Hamiltonian from file \"{filename}\".")
     extension = filename[filename.rfind('.')+1:]
 
     # Check for HamLib HDF5 format
     if extension in ["h5", "hdf5"]:
-        return load_hamlib_hdf5(config_general, config_hamiltonian)
+        return load_hamlib_hdf5(config_hamiltonian)
     elif extension in [ "txt", "dat" ]:
         fmt = None
         numq = 0
@@ -549,19 +542,17 @@ def load_pauli(
 #       on duck typing, then any annotation would at best be a comment listing the different types,
 #       and that may or may not be as useful.
 #           `-> tuple[???,???]`
-def get_physical_hamiltonian(
-        config_general: GeneralConfiguration,
-        config_hamiltonian: HamiltonianConfiguration):
+def get_physical_hamiltonian(        config_hamiltonian: HamiltonianConfiguration):
 
-    config_general.log("Beginning `get_physical_hamiltonian()` function.")
+    logger.info("Beginning `get_physical_hamiltonian()` function.")
 
     if config_hamiltonian.source == "numpy":
-        return load_numpy(config_general, config_hamiltonian)
+        return load_numpy(config_hamiltonian)
     elif config_hamiltonian.source == "LCPS":
         return load_LCPS(config_general, config_hamiltonian)
     elif config_hamiltonian.source == "hdf5":
-        return load_hdf5(config_general, config_hamiltonian)
+        return load_hdf5(config_hamiltonian)
     elif config_hamiltonian.source == "pauli":
-        return load_pauli(config_general, config_hamiltonian)
+        return load_pauli(config_hamiltonian)
     else:
         raise ValueError(f"Invalid Hamiltonian source \"{config_hamiltonian.source}\".")
