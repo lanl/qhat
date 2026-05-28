@@ -5,9 +5,12 @@ This module provides interfaces for writing unitary matrices in multiple formats
 Format is automatically detected from file extension.
 """
 
+import logging
 import numpy as np
 from pathlib import Path
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 # =================================================================================================
@@ -110,7 +113,7 @@ def _get_matrix_format_from_extension(filename):
     return extension_map[ext]
 
 
-def save_matrix(output_path, unitary_matrix, config_general, git_hash=None,
+def save_matrix(output_path, unitary_matrix, config_general=None, git_hash=None,
                 unitarity_error=None, matrix_norm=None):
     """
     Save unitary matrix to file with automatic format detection.
@@ -118,7 +121,7 @@ def save_matrix(output_path, unitary_matrix, config_general, git_hash=None,
     Parameters:
         output_path: Output file path (format inferred from extension)
         unitary_matrix: The matrix to save (numpy array)
-        config_general: Configuration for logging
+        config_general: DEPRECATED - kept for backward compatibility, use logging instead
         git_hash: Optional git hash for metadata
         unitarity_error: Optional unitarity error for metadata
         matrix_norm: Optional matrix norm for metadata
@@ -149,4 +152,4 @@ def save_matrix(output_path, unitary_matrix, config_general, git_hash=None,
         )
 
     handler(output_path, unitary_matrix, git_hash, unitarity_error, matrix_norm)
-    config_general.log(f"Matrix saved to {output_path}")
+    logger.info(f"Matrix saved to {output_path}")

@@ -5,13 +5,17 @@ import os
 
 os.environ["QSHARP_PYTHON_TELEMETRY"] = "none"
 
+import logging
 import math
 
+from qhat.logging_utils import configure_logging
 from qhat.analysis.algorithm import build_algorithm, compute_initial_phase_qubits
 from qhat.analysis.analysis import analyze_algorithm
 from qhat.analysis.configuration import load_configuration
 from qhat.analysis.hamiltonian import get_physical_hamiltonian
 from qhat.analysis.unitary import encode_as_unitary
+
+logger = logging.getLogger(__name__)
 
 # =================================================================================================
 
@@ -20,6 +24,18 @@ def run():
     # Configuration _______________________________________________________________________________
 
     state = load_configuration()
+
+    # Configure logging based on user settings
+    configure_logging(
+        level=state.config_general.loglevel,
+        logfile=state.config_general.logfile
+    )
+
+    logger.info("=" * 99)
+    logger.info("ANALYSIS DRIVER START")
+    logger.info("=" * 99)
+    logger.info(f"Logfile: {state.config_general.logfile}")
+    logger.info(f"Git hash: {state.config_general.git_hash}")
 
     # Hamiltonian _________________________________________________________________________________
 
