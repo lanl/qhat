@@ -82,10 +82,6 @@ class HamiltonianConfiguration:
 # internal types and support functions
 # -------------------------------------------------------------------------------------------------
 
-# Old logging functions - DEPRECATED
-# These functions are no longer used. Logging is now configured via
-# qhat.common.logging_utils.configure_logging() at application startup.
-
 def _get_git_hash():
     file_path = os.path.realpath(__file__)
     dirpath = os.path.dirname(file_path)
