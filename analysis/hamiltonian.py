@@ -1,13 +1,11 @@
 from functools import cache, reduce
 import h5py
 import json
+import logging
 import numpy as np
 import scipy.constants as sc
 
 from openfermion import (
-import logging
-
-logger = logging.getLogger(__name__)
     InteractionOperator,
     QubitOperator,
     binary_code_transform,
@@ -15,6 +13,8 @@ logger = logging.getLogger(__name__)
     count_qubits,
     jordan_wigner,
 )
+
+logger = logging.getLogger(__name__)
 from pyscf import ao2mo, gto, lib, scf
 
 from qhat.analysis.config_types import GeneralConfiguration, HamiltonianConfiguration, value
