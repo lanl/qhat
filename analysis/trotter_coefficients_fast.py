@@ -519,7 +519,7 @@ def compute_C1_exact(x_bits, z_bits, coeffs, N, batch_size):
         Exact value of C1 = Σᵢ<ⱼ ||[Hᵢ, Hⱼ]||
     """
     return _compute_exact_generic(
-        x_bits, z_bits, coeffs, N, batch_size, config_general,
+        x_bits, z_bits, coeffs, N, batch_size,
         label="C1",
         index_generator=generate_all_pairs,
         batch_compute_fn=batch_compute_C1,
@@ -538,7 +538,7 @@ def compute_C21_exact(x_bits, z_bits, coeffs, N, batch_size):
         Exact value of C21 = Σₖ<ᵢ,ₖ<ⱼ ||[Hᵢ, [Hⱼ, Hₖ]]||
     """
     return _compute_exact_generic(
-        x_bits, z_bits, coeffs, N, batch_size, config_general,
+        x_bits, z_bits, coeffs, N, batch_size,
         label="C21",
         index_generator=generate_all_triples,
         batch_compute_fn=batch_compute_C21,
@@ -557,7 +557,7 @@ def compute_C22_exact(x_bits, z_bits, coeffs, N, batch_size):
         Exact value of C22 = Σₖ<ⱼ ||[Hₖ, [Hₖ, Hⱼ]]||
     """
     return _compute_exact_generic(
-        x_bits, z_bits, coeffs, N, batch_size, config_general,
+        x_bits, z_bits, coeffs, N, batch_size,
         label="C22",
         index_generator=generate_all_pairs,
         batch_compute_fn=batch_compute_C22,
@@ -652,7 +652,7 @@ def trotter_error_estimator_fast(pauli_terms, time_limit,
             use_tracking = is_exact_feasible  # Enable tracking if feasible
             return _compute_monte_carlo_path(
                 x_bits, z_bits, coeffs, N, time_limit, batch_size,
-                use_tracking, is_exact_feasible, config_general
+                use_tracking, is_exact_feasible
             )
 
 

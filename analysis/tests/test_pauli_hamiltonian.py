@@ -220,7 +220,7 @@ class TestFileLoading:
 
         config_gen, config_ham = config
         config_ham.load_pauli_strings(str(test_file))
-        H = load_pauli(config_gen, config_ham)
+        H = load_pauli(config_ham)
 
         assert H.num_qubits() == 4
         pauli_dict = H.get_all_pauli_strings(return_as="strings")
@@ -243,7 +243,7 @@ class TestFileLoading:
 
         config_gen, config_ham = config
         config_ham.load_pauli_strings(str(test_file))
-        H = load_pauli(config_gen, config_ham)
+        H = load_pauli(config_ham)
 
         assert H.num_qubits() == 2
         pauli_dict = H.get_all_pauli_strings(return_as="tuples")
@@ -267,7 +267,7 @@ class TestFileLoading:
 
         config_gen, config_ham = config
         config_ham.load_pauli_strings(str(test_file))
-        H = load_pauli(config_gen, config_ham)
+        H = load_pauli(config_ham)
 
         pauli_dict = H.get_all_pauli_strings(return_as="strings")
         assert len(pauli_dict) == 2
@@ -284,7 +284,7 @@ class TestFileLoading:
         config_ham.load_pauli_strings(str(test_file))
 
         with pytest.raises(ValueError, match="Inconsistent dense Pauli string length"):
-            load_pauli(config_gen, config_ham)
+            load_pauli(config_ham)
 
     def test_mixed_format_raises_error(self, config, tmp_path):
         """Test that mixing dense and sparse formats raises error."""
@@ -297,7 +297,7 @@ class TestFileLoading:
         config_ham.load_pauli_strings(str(test_file))
 
         with pytest.raises(ValueError, match="Inconsistent Pauli string file format"):
-            load_pauli(config_gen, config_ham)
+            load_pauli(config_ham)
 
     def test_load_json_format(self, config, tmp_path):
         """Test loading JSON format Pauli file."""
@@ -316,7 +316,7 @@ class TestFileLoading:
 
         config_gen, config_ham = config
         config_ham.load_pauli_strings(str(test_file))
-        H = load_pauli(config_gen, config_ham)
+        H = load_pauli(config_ham)
 
         assert H.num_qubits() == 4
         pauli_dict = H.get_all_pauli_strings(return_as="tuples")
@@ -337,7 +337,7 @@ class TestFileLoading:
         config_ham.load_pauli_strings(str(test_file))
 
         with pytest.raises(ValueError, match="must contain 'n_qubits'"):
-            load_pauli(config_gen, config_ham)
+            load_pauli(config_ham)
 
     def test_json_missing_terms(self, config, tmp_path):
         """Test that JSON without terms raises error."""
@@ -350,7 +350,7 @@ class TestFileLoading:
         config_ham.load_pauli_strings(str(test_file))
 
         with pytest.raises(ValueError, match="must contain 'terms'"):
-            load_pauli(config_gen, config_ham)
+            load_pauli(config_ham)
 
     def test_json_term_missing_fields(self, config, tmp_path):
         """Test that JSON terms must have ops and coeff."""
@@ -366,7 +366,7 @@ class TestFileLoading:
         config_ham.load_pauli_strings(str(test_file))
 
         with pytest.raises(ValueError, match="must have 'ops' and 'coeff'"):
-            load_pauli(config_gen, config_ham)
+            load_pauli(config_ham)
 
 
 # ==================================================================================
@@ -392,7 +392,7 @@ class TestHermitianValidation:
 
         config_gen, config_ham = config
         config_ham.load_pauli_strings(str(test_file))
-        H = load_pauli(config_gen, config_ham)
+        H = load_pauli(config_ham)
 
         # Should not raise
         assert H.num_qubits() == 4
@@ -407,7 +407,7 @@ class TestHermitianValidation:
 
         config_gen, config_ham = config
         config_ham.load_pauli_strings(str(test_file))
-        H = load_pauli(config_gen, config_ham)
+        H = load_pauli(config_ham)
 
         # Should not raise
         assert H.num_qubits() == 4
@@ -423,7 +423,7 @@ class TestHermitianValidation:
         config_ham.load_pauli_strings(str(test_file))
 
         with pytest.raises(ValueError, match="Hamiltonian must be Hermitian"):
-            load_pauli(config_gen, config_ham)
+            load_pauli(config_ham)
 
     def test_relative_tolerance_small_coefficients(self, config, tmp_path):
         """Test that relative tolerance works for small coefficients."""
@@ -436,7 +436,7 @@ class TestHermitianValidation:
         config_ham.load_pauli_strings(str(test_file))
 
         with pytest.raises(ValueError, match="Hamiltonian must be Hermitian"):
-            load_pauli(config_gen, config_ham)
+            load_pauli(config_ham)
 
     def test_converted_to_float(self, config, tmp_path):
         """Test that validated coefficients are converted to float."""
@@ -447,7 +447,7 @@ class TestHermitianValidation:
 
         config_gen, config_ham = config
         config_ham.load_pauli_strings(str(test_file))
-        H = load_pauli(config_gen, config_ham)
+        H = load_pauli(config_ham)
 
         pauli_dict = H.get_all_pauli_strings(return_as="strings")
         # Check that values are float, not complex
@@ -486,7 +486,7 @@ class TestHamiltonianIntegration:
 
         config_gen, config_ham = config
         config_ham.load_pauli_strings(str(test_file))
-        return load_pauli(config_gen, config_ham), config_gen, config_ham
+        return load_pauli(config_ham), config_gen, config_ham
 
     def test_get_all_pauli_strings_tuples(self, sample_hamiltonian):
         """Test getting Pauli strings as tuples."""
@@ -581,7 +581,7 @@ class TestEdgeCases:
 
         config_gen, config_ham = config
         config_ham.load_pauli_strings(str(test_file))
-        H = load_pauli(config_gen, config_ham)
+        H = load_pauli(config_ham)
 
         assert H.num_qubits() == 1
 
@@ -594,7 +594,7 @@ class TestEdgeCases:
 
         config_gen, config_ham = config
         config_ham.load_pauli_strings(str(test_file))
-        H = load_pauli(config_gen, config_ham)
+        H = load_pauli(config_ham)
 
         assert H.num_qubits() == 10
 
@@ -606,7 +606,7 @@ class TestEdgeCases:
 
         config_gen, config_ham = config
         config_ham.load_pauli_strings(str(test_file))
-        H = load_pauli(config_gen, config_ham)
+        H = load_pauli(config_ham)
 
         pauli_dict = H.get_all_pauli_strings(return_as="strings")
         assert len(pauli_dict) == 1
@@ -621,7 +621,7 @@ class TestEdgeCases:
 
         config_gen, config_ham = config
         config_ham.load_pauli_strings(str(test_file))
-        H = load_pauli(config_gen, config_ham)
+        H = load_pauli(config_ham)
 
         pauli_dict = H.get_all_pauli_strings(return_as="tuples")
         # Identity should be 0.0 (or not present)
@@ -645,7 +645,7 @@ class TestEdgeCases:
 
         config_gen, config_ham = config
         config_ham.load_pauli_strings(str(test_file))
-        H = load_pauli(config_gen, config_ham)
+        H = load_pauli(config_ham)
 
         assert H.num_qubits() == 3
         pauli_dict = H.get_all_pauli_strings(return_as="strings")
@@ -661,7 +661,7 @@ class TestEdgeCases:
         config_ham.load_pauli_strings(str(test_file))
 
         with pytest.raises(ValueError, match="Invalid file extension"):
-            load_pauli(config_gen, config_ham)
+            load_pauli(config_ham)
 
     def test_load_json_test_file(self, config):
         """Test loading the data_pauli.json file."""
@@ -672,7 +672,7 @@ class TestEdgeCases:
 
         config_gen, config_ham = config
         config_ham.load_pauli_strings(test_file)
-        H = load_pauli(config_gen, config_ham)
+        H = load_pauli(config_ham)
 
         # Verify basic properties
         assert H.num_qubits() == 4

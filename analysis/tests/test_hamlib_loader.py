@@ -64,7 +64,7 @@ def test_load_simple_hamlib_file():
         config_hamiltonian.hdf5_key = 'test_hamiltonian'
 
         # Load the Hamiltonian
-        H = load_hamlib_hdf5(config_general, config_hamiltonian)
+        H = load_hamlib_hdf5(config_hamiltonian)
 
         # Verify it's a Hamiltonian object
         assert isinstance(H, Hamiltonian)
@@ -115,7 +115,7 @@ def test_load_hamlib_autodetect_key():
         config_hamiltonian.filename = tmp_path
 
         # Load the Hamiltonian (should auto-detect the key)
-        H = load_hamlib_hdf5(config_general, config_hamiltonian)
+        H = load_hamlib_hdf5(config_hamiltonian)
 
         # Verify it loaded correctly
         assert isinstance(H, Hamiltonian)
@@ -149,7 +149,7 @@ def test_load_hamlib_with_metadata():
         config_hamiltonian.filename = tmp_path
         config_hamiltonian.hdf5_key = 'test_hamiltonian'
 
-        H = load_hamlib_hdf5(config_general, config_hamiltonian)
+        H = load_hamlib_hdf5(config_hamiltonian)
 
         # Verify loaded correctly
         assert isinstance(H, Hamiltonian)
@@ -180,7 +180,7 @@ def test_identity_only_hamiltonian():
         config_hamiltonian.filename = tmp_path
         config_hamiltonian.hdf5_key = 'identity_ham'
 
-        H = load_hamlib_hdf5(config_general, config_hamiltonian)
+        H = load_hamlib_hdf5(config_hamiltonian)
 
         # Check
         pauli_dict = H.get_all_pauli_strings(return_as="tuples")
