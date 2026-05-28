@@ -14,12 +14,13 @@ from openfermion import (
     jordan_wigner,
 )
 
-logger = logging.getLogger(__name__)
 from pyscf import ao2mo, gto, lib, scf
 
 from qhat.analysis.config_types import GeneralConfiguration, HamiltonianConfiguration, value
 from qhat.common.bosons_binary import BosonicBinaryEncoding
 from qhat.common.MixedFermionBosonOperator import MixedFermionBosonOperator
+
+logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------------------------------
 
