@@ -141,12 +141,35 @@ analysis.numerical_simulation_inputs = "examples/initial_state.npy"
 #   np.save("ground_state.npy", state)
 
 # =================================================================================================
+# 4. EXACT MATRIX COMPUTATION (Branch 1: Now Available!)
+# =================================================================================================
+# Compute the exact matrix representation of the Hamiltonian without any approximations
+# (no Trotter, no double-factorization)
+
+# analysis.exact_matrix_output_file = "Be-H_exact_hamiltonian.npz"
+
+# This computes the true Hamiltonian matrix H directly from the Pauli string representation.
+# Useful for:
+#   - Validating approximate algorithms (compare exact vs approximate eigenvalues)
+#   - Small-scale testing and verification
+#   - Computing exact ground state energies
+
+# Implementation notes:
+#   - For small systems (≤15 qubits): Materializes full dense matrix
+#   - For large systems (>15 qubits): Creates matrix-free operator (LinearOperator)
+#   - Matrix-free operators work with scipy eigensolvers but cannot be directly saved
+
+# Supported formats (auto-detected from extension):
+#   - .npz: NumPy compressed format (recommended, includes metadata)
+#   - .h5 / .hdf5: HDF5 format
+#   - .txt: Human-readable text (only for very small matrices)
+
+# Note: For systems >15 qubits, the exact matrix is too large to save. The analysis
+#       will create a matrix-free operator but skip the file output.
+
+# =================================================================================================
 # FUTURE ANALYSES (Coming in subsequent branches)
 # =================================================================================================
-
-# Branch 1: Exact Matrix Computation
-# analysis.exact_matrix_output_file = "Be-H_exact_hamiltonian.npz"
-# Compute exact matrix representation of H (no Trotter approximation)
 
 # Branch 2: Eigendecomposition
 # analysis.num_eigenvalues = 5  # Compute 5 lowest eigenvalues

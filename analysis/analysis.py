@@ -145,6 +145,112 @@ def output_unitary_matrix(
 
 # -------------------------------------------------------------------------------------------------
 
+def _compute_exact_matrix(hamiltonian):
+    """
+    Compute the exact matrix representation of the Hamiltonian.
+
+    This computes the Hamiltonian matrix without any approximations (no Trotter,
+    no double-factorization). For small systems (≤15 qubits), returns a dense
+    matrix. For larger systems, returns a matrix-free operator.
+
+    Parameters:
+        hamiltonian: The Hamiltonian object
+
+    Returns:
+        Dense numpy array (small systems) or PauliStringOperator (large systems)
+
+    Raises:
+        Exception: If matrix computation fails
+    """
+    logger.verbose("Computing exact Hamiltonian matrix...")
+    try:
+        return hamiltonian.to_matrix()
+    except Exception as e:
+        logger.info(
+            f"ERROR: Failed to compute exact Hamiltonian matrix: {e}\n"
+            "This may indicate an issue with the Hamiltonian representation."
+        )
+        raise
+
+# -------------------------------------------------------------------------------------------------
+
+def exact_matrix_output(
+        config_analysis: AnalysisConfiguration,
+        hamiltonian,
+        exact_matrix) -> dict:
+    """
+    Save the exact Hamiltonian matrix representation.
+
+    Parameters:
+        config_analysis: Analysis configuration with exact_matrix_output_file
+        hamiltonian: The Hamiltonian object
+        exact_matrix: The exact matrix to save (pre-computed)
+
+    Returns:
+        Dictionary with matrix metadata: shape, file, format, hermiticity_error, norm
+
+    Note:
+        For large systems, exact_matrix may be a matrix-free operator rather than
+        a dense array. In that case, certain properties (like saving to file) may
+        not be supported or may require special handling.
+    """
+    from qhat.analysis.matrix_operations import PauliStringOperator
+
+    # Check if this is a matrix-free operator
+    is_matrix_free = isinstance(exact_matrix, PauliStringOperator)
+
+    if is_matrix_free:
+        logger.verbose(f"Matrix-free operator with shape: {exact_matrix.shape}")
+        logger.info(
+            "WARNING: Matrix-free operator cannot be directly saved to file. "
+            "Skipping matrix output for large system."
+        )
+        return {
+            'matrix_shape': exact_matrix.shape,
+            'matrix_file': None,
+            'matrix_format': None,
+            'hermiticity_error': None,
+            'matrix_norm': None,
+            'matrix_free': True,
+            'note': 'Matrix-free operator not saved (too large)'
+        }
+
+    # For dense matrices, proceed with normal output
+    logger.verbose(f"Matrix shape: {exact_matrix.shape}")
+    logger.verbose(f"Matrix dtype: {exact_matrix.dtype}")
+
+    # Compute Hermiticity check: ||H - H†||_F
+    try:
+        matrix_norm = np.linalg.norm(exact_matrix, ord='fro')
+        H_dag = np.conj(exact_matrix.T)
+        hermiticity_error = np.linalg.norm(exact_matrix - H_dag, ord='fro')
+        logger.verbose(f"Matrix Frobenius norm: {matrix_norm:.6e}")
+        logger.verbose(f"Hermiticity error ||H - H†||_F: {hermiticity_error:.6e}")
+    except Exception as e:
+        logger.info(f"WARNING: Could not compute Hermiticity check: {e}")
+        matrix_norm = None
+        hermiticity_error = None
+
+    # Save matrix to file (format auto-detected from extension)
+    output_file = config_analysis.exact_matrix_output_file
+    save_matrix(
+        output_file, exact_matrix,
+        hermiticity_error=hermiticity_error,
+        matrix_norm=matrix_norm
+    )
+
+    # Return metadata
+    return {
+        'matrix_shape': exact_matrix.shape,
+        'matrix_file': str(output_file),
+        'matrix_format': Path(output_file).suffix,
+        'hermiticity_error': float(hermiticity_error) if hermiticity_error is not None else None,
+        'matrix_norm': float(matrix_norm) if matrix_norm is not None else None,
+        'matrix_free': False
+    }
+
+# -------------------------------------------------------------------------------------------------
+
 def numerical_simulation(
         config_analysis: AnalysisConfiguration,
         algorithm,
@@ -230,19 +336,22 @@ def numerical_simulation(
 
 def analyze_algorithm(
         config_analysis: AnalysisConfiguration,
-        algorithm) -> dict:
+        algorithm,
+        hamiltonian=None) -> dict:
 
     logger.info("Beginning algorithm analysis.")
 
     # Validate at least one analysis requested
     if (config_analysis.resource_estimator is None and
         config_analysis.matrix_output_file is None and
-        config_analysis.numerical_simulation_inputs is None):
+        config_analysis.numerical_simulation_inputs is None and
+        config_analysis.exact_matrix_output_file is None):
         raise ValueError(
             "No analyses requested. Set at least one of:\n"
             "  - resource_estimator (e.g., 'pyliqtr', 'cirq')\n"
             "  - matrix_output_file (e.g., 'matrix.npz', 'matrix.h5', 'matrix.txt')\n"
-            "  - numerical_simulation_inputs (e.g., 'state.npy' or ['state1.npy', 'state2.npy'])"
+            "  - numerical_simulation_inputs (e.g., 'state.npy' or ['state1.npy', 'state2.npy'])\n"
+            "  - exact_matrix_output_file (e.g., 'exact_hamiltonian.npz')"
         )
 
     results = {}
@@ -251,10 +360,22 @@ def analyze_algorithm(
     needs_matrix = (config_analysis.matrix_output_file is not None or
                     config_analysis.numerical_simulation_inputs is not None)
 
-    # Compute matrix once if needed
+    # Check if any analysis needs the exact Hamiltonian matrix
+    needs_exact_matrix = (config_analysis.exact_matrix_output_file is not None)
+
+    # Compute matrices once if needed
     unitary_matrix = None
     if needs_matrix:
         unitary_matrix = _compute_unitary_matrix(algorithm)
+
+    exact_matrix = None
+    if needs_exact_matrix:
+        if hamiltonian is None:
+            raise ValueError(
+                "Exact matrix computation requires hamiltonian parameter. "
+                "Pass hamiltonian to analyze_algorithm()."
+            )
+        exact_matrix = _compute_exact_matrix(hamiltonian)
 
     # Dispatch to requested analyses
     if config_analysis.resource_estimator is not None:
@@ -264,6 +385,10 @@ def analyze_algorithm(
     if config_analysis.matrix_output_file is not None:
         logger.info("Generating unitary matrix output.")
         results["matrix_output"] = output_unitary_matrix(config_analysis, algorithm, unitary_matrix)
+
+    if config_analysis.exact_matrix_output_file is not None:
+        logger.info("Generating exact Hamiltonian matrix output.")
+        results["exact_matrix_output"] = exact_matrix_output(config_analysis, hamiltonian, exact_matrix)
 
     if config_analysis.numerical_simulation_inputs is not None:
         logger.info("Performing numerical simulation.")

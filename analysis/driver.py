@@ -80,7 +80,7 @@ def run():
 
     # Analysis ____________________________________________________________________________________
 
-    state.store_results(analyze_algorithm(state.config_analysis, algorithm))
+    state.store_results(analyze_algorithm(state.config_analysis, algorithm, hamiltonian=physical_hamiltonian))
 
     # Save Results ________________________________________________________________________________
 

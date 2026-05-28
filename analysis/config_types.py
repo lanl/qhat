@@ -161,12 +161,14 @@ class AnalysisConfiguration(ConfigurationBase):
         self.resource_estimator = None
         self.matrix_output_file = None
         self.numerical_simulation_inputs = None
+        self.exact_matrix_output_file = None
 
     def _generate_TOML_table(self):
         table = tomlkit.table()
         self.save_if_present(table, "resource_estimator")
         self.save_if_present(table, "matrix_output_file")
         self.save_if_present(table, "numerical_simulation_inputs")
+        self.save_if_present(table, "exact_matrix_output_file")
         return table
 
 # -------------------------------------------------------------------------------------------------
