@@ -795,356 +795,6 @@ def error_analysis(
 
 # -------------------------------------------------------------------------------------------------
 
-def error_analysis(
-        config_analysis: AnalysisConfiguration,
-        hamiltonian,
-        algorithm,
-        exact_matrix=None,
-        unitary_matrix=None,
-        exact_eigendecomp=None,
-        approx_eigendecomp=None) -> dict:
-    """
-    Compute error metrics comparing exact and approximate representations.
-
-    Three independent error types:
-    1. Eigenvalue errors (if error_num_eigenvalues > 0)
-    2. Matrix norm errors (if error_matrix_norms is not None)
-    3. State-dependent errors (if error_state_inputs is not None)
-
-    Parameters:
-        config_analysis: Analysis configuration with error analysis settings
-        hamiltonian: Hamiltonian object
-        algorithm: Algorithm bloq
-        exact_matrix: Pre-computed exact matrix (optional)
-        unitary_matrix: Pre-computed unitary matrix (optional)
-        exact_eigendecomp: Pre-computed exact eigendecomposition (optional)
-        approx_eigendecomp: Pre-computed approximate eigendecomposition (optional)
-
-    Returns:
-        Dictionary with error metrics
-    """
-    from qhat.analysis.matrix_operations import PauliStringOperator
-    from qhat.analysis.file_io import load_eigendecomposition, load_state
-    import scipy.linalg
-
-    logger.info("Starting error analysis")
-
-    results = {}
-
-    # =============================================================================================
-    # 1. EIGENVALUE ERROR
-    # =============================================================================================
-
-    if config_analysis.error_num_eigenvalues > 0:
-        logger.info(f"Computing eigenvalue errors for {config_analysis.error_num_eigenvalues} eigenvalues")
-
-        # Load or compute eigendecompositions
-        if exact_eigendecomp is None:
-            if os.path.exists('exact_eigendecomposition.npz'):
-                exact_eigendecomp = load_eigendecomposition('exact_eigendecomposition.npz')
-            else:
-                logger.info("Computing exact eigendecomposition for error analysis")
-                # Compute it
-                config_temp = AnalysisConfiguration()
-                config_temp.num_eigenvalues = config_analysis.error_num_eigenvalues
-                config_temp.eigendecomposition_matrices = 'exact'
-                config_temp.which_eigenvalues = 'smallest'
-                eig_results = eigendecomposition_analysis(
-                    config_temp, hamiltonian, algorithm,
-                    exact_matrix=exact_matrix, unitary_matrix=None
-                )
-                exact_eigendecomp = load_eigendecomposition(eig_results['exact_eigendecomposition']['file'])
-
-        if approx_eigendecomp is None:
-            if os.path.exists('approximate_eigendecomposition.npz'):
-                approx_eigendecomp = load_eigendecomposition('approximate_eigendecomposition.npz')
-            else:
-                logger.info("Computing approximate eigendecomposition for error analysis")
-                # Compute it
-                config_temp = AnalysisConfiguration()
-                config_temp.num_eigenvalues = config_analysis.error_num_eigenvalues
-                config_temp.eigendecomposition_matrices = 'approximate'
-                config_temp.which_eigenvalues = 'smallest'
-                eig_results = eigendecomposition_analysis(
-                    config_temp, hamiltonian, algorithm,
-                    exact_matrix=None, unitary_matrix=unitary_matrix
-                )
-                approx_eigendecomp = load_eigendecomposition(eig_results['approximate_eigendecomposition']['file'])
-
-        # Compare eigenvalues
-        exact_eigs = exact_eigendecomp['eigenvalues'][:config_analysis.error_num_eigenvalues]
-        approx_eigs = approx_eigendecomp['eigenvalues'][:config_analysis.error_num_eigenvalues]
-
-        absolute_errors = exact_eigs - approx_eigs
-        relative_errors = absolute_errors / np.abs(exact_eigs)
-
-        logger.info(f"Eigenvalue absolute error range: [{absolute_errors.min():.6e}, {absolute_errors.max():.6e}]")
-        logger.info(f"Eigenvalue relative error range: [{relative_errors.min():.6e}, {relative_errors.max():.6e}]")
-
-        results['eigenvalue_errors'] = {
-            'num_eigenvalues': config_analysis.error_num_eigenvalues,
-            'absolute_errors': absolute_errors.tolist(),
-            'relative_errors': relative_errors.tolist(),
-            'max_absolute_error': float(np.abs(absolute_errors).max()),
-            'max_relative_error': float(np.abs(relative_errors).max())
-        }
-
-    # =============================================================================================
-    # 2. MATRIX NORM ERRORS
-    # =============================================================================================
-
-    if config_analysis.error_matrix_norms is not None:
-        # Normalize to list
-        if isinstance(config_analysis.error_matrix_norms, str):
-            norms_to_compute = [config_analysis.error_matrix_norms]
-        else:
-            norms_to_compute = config_analysis.error_matrix_norms
-
-        logger.info(f"Computing matrix norm errors: {norms_to_compute}")
-
-        # Get matrices if not provided
-        if exact_matrix is None:
-            if hamiltonian is None:
-                raise ValueError("hamiltonian required for matrix norm error analysis")
-            exact_matrix = _compute_exact_matrix(hamiltonian)
-
-        if unitary_matrix is None:
-            if algorithm is None:
-                raise ValueError("algorithm required for matrix norm error analysis")
-            unitary_matrix = _compute_unitary_matrix(algorithm)
-
-        # Check if matrices are dense or matrix-free
-        is_exact_dense = isinstance(exact_matrix, np.ndarray)
-        is_approx_dense = isinstance(unitary_matrix, np.ndarray)
-        is_dense = is_exact_dense and is_approx_dense
-
-        dimension = exact_matrix.shape[0]
-        num_qubits = int(np.log2(dimension))
-
-        if is_dense:
-            # Small systems: direct computation
-            logger.verbose(f"Using dense matrices for norm computation (dimension={dimension})")
-            diff_matrix = exact_matrix - unitary_matrix
-
-            for norm_type in norms_to_compute:
-                if norm_type == 'frobenius':
-                    error = np.linalg.norm(diff_matrix, 'fro')
-                    logger.info(f"Frobenius norm error: {error:.6e}")
-                    results['matrix_frobenius_error'] = float(error)
-
-                elif norm_type == 'spectral':
-                    error = np.linalg.norm(diff_matrix, 2)
-                    logger.info(f"Spectral norm error: {error:.6e}")
-                    results['matrix_spectral_error'] = float(error)
-
-                else:
-                    raise ValueError(f"Unknown matrix norm type: {norm_type}")
-
-        else:
-            # Large systems: matrix-free computation
-            logger.info(f"WARNING: Matrix-free norm computation for {num_qubits} qubits")
-            logger.info(f"  This requires 2^{num_qubits} = {dimension:,} matrix-vector products")
-            logger.info(f"  Estimated time: {'<1 minute' if dimension < 10000 else '1-10 minutes' if dimension < 100000 else '10+ minutes'}")
-
-            for norm_type in norms_to_compute:
-                if norm_type == 'frobenius':
-                    # Compute ||A||_F^2 = sum_i ||A e_i||^2
-                    logger.verbose("Computing Frobenius norm via matrix-vector products")
-                    frobenius_squared = 0.0
-                    for i in range(dimension):
-                        if i % max(1, dimension // 10) == 0:
-                            logger.verbose(f"  Progress: {i}/{dimension} ({100*i//dimension}%)")
-                        # Create basis vector e_i
-                        e_i = np.zeros(dimension, dtype=complex)
-                        e_i[i] = 1.0
-                        # Compute difference: (H - U) e_i
-                        if hasattr(exact_matrix, 'matvec'):
-                            exact_result = exact_matrix.matvec(e_i)
-                        else:
-                            exact_result = exact_matrix @ e_i
-                        if hasattr(unitary_matrix, 'matvec'):
-                            approx_result = unitary_matrix.matvec(e_i)
-                        else:
-                            approx_result = unitary_matrix @ e_i
-                        diff_i = exact_result - approx_result
-                        frobenius_squared += np.linalg.norm(diff_i) ** 2
-
-                    error = np.sqrt(frobenius_squared)
-                    logger.info(f"Frobenius norm error (matrix-free): {error:.6e}")
-                    results['matrix_frobenius_error'] = float(error)
-
-                elif norm_type == 'spectral':
-                    # Compute ||A||_2 = largest singular value via power iteration
-                    logger.verbose("Computing spectral norm via power iteration")
-
-                    # Random starting vector
-                    v = np.random.randn(dimension) + 1j * np.random.randn(dimension)
-                    v = v / np.linalg.norm(v)
-
-                    max_iterations = 100
-                    tolerance = 1e-6
-
-                    for iteration in range(max_iterations):
-                        # Apply (H - U)† (H - U) to v
-                        # First: (H - U) v
-                        if hasattr(exact_matrix, 'matvec'):
-                            exact_result = exact_matrix.matvec(v)
-                        else:
-                            exact_result = exact_matrix @ v
-                        if hasattr(unitary_matrix, 'matvec'):
-                            approx_result = unitary_matrix.matvec(v)
-                        else:
-                            approx_result = unitary_matrix @ v
-                        diff_v = exact_result - approx_result
-
-                        # Then: (H - U)† diff_v
-                        if hasattr(exact_matrix, 'rmatvec'):
-                            exact_adjoint = exact_matrix.rmatvec(diff_v)
-                        else:
-                            exact_adjoint = exact_matrix.conj().T @ diff_v
-                        if hasattr(unitary_matrix, 'rmatvec'):
-                            approx_adjoint = unitary_matrix.rmatvec(diff_v)
-                        else:
-                            approx_adjoint = unitary_matrix.conj().T @ diff_v
-                        result = exact_adjoint - approx_adjoint
-
-                        # Normalize
-                        v_new = result / np.linalg.norm(result)
-
-                        # Check convergence
-                        if np.linalg.norm(v_new - v) < tolerance:
-                            logger.verbose(f"  Converged after {iteration+1} iterations")
-                            break
-
-                        v = v_new
-
-                        if (iteration + 1) % 10 == 0:
-                            logger.verbose(f"  Iteration {iteration+1}/{max_iterations}")
-
-                    # Rayleigh quotient to get eigenvalue (= squared singular value)
-                    if hasattr(exact_matrix, 'matvec'):
-                        exact_result = exact_matrix.matvec(v)
-                    else:
-                        exact_result = exact_matrix @ v
-                    if hasattr(unitary_matrix, 'matvec'):
-                        approx_result = unitary_matrix.matvec(v)
-                    else:
-                        approx_result = unitary_matrix @ v
-                    diff_v = exact_result - approx_result
-
-                    if hasattr(exact_matrix, 'rmatvec'):
-                        exact_adjoint = exact_matrix.rmatvec(diff_v)
-                    else:
-                        exact_adjoint = exact_matrix.conj().T @ diff_v
-                    if hasattr(unitary_matrix, 'rmatvec'):
-                        approx_adjoint = unitary_matrix.rmatvec(diff_v)
-                    else:
-                        approx_adjoint = unitary_matrix.conj().T @ diff_v
-                    result = exact_adjoint - approx_adjoint
-
-                    eigenvalue = np.vdot(v, result)
-                    error = np.sqrt(np.abs(eigenvalue))
-
-                    logger.info(f"Spectral norm error (matrix-free, power iteration): {error:.6e}")
-                    results['matrix_spectral_error'] = float(error)
-
-                else:
-                    raise ValueError(f"Unknown matrix norm type: {norm_type}")
-
-    # =============================================================================================
-    # 3. STATE-DEPENDENT ERRORS
-    # =============================================================================================
-
-    if config_analysis.error_state_inputs is not None:
-        # Normalize to list
-        if isinstance(config_analysis.error_state_inputs, str):
-            state_files = [config_analysis.error_state_inputs]
-        else:
-            state_files = config_analysis.error_state_inputs
-
-        logger.info(f"Computing state-dependent errors for {len(state_files)} state(s)")
-
-        # Get matrices/operators if not provided
-        if exact_matrix is None:
-            if hamiltonian is None:
-                raise ValueError("hamiltonian required for state-dependent error analysis")
-            exact_matrix = _compute_exact_matrix(hamiltonian)
-
-        if unitary_matrix is None:
-            if algorithm is None:
-                raise ValueError("algorithm required for state-dependent error analysis")
-            unitary_matrix = _compute_unitary_matrix(algorithm)
-
-        state_errors = []
-
-        for state_file in state_files:
-            logger.verbose(f"Processing {state_file}")
-
-            # Load state
-            try:
-                initial_state = load_state(state_file)
-            except Exception as e:
-                logger.info(f"ERROR: Failed to load state from {state_file}: {e}")
-                raise
-
-            # Apply exact operator
-            if hasattr(exact_matrix, 'matvec'):
-                exact_final = exact_matrix.matvec(initial_state)
-            else:
-                exact_final = exact_matrix @ initial_state
-
-            # Apply approximate operator
-            if hasattr(unitary_matrix, 'matvec'):
-                approx_final = unitary_matrix.matvec(initial_state)
-            else:
-                approx_final = unitary_matrix @ initial_state
-
-            # Compute error
-            diff = exact_final - approx_final
-            absolute_error = np.linalg.norm(diff)
-            relative_error = absolute_error / np.linalg.norm(exact_final)
-
-            logger.info(f"  {state_file}: absolute error = {absolute_error:.6e}, relative error = {relative_error:.6e}")
-
-            state_errors.append({
-                'input_file': state_file,
-                'absolute_error': float(absolute_error),
-                'relative_error': float(relative_error)
-            })
-
-        results['state_errors'] = state_errors
-
-    # Save results to file
-    output_file = 'error_analysis.npz'
-    save_dict = {}
-
-    if 'eigenvalue_errors' in results:
-        save_dict['eigenvalue_absolute_errors'] = np.array(results['eigenvalue_errors']['absolute_errors'])
-        save_dict['eigenvalue_relative_errors'] = np.array(results['eigenvalue_errors']['relative_errors'])
-        save_dict['eigenvalue_num'] = results['eigenvalue_errors']['num_eigenvalues']
-
-    if 'matrix_frobenius_error' in results:
-        save_dict['matrix_frobenius_error'] = results['matrix_frobenius_error']
-
-    if 'matrix_spectral_error' in results:
-        save_dict['matrix_spectral_error'] = results['matrix_spectral_error']
-
-    if 'state_errors' in results:
-        state_absolute = [s['absolute_error'] for s in results['state_errors']]
-        state_relative = [s['relative_error'] for s in results['state_errors']]
-        save_dict['state_absolute_errors'] = np.array(state_absolute)
-        save_dict['state_relative_errors'] = np.array(state_relative)
-        # Note: filenames are in results dict, not saved to npz
-
-    if save_dict:
-        np.savez(output_file, **save_dict)
-        logger.info(f"Error analysis results saved to {output_file}")
-        results['output_file'] = output_file
-
-    return results
-
-# -------------------------------------------------------------------------------------------------
-
 def numerical_simulation(
         config_analysis: AnalysisConfiguration,
         algorithm,
@@ -1455,6 +1105,98 @@ def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfigura
 
 # -------------------------------------------------------------------------------------------------
 
+def exact_numerical_simulation(
+        config_analysis: AnalysisConfiguration,
+        hamiltonian,
+        exact_matrix) -> dict:
+    """
+    Perform exact numerical simulation by applying the exact Hamiltonian matrix to input state(s).
+
+    This is similar to numerical_simulation() but uses the exact Hamiltonian matrix
+    instead of the approximate unitary. Useful for comparing exact evolution with
+    approximate algorithm results.
+
+    Parameters:
+        config_analysis: Analysis configuration with exact_simulation_inputs
+        hamiltonian: Hamiltonian object (for metadata)
+        exact_matrix: The exact Hamiltonian matrix to apply (pre-computed, can be matrix-free)
+
+    Returns:
+        Dictionary with simulation metadata: list of {input_file, output_file, output_norm}
+    """
+
+    # Log operator properties
+    logger.verbose(f"Exact matrix shape: {exact_matrix.shape}")
+
+    # Normalize input to list
+    inputs = config_analysis.exact_simulation_inputs
+    if isinstance(inputs, str):
+        input_files = [inputs]
+    elif isinstance(inputs, list):
+        input_files = inputs
+    else:
+        raise ValueError(
+            f"exact_simulation_inputs must be a string or list of strings, "
+            f"got {type(inputs)}"
+        )
+
+    logger.info(f"Running exact numerical simulation on {len(input_files)} input state(s)")
+
+    results = []
+
+    for input_file in input_files:
+        logger.verbose(f"Processing {input_file}")
+
+        # Load initial state
+        try:
+            initial_state = load_state(input_file)
+        except Exception as e:
+            logger.info(f"ERROR: Failed to load state from {input_file}: {e}")
+            raise
+
+        # Validate dimensions
+        if initial_state.shape[0] != exact_matrix.shape[1]:
+            raise ValueError(
+                f"Dimension mismatch: state vector has dimension {initial_state.shape[0]} "
+                f"but exact matrix expects {exact_matrix.shape[1]}"
+            )
+
+        # Perform matrix-vector multiplication (or use matvec for matrix-free)
+        logger.verbose("Performing exact matrix-vector multiplication")
+        if hasattr(exact_matrix, 'matvec'):
+            # Matrix-free operator
+            final_state = exact_matrix.matvec(initial_state)
+        else:
+            # Dense matrix
+            final_state = exact_matrix @ initial_state
+
+        # Compute norm
+        final_norm = np.linalg.norm(final_state)
+        logger.verbose(f"Final state norm: {final_norm:.6e}")
+
+        # Generate output filename: input.npy -> input_exact_final.npy
+        input_path = Path(input_file)
+        output_file = str(input_path.parent / f"{input_path.stem}_exact_final{input_path.suffix}")
+
+        # Save final state
+        try:
+            save_state(output_file, final_state)
+        except Exception as e:
+            logger.info(f"ERROR: Failed to save state to {output_file}: {e}")
+            raise
+
+        logger.info(f"Exact simulation complete: {input_file} -> {output_file}")
+
+        results.append({
+            'input_file': input_file,
+            'output_file': output_file,
+            'output_norm': float(final_norm)
+        })
+
+    return {'exact_simulations': results}
+
+# -------------------------------------------------------------------------------------------------
+
 def analyze_algorithm(
         config_analysis: AnalysisConfiguration,
         algorithm,
@@ -1481,7 +1223,8 @@ def analyze_algorithm(
         config_analysis.numerical_simulation_inputs is None and
         config_analysis.exact_matrix_output_file is None and
         not eigendecomposition_requested and
-        not error_analysis_requested):
+        not error_analysis_requested and
+        config_analysis.exact_simulation_inputs is None):
         raise ValueError(
             "No analyses requested. Set at least one of:\n"
             "  - resource_estimator (e.g., 'pyliqtr', 'cirq')\n"
@@ -1491,7 +1234,8 @@ def analyze_algorithm(
             "  - num_eigenvalues (e.g., 5 or 'all')\n"
             "  - enable_eigenvalue_errors (True to compute errors for all eigenvalues)\n"
             "  - error_matrix_norms (e.g., 'frobenius' or ['frobenius', 'spectral'])\n"
-            "  - error_state_inputs (e.g., 'state.npy')"
+            "  - error_state_inputs (e.g., 'state.npy')\n"
+            "  - exact_simulation_inputs (e.g., 'state.npy')"
         )
 
     results = {}
@@ -1534,7 +1278,7 @@ def analyze_algorithm(
 
     if eigendecomposition_requested:
         logger.info("Performing eigendecomposition analysis.")
-        results["eigendecomposition"] = eigendecomposition_analysis(
+        eig_results = eigendecomposition_analysis(
             config_analysis,
             exact_matrix=exact_matrix,
             unitary_matrix=unitary_matrix
@@ -1556,6 +1300,12 @@ def analyze_algorithm(
             unitary_matrix=unitary_matrix,
             exact_eigendecomp=exact_eigendecomp,
             approx_eigendecomp=approx_eigendecomp
+        )
+
+    if config_analysis.exact_simulation_inputs is not None:
+        logger.info("Performing exact numerical simulation.")
+        results["exact_simulation"] = exact_numerical_simulation(
+            config_analysis, hamiltonian, exact_matrix
         )
 
     # TODO: Add gate parallelism / gate depth analysis

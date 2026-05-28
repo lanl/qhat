@@ -413,6 +413,7 @@ analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both
 # =================================================================================================
 # FUTURE ANALYSES (Coming in subsequent branches)
 # =================================================================================================
+# Apply the exact Hamiltonian matrix (no approximations) to input state(s)
 
 # Branch 3: Error Metrics
 analysis.error_num_eigenvalues = 1  # Compare ground state energy
@@ -421,6 +422,59 @@ analysis.error_state_inputs = ["examples/ground_state.npy"]  # State-dependent e
 
 # Branch 4: Exact Numerical Simulation
 # analysis.exact_simulation_inputs = "examples/initial_state.npy"
-# Simulate using exact Hamiltonian evolution (for comparison with approximate)
+
+# This applies the exact Hamiltonian H to the input state(s), producing exact time evolution.
+# Useful for:
+#   - Comparing exact evolution with approximate algorithm results
+#   - Validating algorithm correctness on small-scale problems
+#   - Understanding exact quantum dynamics
+
+# Configuration:
+#   exact_simulation_inputs:
+#     - None (default): Exact simulation disabled
+#     - String: Single input state file
+#     - List: Multiple input state files
+#
+#   Output files:
+#     - input.npy → input_exact_final.npy (note: _exact_final suffix)
+#     - Distinguishes from approximate simulation (_final suffix)
+
+# System size guidance:
+#   - ≤15 qubits: Fast (uses dense exact matrix)
+#   - 16-30 qubits: Uses matrix-free operator (scales well)
+#   - Limited by state vector size (16 GB at 30 qubits)
+
+# Examples:
+
+# Single state exact simulation
+# analysis.exact_simulation_inputs = "examples/initial_state.npy"
+
+# Multiple states
+# analysis.exact_simulation_inputs = [
+#     "examples/ground_state.npy",
+#     "examples/excited_state.npy",
+#     "examples/superposition_state.npy"
+# ]
+
+# Compare exact vs approximate evolution (run both!)
+# analysis.numerical_simulation_inputs = "examples/initial_state.npy"  # Approximate
+# analysis.exact_simulation_inputs = "examples/initial_state.npy"      # Exact
+# # Produces both:
+# #   initial_state_final.npy        (approximate result)
+# #   initial_state_exact_final.npy  (exact result)
+# # Then you can manually compare the output states
+
+# Full validation workflow (all analyses together)
+# This demonstrates using all available QHAT analysis capabilities:
+# analysis.resource_estimator = "pyLIQTR"                  # Gate counts
+# analysis.matrix_output_file = "unitary.npz"              # Approximate matrix
+# analysis.exact_matrix_output_file = "exact.npz"          # Exact matrix
+# analysis.num_eigenvalues = 5                              # Eigendecomposition
+# analysis.eigendecomposition_matrices = "both"             # Both exact and approximate
+# analysis.which_eigenvalues = "smallest"                   # Ground + excited states
+# analysis.error_num_eigenvalues = 1                        # Ground state error
+# analysis.error_state_inputs = "examples/ground.npy"       # State-dependent error
+# analysis.numerical_simulation_inputs = "examples/initial_state.npy"   # Approximate evolution
+# analysis.exact_simulation_inputs = "examples/initial_state.npy"       # Exact evolution
 
 # =================================================================================================
