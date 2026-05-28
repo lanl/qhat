@@ -13,7 +13,6 @@ from openfermion import (
     count_qubits,
     jordan_wigner,
 )
-
 from pyscf import ao2mo, gto, lib, scf
 
 from qhat.analysis.config_types import GeneralConfiguration, HamiltonianConfiguration, value
@@ -285,8 +284,7 @@ def load_hdf5(config_hamiltonian: HamiltonianConfiguration):
     f2 = data["2e"]
     bs = None   # Currently don't support bosons in HDF5
     fb = None   # Currently don't support bosons in HDF5
-    return _verify_and_construct_second_quantization(
-            config_general, config_hamiltonian, f0, f1, f2, bs, fb)
+    return _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, bs, fb)
 
 # -------------------------------------------------------------------------------------------------
 
@@ -305,8 +303,7 @@ def load_numpy(config_hamiltonian: HamiltonianConfiguration):
     f2 = data["two_body"]
     bs = get_optional_scalar("bosonic_scalar", None)
     fb = data.get("fb_interaction", None)
-    return _verify_and_construct_second_quantization(
-            config_general, config_hamiltonian, f0, f1, f2, bs, fb)
+    return _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, bs, fb)
 
 # -------------------------------------------------------------------------------------------------
 
@@ -544,7 +541,7 @@ def get_physical_hamiltonian(config_hamiltonian: HamiltonianConfiguration):
     if config_hamiltonian.source == "numpy":
         return load_numpy(config_hamiltonian)
     elif config_hamiltonian.source == "LCPS":
-        return load_LCPS(config_general, config_hamiltonian)
+        return load_LCPS(config_hamiltonian)
     elif config_hamiltonian.source == "hdf5":
         return load_hdf5(config_hamiltonian)
     elif config_hamiltonian.source == "pauli":

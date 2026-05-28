@@ -46,9 +46,9 @@ def resource_estimation_pyliqtr(config_analysis: AnalysisConfiguration, algorith
 def estimate_resources(config_analysis: AnalysisConfiguration, algorithm) -> dict:
 
     if config_analysis.resource_estimator.lower() == "pyliqtr":
-        return resource_estimation_pyliqtr(config_general, config_analysis, algorithm)
+        return resource_estimation_pyliqtr(config_analysis, algorithm)
     elif config_analysis.resource_estimator.lower() == "cirq":
-        return resource_estimation_cirq(config_general, config_analysis, algorithm)
+        return resource_estimation_cirq(config_analysis, algorithm)
     else:
         raise ValueError(
                 f"Invalid resource estimator method \"{config_analysis.resource_estimator}\".")
@@ -60,7 +60,6 @@ def output_unitary_matrix(config_analysis: AnalysisConfiguration, algorithm) -> 
     Generate and save the unitary matrix representation of the algorithm.
 
     Parameters:
-        config_general: General configuration
         config_analysis: Analysis configuration with matrix_output_format and matrix_output_file
         algorithm: The algorithm bloq to analyze
 
@@ -107,7 +106,6 @@ def output_unitary_matrix(config_analysis: AnalysisConfiguration, algorithm) -> 
     output_file = config_analysis.matrix_output_file
     save_matrix(
         output_file, unitary_matrix,
-        git_hash=config_general.git_hash,
         unitarity_error=unitarity_error,
         matrix_norm=matrix_norm
     )
@@ -141,13 +139,11 @@ def analyze_algorithm(config_analysis: AnalysisConfiguration, algorithm) -> dict
     # Dispatch to requested analyses
     if config_analysis.resource_estimator is not None:
         logger.info(f"Performing resource estimation using {config_analysis.resource_estimator}.")
-        results["resource_estimates"] = estimate_resources(
-            config_general, config_analysis, algorithm)
+        results["resource_estimates"] = estimate_resources(config_analysis, algorithm)
 
     if config_analysis.matrix_output_file is not None:
         logger.info("Generating unitary matrix output.")
-        results["matrix_output"] = output_unitary_matrix(
-            config_general, config_analysis, algorithm)
+        results["matrix_output"] = output_unitary_matrix(config_analysis, algorithm)
 
     # TODO: Add error estimation
     # TODO: Add an option for detailed error analysis (explicitly compute the eigenvalues of the
