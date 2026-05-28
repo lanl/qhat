@@ -190,6 +190,74 @@ def _get_state_format_from_extension(filename):
     return extension_map[ext]
 
 
+# =================================================================================================
+# Eigendecomposition I/O Functions
+# =================================================================================================
+
+def save_eigendecomposition(output_path, eigenvalues, eigenvectors, matrix_type,
+                            num_eigenvalues, which_eigenvalues, git_hash=None):
+    """
+    Save eigendecomposition results to NumPy .npz format.
+
+    Parameters:
+        output_path: Path to output file (must end in .npz)
+        eigenvalues: 1D array of eigenvalues
+        eigenvectors: 2D array where column i is the eigenvector for eigenvalue i
+        matrix_type: 'exact' or 'approximate'
+        num_eigenvalues: Number of eigenvalues computed (int or "all")
+        which_eigenvalues: 'smallest', 'largest', or 'both'
+        git_hash: Optional git hash for provenance
+    """
+    if not output_path.endswith('.npz'):
+        raise ValueError(f"Output path must end with .npz, got: {output_path}")
+
+    metadata = {
+        'eigenvalues': eigenvalues,
+        'eigenvectors': eigenvectors,
+        'matrix_type': matrix_type,
+        'num_eigenvalues': num_eigenvalues if isinstance(num_eigenvalues, int) else str(num_eigenvalues),
+        'which_eigenvalues': which_eigenvalues,
+        'timestamp': datetime.now().isoformat(),
+    }
+
+    if git_hash is not None:
+        metadata['git_hash'] = git_hash
+
+    np.savez(output_path, **metadata)
+    logger.info(f"Eigendecomposition saved to {output_path}")
+
+
+def load_eigendecomposition(path):
+    """
+    Load eigendecomposition results from NumPy .npz format.
+
+    Parameters:
+        path: Path to .npz file
+
+    Returns:
+        Dictionary with keys: eigenvalues, eigenvectors, matrix_type,
+        num_eigenvalues, which_eigenvalues, timestamp, and optionally git_hash
+    """
+    if not path.endswith('.npz'):
+        raise ValueError(f"Path must end with .npz, got: {path}")
+
+    data = np.load(path, allow_pickle=False)
+    result = {
+        'eigenvalues': data['eigenvalues'],
+        'eigenvectors': data['eigenvectors'],
+        'matrix_type': str(data['matrix_type']),
+        'num_eigenvalues': data['num_eigenvalues'],
+        'which_eigenvalues': str(data['which_eigenvalues']),
+        'timestamp': str(data['timestamp']),
+    }
+
+    if 'git_hash' in data:
+        result['git_hash'] = str(data['git_hash'])
+
+    logger.info(f"Eigendecomposition loaded from {path}")
+    return result
+
+
 def load_state(path):
     """
     Load quantum state vector from file with automatic format detection.
