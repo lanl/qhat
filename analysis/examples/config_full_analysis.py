@@ -298,13 +298,72 @@ analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both
 # analysis.eigendecomposition_matrices = "exact"
 
 # =================================================================================================
+# 6. ERROR ANALYSIS (Branch 3: Now Available!)
+# =================================================================================================
+# Compare exact and approximate representations using three types of error metrics
+
+# analysis.error_num_eigenvalues = 1  # Compare ground state energies
+# analysis.error_matrix_norms = "frobenius"  # Options: "frobenius", "spectral", or ["frobenius", "spectral"]
+# analysis.error_state_inputs = "examples/initial_state.npy"  # Can be string or list
+
+# This analysis computes three independent error types:
+#   1. Eigenvalue errors: Compare k smallest eigenvalues (typically k=1 for ground state)
+#   2. Matrix norm errors: Frobenius and/or spectral norms of difference matrix
+#   3. State-dependent errors: ||H_exact|ψ⟩ - H_approx|ψ⟩|| for specific states
+
+# Configuration options:
+#   error_num_eigenvalues:
+#     - 0 (default): Eigenvalue errors disabled
+#     - Positive int (e.g., 1): Compare k eigenvalues
+#     - Requires eigendecompositions (will compute if not already done)
+#
+#   error_matrix_norms:
+#     - None (default): Matrix norm errors disabled
+#     - "frobenius": Fast element-wise difference norm
+#     - "spectral": Physically meaningful worst-case norm (slower)
+#     - ["frobenius", "spectral"]: Both norms
+#     - For large systems (>15 qubits): Uses matrix-free computation (can be slow)
+#
+#   error_state_inputs:
+#     - None (default): State-dependent errors disabled
+#     - String or list of .npy files containing quantum states
+#     - Best-scaling error metric (can reach 30 qubits)
+#     - Fast: just applies operators to states
+
+# System size guidance:
+#   - ≤15 qubits: All error types fast
+#   - 16-20 qubits: Matrix norms slow, eigenvalue+state errors fast
+#   - 20-30 qubits: Use eigenvalue + state errors, avoid matrix norms
+#   - Production: error_num_eigenvalues=1 + error_state_inputs for best performance
+
+# Output: error_analysis.npz containing all computed errors
+
+# Examples:
+
+# Ground state energy comparison (most common, always recommended)
+# analysis.error_num_eigenvalues = 1
+
+# Matrix norms (physical bounds, but expensive for large systems)
+# analysis.error_matrix_norms = "frobenius"  # Fast
+# analysis.error_matrix_norms = ["frobenius", "spectral"]  # Both (slower)
+
+# State-dependent errors (best scaling, physically relevant)
+# analysis.error_state_inputs = "examples/initial_state.npy"
+# analysis.error_state_inputs = ["examples/ground.npy", "examples/excited.npy"]
+
+# All three error types (comprehensive validation for small-medium systems)
+# analysis.error_num_eigenvalues = 1
+# analysis.error_matrix_norms = "frobenius"
+# analysis.error_state_inputs = ["examples/ground.npy", "examples/excited.npy"]
+
+# Minimal setup for large systems (20+ qubits)
+# analysis.error_num_eigenvalues = 1  # Ground state only
+# analysis.error_state_inputs = "examples/ground.npy"  # Scales well
+# # Skip error_matrix_norms for large systems (too slow)
+
+# =================================================================================================
 # FUTURE ANALYSES (Coming in subsequent branches)
 # =================================================================================================
-
-# Branch 3: Error Metrics
-# analysis.error_num_eigenvalues = 1  # Compare ground state energy
-# analysis.error_matrix_norms = ["frobenius", "spectral"]  # Matrix difference norms
-# analysis.error_state_inputs = ["examples/ground_state.npy"]  # State-dependent errors
 
 # Branch 4: Exact Numerical Simulation
 # analysis.exact_simulation_inputs = "examples/initial_state.npy"
