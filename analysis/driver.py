@@ -8,7 +8,7 @@ os.environ["QSHARP_PYTHON_TELEMETRY"] = "none"
 import logging
 import math
 
-from qhat.logging_utils import configure_logging
+from qhat.common.logging_utils import configure_logging
 from qhat.analysis.algorithm import build_algorithm, compute_initial_phase_qubits
 from qhat.analysis.analysis import analyze_algorithm
 from qhat.analysis.configuration import load_configuration

@@ -253,7 +253,7 @@ python3.11 scripts/check_logging_migration.py | grep "your_file.py" -A 10
 
 - **LOGGING.md** - Complete documentation
 - **REFACTOR_SUMMARY.md** - Overall status and plan
-- **logging_utils.py** - API reference
+- **common/logging_utils.py** - API reference
 - **test_logging.py** - Working examples
 - **scripts/check_logging_migration.py** - Track progress
 

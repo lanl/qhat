@@ -18,7 +18,7 @@ QHAT uses a centralized logging architecture based on Python's standard `logging
 ```python
 # In driver.py or hamgen.py
 import logging
-from qhat.logging_utils import configure_logging
+from qhat.common.logging_utils import configure_logging
 
 # Load user configuration
 state = load_configuration()
@@ -88,7 +88,7 @@ general.print_verbose()  # Sets level to "verbose"
 ### Programmatic Configuration
 
 ```python
-from qhat.logging_utils import configure_logging
+from qhat.common.logging_utils import configure_logging
 
 # Basic configuration
 configure_logging(level="info", logfile="output.log")
@@ -112,7 +112,7 @@ configure_logging(level="debug")
 Change log level for a specific section of code:
 
 ```python
-from qhat.logging_utils import temporary_log_level
+from qhat.common.logging_utils import temporary_log_level
 import logging
 
 # Normal verbosity
@@ -132,7 +132,7 @@ logger.debug("This is NOT visible")
 Automatically log how long an operation takes:
 
 ```python
-from qhat.logging_utils import log_execution_time
+from qhat.common.logging_utils import log_execution_time
 
 with log_execution_time("matrix computation", logger):
     result = expensive_computation()
@@ -144,7 +144,7 @@ with log_execution_time("matrix computation", logger):
 Change log level during execution:
 
 ```python
-from qhat.logging_utils import reconfigure_log_level
+from qhat.common.logging_utils import reconfigure_log_level
 
 # Start at info level
 configure_logging(level="info")
@@ -303,7 +303,7 @@ configure_logging(level="info", logfile="/tmp/test.log")  # Use absolute path
 Example module demonstrating proper logging usage.
 """
 import logging
-from qhat.logging_utils import log_execution_time
+from qhat.common.logging_utils import log_execution_time
 
 logger = logging.getLogger(__name__)
 
@@ -338,7 +338,7 @@ def _process_item(item):
 Example application entry point.
 """
 import logging
-from qhat.logging_utils import configure_logging
+from qhat.common.logging_utils import configure_logging
 from qhat.analysis.configuration import load_configuration
 
 logger = logging.getLogger(__name__)
@@ -377,7 +377,7 @@ if __name__ == "__main__":
 
 ## API Reference
 
-See `qhat/logging_utils.py` for complete API documentation.
+See `qhat/common/logging_utils.py` for complete API documentation.
 
 ### Main Functions
 

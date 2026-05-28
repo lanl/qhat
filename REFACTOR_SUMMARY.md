@@ -10,7 +10,7 @@
 
 ### 1. New Infrastructure Created
 
-#### `logging_utils.py` - Core Logging Module
+#### `common/logging_utils.py` - Core Logging Module
 Central logging configuration for QHAT with:
 - `configure_logging()` - Setup function called once at startup
 - Custom `VERBOSE` log level (25, between INFO and WARNING)
@@ -271,7 +271,7 @@ python3.11 -c "import sys; sys.path.insert(0, '.'); import test_logging"
 
 ```
 New files:
-  logging_utils.py                   (271 lines) - Core module
+  common/logging_utils.py                   (271 lines) - Core module
   LOGGING.md                         (392 lines) - Documentation  
   scripts/check_logging_migration.py (181 lines) - Migration tool
   test_logging.py                    (73 lines)  - Test/demo

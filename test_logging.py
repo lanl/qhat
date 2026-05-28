@@ -10,7 +10,7 @@ This script demonstrates:
 """
 
 import logging
-from qhat.logging_utils import configure_logging, temporary_log_level, log_execution_time
+from qhat.common.logging_utils import configure_logging, temporary_log_level, log_execution_time
 import time
 
 # Configure logging
