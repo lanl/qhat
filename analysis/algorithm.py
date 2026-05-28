@@ -27,6 +27,7 @@
 # Addendum: Qualtran provides QPE algorithms, including TextbookQPE.  It may not be the most
 # efficient (?) but it may be a reliable starting point.
 
+import logging
 import math
 
 from pyLIQTR.PhaseEstimation.pe import PhaseEstimation
@@ -35,15 +36,16 @@ from qualtran.bloqs.phase_estimation import TextbookQPE
 
 from qhat.analysis.config_types import AlgorithmConfiguration, GeneralConfiguration
 
+logger = logging.getLogger(__name__)
+
 # -------------------------------------------------------------------------------------------------
 
 def build_qpe_qualtran_textbook(
-        config_general: GeneralConfiguration,
         config_algorithm: AlgorithmConfiguration,
         unitary,
         P0):
 
-    config_general.log_verbose("Build a QPE algorithm with Qualtran's \"textbook\" method.")
+    logger.verbose("Build a QPE algorithm with Qualtran's \"textbook\" method.")
 
     P = config_algorithm.num_phase_qubits
     if P is None:
@@ -51,8 +53,7 @@ def build_qpe_qualtran_textbook(
         assert config_algorithm.probability_of_failure is not None
         Pextra = math.ceil(math.log2(2.0 + 0.5 / config_algorithm.probability_of_failure))
         P = P0 + Pextra
-        config_general.log_verbose(
-                f"-- extending the phase register by {Pextra} qubits (total = {P})")
+        logger.verbose(f"-- extending the phase register by {Pextra} qubits (total = {P})")
 
     # TODO: There is a note in the documentation (see link below) that a fast-forwardable unitary
     #       can lower the cost from (2^m - 1) * cost(C-U) to m * cost(C-U).  If we have a
@@ -107,11 +108,10 @@ def build_qpe_qualtran_textbook(
 # -------------------------------------------------------------------------------------------------
 
 def build_qpe_pyliqtr_qubitized(
-        config_general: GeneralConfiguration,
         config_algorithm: AlgorithmConfiguration,
         unitary):
 
-    config_general.log_verbose(
+    logger.verbose(
             "Build a QPE algorithm with pyLIQTR's \"QubitizedPhaseEstimation\" method.")
 
     # TODO: The name and signature suggest that this may _only_ be valid for block-encoded
@@ -121,57 +121,53 @@ def build_qpe_pyliqtr_qubitized(
 # -------------------------------------------------------------------------------------------------
 
 def build_time_evolution(
-        config_general: GeneralConfiguration,
         config_algorithm: AlgorithmConfiguration,
         unitary):
 
-    config_general.log_verbose("Build a time evolution algorithm.")
+    logger.verbose("Build a time evolution algorithm.")
 
     return unitary
 
 # -------------------------------------------------------------------------------------------------
 
 def build_controlled_time_evolution(
-        config_general: GeneralConfiguration,
         config_algorithm: AlgorithmConfiguration,
         unitary):
 
-    config_general.log_verbose("Build a singly-controlled time evolution algorithm.")
+    logger.verbose("Build a singly-controlled time evolution algorithm.")
 
     return unitary.controlled()
 
 # -------------------------------------------------------------------------------------------------
 
 def build_algorithm(
-        config_general: GeneralConfiguration,
         config_algorithm: AlgorithmConfiguration,
         unitary,
         P0):
 
-    config_general.log("Beginning to construct quantum algorithm.")
+    logger.info("Beginning to construct quantum algorithm.")
 
     if config_algorithm.method.lower() in ("qpe: qualtran textbook",):
-        return build_qpe_qualtran_textbook(config_general, config_algorithm, unitary, P0)
+        return build_qpe_qualtran_textbook(config_algorithm, unitary, P0)
     elif config_algorithm.method.lower() in ("qpe: qualtran qubitization",):
         # TODO: This may be more specialized (for LCU only?), but I'm not yet sure of the details.
         raise NotImplementedError()
     elif config_algorithm.method.lower() in ("qpe: pyliqtr qubitized",):
-        return build_qpe_pyliqtr_qubitized(config_general, config_algorithm, unitary)
+        return build_qpe_pyliqtr_qubitized(config_algorithm, unitary)
     elif config_algorithm.method.lower() in ("time evolution",):
-        return build_time_evolution(config_general, config_algorithm, unitary)
+        return build_time_evolution(config_algorithm, unitary)
     elif config_algorithm.method.lower() in ("controlled time evolution",):
-        return build_controlled_time_evolution(config_general, config_algorithm, unitary)
+        return build_controlled_time_evolution(config_algorithm, unitary)
     else:
         raise ValueError(f"Invalid algorithm method \"{config_algorithm.method}\".")
 
 # -------------------------------------------------------------------------------------------------
 
 def compute_initial_phase_qubits(
-        config_general: GeneralConfiguration,
         config_algorithm: AlgorithmConfiguration,
         Elo2, Ehi2):
 
-    config_general.log("Computing initial phase qubits.")
+    logger.info("Computing initial phase qubits.")
 
     if config_algorithm.energy_error is None:
         Elo3 = Elo2
@@ -179,10 +175,10 @@ def compute_initial_phase_qubits(
         P0 = None
     else:
         P0 = math.ceil(math.log2((Ehi2 - Elo2) / config_algorithm.energy_error))
-        config_general.log_verbose(f"-- initial number of phase qubits = {P0}")
+        logger.verbose(f"-- initial number of phase qubits = {P0}")
         dE_new = 2**P0 * config_algorithm.energy_error
         Elo3 = Elo2
         Ehi3 = Elo3 + dE_new
-        config_general.log_verbose(f"-- QPE-optimized bounds = [{Elo3}, {Ehi3})")
+        logger.verbose(f"-- QPE-optimized bounds = [{Elo3}, {Ehi3})")
 
     return (P0, Elo3, Ehi3)

@@ -5,29 +5,31 @@ This module provides interfaces for writing unitary matrices in multiple formats
 Format is automatically detected from file extension.
 """
 
+import logging
 import numpy as np
 from pathlib import Path
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 # =================================================================================================
 # Matrix I/O Functions
 # =================================================================================================
 
-def _save_matrix_numpy(output_path, unitary_matrix, git_hash, unitarity_error, matrix_norm):
+def _save_matrix_numpy(output_path, unitary_matrix, unitarity_error, matrix_norm):
     """Save matrix in NumPy .npz format with metadata."""
     np.savez(
         output_path,
         matrix=unitary_matrix,
         shape=unitary_matrix.shape,
-        git_hash=git_hash,
         timestamp=datetime.now().isoformat(),
         unitarity_error=unitarity_error,
         matrix_norm=matrix_norm
     )
 
 
-def _save_matrix_hdf5(output_path, unitary_matrix, git_hash, unitarity_error, matrix_norm):
+def _save_matrix_hdf5(output_path, unitary_matrix, unitarity_error, matrix_norm):
     """Save matrix in HDF5 format with metadata as attributes."""
     try:
         import h5py
@@ -37,7 +39,6 @@ def _save_matrix_hdf5(output_path, unitary_matrix, git_hash, unitarity_error, ma
     with h5py.File(output_path, 'w') as f:
         dset = f.create_dataset('matrix', data=unitary_matrix, compression='gzip')
         dset.attrs['shape'] = unitary_matrix.shape
-        dset.attrs['git_hash'] = git_hash
         dset.attrs['timestamp'] = datetime.now().isoformat()
         if unitarity_error is not None:
             dset.attrs['unitarity_error'] = float(unitarity_error)
@@ -45,7 +46,7 @@ def _save_matrix_hdf5(output_path, unitary_matrix, git_hash, unitarity_error, ma
             dset.attrs['matrix_norm'] = float(matrix_norm)
 
 
-def _save_matrix_text(output_path, unitary_matrix, git_hash, unitarity_error, matrix_norm):
+def _save_matrix_text(output_path, unitary_matrix, unitarity_error, matrix_norm):
     """Save matrix in human-readable sparse text format (coordinate format).
 
     Only non-zero entries are written to save space. This is especially beneficial
@@ -65,7 +66,6 @@ def _save_matrix_text(output_path, unitary_matrix, git_hash, unitarity_error, ma
         f.write(f"# Unitary Matrix (Sparse Coordinate Format)\n")
         f.write(f"# Shape: {unitary_matrix.shape}\n")
         f.write(f"# Non-zero entries: {nnz}\n")
-        f.write(f"# Git hash: {git_hash}\n")
         f.write(f"# Timestamp: {datetime.now().isoformat()}\n")
         if unitarity_error is not None:
             f.write(f"# Unitarity error: {unitarity_error:.6e}\n")
@@ -110,16 +110,13 @@ def _get_matrix_format_from_extension(filename):
     return extension_map[ext]
 
 
-def save_matrix(output_path, unitary_matrix, config_general, git_hash=None,
-                unitarity_error=None, matrix_norm=None):
+def save_matrix(output_path, unitary_matrix, unitarity_error=None, matrix_norm=None):
     """
     Save unitary matrix to file with automatic format detection.
 
     Parameters:
         output_path: Output file path (format inferred from extension)
         unitary_matrix: The matrix to save (numpy array)
-        config_general: Configuration for logging
-        git_hash: Optional git hash for metadata
         unitarity_error: Optional unitarity error for metadata
         matrix_norm: Optional matrix norm for metadata
 
@@ -148,5 +145,5 @@ def save_matrix(output_path, unitary_matrix, config_general, git_hash=None,
             f"Valid options are: {', '.join(repr(k) for k in format_handlers.keys())}"
         )
 
-    handler(output_path, unitary_matrix, git_hash, unitarity_error, matrix_norm)
-    config_general.log(f"Matrix saved to {output_path}")
+    handler(output_path, unitary_matrix, unitarity_error, matrix_norm)
+    logger.info(f"Matrix saved to {output_path}")

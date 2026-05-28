@@ -1,4 +1,5 @@
 import argparse
+import logging
 
 from qhat.analysis.config_types import (
     AnalysisConfiguration,
@@ -8,6 +9,8 @@ from qhat.analysis.config_types import (
     State,
     UnitaryConfiguration,
 )
+
+logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------------------------------
 
@@ -42,7 +45,7 @@ def load_configuration() -> State:
     # Build the state (does some post-processing of user configuration)
     state = State(config_script, general, hamiltonian, unitary, algorithm, analysis)
 
-    state.config_general.log("\n".join([
+    logger.info("\n".join([
         f"Contents of configuration file \"{args.configuration_file}\":",
         config_script
         ]))

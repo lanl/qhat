@@ -7,6 +7,8 @@ import sys
 import tomlkit
 from tomlkit.toml_file import TOMLFile
 
+logger = logging.getLogger(__name__)
+
 # -------------------------------------------------------------------------------------------------
 
 # TODO: Where should this live?
@@ -169,82 +171,6 @@ class AnalysisConfiguration(ConfigurationBase):
 # internal types and support functions
 # -------------------------------------------------------------------------------------------------
 
-# from https://stackoverflow.com/a/35804945/1791919
-def _addLoggingLevel(levelName, levelNum, methodName=None):
-    """
-    Comprehensively adds a new logging level to the `logging` module and the
-    currently configured logging class.
-
-    `levelName` becomes an attribute of the `logging` module with the value
-    `levelNum`. `methodName` becomes a convenience method for both `logging`
-    itself and the class returned by `logging.getLoggerClass()` (usually just
-    `logging.Logger`). If `methodName` is not specified, `levelName.lower()` is
-    used.
-
-    To avoid accidental clobberings of existing attributes, this method will
-    raise an `AttributeError` if the level name is already an attribute of the
-    `logging` module or if the method name is already present
-
-    Example
-    -------
-    >>> addLoggingLevel('TRACE', logging.DEBUG - 5)
-    >>> logging.getLogger(__name__).setLevel("TRACE")
-    >>> logging.getLogger(__name__).trace('that worked')
-    >>> logging.trace('so did this')
-    >>> logging.TRACE
-    5
-
-    """
-    if not methodName:
-        methodName = levelName.lower()
-    if hasattr(logging, levelName):
-       raise AttributeError('{} already defined in logging module'.format(levelName))
-    if hasattr(logging, methodName):
-       raise AttributeError('{} already defined in logging module'.format(methodName))
-    if hasattr(logging.getLoggerClass(), methodName):
-       raise AttributeError('{} already defined in logger class'.format(methodName))
-    # This method was inspired by the answers to Stack Overflow post
-    # http://stackoverflow.com/q/2183233/2988730, especially
-    # http://stackoverflow.com/a/13638084/2988730
-    def logForLevel(self, message, *args, **kwargs):
-        if self.isEnabledFor(levelNum):
-            self._log(levelNum, message, args, **kwargs)
-    def logToRoot(message, *args, **kwargs):
-        logging.log(levelNum, message, *args, **kwargs)
-    logging.addLevelName(levelNum, levelName)
-    setattr(logging, levelName, levelNum)
-    setattr(logging.getLoggerClass(), methodName, logForLevel)
-    setattr(logging, methodName, logToRoot)
-
-def get_log_level(level_str):
-    if level_str.lower() == "info":
-        return logging.INFO
-    elif level_str.lower() == "verbose":
-        return logging.VERBOSE
-    elif level_str.lower() == "debug":
-        return logging.DEBUG
-    else:
-        raise ValueError(f"Invalid log level requested: \"{level_str}\"")
-
-def _configure_log(user_logfile, log_level):
-    # Build the logger
-    logger = logging.getLogger()
-    logger.setLevel(log_level)
-    # Define log format
-    formatter = logging.Formatter('{asctime:23} {levelname:>7s} | {message}', style='{')
-    # Configure the logger for stdout
-    stdout_handler = logging.StreamHandler(sys.stdout)
-    stdout_handler.setLevel(log_level)
-    stdout_handler.setFormatter(formatter)
-    logger.addHandler(stdout_handler)
-    # Configure the logger for the log file (if the user provides a filename)
-    file_handler = logging.FileHandler(user_logfile)
-    file_handler.setLevel(log_level)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-    # Return the logger
-    return logger
-
 def _get_git_hash():
     file_path = os.path.realpath(__file__)
     dirpath = os.path.dirname(file_path)
@@ -263,21 +189,14 @@ class GeneralConfiguration:
     def __init__(self, user_config: GeneralConfigurationUser):
         self.logfile = user_config.logfile
         self.loglevel = user_config._loglevel
-        _addLoggingLevel("VERBOSE", (logging.INFO + logging.DEBUG) // 2)
-        self.logger = _configure_log(user_config.logfile, get_log_level(user_config._loglevel))
         self.git_hash = _get_git_hash()
-        self.log("\n".join(["", '*' * 99, "ANALYSIS DRIVER START", '*' * 99]))
-        self.log(f"Logfile: {self.logfile}")
-        self.log(f"Running script with git hash {self.git_hash}")
-    def log(self, *args, **kwargs):
-        self.logger.info(*args, **kwargs)
-    def log_verbose(self, *args, **kwargs):
-        self.logger.verbose(*args, **kwargs)
-    def log_debug(self, *args, **kwargs):
-        self.logger.debug(*args, **kwargs)
+        # Note: Logging is now configured by the application entry point (driver.py)
+        # using qhat.logging_utils.configure_logging()
+
     def _generate_TOML_table(self):
         table = tomlkit.table()
         table["logfile"] = self.logfile
+        table["loglevel"] = self.loglevel
         table["git_hash"] = self.git_hash
         return table
 
@@ -336,15 +255,14 @@ class State:
                     )
                 ).value
         self.config_hamiltonian.config_hash = ctypes.c_size_t(hash(self.config_hamiltonian)).value
-        self.config_general.log(
-                f"Unique hash for Hamiltonian: {self.config_hamiltonian.config_hash}")
-        self.config_general.log(f"Unique hash for full analysis: {self.overall_hash}")
+        logger.info(f"Unique hash for Hamiltonian: {self.config_hamiltonian.config_hash}")
+        logger.info(f"Unique hash for full analysis: {self.overall_hash}")
     def store_result(self, key, value):
         self.results[key] = value
     def store_results(self, d):
         self.results.update(d)
     def show_results(self):
-        self.config_general.log("results:\n" + pprint.pformat(self.results))
+        logger.info("results:\n" + pprint.pformat(self.results))
     def save_summary(self):
         document = tomlkit.document()
         document.add(tomlkit.comment("CONFIGURATION " + 63 * "="))
@@ -362,7 +280,7 @@ class State:
         filename = ".".join((str(self.overall_hash), "toml"))
         tomlfile = TOMLFile(filename)
         tomlfile.write(document)
-        self.config_general.log(f"Summary file saved to \"{filename}\".")
+        logger.info(f"Summary file saved to \"{filename}\".")
 
 # -------------------------------------------------------------------------------------------------
 

@@ -7,23 +7,20 @@ from qualtran.resource_counting import get_cost_value, QubitCount
 
 from qhat.analysis.config_types import AnalysisConfiguration, GeneralConfiguration
 from qhat.analysis.file_io import save_matrix
+import logging
+
+logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------------------------------
 
-def resource_estimation_cirq(
-        config_general: GeneralConfiguration,
-        config_analysis: AnalysisConfiguration,
-        algorithm) -> dict:
+def resource_estimation_cirq(config_analysis: AnalysisConfiguration, algorithm) -> dict:
     raise NotImplementedError
 
 # -------------------------------------------------------------------------------------------------
 
-def resource_estimation_pyliqtr(
-        config_general: GeneralConfiguration,
-        config_analysis: AnalysisConfiguration,
-        algorithm) -> dict:
+def resource_estimation_pyliqtr(config_analysis: AnalysisConfiguration, algorithm) -> dict:
 
-    config_general.log_verbose("Estimating resources with pyLIQTR.")
+    logger.verbose("Estimating resources with pyLIQTR.")
 
     # TODO: rotation error
     #       -- argument rotation_gate_precision sets the precision for a single rotation gate
@@ -46,30 +43,23 @@ def resource_estimation_pyliqtr(
 
 # -------------------------------------------------------------------------------------------------
 
-def estimate_resources(
-        config_general: GeneralConfiguration,
-        config_analysis: AnalysisConfiguration,
-        algorithm) -> dict:
+def estimate_resources(config_analysis: AnalysisConfiguration, algorithm) -> dict:
 
     if config_analysis.resource_estimator.lower() == "pyliqtr":
-        return resource_estimation_pyliqtr(config_general, config_analysis, algorithm)
+        return resource_estimation_pyliqtr(config_analysis, algorithm)
     elif config_analysis.resource_estimator.lower() == "cirq":
-        return resource_estimation_cirq(config_general, config_analysis, algorithm)
+        return resource_estimation_cirq(config_analysis, algorithm)
     else:
         raise ValueError(
                 f"Invalid resource estimator method \"{config_analysis.resource_estimator}\".")
 
 # -------------------------------------------------------------------------------------------------
 
-def output_unitary_matrix(
-        config_general: GeneralConfiguration,
-        config_analysis: AnalysisConfiguration,
-        algorithm) -> dict:
+def output_unitary_matrix(config_analysis: AnalysisConfiguration, algorithm) -> dict:
     """
     Generate and save the unitary matrix representation of the algorithm.
 
     Parameters:
-        config_general: General configuration
         config_analysis: Analysis configuration with matrix_output_format and matrix_output_file
         algorithm: The algorithm bloq to analyze
 
@@ -85,19 +75,19 @@ def output_unitary_matrix(
         )
 
     # Extract the unitary matrix
-    config_general.log_verbose("Computing unitary matrix via tensor contraction...")
+    logger.verbose("Computing unitary matrix via tensor contraction...")
     try:
         unitary_matrix = algorithm.tensor_contract()
     except Exception as e:
-        config_general.log(
+        logger.info(
             f"ERROR: Failed to compute unitary matrix: {e}\n"
             "This may indicate a bug in the algorithm's tensor_contract() implementation."
         )
         raise
 
     # Log basic properties
-    config_general.log_verbose(f"Matrix shape: {unitary_matrix.shape}")
-    config_general.log_verbose(f"Matrix dtype: {unitary_matrix.dtype}")
+    logger.verbose(f"Matrix shape: {unitary_matrix.shape}")
+    logger.verbose(f"Matrix dtype: {unitary_matrix.dtype}")
 
     # Compute unitarity check: ||U†U - I||_F
     try:
@@ -105,18 +95,17 @@ def output_unitary_matrix(
         U_dag_U = np.conj(unitary_matrix.T) @ unitary_matrix
         identity = np.eye(unitary_matrix.shape[0])
         unitarity_error = np.linalg.norm(U_dag_U - identity, ord='fro')
-        config_general.log_verbose(f"Matrix Frobenius norm: {matrix_norm:.6e}")
-        config_general.log_verbose(f"Unitarity error ||U†U - I||_F: {unitarity_error:.6e}")
+        logger.verbose(f"Matrix Frobenius norm: {matrix_norm:.6e}")
+        logger.verbose(f"Unitarity error ||U†U - I||_F: {unitarity_error:.6e}")
     except Exception as e:
-        config_general.log(f"WARNING: Could not compute unitarity check: {e}")
+        logger.info(f"WARNING: Could not compute unitarity check: {e}")
         matrix_norm = None
         unitarity_error = None
 
     # Save matrix to file (format auto-detected from extension)
     output_file = config_analysis.matrix_output_file
     save_matrix(
-        output_file, unitary_matrix, config_general,
-        git_hash=config_general.git_hash,
+        output_file, unitary_matrix,
         unitarity_error=unitarity_error,
         matrix_norm=matrix_norm
     )
@@ -132,12 +121,9 @@ def output_unitary_matrix(
 
 # -------------------------------------------------------------------------------------------------
 
-def analyze_algorithm(
-        config_general: GeneralConfiguration,
-        config_analysis: AnalysisConfiguration,
-        algorithm) -> dict:
+def analyze_algorithm(config_analysis: AnalysisConfiguration, algorithm) -> dict:
 
-    config_general.log("Beginning algorithm analysis.")
+    logger.info("Beginning algorithm analysis.")
 
     # Validate at least one analysis requested
     if (config_analysis.resource_estimator is None and
@@ -152,14 +138,12 @@ def analyze_algorithm(
 
     # Dispatch to requested analyses
     if config_analysis.resource_estimator is not None:
-        config_general.log(f"Performing resource estimation using {config_analysis.resource_estimator}.")
-        results["resource_estimates"] = estimate_resources(
-            config_general, config_analysis, algorithm)
+        logger.info(f"Performing resource estimation using {config_analysis.resource_estimator}.")
+        results["resource_estimates"] = estimate_resources(config_analysis, algorithm)
 
     if config_analysis.matrix_output_file is not None:
-        config_general.log("Generating unitary matrix output.")
-        results["matrix_output"] = output_unitary_matrix(
-            config_general, config_analysis, algorithm)
+        logger.info("Generating unitary matrix output.")
+        results["matrix_output"] = output_unitary_matrix(config_analysis, algorithm)
 
     # TODO: Add error estimation
     # TODO: Add an option for detailed error analysis (explicitly compute the eigenvalues of the
@@ -168,6 +152,6 @@ def analyze_algorithm(
     # TODO: Add gate parallelism / gate depth analysis
     # TODO: Would it be useful to analyze in terms of a different basis (e.g., Toffoli gates)?
 
-    config_general.log("Algorithm analysis complete.")
+    logger.info("Algorithm analysis complete.")
 
     return results

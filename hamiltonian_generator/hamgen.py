@@ -1,4 +1,5 @@
 import argparse
+import logging
 import math
 import pickle
 import pprint
@@ -12,12 +13,15 @@ from openfermion.transforms.opconversions.binary_codes import _encoder_bk
 from openfermionpyscf import PyscfMolecularData
 from openfermionpyscf._run_pyscf import compute_integrals, compute_scf, prepare_pyscf_molecule
 
+from qhat.common.logging_utils import configure_logging
 from qhat.hamiltonian_generator.hamgen_types import (
     GeneralConfiguration,
     GeneralConfigurationUser,
     HamiltonianConfiguration,
     State,
 )
+
+logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------------------------------
 
@@ -467,6 +471,18 @@ def compute_metadata(state, ham3_Fermion2Qubit):
 
 def run():
     state = load_configuration()
+
+    # Configure logging based on user settings
+    configure_logging(
+        level=state.config_general.loglevel,
+        logfile=state.config_general.logfile
+    )
+
+    logger.info("=" * 80)
+    logger.info("HAMILTONIAN GENERATOR START")
+    logger.info("=" * 80)
+    logger.info(f"Logfile: {state.config_general.logfile}")
+    logger.info(f"Git hash: {state.config_general.git_hash}")
 
     # TODO: If the final result files already exist, exit as no-op
     # TODO: Add the ability to save and reload ham3 similar to ham2 and ham1

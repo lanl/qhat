@@ -1,3 +1,4 @@
+import logging
 import math
 
 from openfermion import InteractionOperator, jordan_wigner
@@ -10,14 +11,13 @@ from pyLIQTR.ProblemInstances.ChemicalHamiltonian import ChemicalHamiltonian
 from qhat.analysis.config_types import GeneralConfiguration, UnitaryConfiguration, value
 from qhat.analysis.ordering import reorder_paulis
 
+logger = logging.getLogger(__name__)
+
 # -------------------------------------------------------------------------------------------------
 
-def encode_linear_t(
-        config_general: GeneralConfiguration,
-        config_unitary: UnitaryConfiguration,
-        hamiltonian):
+def encode_linear_t(config_unitary: UnitaryConfiguration, hamiltonian):
 
-    config_general.log_verbose("Encoding with fermionic linear-T block encoding from pyLIQTR.")
+    logger.verbose("Encoding with fermionic linear-T block encoding from pyLIQTR.")
 
     raise NotImplementedError()
 
@@ -33,12 +33,9 @@ def encode_linear_t(
 
 # -------------------------------------------------------------------------------------------------
 
-def encode_pauli_lcu(
-        config_general: GeneralConfiguration,
-        config_unitary: UnitaryConfiguration,
-        hamiltonian):
+def encode_pauli_lcu(config_unitary: UnitaryConfiguration, hamiltonian):
 
-    config_general.log_verbose(
+    logger.verbose(
             "Encoding with Pauli linear-combination-of-unitaries block encoding from pyLIQTR.")
 
     # TODO: If every encoding method wraps the hamiltonian in the ChemicalHamiltonian class, then I
@@ -60,11 +57,10 @@ def encode_pauli_lcu(
 # -------------------------------------------------------------------------------------------------
 
 def encode_double_factorization(
-        config_general: GeneralConfiguration,
         config_unitary: UnitaryConfiguration,
         hamiltonian) -> DoubleFactorized:
 
-    config_general.log_verbose("Encoding with double-factorized block encoding from pyLIQTR.")
+    logger.verbose("Encoding with double-factorized block encoding from pyLIQTR.")
 
     # TODO: We need to process the Hamiltonian into a ChemicalHamiltonian.  Under what conditions
     #       can that happen?  Purely-fermionic only?
@@ -80,11 +76,9 @@ def encode_double_factorization(
 # -------------------------------------------------------------------------------------------------
 
 def encode_ramped_trotter(
-        config_general: GeneralConfiguration,
         config_unitary: UnitaryConfiguration,
         hamiltonian,
         tevol_hbar):
-        #tevol_hbar) -> RampedTrotterizedUnitary:
 
     # Get the implementation choice from config
     trotter_impl = config_unitary.trotter_implementation
@@ -97,12 +91,11 @@ def encode_ramped_trotter(
         )
 
     impl_label = f"{trotter_impl} QHAT"
-    config_general.log_verbose(f"Encoding with ramped-trotterization method from `common` ({impl_label}).")
+    logger.verbose(f"Encoding with ramped-trotterization method from `common` ({impl_label}).")
 
     timestep = value(config_unitary.timestep, tevol_hbar)
     assert timestep >= 0.0
-    config_general.log(f"-- timestep = {timestep}")
-    config_general.t_hbar = timestep
+    logger.info(f"-- timestep = {timestep}")
 
     # Compute the number of Trotter steps based on the Trotter error from arXiv:1912.08854v3
     # Using fast implementation for better performance (100-150x more samples per second)
@@ -115,33 +108,32 @@ def encode_ramped_trotter(
 
     # Validate user configuration
     if error_coeff_mode not in ['monte_carlo', 'exact']:
-        config_general.log(f"WARNING: Invalid error_coeff_mode='{error_coeff_mode}', using 'monte_carlo'")
+        logger.warning(f"Invalid error_coeff_mode='{error_coeff_mode}', using 'monte_carlo'")
         error_coeff_mode = 'monte_carlo'
 
-    config_general.log(f"-- Error coefficient computation mode: {error_coeff_mode}")
+    logger.info(f"-- Error coefficient computation mode: {error_coeff_mode}")
     if error_coeff_mode == 'monte_carlo' and error_coeff_auto_exact:
-        config_general.log(f"-- Auto-switch to exact coefficient computation: enabled")
-    config_general.log(f"-- Error coefficient time limit: {error_coeff_time_limit}s")
+        logger.info(f"-- Auto-switch to exact coefficient computation: enabled")
+    logger.info(f"-- Error coefficient time limit: {error_coeff_time_limit}s")
 
     # Compute error coefficients with user-specified mode
     c1, c2 = trotter_error_estimator_fast(
         hamiltonian.get_grouped_terms(),
         error_coeff_time_limit,
-        config_general,
         mode=error_coeff_mode,
         auto_exact=error_coeff_auto_exact
     )
-    config_general.log(f"-- Trotter error coefficients: C1 = {c1}, C2 = {c2}")
+    logger.info(f"-- Trotter error coefficients: C1 = {c1}, C2 = {c2}")
     assert config_unitary.energy_error is not None
-    config_general.log(f"-- allowable energy error = {config_unitary.energy_error} Hartrees")
-    config_general.log(f"-- effective energy range = {2 * math.pi / timestep} Hartrees")
+    logger.info(f"-- allowable energy error = {config_unitary.energy_error} Hartrees")
+    logger.info(f"-- effective energy range = {2 * math.pi / timestep} Hartrees")
     eps_trotter = config_unitary.energy_error * timestep / (2 * math.pi)
-    config_general.log(f"-- allowable fractional Trotter error = {eps_trotter}")
+    logger.info(f"-- allowable fractional Trotter error = {eps_trotter}")
     # use config_unitary.energy_error here instead of eps_trotter, because these equations are
     # derived in terms of the absolute energy error rather than the fractional energy error
     s1 = timestep * config_unitary.error_scale * c1 / config_unitary.energy_error
     s2 = timestep * math.sqrt(config_unitary.error_scale * c2 / config_unitary.energy_error)
-    config_general.log(f"-- Trotter step count: s1 = {s1}, s2 = {s2}")
+    logger.info(f"-- Trotter step count: s1 = {s1}, s2 = {s2}")
 
     r1 = 1
     r2 = 2
@@ -153,7 +145,7 @@ def encode_ramped_trotter(
         Nsteps0 = s1
     # TODO: Add fourth-order (possibly only computed if second order is better than first order)
     Nsteps = max(1, math.ceil(Nsteps0))
-    config_general.log(f"-- using {method} Trotter formula with {Nsteps} steps ({Nsteps0})")
+    logger.info(f"-- using {method} Trotter formula with {Nsteps} steps ({Nsteps0})")
 
     pauli_strings = hamiltonian.get_all_pauli_strings(return_as='strings')
     pauli_strings = reorder_paulis(pauli_strings, config_unitary.ordering_method)
@@ -180,19 +172,18 @@ def encode_ramped_trotter(
 # -------------------------------------------------------------------------------------------------
 
 def encode_as_unitary(
-        config_general: GeneralConfiguration,
         config_unitary: UnitaryConfiguration,
         hamiltonian,
         tevol_hbar):
 
-    config_general.log("Beginning to encode the Hamiltonian as a unitary.")
+    logger.info("Beginning to encode the Hamiltonian as a unitary.")
 
     if config_unitary.method.lower() in ("double factorization", "double-factorization"):
-        return encode_double_factorization(config_general, config_unitary, hamiltonian)
+        return encode_double_factorization(config_unitary, hamiltonian)
     elif config_unitary.method.lower() in ("pauli lcu", "pauli-lcu", "paulilcu",):
-        return encode_pauli_lcu(config_general, config_unitary, hamiltonian)
+        return encode_pauli_lcu(config_unitary, hamiltonian)
     elif config_unitary.method.lower() in ("linear t", "linear-t", "lineart",):
-        return encode_linear_t(config_general, config_unitary, hamiltonian)
+        return encode_linear_t(config_unitary, hamiltonian)
     elif config_unitary.method.lower() in ("first quantization",):
         # TODO: This will be important for Marian's team.  Something is available in pyLIQTR, but
         #       I've not yet looked to see how it works.
@@ -202,6 +193,6 @@ def encode_as_unitary(
         #          unitaries.  But I've not confirmed this.
         raise NotImplementedError()
     elif config_unitary.method.lower() in ("ramped trotter"):
-        return encode_ramped_trotter(config_general, config_unitary, hamiltonian, tevol_hbar)
+        return encode_ramped_trotter(config_unitary, hamiltonian, tevol_hbar)
     else:
         raise ValueError(f"Invalid unitary encoding method \"{config_unitary.method}\".")

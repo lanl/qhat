@@ -15,10 +15,13 @@ Performance: 100-150x faster than the reference implementation in trotter_coeffi
 For validation and testing, see trotter_coefficients.py for the reference implementation.
 """
 
+import logging
 import time
 import numpy as np
 import math
 from numba import njit, prange
+
+logger = logging.getLogger(__name__)
 
 # --------------------------------------------------
 # Configuration for exact computation
@@ -441,7 +444,7 @@ def generate_all_triples(N):
     return indices
 
 
-def _compute_exact_generic(x_bits, z_bits, coeffs, N, batch_size, config_general,
+def _compute_exact_generic(x_bits, z_bits, coeffs, N, batch_size,
                            label, index_generator, batch_compute_fn, unit_name):
     """
     Generic function for exact computation of commutator norms.
@@ -454,7 +457,6 @@ def _compute_exact_generic(x_bits, z_bits, coeffs, N, batch_size, config_general
         coeffs: Array of coefficients for all Pauli strings
         N: Number of Pauli strings
         batch_size: Batch size for computation. If None, uses EXACT_COMPUTATION_BATCH_SIZE.
-        config_general: GeneralConfiguration object for logging
         label: Label for logging (e.g., "C1", "C21", "C22")
         index_generator: Function to generate all indices, called with (N)
         batch_compute_fn: Function to compute batch norms, called with (x_bits, z_bits, coeffs, batch, N)
@@ -466,7 +468,7 @@ def _compute_exact_generic(x_bits, z_bits, coeffs, N, batch_size, config_general
     if batch_size is None:
         batch_size = EXACT_COMPUTATION_BATCH_SIZE
 
-    config_general.log_verbose(f"  Computing {label} exactly (deterministic enumeration)...")
+    logger.verbose(f"  Computing {label} exactly (deterministic enumeration)...")
     start_time = time.time()
     last_progress_time = start_time
     progress_interval = INITIAL_PROGRESS_INTERVAL
@@ -490,7 +492,7 @@ def _compute_exact_generic(x_bits, z_bits, coeffs, N, batch_size, config_general
             elapsed = current_time - start_time
             rate = end_idx / elapsed if elapsed > 0 else 0
             eta = (total_count - end_idx) / rate if rate > 0 else 0
-            config_general.log_verbose(f"    Progress: {end_idx:,}/{total_count:,} {unit_name} ({percent:.1f}%) - "
+            logger.verbose(f"    Progress: {end_idx:,}/{total_count:,} {unit_name} ({percent:.1f}%) - "
                   f"{rate/1e6:.1f}M {unit_name}/sec - ETA {eta:.1f}s")
             last_progress_time = current_time
             # Increase interval for next report (exponential backoff)
@@ -499,26 +501,25 @@ def _compute_exact_generic(x_bits, z_bits, coeffs, N, batch_size, config_general
 
     elapsed = time.time() - start_time
     rate = total_count / elapsed if elapsed > 0 else 0
-    config_general.log_verbose(f"  {label} EXACT: {total_count:,} {unit_name} computed in {elapsed:.3f}s ({rate/1e6:.1f}M {unit_name}/sec)")
-    config_general.log_verbose(f"  {label} exact value: {sum_value:.6f}")
+    logger.verbose(f"  {label} EXACT: {total_count:,} {unit_name} computed in {elapsed:.3f}s ({rate/1e6:.1f}M {unit_name}/sec)")
+    logger.verbose(f"  {label} exact value: {sum_value:.6f}")
 
     return sum_value
 
 
-def compute_C1_exact(x_bits, z_bits, coeffs, N, batch_size, config_general):
+def compute_C1_exact(x_bits, z_bits, coeffs, N, batch_size):
     """
     Compute C1 exactly by enumerating all pairs deterministically.
 
     Args:
         batch_size: Batch size for computation. If None, uses EXACT_COMPUTATION_BATCH_SIZE.
                    Larger batches are more efficient but give less frequent progress updates.
-        config_general: GeneralConfiguration object for logging
 
     Returns:
         Exact value of C1 = Σᵢ<ⱼ ||[Hᵢ, Hⱼ]||
     """
     return _compute_exact_generic(
-        x_bits, z_bits, coeffs, N, batch_size, config_general,
+        x_bits, z_bits, coeffs, N, batch_size,
         label="C1",
         index_generator=generate_all_pairs,
         batch_compute_fn=batch_compute_C1,
@@ -526,19 +527,18 @@ def compute_C1_exact(x_bits, z_bits, coeffs, N, batch_size, config_general):
     )
 
 
-def compute_C21_exact(x_bits, z_bits, coeffs, N, batch_size, config_general):
+def compute_C21_exact(x_bits, z_bits, coeffs, N, batch_size):
     """
     Compute C21 exactly by enumerating all triples deterministically.
 
     Args:
         batch_size: Batch size for computation. If None, uses EXACT_COMPUTATION_BATCH_SIZE.
-        config_general: GeneralConfiguration object for logging
 
     Returns:
         Exact value of C21 = Σₖ<ᵢ,ₖ<ⱼ ||[Hᵢ, [Hⱼ, Hₖ]]||
     """
     return _compute_exact_generic(
-        x_bits, z_bits, coeffs, N, batch_size, config_general,
+        x_bits, z_bits, coeffs, N, batch_size,
         label="C21",
         index_generator=generate_all_triples,
         batch_compute_fn=batch_compute_C21,
@@ -546,19 +546,18 @@ def compute_C21_exact(x_bits, z_bits, coeffs, N, batch_size, config_general):
     )
 
 
-def compute_C22_exact(x_bits, z_bits, coeffs, N, batch_size, config_general):
+def compute_C22_exact(x_bits, z_bits, coeffs, N, batch_size):
     """
     Compute C22 exactly by enumerating all pairs deterministically.
 
     Args:
         batch_size: Batch size for computation. If None, uses EXACT_COMPUTATION_BATCH_SIZE.
-        config_general: GeneralConfiguration object for logging
 
     Returns:
         Exact value of C22 = Σₖ<ⱼ ||[Hₖ, [Hₖ, Hⱼ]]||
     """
     return _compute_exact_generic(
-        x_bits, z_bits, coeffs, N, batch_size, config_general,
+        x_bits, z_bits, coeffs, N, batch_size,
         label="C22",
         index_generator=generate_all_pairs,
         batch_compute_fn=batch_compute_C22,
@@ -566,7 +565,7 @@ def compute_C22_exact(x_bits, z_bits, coeffs, N, batch_size, config_general):
     )
 
 
-def trotter_error_estimator_fast(pauli_terms, time_limit, config_general,
+def trotter_error_estimator_fast(pauli_terms, time_limit,
                                   batch_size=10000, mode='monte_carlo', auto_exact=False):
     """
     Fast Monte Carlo estimation of nested commutator norms with exact computation for small systems.
@@ -591,7 +590,6 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general,
     Args:
         pauli_terms: List of QubitOperator terms
         time_limit: Total time limit in seconds
-        config_general: GeneralConfiguration object with log_verbose method for logging
         batch_size: Number of samples per batch (larger = better parallelization)
         mode: Computation mode, one of:
             'monte_carlo' (default): Monte Carlo sampling with tracking for early exit
@@ -614,10 +612,10 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general,
     N = len(pauli_terms)
 
     # Preprocessing (shared by all paths)
-    config_general.log_verbose(f"Preprocessing {N} Pauli terms...")
+    logger.verbose(f"Preprocessing {N} Pauli terms...")
     start_prep = time.time()
     x_bits, z_bits, coeffs, n_qubits = preprocess_pauli_terms(pauli_terms)
-    config_general.log_verbose(f"  Preprocessing done in {time.time() - start_prep:.3f}s ({n_qubits} qubits)")
+    logger.verbose(f"  Preprocessing done in {time.time() - start_prep:.3f}s ({n_qubits} qubits)")
 
     # Validate mode parameter
     if mode not in ['monte_carlo', 'exact']:
@@ -635,37 +633,37 @@ def trotter_error_estimator_fast(pauli_terms, time_limit, config_general,
                 f"Estimated time or memory exceeds limits. "
                 f"Use mode='monte_carlo' instead."
             )
-        config_general.log_verbose(f"  Using EXACT computation (user requested, N={N})")
-        return _compute_exact_path(x_bits, z_bits, coeffs, N, batch_size, config_general)
+        logger.verbose(f"  Using EXACT computation (user requested, N={N})")
+        return _compute_exact_path(x_bits, z_bits, coeffs, N, batch_size)
 
     else:  # mode == 'monte_carlo'
         # Path A/C: Monte Carlo, with optional auto-switch
         if auto_exact and is_exact_feasible:
             # Auto-switch to exact computation
-            config_general.log_verbose(f"  Auto-switching to EXACT computation (N={N}, feasible within limits)")
-            return _compute_exact_path(x_bits, z_bits, coeffs, N, batch_size, config_general)
+            logger.verbose(
+                    f"  Auto-switching to EXACT computation (N={N}, feasible within limits)")
+            return _compute_exact_path(x_bits, z_bits, coeffs, N, batch_size)
         else:
             # Use Monte Carlo
             if is_exact_feasible:
-                config_general.log_verbose(f"  Using MONTE CARLO with tracking (N={N})")
+                logger.verbose(f"  Using MONTE CARLO with tracking (N={N})")
             else:
-                config_general.log_verbose(f"  Using MONTE CARLO sampling (N={N}, too large for exact)")
+                logger.verbose(f"  Using MONTE CARLO sampling (N={N}, too large for exact)")
             use_tracking = is_exact_feasible  # Enable tracking if feasible
             return _compute_monte_carlo_path(
                 x_bits, z_bits, coeffs, N, time_limit, batch_size,
-                use_tracking, is_exact_feasible, config_general
+                use_tracking, is_exact_feasible
             )
 
 
-def _compute_exact_path(x_bits, z_bits, coeffs, N, batch_size, config_general):
+def _compute_exact_path(x_bits, z_bits, coeffs, N, batch_size):
     """
     Path B: Deterministic exact computation.
 
     Args:
-        config_general: GeneralConfiguration object for logging
     """
     # Warmup JIT
-    config_general.log_verbose(f"Warming up Numba JIT compilation...")
+    logger.verbose(f"Warming up Numba JIT compilation...")
     if N >= 2:
         dummy_indices = np.array([[0, 1]], dtype=np.int64)
         batch_compute_C1(x_bits, z_bits, coeffs, dummy_indices, N)
@@ -673,35 +671,34 @@ def _compute_exact_path(x_bits, z_bits, coeffs, N, batch_size, config_general):
             dummy_indices_3 = np.array([[0, 1, 2]], dtype=np.int64)
             batch_compute_C21(x_bits, z_bits, coeffs, dummy_indices_3, N)
             batch_compute_C22(x_bits, z_bits, coeffs, dummy_indices[:, [0, 1]], N)
-    config_general.log_verbose(f"  Warmup complete")
+    logger.verbose(f"  Warmup complete")
 
     # Compute exactly
-    C1_exact = compute_C1_exact(x_bits, z_bits, coeffs, N, batch_size, config_general)
-    C21_exact = compute_C21_exact(x_bits, z_bits, coeffs, N, batch_size, config_general)
-    C22_exact = compute_C22_exact(x_bits, z_bits, coeffs, N, batch_size, config_general)
+    C1_exact = compute_C1_exact(x_bits, z_bits, coeffs, N, batch_size)
+    C21_exact = compute_C21_exact(x_bits, z_bits, coeffs, N, batch_size)
+    C22_exact = compute_C22_exact(x_bits, z_bits, coeffs, N, batch_size)
 
     # Report
-    config_general.log_verbose("\n" + "="*70)
-    config_general.log_verbose("✅ EXACT COMPUTATION COMPLETED")
-    config_general.log_verbose(f"   All combinations enumerated deterministically")
-    config_general.log_verbose("="*70)
+    logger.verbose("\n" + "="*70)
+    logger.verbose("✅ EXACT COMPUTATION COMPLETED")
+    logger.verbose(f"   All combinations enumerated deterministically")
+    logger.verbose("="*70)
 
     return C1_exact / 2, C21_exact / 12 + C22_exact / 24
 
 
 def _compute_monte_carlo_path(x_bits, z_bits, coeffs, N, time_limit, batch_size,
-                               use_tracking, is_feasible, config_general):
+                               use_tracking, is_feasible):
     """
     Path A: Monte Carlo sampling with optional tracking for early exit.
 
     This is the current implementation, extracted into a helper function.
 
     Args:
-        config_general: GeneralConfiguration object for logging
     """
     # Setup tracking if enabled
     if use_tracking:
-        config_general.log_verbose(f"  Exact computation is feasible for N={N} - enabling tracking")
+        logger.verbose(f"  Exact computation is feasible for N={N} - enabling tracking")
         seen_c1 = set()
         seen_c21 = set()
         seen_c22 = set()
@@ -715,7 +712,7 @@ def _compute_monte_carlo_path(x_bits, z_bits, coeffs, N, time_limit, batch_size,
         total_c22 = N * (N - 1) // 2
 
     # Warmup: trigger Numba JIT compilation before timing
-    config_general.log_verbose(f"Warming up Numba JIT compilation...")
+    logger.verbose(f"Warming up Numba JIT compilation...")
     if N >= 2:
         dummy_indices = np.array([[0, 1]], dtype=np.int64)
         batch_compute_C1(x_bits, z_bits, coeffs, dummy_indices, N)
@@ -723,12 +720,12 @@ def _compute_monte_carlo_path(x_bits, z_bits, coeffs, N, time_limit, batch_size,
             dummy_indices_3 = np.array([[0, 1, 2]], dtype=np.int64)
             batch_compute_C21(x_bits, z_bits, coeffs, dummy_indices_3, N)
             batch_compute_C22(x_bits, z_bits, coeffs, dummy_indices[:, [0, 1]], N)
-    config_general.log_verbose(f"  Warmup complete")
+    logger.verbose(f"  Warmup complete")
 
     # ---------------------------
     # Estimate C1 = sum_{i<j} ||[H_i, H_j]||
     # ---------------------------
-    config_general.log_verbose(f"Estimating C1 with batch_size={batch_size}...")
+    logger.verbose(f"Estimating C1 with batch_size={batch_size}...")
     C1_sum = 0.0
     samples_C1 = 0
     start_time = time.time()
@@ -759,8 +756,8 @@ def _compute_monte_carlo_path(x_bits, z_bits, coeffs, N, time_limit, batch_size,
             # Check if we've seen all pairs
             if len(seen_c1) == total_c1:
                 C1_exact = sum(c1_values.values())
-                config_general.log_verbose(f"  C1 EXACT: All {total_c1} pairs sampled in {time.time() - start_time:.3f}s")
-                config_general.log_verbose(f"  C1 exact value: {C1_exact:.6f}")
+                logger.verbose(f"  C1 EXACT: All {total_c1} pairs sampled in {time.time() - start_time:.3f}s")
+                logger.verbose(f"  C1 exact value: {C1_exact:.6f}")
                 C1_est = C1_exact
                 break
 
@@ -770,16 +767,16 @@ def _compute_monte_carlo_path(x_bits, z_bits, coeffs, N, time_limit, batch_size,
     if not use_tracking or len(seen_c1) < total_c1:
         total_C1 = N * (N - 1) / 2
         C1_est = C1_sum * (total_C1 / samples_C1) if samples_C1 > 0 else 0.0
-        config_general.log_verbose(f"  C1 estimation: {samples_C1} samples in {time.time() - start_time:.3f}s")
-        config_general.log_verbose(f"  C1 estimate: {C1_est:.6f}")
+        logger.verbose(f"  C1 estimation: {samples_C1} samples in {time.time() - start_time:.3f}s")
+        logger.verbose(f"  C1 estimate: {C1_est:.6f}")
 
         if use_tracking:
-            config_general.log_verbose(f"    (Sampled {len(seen_c1)}/{total_c1} unique pairs, {100*len(seen_c1)/total_c1:.1f}% coverage)")
+            logger.verbose(f"    (Sampled {len(seen_c1)}/{total_c1} unique pairs, {100*len(seen_c1)/total_c1:.1f}% coverage)")
 
     # ---------------------------
     # Estimate C21 = sum_{k<j, k<i} ||[H_i, [H_j, H_k]]||
     # ---------------------------
-    config_general.log_verbose(f"Estimating C21 with batch_size={batch_size}...")
+    logger.verbose(f"Estimating C21 with batch_size={batch_size}...")
     C21_sum = 0.0
     samples_C21 = 0
     start_time = time.time()
@@ -787,7 +784,7 @@ def _compute_monte_carlo_path(x_bits, z_bits, coeffs, N, time_limit, batch_size,
     # Need at least 3 terms for triples
     if N < 3:
         C21_est = 0.0
-        config_general.log_verbose(f"  C21 estimation: N={N} too small for triples, C21=0")
+        logger.verbose(f"  C21 estimation: N={N} too small for triples, C21=0")
     else:
         while time.time() - start_time < time_limit / 3:
             # Generate random triples (i, j, k) with k < i and k < j
@@ -829,8 +826,8 @@ def _compute_monte_carlo_path(x_bits, z_bits, coeffs, N, time_limit, batch_size,
                 # Check if we've seen all triples
                 if len(seen_c21) == total_c21:
                     C21_exact = sum(c21_values.values())
-                    config_general.log_verbose(f"  C21 EXACT: All {total_c21} triples sampled in {time.time() - start_time:.3f}s")
-                    config_general.log_verbose(f"  C21 exact value: {C21_exact:.6f}")
+                    logger.verbose(f"  C21 EXACT: All {total_c21} triples sampled in {time.time() - start_time:.3f}s")
+                    logger.verbose(f"  C21 exact value: {C21_exact:.6f}")
                     C21_est = C21_exact
                     break
 
@@ -840,16 +837,16 @@ def _compute_monte_carlo_path(x_bits, z_bits, coeffs, N, time_limit, batch_size,
         if not use_tracking or len(seen_c21) < total_c21:
             total_C21 = N * (N - 1) * (N - 2) // 6  # C(N, 3)
             C21_est = C21_sum * (total_C21 / samples_C21) if samples_C21 > 0 else 0.0
-            config_general.log_verbose(f"  C21 estimation: {samples_C21} samples in {time.time() - start_time:.3f}s")
-            config_general.log_verbose(f"  C21 estimate: {C21_est:.6f}")
+            logger.verbose(f"  C21 estimation: {samples_C21} samples in {time.time() - start_time:.3f}s")
+            logger.verbose(f"  C21 estimate: {C21_est:.6f}")
 
             if use_tracking:
-                config_general.log_verbose(f"    (Sampled {len(seen_c21)}/{total_c21} unique triples, {100*len(seen_c21)/total_c21:.1f}% coverage)")
+                logger.verbose(f"    (Sampled {len(seen_c21)}/{total_c21} unique triples, {100*len(seen_c21)/total_c21:.1f}% coverage)")
 
     # ---------------------------
     # Estimate C22 = sum_{k<j} ||[H_k, [H_k, H_j]]||
     # ---------------------------
-    config_general.log_verbose(f"Estimating C22 with batch_size={batch_size}...")
+    logger.verbose(f"Estimating C22 with batch_size={batch_size}...")
     C22_sum = 0.0
     samples_C22 = 0
     start_time = time.time()
@@ -880,8 +877,8 @@ def _compute_monte_carlo_path(x_bits, z_bits, coeffs, N, time_limit, batch_size,
             # Check if we've seen all pairs
             if len(seen_c22) == total_c22:
                 C22_exact = sum(c22_values.values())
-                config_general.log_verbose(f"  C22 EXACT: All {total_c22} pairs sampled in {time.time() - start_time:.3f}s")
-                config_general.log_verbose(f"  C22 exact value: {C22_exact:.6f}")
+                logger.verbose(f"  C22 EXACT: All {total_c22} pairs sampled in {time.time() - start_time:.3f}s")
+                logger.verbose(f"  C22 exact value: {C22_exact:.6f}")
                 C22_est = C22_exact
                 break
 
@@ -891,23 +888,23 @@ def _compute_monte_carlo_path(x_bits, z_bits, coeffs, N, time_limit, batch_size,
     if not use_tracking or len(seen_c22) < total_c22:
         total_C22 = N * (N - 1) / 2
         C22_est = C22_sum * (total_C22 / samples_C22) if samples_C22 > 0 else 0.0
-        config_general.log_verbose(f"  C22 estimation: {samples_C22} samples in {time.time() - start_time:.3f}s")
-        config_general.log_verbose(f"  C22 estimate: {C22_est:.6f}")
+        logger.verbose(f"  C22 estimation: {samples_C22} samples in {time.time() - start_time:.3f}s")
+        logger.verbose(f"  C22 estimate: {C22_est:.6f}")
 
         if use_tracking:
-            config_general.log_verbose(f"    (Sampled {len(seen_c22)}/{total_c22} unique pairs, {100*len(seen_c22)/total_c22:.1f}% coverage)")
+            logger.verbose(f"    (Sampled {len(seen_c22)}/{total_c22} unique pairs, {100*len(seen_c22)/total_c22:.1f}% coverage)")
 
     # ---------------------------
     # Final output
     # ---------------------------
     # Check if we achieved exact computation
     if use_tracking and len(seen_c1) == total_c1 and len(seen_c21) == total_c21 and len(seen_c22) == total_c22:
-        config_general.log_verbose("\n" + "="*70)
-        config_general.log_verbose("✅ EXACT COMPUTATION ACHIEVED")
-        config_general.log_verbose(f"   All {total_c1} C1 pairs sampled")
-        config_general.log_verbose(f"   All {total_c21} C21 triples sampled")
-        config_general.log_verbose(f"   All {total_c22} C22 pairs sampled")
-        config_general.log_verbose("="*70)
+        logger.verbose("\n" + "="*70)
+        logger.verbose("✅ EXACT COMPUTATION ACHIEVED")
+        logger.verbose(f"   All {total_c1} C1 pairs sampled")
+        logger.verbose(f"   All {total_c21} C21 triples sampled")
+        logger.verbose(f"   All {total_c22} C22 pairs sampled")
+        logger.verbose("="*70)
 
     # Return C1 and C2 as defined in Childs et al. (arXiv:1912.08854v3)
     # C1 is divided by 2 as per the convention (see VERIFICATION_OF_USER_FIX.md)
