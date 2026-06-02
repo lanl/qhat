@@ -47,6 +47,10 @@ multiple of these functions, whichever is called last takes precedence.
 - **`general.print_default()`** -- Calling this function resets the printout level back to the
   standard verbosity, removing "verbose" and "debug" printouts.
 
+By default, the script also writes a Hartree-Fock initial state vector next to the Pauli data file.
+For larger active spaces this vector becomes very large.  Set **`general.write_initial_state`** to
+`False` to skip writing this `.npy` file.
+
 ### Describing the Hamiltonian
 
 Users need to describe the system for which a Hamiltonian will be generated, as well as provide
@@ -109,3 +113,20 @@ the described Hamiltonian.
 The `build_config.py` script is an example of how to build a large suite of configuration files to
 build Hamiltonians for many related molecules.  It does not run the Hamiltonian generation script,
 but only builds the configuration files that can then be fed into the Hamiltonian generate script.
+
+The `build_pilot_dataset.py` script builds a smaller pilot dataset with representative elements up
+to atomic number 30.  It targets both small active spaces and active spaces from 20 to 30 qubits,
+and it writes a `manifest.csv` file describing the generated configs.  To create configs only:
+
+```
+python3 hamiltonian_generator/build_pilot_dataset.py
+```
+
+To also run `hamgen.py` for every pilot config:
+
+```
+python3 hamiltonian_generator/build_pilot_dataset.py --run --keep-going
+```
+
+The pilot disables initial-state vector output by default so 20-30 qubit Hamiltonians do not create
+large `.npy` files.

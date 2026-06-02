@@ -1,0 +1,66 @@
+2026-05-27 22:59:20,308    INFO | Running script with git hash 177944fe4ae3de88b128cad9054665bd843c9b3f
+2026-05-27 22:59:20,309    INFO | Writing to file stub "Mg-Mg_3.00_sto-6g" in format "default".
+2026-05-27 22:59:20,309    INFO | Contents of configuration file "/home/abhijith/Code/qhat/library_pilot/012-012_Mg-Mg/26q/sto-6g/Mg-Mg_3.00_sto-6g_as-014-012_jw.config":
+general.print_verbose()
+general.logfile = "Mg-Mg_3.00_sto-6g_as-014-012_jw.log"
+general.file_stub = "Mg-Mg_3.00_sto-6g"
+general.file_format = "default"
+general.write_initial_state = False
+L = 3.00000000
+hamiltonian.add_atom("Mg", -0.5 * L, 0.0, 0.0)
+hamiltonian.add_atom("Mg",  0.5 * L, 0.0, 0.0)
+hamiltonian.basis = "sto-6g"
+hamiltonian.num_active_occupied = 14
+hamiltonian.num_active_vacant = 12
+hamiltonian.f2q_mapping = "JW"
+2026-05-27 22:59:20,309    INFO | Trying to load "Mg-Mg_3.00_sto-6g_as-014-012.pickle".
+2026-05-27 22:59:20,309    INFO | Could not load "Mg-Mg_3.00_sto-6g_as-014-012.pickle". Trying to load "Mg-Mg_3.00_sto-6g.pickle".
+2026-05-27 22:59:20,309    INFO | Could not load "Mg-Mg_3.00_sto-6g.pickle".  Recomputing from the beginning.
+2026-05-27 22:59:20,309    INFO | Perform Hartree-Fock calculation.
+2026-05-27 22:59:20,309 VERBOSE | Construct instance of MolecularData.
+2026-05-27 22:59:20,837 VERBOSE | geometry: 
+           ('Mg', (-1.5, 0.0, 0.0))
+           ('Mg', (1.5, 0.0, 0.0))
+2026-05-27 22:59:20,838 VERBOSE | Construct instance of PyscfMolecularData.
+2026-05-27 22:59:21,039    INFO | Hartree-Fock energy from run_pyscf = -394.06122800657926
+2026-05-27 22:59:21,039    INFO | Pickle to "Mg-Mg_3.00_sto-6g.pickle" file.
+2026-05-27 22:59:21,040    INFO | Apply active space.
+2026-05-27 22:59:21,040 VERBOSE | Define active space.
+2026-05-27 22:59:21,040    INFO | single-occupancy (spin) orbital counts:
+                 total   active  frozen
+   num orbitals      36      26      10
+   num occupied      24      14      10
+   num vacant        12      12       0
+2026-05-27 22:59:21,040 VERBOSE | single-occupancy (spin) orbital indices:
+   frozen occupied  [ 0, 10)
+   active occupied  [10, 24)
+   active vacant    [24, 36)
+   frozen vacant    [36, 36)
+2026-05-27 22:59:21,040 VERBOSE | double-occupancy (spatial) orbital indices:
+   frozen occupied  [ 0,  5)
+   active total     [ 5, 18)
+2026-05-27 22:59:21,040 VERBOSE | Build instance of InteractionOperator.
+2026-05-27 22:59:21,082    INFO | Pickle to "Mg-Mg_3.00_sto-6g_as-014-012.pickle" file.
+2026-05-27 22:59:21,107    INFO | Map fermionic operators to qubit operators.
+2026-05-27 22:59:22,522    INFO | Generate sum of Pauli strings.
+2026-05-27 22:59:22,524    INFO | metadata:
+{  'Hartree-Fock energy (Hartrees)': -394.06122800657926,
+   'basis set': 'sto-6g',
+   'eigenvalue lower bound from shifted one-norm (Hartrees)': np.float64(-468.05304580391225),
+   'eigenvalue upper bound from shifted one-norm (Hartrees)': np.float64(-289.2203645395148),
+   'fermion-to-qubit operator mapping': 'jordan-wigner',
+   'interatomic separation (angstroms)': 3.0,
+   'number of active, occupied, single-occupancy orbitals': 14,
+   'number of active, vacant, single-occupancy orbitals': 12,
+   'number of frozen, occupied, single-occupancy orbitals': 10,
+   'number of frozen, vacant, single-occupancy orbitals': 0,
+   'number of qubits': 26,
+   'number of terms in sum of Pauli strings': 9364,
+   'one-norm of sum of Pauli strings (Hartrees)': np.float64(468.05304580391225),
+   'runtime for Hartree-Fock calculation (seconds)': 0.7298760414123535,
+   'runtime for active space calculation (seconds)': 0.0428009033203125,
+   'runtime for fermion-to-qubit calculation (seconds)': 1.415320634841919,
+   'size of active space': 26}
+2026-05-27 22:59:22,524    INFO | Save sum of Pauli strings to data file "Mg-Mg_3.00_sto-6g_as-014-012_jw.dat".
+2026-05-27 22:59:22,556    INFO | Skipping initial state vector generation.
+2026-05-27 22:59:22,556    INFO | Hamiltonian generation complete.

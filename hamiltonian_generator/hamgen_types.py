@@ -14,6 +14,7 @@ class GeneralConfigurationUser:
     def __init__(self):
         self.file_stub = None
         self.file_format = "default"
+        self.write_initial_state = True
         # Logfile name
         self.logfile = "hamgen.log"
         # How much information to print as the script runs
@@ -184,6 +185,7 @@ class GeneralConfiguration:
             self.file_format = "hamlib"
         else:
             self.file_format = "default"
+        self.write_initial_state = bool(user_config.write_initial_state)
         self.log(f"Writing to file stub \"{self.file_stub}\" in format \"{self.file_format}\".")
     def log(self, *args, **kwargs):
         self.logger.info(*args, **kwargs)
@@ -230,4 +232,3 @@ class State:
                 ext=self.config_general.ham3_ext())
 
 # -------------------------------------------------------------------------------------------------
-

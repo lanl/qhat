@@ -481,18 +481,20 @@ def run():
     state.log("Generate sum of Pauli strings.")
     pauli_sum = ham3_Fermion2Qubit.terms
 
-    state.log("Generate initial state vector.")
-    psi0 = get_initial_state(state, ham3_Fermion2Qubit)
-
     compute_metadata(state, ham3_Fermion2Qubit)
 
     ham3_filename = state.filename_ham3()
     state.log(f"Save sum of Pauli strings to data file \"{ham3_filename}\".")
     write_data(state, pauli_sum, ham2_ActiveSpace.n_qubits)
 
-    is_filename = ham3_filename[0:-4] + ".npy"
-    state.log(f"Save initial state to data file \"{is_filename}\".")
-    write_initial_state(psi0, is_filename, ham2_ActiveSpace.n_qubits)
+    if state.config_general.write_initial_state:
+        state.log("Generate initial state vector.")
+        psi0 = get_initial_state(state, ham3_Fermion2Qubit)
+        is_filename = ham3_filename[0:-4] + ".npy"
+        state.log(f"Save initial state to data file \"{is_filename}\".")
+        write_initial_state(psi0, is_filename, ham2_ActiveSpace.n_qubits)
+    else:
+        state.log("Skipping initial state vector generation.")
 
     state.log("Hamiltonian generation complete.")
 

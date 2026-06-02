@@ -1,0 +1,32 @@
+# number of frozen, occupied, single-occupancy orbitals = 0
+# number of active, occupied, single-occupancy orbitals = 2
+# number of active, vacant, single-occupancy orbitals = 2
+# number of frozen, vacant, single-occupancy orbitals = 0
+# size of active space = 4
+# number of qubits = 4
+# basis set = sto-6g
+# interatomic separation (angstroms) = 0.5
+# fermion-to-qubit operator mapping = bravyi-kitaev
+# number of terms in sum of Pauli strings = 15
+# one-norm of sum of Pauli strings (Hartrees) = 2.69864179123875
+# eigenvalue lower bound from shifted one-norm (Hartrees) = -1.9557630745194188
+# eigenvalue upper bound from shifted one-norm (Hartrees) = 2.69864179123875
+# Hartree-Fock energy (Hartrees) = -1.053187938674564
+# runtime for Hartree-Fock calculation (seconds) = 0.4591536521911621
+# runtime for active space calculation (seconds) = 0.0003917217254638672
+# runtime for fermion-to-qubit calculation (seconds) = 0.0014679431915283203
+ 2.16233166409554534e-01 ZIII
+ 3.71439358359665572e-01 IIII
+ 2.16233166409554534e-01 ZZII
+-3.67762490919060547e-01 IIZI
+-3.67762490919060547e-01 IZZZ
+4.23093514306269597e-02+0.00000000000000000e+00j YZYI
+4.23093514306269597e-02+0.00000000000000000e+00j XZXI
+4.23093514306269597e-02+0.00000000000000000e+00j XZXZ
+4.23093514306269597e-02+0.00000000000000000e+00j YZYZ
+ 1.79965867502744209e-01 IZII
+ 1.34671536144229831e-01 ZIZI
+ 1.76980887574856804e-01 ZZZI
+ 1.76980887574856804e-01 ZZZZ
+ 1.34671536144229831e-01 ZIZZ
+ 1.86702997558429451e-01 IZIZ

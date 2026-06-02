@@ -1,0 +1,66 @@
+2026-05-27 23:00:12,941    INFO | Running script with git hash 177944fe4ae3de88b128cad9054665bd843c9b3f
+2026-05-27 23:00:12,941    INFO | Writing to file stub "Be-Be_2.10_sto-6g" in format "default".
+2026-05-27 23:00:12,941    INFO | Contents of configuration file "/home/abhijith/Code/qhat/library_pilot/004-004_Be-Be/08q/sto-6g/Be-Be_2.10_sto-6g_as-004-004_jw.config":
+general.print_verbose()
+general.logfile = "Be-Be_2.10_sto-6g_as-004-004_jw.log"
+general.file_stub = "Be-Be_2.10_sto-6g"
+general.file_format = "default"
+general.write_initial_state = False
+L = 2.10000000
+hamiltonian.add_atom("Be", -0.5 * L, 0.0, 0.0)
+hamiltonian.add_atom("Be",  0.5 * L, 0.0, 0.0)
+hamiltonian.basis = "sto-6g"
+hamiltonian.num_active_occupied = 4
+hamiltonian.num_active_vacant = 4
+hamiltonian.f2q_mapping = "JW"
+2026-05-27 23:00:12,941    INFO | Trying to load "Be-Be_2.10_sto-6g_as-004-004.pickle".
+2026-05-27 23:00:12,941    INFO | Could not load "Be-Be_2.10_sto-6g_as-004-004.pickle". Trying to load "Be-Be_2.10_sto-6g.pickle".
+2026-05-27 23:00:12,941    INFO | Could not load "Be-Be_2.10_sto-6g.pickle".  Recomputing from the beginning.
+2026-05-27 23:00:12,942    INFO | Perform Hartree-Fock calculation.
+2026-05-27 23:00:12,942 VERBOSE | Construct instance of MolecularData.
+2026-05-27 23:00:13,385 VERBOSE | geometry: 
+           ('Be', (-1.05, 0.0, 0.0))
+           ('Be', (1.05, 0.0, 0.0))
+2026-05-27 23:00:13,385 VERBOSE | Construct instance of PyscfMolecularData.
+2026-05-27 23:00:13,475    INFO | Hartree-Fock energy from run_pyscf = -28.985899037125794
+2026-05-27 23:00:13,475    INFO | Pickle to "Be-Be_2.10_sto-6g.pickle" file.
+2026-05-27 23:00:13,475    INFO | Apply active space.
+2026-05-27 23:00:13,475 VERBOSE | Define active space.
+2026-05-27 23:00:13,476    INFO | single-occupancy (spin) orbital counts:
+                 total   active  frozen
+   num orbitals      20       8      12
+   num occupied       8       4       4
+   num vacant        12       4       8
+2026-05-27 23:00:13,476 VERBOSE | single-occupancy (spin) orbital indices:
+   frozen occupied  [ 0,  4)
+   active occupied  [ 4,  8)
+   active vacant    [ 8, 12)
+   frozen vacant    [12, 20)
+2026-05-27 23:00:13,476 VERBOSE | double-occupancy (spatial) orbital indices:
+   frozen occupied  [ 0,  2)
+   active total     [ 2,  6)
+2026-05-27 23:00:13,476 VERBOSE | Build instance of InteractionOperator.
+2026-05-27 23:00:13,477    INFO | Pickle to "Be-Be_2.10_sto-6g_as-004-004.pickle" file.
+2026-05-27 23:00:13,477    INFO | Map fermionic operators to qubit operators.
+2026-05-27 23:00:13,487    INFO | Generate sum of Pauli strings.
+2026-05-27 23:00:13,487    INFO | metadata:
+{  'Hartree-Fock energy (Hartrees)': -28.985899037125794,
+   'basis set': 'sto-6g',
+   'eigenvalue lower bound from shifted one-norm (Hartrees)': np.float64(-31.50719325004274),
+   'eigenvalue upper bound from shifted one-norm (Hartrees)': np.float64(-25.355642138964193),
+   'fermion-to-qubit operator mapping': 'jordan-wigner',
+   'interatomic separation (angstroms)': 2.1,
+   'number of active, occupied, single-occupancy orbitals': 4,
+   'number of active, vacant, single-occupancy orbitals': 4,
+   'number of frozen, occupied, single-occupancy orbitals': 4,
+   'number of frozen, vacant, single-occupancy orbitals': 8,
+   'number of qubits': 8,
+   'number of terms in sum of Pauli strings': 105,
+   'one-norm of sum of Pauli strings (Hartrees)': np.float64(31.50719325004274),
+   'runtime for Hartree-Fock calculation (seconds)': 0.5332262516021729,
+   'runtime for active space calculation (seconds)': 0.0010976791381835938,
+   'runtime for fermion-to-qubit calculation (seconds)': 0.009548187255859375,
+   'size of active space': 8}
+2026-05-27 23:00:13,487    INFO | Save sum of Pauli strings to data file "Be-Be_2.10_sto-6g_as-004-004_jw.dat".
+2026-05-27 23:00:13,488    INFO | Skipping initial state vector generation.
+2026-05-27 23:00:13,488    INFO | Hamiltonian generation complete.

@@ -1,0 +1,40 @@
+2026-05-27 22:58:15,699    INFO | Running script with git hash 177944fe4ae3de88b128cad9054665bd843c9b3f
+2026-05-27 22:58:15,700    INFO | Writing to file stub "H-H_0.50_sto-6g" in format "default".
+2026-05-27 22:58:15,700    INFO | Contents of configuration file "/home/abhijith/Code/qhat/library_pilot/001-001_H-H/04q/sto-6g/H-H_0.50_sto-6g_as-002-002_bk.config":
+general.print_verbose()
+general.logfile = "H-H_0.50_sto-6g_as-002-002_bk.log"
+general.file_stub = "H-H_0.50_sto-6g"
+general.file_format = "default"
+general.write_initial_state = False
+L = 0.50000000
+hamiltonian.add_atom("H", -0.5 * L, 0.0, 0.0)
+hamiltonian.add_atom("H",  0.5 * L, 0.0, 0.0)
+hamiltonian.basis = "sto-6g"
+hamiltonian.num_active_occupied = 2
+hamiltonian.num_active_vacant = 2
+hamiltonian.f2q_mapping = "BK"
+2026-05-27 22:58:15,700    INFO | Trying to load "H-H_0.50_sto-6g_as-002-002.pickle".
+2026-05-27 22:58:15,700    INFO | Loaded "H-H_0.50_sto-6g_as-002-002.pickle". Continuing from after the active space is applied.
+2026-05-27 22:58:15,700    INFO | Map fermionic operators to qubit operators.
+2026-05-27 22:58:15,702    INFO | Generate sum of Pauli strings.
+2026-05-27 22:58:15,702    INFO | metadata:
+{  'Hartree-Fock energy (Hartrees)': -1.053187938674564,
+   'basis set': 'sto-6g',
+   'eigenvalue lower bound from shifted one-norm (Hartrees)': np.float64(-1.9557630745194188),
+   'eigenvalue upper bound from shifted one-norm (Hartrees)': np.float64(2.69864179123875),
+   'fermion-to-qubit operator mapping': 'bravyi-kitaev',
+   'interatomic separation (angstroms)': 0.5,
+   'number of active, occupied, single-occupancy orbitals': 2,
+   'number of active, vacant, single-occupancy orbitals': 2,
+   'number of frozen, occupied, single-occupancy orbitals': 0,
+   'number of frozen, vacant, single-occupancy orbitals': 0,
+   'number of qubits': 4,
+   'number of terms in sum of Pauli strings': 15,
+   'one-norm of sum of Pauli strings (Hartrees)': np.float64(2.69864179123875),
+   'runtime for Hartree-Fock calculation (seconds)': 0.4591536521911621,
+   'runtime for active space calculation (seconds)': 0.0003917217254638672,
+   'runtime for fermion-to-qubit calculation (seconds)': 0.0014679431915283203,
+   'size of active space': 4}
+2026-05-27 22:58:15,702    INFO | Save sum of Pauli strings to data file "H-H_0.50_sto-6g_as-002-002_bk.dat".
+2026-05-27 22:58:15,702    INFO | Skipping initial state vector generation.
+2026-05-27 22:58:15,702    INFO | Hamiltonian generation complete.
