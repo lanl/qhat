@@ -283,10 +283,10 @@ def _eigendecompose(matrix, matrix_type, num_qubits, num_eigenvalues, which_eigs
 
     if is_full:
         # Full eigendecomposition
-        if is_matrix_free or dimension > 32768:
+        if is_matrix_free:
             raise ValueError(
-                f"Full eigendecomposition not supported for systems with >15 qubits "
-                f"(dimension={dimension}). Use num_eigenvalues=k for partial decomposition."
+                f"Full eigendecomposition not supported for matrix-free operators. "
+                f"Use num_eigenvalues=k for partial decomposition."
             )
         logger.verbose(f"Computing full eigendecomposition for {matrix_type} matrix")
         eigenvalues, eigenvectors = scipy.linalg.eigh(matrix)
@@ -297,10 +297,9 @@ def _eigendecompose(matrix, matrix_type, num_qubits, num_eigenvalues, which_eigs
         k = int(num_eigenvalues)
         if k <= 0:
             raise ValueError(f"num_eigenvalues must be positive, got {k}")
-        if k >= dimension:
+        if k > dimension:
             raise ValueError(
-                f"num_eigenvalues ({k}) must be less than dimension ({dimension}). "
-                f"Use num_eigenvalues='all' for full decomposition."
+                f"num_eigenvalues ({k}) must be less than or equal to dimension ({dimension})."
             )
 
         # Map user-friendly values to scipy's 'which' parameter
@@ -346,7 +345,6 @@ def _eigendecompose(matrix, matrix_type, num_qubits, num_eigenvalues, which_eigs
 def eigendecomposition_analysis(
         config_analysis: AnalysisConfiguration,
         hamiltonian,
-        algorithm,
         exact_matrix=None,
         unitary_matrix=None) -> dict:
     """
@@ -354,13 +352,15 @@ def eigendecomposition_analysis(
 
     Parameters:
         config_analysis: Analysis configuration with eigendecomposition settings
-        hamiltonian: Hamiltonian object (needed if exact_matrix not provided and required)
-        algorithm: Algorithm bloq (needed if unitary_matrix not provided and required)
-        exact_matrix: Pre-computed exact matrix (optional)
-        unitary_matrix: Pre-computed unitary matrix (optional)
+        hamiltonian: Hamiltonian object (needed for num_qubits)
+        exact_matrix: Pre-computed exact matrix (required if eigendecomposition_matrices is 'exact' or 'both')
+        unitary_matrix: Pre-computed unitary matrix (required if eigendecomposition_matrices is 'approximate' or 'both')
 
     Returns:
         Dictionary with eigendecomposition results and file paths
+
+    Raises:
+        ValueError: If required matrices are not provided
     """
     from qhat.analysis.file_io import save_eigendecomposition
     from qhat.analysis.matrix_operations import PauliStringOperator
@@ -385,19 +385,15 @@ def eigendecomposition_analysis(
 
     results = {}
 
-    # Get git hash for provenance
-    from qhat.analysis.config_types import _get_git_hash
-    git_hash = _get_git_hash()
-
     # Compute exact eigendecomposition if requested
     if need_exact:
         logger.info("Computing exact matrix eigendecomposition")
 
-        # Get exact matrix if not provided
         if exact_matrix is None:
-            if hamiltonian is None:
-                raise ValueError("hamiltonian required for exact eigendecomposition")
-            exact_matrix = _compute_exact_matrix(hamiltonian)
+            raise ValueError(
+                "exact_matrix is required for exact eigendecomposition. "
+                "Compute the matrix before calling eigendecomposition_analysis()."
+            )
 
         num_qubits = hamiltonian.num_qubits()
         eigs, vecs, num_computed = _eigendecompose(
@@ -408,7 +404,7 @@ def eigendecomposition_analysis(
         output_file = 'exact_eigendecomposition.npz'
         save_eigendecomposition(
             output_file, eigs, vecs, 'exact',
-            num_eigenvalues, which_eigs, git_hash=git_hash
+            num_eigenvalues, which_eigs
         )
 
         results['exact_eigendecomposition'] = {
@@ -422,11 +418,11 @@ def eigendecomposition_analysis(
     if need_approx:
         logger.info("Computing approximate matrix eigendecomposition")
 
-        # Get unitary matrix if not provided
         if unitary_matrix is None:
-            if algorithm is None:
-                raise ValueError("algorithm required for approximate eigendecomposition")
-            unitary_matrix = _compute_unitary_matrix(algorithm)
+            raise ValueError(
+                "unitary_matrix is required for approximate eigendecomposition. "
+                "Compute the matrix before calling eigendecomposition_analysis()."
+            )
 
         # Infer num_qubits from matrix dimension
         dimension = unitary_matrix.shape[0]
@@ -440,7 +436,7 @@ def eigendecomposition_analysis(
         output_file = 'approximate_eigendecomposition.npz'
         save_eigendecomposition(
             output_file, eigs, vecs, 'approximate',
-            num_eigenvalues, which_eigs, git_hash=git_hash
+            num_eigenvalues, which_eigs
         )
 
         results['approximate_eigendecomposition'] = {
