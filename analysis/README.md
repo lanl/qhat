@@ -208,6 +208,28 @@ There are many details of the algorithm that may be worth analyzing. The availab
   analysis.matrix_output_file = "unitary_matrix.npz"
   ```
 
+- **Exact Hamiltonian Matrix Output**: Setting `analysis.exact_matrix_output_file` to a filename
+  will compute and save the exact matrix representation of the Hamiltonian **without any
+  approximations**.  Supported formats are the same as for unitary matrix output.
+  
+  This is useful for:
+  - Validating approximate algorithms by comparing exact vs approximate eigenvalues
+  - Computing exact ground state energies for small systems
+  - Testing and debugging algorithm implementations
+  
+  **System size considerations**:
+  - **Small systems (≤15 qubits)**: Full dense matrix is computed and saved to file
+  - **Large systems (>15 qubits)**: Matrix-free operator is created but not saved (too large)
+  
+  **Example**:
+  ```python
+  analysis.exact_matrix_output_file = "exact_hamiltonian.npz"
+  ```
+  
+  **Note**: For large systems, the exact matrix computation creates a matrix-free LinearOperator
+  that can be used with scipy sparse eigensolvers, but cannot be directly saved to a file. The
+  analysis will skip file output and note this in the results.
+
 #### Numerical Simulation
 
 - **Numerical Simulation**: Setting `analysis.numerical_simulation_inputs` to one or more state
