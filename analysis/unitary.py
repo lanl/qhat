@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------------------------------
 
-def encode_linear_t(config_unitary: UnitaryConfiguration, hamiltonian):
+def encode_linear_t(
+        config_unitary: UnitaryConfiguration,
+        hamiltonian):
 
     logger.verbose("Encoding with fermionic linear-T block encoding from pyLIQTR.")
 
@@ -33,7 +35,9 @@ def encode_linear_t(config_unitary: UnitaryConfiguration, hamiltonian):
 
 # -------------------------------------------------------------------------------------------------
 
-def encode_pauli_lcu(config_unitary: UnitaryConfiguration, hamiltonian):
+def encode_pauli_lcu(
+        config_unitary: UnitaryConfiguration,
+        hamiltonian):
 
     logger.verbose(
             "Encoding with Pauli linear-combination-of-unitaries block encoding from pyLIQTR.")

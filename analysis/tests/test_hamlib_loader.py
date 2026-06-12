@@ -18,16 +18,6 @@ class MockConfig:
     def __init__(self):
         self.verbose = False
 
-    def log(self, msg):
-        """Mock logging."""
-        if self.verbose:
-            print(msg)
-
-    def log_verbose(self, msg):
-        """Mock verbose logging."""
-        if self.verbose:
-            print(f"[VERBOSE] {msg}")
-
 
 def create_test_hamlib_hdf5(filename, include_metadata=True):
     """
@@ -58,7 +48,6 @@ def test_load_simple_hamlib_file():
         create_test_hamlib_hdf5(tmp_path)
 
         # Create mock configuration
-        config_general = MockConfig()
         config_hamiltonian = MockConfig()
         config_hamiltonian.filename = tmp_path
         config_hamiltonian.hdf5_key = 'test_hamiltonian'
@@ -110,7 +99,6 @@ def test_load_hamlib_autodetect_key():
         create_test_hamlib_hdf5(tmp_path)
 
         # Create mock configuration WITHOUT specifying hdf5_key
-        config_general = MockConfig()
         config_hamiltonian = MockConfig()
         config_hamiltonian.filename = tmp_path
 
@@ -144,7 +132,6 @@ def test_load_hamlib_with_metadata():
             assert dataset.attrs['nqubits'] == 2
 
         # Load the file
-        config_general = MockConfig()
         config_hamiltonian = MockConfig()
         config_hamiltonian.filename = tmp_path
         config_hamiltonian.hdf5_key = 'test_hamiltonian'
@@ -175,7 +162,6 @@ def test_identity_only_hamiltonian():
             f.create_dataset('identity_ham', data=hamlib_string.encode('utf-8'))
 
         # Load it
-        config_general = MockConfig()
         config_hamiltonian = MockConfig()
         config_hamiltonian.filename = tmp_path
         config_hamiltonian.hdf5_key = 'identity_ham'
@@ -205,7 +191,6 @@ def test_real_hamlib_file():
         return
 
     # Load using Jordan-Wigner mapping (ham_JW)
-    config_general = MockConfig()
     config_hamiltonian = MockConfig()
     config_hamiltonian.filename = str(test_file)
     config_hamiltonian.hdf5_key = 'ham_JW'

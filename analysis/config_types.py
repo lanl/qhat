@@ -160,11 +160,13 @@ class AnalysisConfiguration(ConfigurationBase):
     def __init__(self):
         self.resource_estimator = None
         self.matrix_output_file = None
+        self.numerical_simulation_inputs = None
 
     def _generate_TOML_table(self):
         table = tomlkit.table()
         self.save_if_present(table, "resource_estimator")
         self.save_if_present(table, "matrix_output_file")
+        self.save_if_present(table, "numerical_simulation_inputs")
         return table
 
 # -------------------------------------------------------------------------------------------------
@@ -190,8 +192,6 @@ class GeneralConfiguration:
         self.logfile = user_config.logfile
         self.loglevel = user_config._loglevel
         self.git_hash = _get_git_hash()
-        # Note: Logging is now configured by the application entry point (driver.py)
-        # using qhat.logging_utils.configure_logging()
 
     def _generate_TOML_table(self):
         table = tomlkit.table()

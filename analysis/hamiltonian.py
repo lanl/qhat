@@ -203,7 +203,9 @@ class Hamiltonian:
         else:
             raise TypeError(
                     f"Unable to shift a fermionic Hamiltonian of type \"{type(self._H)}\".")
-    def compute_initial_energy_bounds(self, config_hamiltonian: HamiltonianConfiguration):
+    def compute_initial_energy_bounds(
+            self,
+            config_hamiltonian: HamiltonianConfiguration):
         logger.info("Computing initial energy bounds.")
         pauli_sum = self.get_all_pauli_strings()
         logger.verbose(f"-- number of Pauli strings = {len(pauli_sum)}")
