@@ -146,7 +146,7 @@ analysis.numerical_simulation_inputs = "examples/initial_state.npy"
 # Compute the exact matrix representation of the Hamiltonian without any approximations
 # (no Trotter, no double-factorization)
 
-# analysis.exact_matrix_output_file = "Be-H_exact_hamiltonian.npz"
+analysis.exact_matrix_output_file = "Be-H_exact_hamiltonian.npz"
 
 # This computes the true Hamiltonian matrix H directly from the Pauli string representation.
 # Useful for:
@@ -155,17 +155,26 @@ analysis.numerical_simulation_inputs = "examples/initial_state.npy"
 #   - Computing exact ground state energies
 
 # Implementation notes:
-#   - For small systems (≤15 qubits): Materializes full dense matrix
-#   - For large systems (>15 qubits): Creates matrix-free operator (LinearOperator)
-#   - Matrix-free operators work with scipy eigensolvers but cannot be directly saved
+#   - Uses memory-based threshold to choose between dense and sparse representations
+#   - Default threshold: 16 GB (allows dense matrices up to ~15 qubits)
+#   - Dense matrices: Full materialization, can be saved to file
+#   - Sparse matrices (above threshold): Matrix-free operator, works with scipy eigensolvers
+#   - Matrix-free operators cannot be directly saved to file
+
+# Optional: Configure memory threshold for dense/sparse selection
+# analysis.matrix_memory_threshold_gb = 16.0  # Default: 16 GB
+# Examples:
+#   - 1.0 GB threshold allows dense up to ~13 qubits
+#   - 16.0 GB threshold allows dense up to ~15 qubits
+#   - 64.0 GB threshold allows dense up to ~16 qubits
 
 # Supported formats (auto-detected from extension):
 #   - .npz: NumPy compressed format (recommended, includes metadata)
 #   - .h5 / .hdf5: HDF5 format
 #   - .txt: Human-readable text (only for very small matrices)
 
-# Note: For systems >15 qubits, the exact matrix is too large to save. The analysis
-#       will create a matrix-free operator but skip the file output.
+# Note: For systems exceeding the memory threshold, the exact matrix computation will use
+#       a matrix-free operator but skip the file output.
 
 # =================================================================================================
 # FUTURE ANALYSES (Coming in subsequent branches)
