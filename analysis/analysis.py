@@ -254,6 +254,196 @@ def exact_matrix_output(
 
 # -------------------------------------------------------------------------------------------------
 
+def _eigendecompose(matrix, matrix_type, num_eigenvalues, which_eigs):
+    """
+    Perform eigendecomposition of a matrix (full or partial).
+
+    Parameters:
+        matrix: Matrix to decompose (dense array or matrix-free operator)
+        matrix_type: String describing the matrix type (for logging)
+        num_eigenvalues: Number of eigenvalues to compute (int) or "all" for full decomposition
+        which_eigs: Which eigenvalues to compute ('smallest', 'largest', or 'both')
+
+    Returns:
+        tuple: (eigenvalues, eigenvectors, num_computed)
+
+    Raises:
+        ValueError: If parameters are invalid or operation not supported
+    """
+    import scipy.linalg
+    import scipy.sparse.linalg
+    from qhat.analysis.matrix_operations import PauliStringOperator
+
+    dimension = matrix.shape[0]
+    is_matrix_free = isinstance(matrix, PauliStringOperator) or hasattr(matrix, 'matvec')
+
+    # Determine if full or partial eigendecomposition
+    is_full = isinstance(num_eigenvalues, str) and num_eigenvalues.lower() == "all"
+
+    if is_full:
+        # Full eigendecomposition
+        if is_matrix_free:
+            raise ValueError(
+                f"Full eigendecomposition not supported for matrix-free operators. "
+                f"Use num_eigenvalues=k for partial decomposition."
+            )
+        logger.verbose(f"Computing full eigendecomposition for {matrix_type} matrix")
+        eigenvalues, eigenvectors = scipy.linalg.eigh(matrix)
+        num_computed = len(eigenvalues)
+
+    else:
+        # Partial eigendecomposition using sparse methods
+        k = int(num_eigenvalues)
+        if k <= 0:
+            raise ValueError(f"num_eigenvalues must be positive, got {k}")
+        if k > dimension:
+            raise ValueError(
+                f"num_eigenvalues ({k}) must be less than or equal to dimension ({dimension})."
+            )
+
+        # Map user-friendly values to scipy's 'which' parameter
+        which_map = {
+            'smallest': 'SA',  # Smallest Algebraic (most negative)
+            'largest': 'LA',   # Largest Algebraic (most positive)
+        }
+
+        if which_eigs == 'both':
+            # Compute both smallest and largest
+            logger.verbose(f"Computing {k} smallest and {k} largest eigenvalues for {matrix_type} matrix")
+            eigs_small, vecs_small = scipy.sparse.linalg.eigsh(
+                matrix, k=k, which='SA', return_eigenvectors=True
+            )
+            eigs_large, vecs_large = scipy.sparse.linalg.eigsh(
+                matrix, k=k, which='LA', return_eigenvectors=True
+            )
+            # Concatenate results
+            eigenvalues = np.concatenate([eigs_small, eigs_large])
+            eigenvectors = np.concatenate([vecs_small, vecs_large], axis=1)
+            num_computed = len(eigenvalues)
+        else:
+            # Compute only one set
+            which_scipy = which_map.get(which_eigs)
+            if which_scipy is None:
+                raise ValueError(
+                    f"which_eigenvalues must be 'smallest', 'largest', or 'both', "
+                    f"got '{which_eigs}'"
+                )
+            logger.verbose(f"Computing {k} {which_eigs} eigenvalues for {matrix_type} matrix")
+            eigenvalues, eigenvectors = scipy.sparse.linalg.eigsh(
+                matrix, k=k, which=which_scipy, return_eigenvectors=True
+            )
+            num_computed = len(eigenvalues)
+
+    logger.info(f"Computed {num_computed} eigenvalues for {matrix_type} matrix")
+    logger.verbose(f"  Eigenvalue range: [{eigenvalues.min():.6e}, {eigenvalues.max():.6e}]")
+
+    return eigenvalues, eigenvectors, num_computed
+
+# -------------------------------------------------------------------------------------------------
+
+def _process_eigendecomposition(matrix, matrix_type, num_eigenvalues, which_eigs):
+    """
+    Process eigendecomposition for a single matrix: compute, save, and return metadata.
+
+    Parameters:
+        matrix: Matrix to decompose (dense array or matrix-free operator)
+        matrix_type: String describing the matrix type ('exact' or 'approximate')
+        num_eigenvalues: Number of eigenvalues to compute (int) or "all"
+        which_eigs: Which eigenvalues to compute ('smallest', 'largest', or 'both')
+
+    Returns:
+        Dictionary with file path, num_eigenvalues, eigenvalue_range, and which
+
+    Raises:
+        ValueError: If matrix is None
+    """
+    from qhat.analysis.file_io import save_eigendecomposition
+
+    logger.info(f"Computing {matrix_type} matrix eigendecomposition")
+
+    if matrix is None:
+        raise ValueError(
+            f"{matrix_type}_matrix is required for {matrix_type} eigendecomposition. "
+            "Compute the matrix before calling eigendecomposition_analysis()."
+        )
+
+    eigs, vecs, num_computed = _eigendecompose(
+        matrix, matrix_type, num_eigenvalues, which_eigs
+    )
+
+    # Save to file
+    output_file = f'{matrix_type}_eigendecomposition.npz'
+    save_eigendecomposition(
+        output_file, eigs, vecs, matrix_type,
+        num_eigenvalues, which_eigs
+    )
+
+    return {
+        'file': output_file,
+        'num_eigenvalues': num_computed,
+        'eigenvalue_range': [float(eigs.min()), float(eigs.max())],
+        'which': which_eigs
+    }
+
+# -------------------------------------------------------------------------------------------------
+
+def eigendecomposition_analysis(
+        config_analysis: AnalysisConfiguration,
+        exact_matrix=None,
+        unitary_matrix=None) -> dict:
+    """
+    Compute eigendecompositions of exact and/or approximate matrices.
+
+    Parameters:
+        config_analysis: Analysis configuration with eigendecomposition settings
+        exact_matrix: Pre-computed exact matrix (required if eigendecomposition_matrices is 'exact' or 'both')
+        unitary_matrix: Pre-computed unitary matrix (required if eigendecomposition_matrices is 'approximate' or 'both')
+
+    Returns:
+        Dictionary with eigendecomposition results and file paths
+
+    Raises:
+        ValueError: If required matrices are not provided
+    """
+    from qhat.analysis.file_io import save_eigendecomposition
+    from qhat.analysis.matrix_operations import PauliStringOperator
+    import scipy.linalg
+    import scipy.sparse.linalg
+
+    num_eigenvalues = config_analysis.num_eigenvalues
+    which_matrices = config_analysis.eigendecomposition_matrices
+    which_eigs = config_analysis.which_eigenvalues
+
+    logger.info(f"Starting eigendecomposition analysis")
+    logger.verbose(f"  num_eigenvalues: {num_eigenvalues}")
+    logger.verbose(f"  eigendecomposition_matrices: {which_matrices}")
+    logger.verbose(f"  which_eigenvalues: {which_eigs}")
+
+    # Determine if full or partial eigendecomposition
+    is_full = isinstance(num_eigenvalues, str) and num_eigenvalues.lower() == "all"
+
+    # Determine which matrices we need
+    need_exact = which_matrices in ['exact', 'both']
+    need_approx = which_matrices in ['approximate', 'both']
+
+    results = {}
+
+    # Compute exact eigendecomposition if requested
+    if need_exact:
+        results['exact_eigendecomposition'] = _process_eigendecomposition(
+            exact_matrix, 'exact', num_eigenvalues, which_eigs
+        )
+
+    # Compute approximate eigendecomposition if requested
+    if need_approx:
+        results['approximate_eigendecomposition'] = _process_eigendecomposition(
+            unitary_matrix, 'approximate', num_eigenvalues, which_eigs
+        )
+
+    return results
+
+# -------------------------------------------------------------------------------------------------
+
 def numerical_simulation(
         config_analysis: AnalysisConfiguration,
         algorithm,
@@ -345,26 +535,43 @@ def analyze_algorithm(
     logger.info("Beginning algorithm analysis.")
 
     # Validate at least one analysis requested
+    num_eigenvalues = config_analysis.num_eigenvalues
+    eigendecomposition_requested = (
+        isinstance(num_eigenvalues, int) and num_eigenvalues > 0
+    ) or (
+        isinstance(num_eigenvalues, str) and num_eigenvalues.lower() == "all"
+    )
+
     if (config_analysis.resource_estimator is None and
         config_analysis.matrix_output_file is None and
         config_analysis.numerical_simulation_inputs is None and
-        config_analysis.exact_matrix_output_file is None):
+        config_analysis.exact_matrix_output_file is None and
+        not eigendecomposition_requested):
         raise ValueError(
             "No analyses requested. Set at least one of:\n"
             "  - resource_estimator (e.g., 'pyliqtr', 'cirq')\n"
             "  - matrix_output_file (e.g., 'matrix.npz', 'matrix.h5', 'matrix.txt')\n"
             "  - numerical_simulation_inputs (e.g., 'state.npy' or ['state1.npy', 'state2.npy'])\n"
-            "  - exact_matrix_output_file (e.g., 'exact_hamiltonian.npz')"
+            "  - exact_matrix_output_file (e.g., 'exact_hamiltonian.npz')\n"
+            "  - num_eigenvalues (e.g., 5 or 'all')"
         )
 
     results = {}
 
     # Check if any analysis needs the unitary matrix
-    needs_matrix = (config_analysis.matrix_output_file is not None or
-                    config_analysis.numerical_simulation_inputs is not None)
+    needs_matrix = (
+        config_analysis.matrix_output_file is not None or
+        config_analysis.numerical_simulation_inputs is not None or
+        (eigendecomposition_requested and
+         config_analysis.eigendecomposition_matrices in ['approximate', 'both'])
+    )
 
     # Check if any analysis needs the exact Hamiltonian matrix
-    needs_exact_matrix = (config_analysis.exact_matrix_output_file is not None)
+    needs_exact_matrix = (
+        config_analysis.exact_matrix_output_file is not None or
+        (eigendecomposition_requested and
+         config_analysis.eigendecomposition_matrices in ['exact', 'both'])
+    )
 
     # Compute matrices once if needed
     unitary_matrix = None
@@ -396,6 +603,14 @@ def analyze_algorithm(
     if config_analysis.numerical_simulation_inputs is not None:
         logger.info("Performing numerical simulation.")
         results["numerical_simulation"] = numerical_simulation(config_analysis, algorithm, unitary_matrix)
+
+    if eigendecomposition_requested:
+        logger.info("Performing eigendecomposition analysis.")
+        results["eigendecomposition"] = eigendecomposition_analysis(
+            config_analysis,
+            exact_matrix=exact_matrix,
+            unitary_matrix=unitary_matrix
+        )
 
     # TODO: Add error estimation
     # TODO: Add an option for detailed error analysis (explicitly compute the eigenvalues of the

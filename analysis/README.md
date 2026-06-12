@@ -230,6 +230,60 @@ There are many details of the algorithm that may be worth analyzing. The availab
   that can be used with scipy sparse eigensolvers, but cannot be directly saved to a file. The
   analysis will skip file output and note this in the results.
 
+#### Eigendecomposition Analysis
+
+- **Eigendecomposition Analysis**: Setting `analysis.num_eigenvalues` to a positive integer or `"all"` enables eigenvalue/eigenvector computation for exact and/or approximate matrices.
+
+  **Configuration parameters**:
+  
+  - **`num_eigenvalues`**: Controls how many eigenvalues to compute
+    - `0` (default): Eigendecomposition disabled
+    - Positive integer (e.g., `5`): Compute that many eigenvalues using sparse methods (recommended for large systems)
+    - `"all"` (case-insensitive): Compute full eigendecomposition (all eigenvalues and eigenvectors)
+      - **Only feasible for small systems**
+
+  - **`eigendecomposition_matrices`**: Which matrices to eigendecompose
+    - `"approximate"` (default): Only eigendecompose the algorithm's unitary matrix
+    - `"exact"`: Only eigendecompose the exact Hamiltonian matrix
+    - `"both"`: Eigendecompose both matrices (useful for comparison)
+
+  - **`which_eigenvalues`**: Which eigenvalues to compute (ignored for full decomposition)
+    - `"smallest"` (default): Algebraically smallest (most negative, ground state for Hamiltonians)
+    - `"largest"`: Algebraically largest (most positive)
+    - `"both"`: Compute k smallest AND k largest (returns 2k eigenvalues total)
+    - **Important**: "smallest" means most negative (closest to -∞), NOT smallest magnitude
+
+  **Output files**:
+  - `exact_eigendecomposition.npz`: Results for exact matrix (if requested)
+  - `approximate_eigendecomposition.npz`: Results for approximate matrix (if requested)
+  - Each file contains: eigenvalues, eigenvectors, metadata
+
+  **Examples**:
+  ```python
+  # Ground state energy (1 smallest eigenvalue) for large system
+  analysis.num_eigenvalues = 1
+  analysis.which_eigenvalues = "smallest"
+  analysis.eigendecomposition_matrices = "both"  # Compare exact vs approximate
+
+  # Low-lying excited states (5 smallest eigenvalues)
+  analysis.num_eigenvalues = 5
+  analysis.which_eigenvalues = "smallest"
+
+  # High and low energy states
+  analysis.num_eigenvalues = 3
+  analysis.which_eigenvalues = "both"  # Returns 6 eigenvalues (3 smallest + 3 largest)
+
+  # Full spectrum for small system
+  analysis.num_eigenvalues = "all"
+  analysis.eigendecomposition_matrices = "exact"
+  ```
+
+  **Eigenvalue terminology**:
+  - For a Hamiltonian with eigenvalues [-10, -5, 0, 5, 10]:
+    - `"smallest"` gives [-10, -5, ...] (most negative, ground state)
+    - `"largest"` gives [10, 5, ...] (most positive)
+    - This is NOT based on magnitude (which would give [0, 5, -5, ...])
+
 #### Numerical Simulation
 
 - **Numerical Simulation**: Setting `analysis.numerical_simulation_inputs` to one or more state

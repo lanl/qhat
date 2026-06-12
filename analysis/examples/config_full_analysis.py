@@ -140,9 +140,9 @@ analysis.numerical_simulation_inputs = "examples/initial_state.npy"
 #   state = np.array([1.0, 0.0, 0.0, 0.0], dtype=complex)
 #   np.save("ground_state.npy", state)
 
-# =================================================================================================
+# -------------------------------------------------------------------------------------------------
 # 4. EXACT MATRIX COMPUTATION
-# =================================================================================================
+# -------------------------------------------------------------------------------------------------
 # Compute the exact matrix representation of the Hamiltonian without any approximations
 
 analysis.exact_matrix_output_file = "Be-H_exact_hamiltonian.npz"
@@ -175,14 +175,68 @@ analysis.exact_matrix_output_file = "Be-H_exact_hamiltonian.npz"
 # Note: For systems exceeding the memory threshold, the exact matrix computation will use
 #       a matrix-free operator (enabling other analyses) but skip the file output.
 
+# -------------------------------------------------------------------------------------------------
+# 5. EIGENDECOMPOSITION ANALYSIS
+# -------------------------------------------------------------------------------------------------
+# Compute eigenvalues and eigenvectors of exact and/or approximate matrices.  May not be practical
+# or even possible for large systems.
+
+analysis.num_eigenvalues = 5  # Compute 5 eigenvalues (use sparse methods)
+analysis.eigendecomposition_matrices = "both"  # Options: "exact", "approximate", "both"
+analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both"
+
+# This analysis computes eigendecompositions for validation and comparison:
+#   - Ground state energy (use num_eigenvalues=1, which_eigenvalues="smallest")
+#   - Low-lying excited states (use num_eigenvalues=5, which_eigenvalues="smallest")
+#   - High-energy states (use num_eigenvalues=5, which_eigenvalues="largest")
+#   - Both ends of spectrum (use which_eigenvalues="both")
+
+# Configuration options:
+#   num_eigenvalues:
+#     - 0 (default): Eigendecomposition disabled
+#     - Positive int (e.g., 5): Compute that many eigenvalues
+#     - "all": Full eigendecomposition (only for small systems)
+#
+#   eigendecomposition_matrices:
+#     - "approximate" (default): Only eigendecompose unitary matrix
+#     - "exact": Only eigendecompose exact Hamiltonian matrix
+#     - "both": Eigendecompose both (useful for comparison)
+#
+#   which_eigenvalues (ignored for "all"):
+#     - "smallest" (default): Algebraically smallest (most negative, ground state)
+#     - "largest": Algebraically largest (most positive)
+#     - "both": Compute smallest AND largest (returns num_eigenvalues smallest AND num_eigenvalues
+#       largest)
+#
+
+# Output files:
+#   - exact_eigendecomposition.npz (if "exact" or "both")
+#   - approximate_eigendecomposition.npz (if "approximate" or "both")
+
+# Examples:
+
+# Ground state energy comparison
+# analysis.num_eigenvalues = 1
+# analysis.eigendecomposition_matrices = "both"
+# analysis.which_eigenvalues = "smallest"
+
+# Low-lying spectrum (5 lowest-energy states)
+# analysis.num_eigenvalues = 5
+# analysis.eigendecomposition_matrices = "exact"
+# analysis.which_eigenvalues = "smallest"
+
+# High and low energy states (3 smallest + 3 largest = 6 total)
+# analysis.num_eigenvalues = 3
+# analysis.eigendecomposition_matrices = "both"
+# analysis.which_eigenvalues = "both"
+
+# Full spectrum for small system
+# analysis.num_eigenvalues = "all"
+# analysis.eigendecomposition_matrices = "exact"
+
 # =================================================================================================
 # FUTURE ANALYSES (Coming in subsequent branches)
 # =================================================================================================
-
-# Branch 2: Eigendecomposition
-# analysis.num_eigenvalues = 5  # Compute 5 lowest eigenvalues
-# analysis.eigendecomposition_matrices = "both"  # Analyze both exact and approximate
-# analysis.which_eigenvalues = "smallest"  # Ground state and low-lying excited states
 
 # Branch 3: Error Metrics
 # analysis.error_num_eigenvalues = 1  # Compare ground state energy
