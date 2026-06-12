@@ -240,8 +240,7 @@ There are many details of the algorithm that may be worth analyzing. The availab
     - `0` (default): Eigendecomposition disabled
     - Positive integer (e.g., `5`): Compute that many eigenvalues using sparse methods (recommended for large systems)
     - `"all"` (case-insensitive): Compute full eigendecomposition (all eigenvalues and eigenvectors)
-      - **Only feasible for small systems (≤10 qubits)**
-      - Systems >15 qubits will raise an error
+      - **Only feasible for small systems**
 
   - **`eigendecomposition_matrices`**: Which matrices to eigendecompose
     - `"approximate"` (default): Only eigendecompose the algorithm's unitary matrix
@@ -253,13 +252,6 @@ There are many details of the algorithm that may be worth analyzing. The availab
     - `"largest"`: Algebraically largest (most positive)
     - `"both"`: Compute k smallest AND k largest (returns 2k eigenvalues total)
     - **Important**: "smallest" means most negative (closest to -∞), NOT smallest magnitude
-
-  **System size guidance**:
-  - **≤10 qubits**: `num_eigenvalues = "all"` is feasible
-  - **10-12 qubits**: `"all"` possible but expensive, consider partial
-  - **≥12 qubits**: Use partial (specify small k like 5-10)
-  - **20+ qubits (production)**: MUST use partial, `"all"` not feasible
-  - **25-30 qubits**: Partial eigendecomposition still scales well with sparse methods
 
   **Output files**:
   - `exact_eigendecomposition.npz`: Results for exact matrix (if requested)
