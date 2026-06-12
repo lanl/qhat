@@ -140,9 +140,9 @@ analysis.numerical_simulation_inputs = "examples/initial_state.npy"
 #   state = np.array([1.0, 0.0, 0.0, 0.0], dtype=complex)
 #   np.save("ground_state.npy", state)
 
-# =================================================================================================
+# -------------------------------------------------------------------------------------------------
 # 4. EXACT MATRIX COMPUTATION
-# =================================================================================================
+# -------------------------------------------------------------------------------------------------
 # Compute the exact matrix representation of the Hamiltonian without any approximations
 
 analysis.exact_matrix_output_file = "Be-H_exact_hamiltonian.npz"
@@ -175,9 +175,9 @@ analysis.exact_matrix_output_file = "Be-H_exact_hamiltonian.npz"
 # Note: For systems exceeding the memory threshold, the exact matrix computation will use
 #       a matrix-free operator (enabling other analyses) but skip the file output.
 
-# =================================================================================================
-# 5. EIGENDECOMPOSITION ANALYSIS (Branch 2: Now Available!)
-# =================================================================================================
+# -------------------------------------------------------------------------------------------------
+# 5. EIGENDECOMPOSITION ANALYSIS
+# -------------------------------------------------------------------------------------------------
 # Compute eigenvalues and eigenvectors of exact and/or approximate matrices
 
 # analysis.num_eigenvalues = 5  # Compute 5 eigenvalues (use sparse methods)
