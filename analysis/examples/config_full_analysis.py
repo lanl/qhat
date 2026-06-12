@@ -178,11 +178,12 @@ analysis.exact_matrix_output_file = "Be-H_exact_hamiltonian.npz"
 # -------------------------------------------------------------------------------------------------
 # 5. EIGENDECOMPOSITION ANALYSIS
 # -------------------------------------------------------------------------------------------------
-# Compute eigenvalues and eigenvectors of exact and/or approximate matrices
+# Compute eigenvalues and eigenvectors of exact and/or approximate matrices.  May not be practical
+# or even possible for large systems.
 
-# analysis.num_eigenvalues = 5  # Compute 5 eigenvalues (use sparse methods)
-# analysis.eigendecomposition_matrices = "both"  # Options: "exact", "approximate", "both"
-# analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both"
+analysis.num_eigenvalues = 5  # Compute 5 eigenvalues (use sparse methods)
+analysis.eigendecomposition_matrices = "both"  # Options: "exact", "approximate", "both"
+analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both"
 
 # This analysis computes eigendecompositions for validation and comparison:
 #   - Ground state energy (use num_eigenvalues=1, which_eigenvalues="smallest")
@@ -193,8 +194,8 @@ analysis.exact_matrix_output_file = "Be-H_exact_hamiltonian.npz"
 # Configuration options:
 #   num_eigenvalues:
 #     - 0 (default): Eigendecomposition disabled
-#     - Positive int (e.g., 5): Compute that many eigenvalues (recommended for large systems)
-#     - "all": Full eigendecomposition (only for systems ≤10 qubits)
+#     - Positive int (e.g., 5): Compute that many eigenvalues
+#     - "all": Full eigendecomposition (only for small systems)
 #
 #   eigendecomposition_matrices:
 #     - "approximate" (default): Only eigendecompose unitary matrix
@@ -204,14 +205,9 @@ analysis.exact_matrix_output_file = "Be-H_exact_hamiltonian.npz"
 #   which_eigenvalues (ignored for "all"):
 #     - "smallest" (default): Algebraically smallest (most negative, ground state)
 #     - "largest": Algebraically largest (most positive)
-#     - "both": Compute smallest AND largest (returns 2k eigenvalues)
+#     - "both": Compute smallest AND largest (returns num_eigenvalues smallest AND num_eigenvalues
+#       largest)
 #
-# System size guidance:
-#   - ≤10 qubits: "all" feasible
-#   - 10-12 qubits: "all" possible but expensive
-#   - ≥12 qubits: Use partial (specify k=5-10)
-#   - 20+ qubits: MUST use partial
-#   - 25-30 qubits: Partial still scales well
 
 # Output files:
 #   - exact_eigendecomposition.npz (if "exact" or "both")
@@ -219,7 +215,7 @@ analysis.exact_matrix_output_file = "Be-H_exact_hamiltonian.npz"
 
 # Examples:
 
-# Ground state energy comparison (most common use case for large systems)
+# Ground state energy comparison
 # analysis.num_eigenvalues = 1
 # analysis.eigendecomposition_matrices = "both"
 # analysis.which_eigenvalues = "smallest"
