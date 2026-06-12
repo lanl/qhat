@@ -39,8 +39,7 @@ def test_save_load_eigendecomposition():
             output_file, eigenvalues, eigenvectors,
             matrix_type='exact',
             num_eigenvalues=3,
-            which_eigenvalues='smallest',
-            git_hash='test123'
+            which_eigenvalues='smallest'
         )
 
         # Load
@@ -51,7 +50,6 @@ def test_save_load_eigendecomposition():
         np.testing.assert_array_almost_equal(loaded['eigenvectors'], eigenvectors)
         assert loaded['matrix_type'] == 'exact'
         assert loaded['which_eigenvalues'] == 'smallest'
-        assert loaded['git_hash'] == 'test123'
 
     finally:
         if os.path.exists(output_file):
@@ -96,10 +94,7 @@ def test_eigendecomposition_identity():
         original_dir = os.getcwd()
         os.chdir(tmpdir)
         try:
-            results = eigendecomposition_analysis(
-                config,
-                hamiltonian=None,
-                algorithm=None,
+            results = eigendecomposition_analysis(config,
                 exact_matrix=None,
                 unitary_matrix=identity
             )
@@ -142,10 +137,7 @@ def test_eigendecomposition_pauli_z():
         original_dir = os.getcwd()
         os.chdir(tmpdir)
         try:
-            results = eigendecomposition_analysis(
-                config,
-                hamiltonian=MockHamiltonian(),
-                algorithm=None,
+            results = eigendecomposition_analysis(config,
                 exact_matrix=pauli_z,
                 unitary_matrix=None
             )
@@ -179,10 +171,7 @@ def test_eigendecomposition_orthonormality():
         original_dir = os.getcwd()
         os.chdir(tmpdir)
         try:
-            results = eigendecomposition_analysis(
-                config,
-                hamiltonian=None,
-                algorithm=None,
+            results = eigendecomposition_analysis(config,
                 exact_matrix=None,
                 unitary_matrix=matrix
             )
@@ -221,10 +210,7 @@ def test_full_eigendecomposition():
         original_dir = os.getcwd()
         os.chdir(tmpdir)
         try:
-            results = eigendecomposition_analysis(
-                config,
-                hamiltonian=None,
-                algorithm=None,
+            results = eigendecomposition_analysis(config,
                 exact_matrix=None,
                 unitary_matrix=matrix
             )
@@ -258,10 +244,7 @@ def test_partial_eigendecomposition_smallest():
         original_dir = os.getcwd()
         os.chdir(tmpdir)
         try:
-            results = eigendecomposition_analysis(
-                config,
-                hamiltonian=None,
-                algorithm=None,
+            results = eigendecomposition_analysis(config,
                 exact_matrix=None,
                 unitary_matrix=matrix
             )
@@ -294,10 +277,7 @@ def test_partial_eigendecomposition_largest():
         original_dir = os.getcwd()
         os.chdir(tmpdir)
         try:
-            results = eigendecomposition_analysis(
-                config,
-                hamiltonian=None,
-                algorithm=None,
+            results = eigendecomposition_analysis(config,
                 exact_matrix=None,
                 unitary_matrix=matrix
             )
@@ -330,10 +310,7 @@ def test_partial_eigendecomposition_both():
         original_dir = os.getcwd()
         os.chdir(tmpdir)
         try:
-            results = eigendecomposition_analysis(
-                config,
-                hamiltonian=None,
-                algorithm=None,
+            results = eigendecomposition_analysis(config,
                 exact_matrix=None,
                 unitary_matrix=matrix
             )
@@ -370,10 +347,7 @@ def test_case_insensitive_all():
             original_dir = os.getcwd()
             os.chdir(tmpdir)
             try:
-                results = eigendecomposition_analysis(
-                    config,
-                    hamiltonian=None,
-                    algorithm=None,
+                results = eigendecomposition_analysis(config,
                     exact_matrix=None,
                     unitary_matrix=matrix
                 )
@@ -408,10 +382,7 @@ def test_eigendecomposition_exact_only():
         original_dir = os.getcwd()
         os.chdir(tmpdir)
         try:
-            results = eigendecomposition_analysis(
-                config,
-                hamiltonian=MockHamiltonian(),
-                algorithm=None,
+            results = eigendecomposition_analysis(config,
                 exact_matrix=exact_matrix,
                 unitary_matrix=None
             )
@@ -439,10 +410,7 @@ def test_eigendecomposition_approximate_only():
         original_dir = os.getcwd()
         os.chdir(tmpdir)
         try:
-            results = eigendecomposition_analysis(
-                config,
-                hamiltonian=None,
-                algorithm=None,
+            results = eigendecomposition_analysis(config,
                 exact_matrix=None,
                 unitary_matrix=approx_matrix
             )
@@ -475,10 +443,7 @@ def test_eigendecomposition_both_matrices():
         original_dir = os.getcwd()
         os.chdir(tmpdir)
         try:
-            results = eigendecomposition_analysis(
-                config,
-                hamiltonian=MockHamiltonian(),
-                algorithm=None,
+            results = eigendecomposition_analysis(config,
                 exact_matrix=exact_matrix,
                 unitary_matrix=approx_matrix
             )
@@ -500,30 +465,23 @@ def test_eigendecomposition_both_matrices():
 # =================================================================================================
 
 def test_full_decomposition_too_large():
-    """Test that full decomposition rejects matrices >15 qubits."""
+    """Test that full decomposition rejects matrix-free operators."""
     from qhat.analysis.analysis import eigendecomposition_analysis
     from qhat.analysis.config_types import AnalysisConfiguration
 
-    # Create a mock matrix-free operator for 16 qubits
+    # Create a mock matrix-free operator
     class MockOperator:
         def __init__(self):
-            self.shape = (65536, 65536)  # 2^16
+            self.shape = (65536, 65536)
         def matvec(self, v):
             return v
-
-    class MockHamiltonian:
-        def num_qubits(self):
-            return 16
 
     config = AnalysisConfiguration()
     config.num_eigenvalues = "all"
     config.eigendecomposition_matrices = "exact"
 
-    with pytest.raises(ValueError, match="Full eigendecomposition not supported for systems with >15 qubits"):
-        eigendecomposition_analysis(
-            config,
-            hamiltonian=MockHamiltonian(),
-            algorithm=None,
+    with pytest.raises(ValueError, match="Full eigendecomposition not supported for matrix-free operators"):
+        eigendecomposition_analysis(config,
             exact_matrix=MockOperator(),
             unitary_matrix=None
         )
@@ -541,10 +499,7 @@ def test_invalid_num_eigenvalues():
     config.eigendecomposition_matrices = "approximate"
 
     with pytest.raises(ValueError, match="must be positive"):
-        eigendecomposition_analysis(
-            config,
-            hamiltonian=None,
-            algorithm=None,
+        eigendecomposition_analysis(config,
             exact_matrix=None,
             unitary_matrix=matrix
         )
@@ -561,11 +516,8 @@ def test_num_eigenvalues_exceeds_dimension():
     config.num_eigenvalues = 10  # More than dimension
     config.eigendecomposition_matrices = "approximate"
 
-    with pytest.raises(ValueError, match="must be less than dimension"):
-        eigendecomposition_analysis(
-            config,
-            hamiltonian=None,
-            algorithm=None,
+    with pytest.raises(ValueError, match="must be less than or equal to dimension"):
+        eigendecomposition_analysis(config,
             exact_matrix=None,
             unitary_matrix=matrix
         )
@@ -584,10 +536,7 @@ def test_invalid_which_eigenvalues():
     config.eigendecomposition_matrices = "approximate"
 
     with pytest.raises(ValueError, match="must be 'smallest', 'largest', or 'both'"):
-        eigendecomposition_analysis(
-            config,
-            hamiltonian=None,
-            algorithm=None,
+        eigendecomposition_analysis(config,
             exact_matrix=None,
             unitary_matrix=matrix
         )
@@ -616,8 +565,6 @@ def test_full_vs_partial_consistency():
 
             results_full = eigendecomposition_analysis(
                 config_full,
-                hamiltonian=None,
-                algorithm=None,
                 exact_matrix=None,
                 unitary_matrix=matrix
             )
@@ -636,8 +583,6 @@ def test_full_vs_partial_consistency():
 
             results_partial = eigendecomposition_analysis(
                 config_partial,
-                hamiltonian=None,
-                algorithm=None,
                 exact_matrix=None,
                 unitary_matrix=matrix
             )
