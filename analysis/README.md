@@ -261,11 +261,32 @@ depending on the analyses requested:
 
 The logfile is typically most useful for understanding the analysis process and intermediate values.
 
-## Example
+## Examples
 
-The provided `config.py` file presents an example configuration file that can be used to generate
-resource estimates.  It loads data from the tensors file in the `examples` directory, and uses the
-options specified in the configuration file to generate resource estimates.  The first two lines of
-the provided `config.py` file allow the user to easily switch between a Trotterization-based
-analysis or a double-factorization-based analysis (additionally demonstrating that configuration
-files are themselves Python scripts rather than simple key-value lists).
+The `analysis/examples/` directory contains configuration files demonstrating various analysis capabilities:
+
+### Basic Example: `config.py`
+
+The basic `config.py` file presents a simple configuration for generating resource estimates. It loads data from the tensors file in the `examples` directory and demonstrates switching between Trotterization-based and double-factorization-based analysis (showing that configuration files are Python scripts, not just key-value lists).
+
+### Comprehensive Example: `config_full_analysis.py`
+
+The `config_full_analysis.py` file demonstrates **ALL currently available analysis capabilities**:
+
+1. **Resource Estimation**: Quantum gate counts, qubit requirements, circuit depth
+2. **Matrix Output**: Save the unitary matrix representation to various formats (.npz, .h5, .txt)
+3. **Numerical Simulation**: Apply the unitary to one or more input quantum states
+
+This comprehensive example serves as a complete reference showing how to:
+- Configure all available analyses in one file
+- Use different output formats
+- Process multiple input states
+- Structure configuration files with clear documentation
+- Set up for future features (exact matrices, eigendecomposition, error analysis)
+
+To run either example:
+```bash
+python3.11 -m qhat.analysis.driver examples/config.py
+# or
+python3.11 -m qhat.analysis.driver examples/config_full_analysis.py
+```
