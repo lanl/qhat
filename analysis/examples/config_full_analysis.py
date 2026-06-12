@@ -141,10 +141,9 @@ analysis.numerical_simulation_inputs = "examples/initial_state.npy"
 #   np.save("ground_state.npy", state)
 
 # =================================================================================================
-# 4. EXACT MATRIX COMPUTATION (Branch 1: Now Available!)
+# 4. EXACT MATRIX COMPUTATION
 # =================================================================================================
 # Compute the exact matrix representation of the Hamiltonian without any approximations
-# (no Trotter, no double-factorization)
 
 analysis.exact_matrix_output_file = "Be-H_exact_hamiltonian.npz"
 
@@ -174,7 +173,7 @@ analysis.exact_matrix_output_file = "Be-H_exact_hamiltonian.npz"
 #   - .txt: Human-readable text (only for very small matrices)
 
 # Note: For systems exceeding the memory threshold, the exact matrix computation will use
-#       a matrix-free operator but skip the file output.
+#       a matrix-free operator (enabling other analyses) but skip the file output.
 
 # =================================================================================================
 # FUTURE ANALYSES (Coming in subsequent branches)

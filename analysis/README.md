@@ -210,8 +210,7 @@ There are many details of the algorithm that may be worth analyzing. The availab
 
 - **Exact Hamiltonian Matrix Output**: Setting `analysis.exact_matrix_output_file` to a filename
   will compute and save the exact matrix representation of the Hamiltonian **without any
-  approximations** (no Trotter, no double-factorization). Supported formats are the same as for
-  unitary matrix output.
+  approximations**.  Supported formats are the same as for unitary matrix output.
   
   This is useful for:
   - Validating approximate algorithms by comparing exact vs approximate eigenvalues
