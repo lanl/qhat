@@ -254,14 +254,13 @@ def exact_matrix_output(
 
 # -------------------------------------------------------------------------------------------------
 
-def _eigendecompose(matrix, matrix_type, num_qubits, num_eigenvalues, which_eigs):
+def _eigendecompose(matrix, matrix_type, num_eigenvalues, which_eigs):
     """
     Perform eigendecomposition of a matrix (full or partial).
 
     Parameters:
         matrix: Matrix to decompose (dense array or matrix-free operator)
         matrix_type: String describing the matrix type (for logging)
-        num_qubits: Number of qubits (determines dimension)
         num_eigenvalues: Number of eigenvalues to compute (int) or "all" for full decomposition
         which_eigs: Which eigenvalues to compute ('smallest', 'largest', or 'both')
 
@@ -275,7 +274,7 @@ def _eigendecompose(matrix, matrix_type, num_qubits, num_eigenvalues, which_eigs
     import scipy.sparse.linalg
     from qhat.analysis.matrix_operations import PauliStringOperator
 
-    dimension = 2 ** num_qubits
+    dimension = matrix.shape[0]
     is_matrix_free = isinstance(matrix, PauliStringOperator) or hasattr(matrix, 'matvec')
 
     # Determine if full or partial eigendecomposition
@@ -342,9 +341,54 @@ def _eigendecompose(matrix, matrix_type, num_qubits, num_eigenvalues, which_eigs
 
 # -------------------------------------------------------------------------------------------------
 
+def _process_eigendecomposition(matrix, matrix_type, num_eigenvalues, which_eigs):
+    """
+    Process eigendecomposition for a single matrix: compute, save, and return metadata.
+
+    Parameters:
+        matrix: Matrix to decompose (dense array or matrix-free operator)
+        matrix_type: String describing the matrix type ('exact' or 'approximate')
+        num_eigenvalues: Number of eigenvalues to compute (int) or "all"
+        which_eigs: Which eigenvalues to compute ('smallest', 'largest', or 'both')
+
+    Returns:
+        Dictionary with file path, num_eigenvalues, eigenvalue_range, and which
+
+    Raises:
+        ValueError: If matrix is None
+    """
+    from qhat.analysis.file_io import save_eigendecomposition
+
+    logger.info(f"Computing {matrix_type} matrix eigendecomposition")
+
+    if matrix is None:
+        raise ValueError(
+            f"{matrix_type}_matrix is required for {matrix_type} eigendecomposition. "
+            "Compute the matrix before calling eigendecomposition_analysis()."
+        )
+
+    eigs, vecs, num_computed = _eigendecompose(
+        matrix, matrix_type, num_eigenvalues, which_eigs
+    )
+
+    # Save to file
+    output_file = f'{matrix_type}_eigendecomposition.npz'
+    save_eigendecomposition(
+        output_file, eigs, vecs, matrix_type,
+        num_eigenvalues, which_eigs
+    )
+
+    return {
+        'file': output_file,
+        'num_eigenvalues': num_computed,
+        'eigenvalue_range': [float(eigs.min()), float(eigs.max())],
+        'which': which_eigs
+    }
+
+# -------------------------------------------------------------------------------------------------
+
 def eigendecomposition_analysis(
         config_analysis: AnalysisConfiguration,
-        hamiltonian,
         exact_matrix=None,
         unitary_matrix=None) -> dict:
     """
@@ -352,7 +396,6 @@ def eigendecomposition_analysis(
 
     Parameters:
         config_analysis: Analysis configuration with eigendecomposition settings
-        hamiltonian: Hamiltonian object (needed for num_qubits)
         exact_matrix: Pre-computed exact matrix (required if eigendecomposition_matrices is 'exact' or 'both')
         unitary_matrix: Pre-computed unitary matrix (required if eigendecomposition_matrices is 'approximate' or 'both')
 
@@ -385,45 +428,17 @@ def eigendecomposition_analysis(
 
     results = {}
 
-    # Helper function to process one matrix type
-    def _process_matrix(matrix, matrix_type, num_qubits):
-        logger.info(f"Computing {matrix_type} matrix eigendecomposition")
-
-        if matrix is None:
-            raise ValueError(
-                f"{matrix_type}_matrix is required for {matrix_type} eigendecomposition. "
-                "Compute the matrix before calling eigendecomposition_analysis()."
-            )
-
-        eigs, vecs, num_computed = _eigendecompose(
-            matrix, matrix_type, num_qubits, num_eigenvalues, which_eigs
-        )
-
-        # Save to file
-        output_file = f'{matrix_type}_eigendecomposition.npz'
-        save_eigendecomposition(
-            output_file, eigs, vecs, matrix_type,
-            num_eigenvalues, which_eigs
-        )
-
-        return {
-            'file': output_file,
-            'num_eigenvalues': num_computed,
-            'eigenvalue_range': [float(eigs.min()), float(eigs.max())],
-            'which': which_eigs
-        }
-
     # Compute exact eigendecomposition if requested
     if need_exact:
-        num_qubits = hamiltonian.num_qubits()
-        results['exact_eigendecomposition'] = _process_matrix(exact_matrix, 'exact', num_qubits)
+        results['exact_eigendecomposition'] = _process_eigendecomposition(
+            exact_matrix, 'exact', num_eigenvalues, which_eigs
+        )
 
     # Compute approximate eigendecomposition if requested
     if need_approx:
-        # Infer num_qubits from matrix dimension
-        dimension = unitary_matrix.shape[0] if unitary_matrix is not None else 0
-        num_qubits = int(np.log2(dimension)) if dimension > 0 else 0
-        results['approximate_eigendecomposition'] = _process_matrix(unitary_matrix, 'approximate', num_qubits)
+        results['approximate_eigendecomposition'] = _process_eigendecomposition(
+            unitary_matrix, 'approximate', num_eigenvalues, which_eigs
+        )
 
     return results
 
@@ -592,7 +607,7 @@ def analyze_algorithm(
     if eigendecomposition_requested:
         logger.info("Performing eigendecomposition analysis.")
         results["eigendecomposition"] = eigendecomposition_analysis(
-            config_analysis, hamiltonian, algorithm,
+            config_analysis,
             exact_matrix=exact_matrix,
             unitary_matrix=unitary_matrix
         )
