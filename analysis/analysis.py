@@ -254,6 +254,95 @@ def exact_matrix_output(
 
 # -------------------------------------------------------------------------------------------------
 
+def _eigendecompose(matrix, matrix_type, num_qubits, num_eigenvalues, which_eigs):
+    """
+    Perform eigendecomposition of a matrix (full or partial).
+
+    Parameters:
+        matrix: Matrix to decompose (dense array or matrix-free operator)
+        matrix_type: String describing the matrix type (for logging)
+        num_qubits: Number of qubits (determines dimension)
+        num_eigenvalues: Number of eigenvalues to compute (int) or "all" for full decomposition
+        which_eigs: Which eigenvalues to compute ('smallest', 'largest', or 'both')
+
+    Returns:
+        tuple: (eigenvalues, eigenvectors, num_computed)
+
+    Raises:
+        ValueError: If parameters are invalid or operation not supported
+    """
+    import scipy.linalg
+    import scipy.sparse.linalg
+    from qhat.analysis.matrix_operations import PauliStringOperator
+
+    dimension = 2 ** num_qubits
+    is_matrix_free = isinstance(matrix, PauliStringOperator) or hasattr(matrix, 'matvec')
+
+    # Determine if full or partial eigendecomposition
+    is_full = isinstance(num_eigenvalues, str) and num_eigenvalues.lower() == "all"
+
+    if is_full:
+        # Full eigendecomposition
+        if is_matrix_free or dimension > 32768:
+            raise ValueError(
+                f"Full eigendecomposition not supported for systems with >15 qubits "
+                f"(dimension={dimension}). Use num_eigenvalues=k for partial decomposition."
+            )
+        logger.verbose(f"Computing full eigendecomposition for {matrix_type} matrix")
+        eigenvalues, eigenvectors = scipy.linalg.eigh(matrix)
+        num_computed = len(eigenvalues)
+
+    else:
+        # Partial eigendecomposition using sparse methods
+        k = int(num_eigenvalues)
+        if k <= 0:
+            raise ValueError(f"num_eigenvalues must be positive, got {k}")
+        if k >= dimension:
+            raise ValueError(
+                f"num_eigenvalues ({k}) must be less than dimension ({dimension}). "
+                f"Use num_eigenvalues='all' for full decomposition."
+            )
+
+        # Map user-friendly values to scipy's 'which' parameter
+        which_map = {
+            'smallest': 'SA',  # Smallest Algebraic (most negative)
+            'largest': 'LA',   # Largest Algebraic (most positive)
+        }
+
+        if which_eigs == 'both':
+            # Compute both smallest and largest
+            logger.verbose(f"Computing {k} smallest and {k} largest eigenvalues for {matrix_type} matrix")
+            eigs_small, vecs_small = scipy.sparse.linalg.eigsh(
+                matrix, k=k, which='SA', return_eigenvectors=True
+            )
+            eigs_large, vecs_large = scipy.sparse.linalg.eigsh(
+                matrix, k=k, which='LA', return_eigenvectors=True
+            )
+            # Concatenate results
+            eigenvalues = np.concatenate([eigs_small, eigs_large])
+            eigenvectors = np.concatenate([vecs_small, vecs_large], axis=1)
+            num_computed = len(eigenvalues)
+        else:
+            # Compute only one set
+            which_scipy = which_map.get(which_eigs)
+            if which_scipy is None:
+                raise ValueError(
+                    f"which_eigenvalues must be 'smallest', 'largest', or 'both', "
+                    f"got '{which_eigs}'"
+                )
+            logger.verbose(f"Computing {k} {which_eigs} eigenvalues for {matrix_type} matrix")
+            eigenvalues, eigenvectors = scipy.sparse.linalg.eigsh(
+                matrix, k=k, which=which_scipy, return_eigenvectors=True
+            )
+            num_computed = len(eigenvalues)
+
+    logger.info(f"Computed {num_computed} eigenvalues for {matrix_type} matrix")
+    logger.verbose(f"  Eigenvalue range: [{eigenvalues.min():.6e}, {eigenvalues.max():.6e}]")
+
+    return eigenvalues, eigenvectors, num_computed
+
+# -------------------------------------------------------------------------------------------------
+
 def eigendecomposition_analysis(
         config_analysis: AnalysisConfiguration,
         hamiltonian,
@@ -296,71 +385,6 @@ def eigendecomposition_analysis(
 
     results = {}
 
-    # Helper function to perform eigendecomposition
-    def _eigendecompose(matrix, matrix_type, num_qubits):
-        dimension = 2 ** num_qubits
-        is_matrix_free = isinstance(matrix, PauliStringOperator) or hasattr(matrix, 'matvec')
-
-        if is_full:
-            # Full eigendecomposition
-            if is_matrix_free or dimension > 32768:
-                raise ValueError(
-                    f"Full eigendecomposition not supported for systems with >15 qubits "
-                    f"(dimension={dimension}). Use num_eigenvalues=k for partial decomposition."
-                )
-            logger.verbose(f"Computing full eigendecomposition for {matrix_type} matrix")
-            eigenvalues, eigenvectors = scipy.linalg.eigh(matrix)
-            num_computed = len(eigenvalues)
-
-        else:
-            # Partial eigendecomposition using sparse methods
-            k = int(num_eigenvalues)
-            if k <= 0:
-                raise ValueError(f"num_eigenvalues must be positive, got {k}")
-            if k >= dimension:
-                raise ValueError(
-                    f"num_eigenvalues ({k}) must be less than dimension ({dimension}). "
-                    f"Use num_eigenvalues='all' for full decomposition."
-                )
-
-            # Map user-friendly values to scipy's 'which' parameter
-            which_map = {
-                'smallest': 'SA',  # Smallest Algebraic (most negative)
-                'largest': 'LA',   # Largest Algebraic (most positive)
-            }
-
-            if which_eigs == 'both':
-                # Compute both smallest and largest
-                logger.verbose(f"Computing {k} smallest and {k} largest eigenvalues for {matrix_type} matrix")
-                eigs_small, vecs_small = scipy.sparse.linalg.eigsh(
-                    matrix, k=k, which='SA', return_eigenvectors=True
-                )
-                eigs_large, vecs_large = scipy.sparse.linalg.eigsh(
-                    matrix, k=k, which='LA', return_eigenvectors=True
-                )
-                # Concatenate results
-                eigenvalues = np.concatenate([eigs_small, eigs_large])
-                eigenvectors = np.concatenate([vecs_small, vecs_large], axis=1)
-                num_computed = len(eigenvalues)
-            else:
-                # Compute only one set
-                which_scipy = which_map.get(which_eigs)
-                if which_scipy is None:
-                    raise ValueError(
-                        f"which_eigenvalues must be 'smallest', 'largest', or 'both', "
-                        f"got '{which_eigs}'"
-                    )
-                logger.verbose(f"Computing {k} {which_eigs} eigenvalues for {matrix_type} matrix")
-                eigenvalues, eigenvectors = scipy.sparse.linalg.eigsh(
-                    matrix, k=k, which=which_scipy, return_eigenvectors=True
-                )
-                num_computed = len(eigenvalues)
-
-        logger.info(f"Computed {num_computed} eigenvalues for {matrix_type} matrix")
-        logger.verbose(f"  Eigenvalue range: [{eigenvalues.min():.6e}, {eigenvalues.max():.6e}]")
-
-        return eigenvalues, eigenvectors, num_computed
-
     # Get git hash for provenance
     from qhat.analysis.config_types import _get_git_hash
     git_hash = _get_git_hash()
@@ -376,7 +400,9 @@ def eigendecomposition_analysis(
             exact_matrix = _compute_exact_matrix(hamiltonian)
 
         num_qubits = hamiltonian.num_qubits()
-        eigs, vecs, num_computed = _eigendecompose(exact_matrix, 'exact', num_qubits)
+        eigs, vecs, num_computed = _eigendecompose(
+            exact_matrix, 'exact', num_qubits, num_eigenvalues, which_eigs
+        )
 
         # Save to file
         output_file = 'exact_eigendecomposition.npz'
@@ -406,7 +432,9 @@ def eigendecomposition_analysis(
         dimension = unitary_matrix.shape[0]
         num_qubits = int(np.log2(dimension))
 
-        eigs, vecs, num_computed = _eigendecompose(unitary_matrix, 'approximate', num_qubits)
+        eigs, vecs, num_computed = _eigendecompose(
+            unitary_matrix, 'approximate', num_qubits, num_eigenvalues, which_eigs
+        )
 
         # Save to file
         output_file = 'approximate_eigendecomposition.npz'
