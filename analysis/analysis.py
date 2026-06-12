@@ -385,66 +385,45 @@ def eigendecomposition_analysis(
 
     results = {}
 
-    # Compute exact eigendecomposition if requested
-    if need_exact:
-        logger.info("Computing exact matrix eigendecomposition")
+    # Helper function to process one matrix type
+    def _process_matrix(matrix, matrix_type, num_qubits):
+        logger.info(f"Computing {matrix_type} matrix eigendecomposition")
 
-        if exact_matrix is None:
+        if matrix is None:
             raise ValueError(
-                "exact_matrix is required for exact eigendecomposition. "
+                f"{matrix_type}_matrix is required for {matrix_type} eigendecomposition. "
                 "Compute the matrix before calling eigendecomposition_analysis()."
             )
 
-        num_qubits = hamiltonian.num_qubits()
         eigs, vecs, num_computed = _eigendecompose(
-            exact_matrix, 'exact', num_qubits, num_eigenvalues, which_eigs
+            matrix, matrix_type, num_qubits, num_eigenvalues, which_eigs
         )
 
         # Save to file
-        output_file = 'exact_eigendecomposition.npz'
+        output_file = f'{matrix_type}_eigendecomposition.npz'
         save_eigendecomposition(
-            output_file, eigs, vecs, 'exact',
+            output_file, eigs, vecs, matrix_type,
             num_eigenvalues, which_eigs
         )
 
-        results['exact_eigendecomposition'] = {
+        return {
             'file': output_file,
             'num_eigenvalues': num_computed,
             'eigenvalue_range': [float(eigs.min()), float(eigs.max())],
             'which': which_eigs
         }
+
+    # Compute exact eigendecomposition if requested
+    if need_exact:
+        num_qubits = hamiltonian.num_qubits()
+        results['exact_eigendecomposition'] = _process_matrix(exact_matrix, 'exact', num_qubits)
 
     # Compute approximate eigendecomposition if requested
     if need_approx:
-        logger.info("Computing approximate matrix eigendecomposition")
-
-        if unitary_matrix is None:
-            raise ValueError(
-                "unitary_matrix is required for approximate eigendecomposition. "
-                "Compute the matrix before calling eigendecomposition_analysis()."
-            )
-
         # Infer num_qubits from matrix dimension
-        dimension = unitary_matrix.shape[0]
-        num_qubits = int(np.log2(dimension))
-
-        eigs, vecs, num_computed = _eigendecompose(
-            unitary_matrix, 'approximate', num_qubits, num_eigenvalues, which_eigs
-        )
-
-        # Save to file
-        output_file = 'approximate_eigendecomposition.npz'
-        save_eigendecomposition(
-            output_file, eigs, vecs, 'approximate',
-            num_eigenvalues, which_eigs
-        )
-
-        results['approximate_eigendecomposition'] = {
-            'file': output_file,
-            'num_eigenvalues': num_computed,
-            'eigenvalue_range': [float(eigs.min()), float(eigs.max())],
-            'which': which_eigs
-        }
+        dimension = unitary_matrix.shape[0] if unitary_matrix is not None else 0
+        num_qubits = int(np.log2(dimension)) if dimension > 0 else 0
+        results['approximate_eigendecomposition'] = _process_matrix(unitary_matrix, 'approximate', num_qubits)
 
     return results
 
