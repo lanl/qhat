@@ -195,7 +195,7 @@ def _get_state_format_from_extension(filename):
 # =================================================================================================
 
 def save_eigendecomposition(output_path, eigenvalues, eigenvectors, matrix_type,
-                            num_eigenvalues, which_eigenvalues, git_hash=None):
+                            num_eigenvalues, which_eigenvalues):
     """
     Save eigendecomposition results to NumPy .npz format.
 
@@ -206,7 +206,6 @@ def save_eigendecomposition(output_path, eigenvalues, eigenvectors, matrix_type,
         matrix_type: 'exact' or 'approximate'
         num_eigenvalues: Number of eigenvalues computed (int or "all")
         which_eigenvalues: 'smallest', 'largest', or 'both'
-        git_hash: Optional git hash for provenance
     """
     if not output_path.endswith('.npz'):
         raise ValueError(f"Output path must end with .npz, got: {output_path}")
@@ -219,9 +218,6 @@ def save_eigendecomposition(output_path, eigenvalues, eigenvectors, matrix_type,
         'which_eigenvalues': which_eigenvalues,
         'timestamp': datetime.now().isoformat(),
     }
-
-    if git_hash is not None:
-        metadata['git_hash'] = git_hash
 
     np.savez(output_path, **metadata)
     logger.info(f"Eigendecomposition saved to {output_path}")
@@ -236,7 +232,7 @@ def load_eigendecomposition(path):
 
     Returns:
         Dictionary with keys: eigenvalues, eigenvectors, matrix_type,
-        num_eigenvalues, which_eigenvalues, timestamp, and optionally git_hash
+        num_eigenvalues, which_eigenvalues, and timestamp
     """
     if not path.endswith('.npz'):
         raise ValueError(f"Path must end with .npz, got: {path}")
@@ -250,9 +246,6 @@ def load_eigendecomposition(path):
         'which_eigenvalues': str(data['which_eigenvalues']),
         'timestamp': str(data['timestamp']),
     }
-
-    if 'git_hash' in data:
-        result['git_hash'] = str(data['git_hash'])
 
     logger.info(f"Eigendecomposition loaded from {path}")
     return result
