@@ -5,11 +5,17 @@ This module provides utilities for converting Pauli string representations
 of Hamiltonians into matrix form, supporting both dense (small systems)
 and matrix-free (large systems) approaches.
 
-For small systems (≤15 qubits, dimension ≤32768):
+The choice between dense and sparse representation is based on a memory threshold:
+    - Dense matrices require (2^num_qubits)^2 * 16 bytes (complex128)
+    - Default threshold: 16 GB (allows dense up to 15 qubits, dimension 32768)
+    - Calculations performed in log space to safely handle large qubit counts
+
+Dense representation (memory ≤ threshold):
     - Use dense matrix representation via pauli_dict_to_matrix()
     - Fast, simple, allows direct matrix operations
+    - Full matrix stored in memory
 
-For large systems (>15 qubits):
+Sparse/matrix-free representation (memory > threshold):
     - Use PauliStringOperator class for matrix-free operations
     - Only materializes matrix-vector products, not full matrix
     - Compatible with scipy.sparse.linalg iterative methods
@@ -301,12 +307,14 @@ class PauliStringOperator(LinearOperator):
 # Utility Functions
 # =================================================================================================
 
-def get_operator_type(num_qubits, force_dense=None, force_sparse=None):
+def get_operator_type(num_qubits, memory_threshold_gb, force_dense=None, force_sparse=None):
     """
     Determine whether to use dense matrix or matrix-free operator.
 
     Parameters:
         num_qubits: int, number of qubits
+        memory_threshold_gb: float, memory threshold in GB for dense representation
+                           Dense matrix memory = (2^num_qubits)^2 * 16 bytes
         force_dense: bool or None, force dense representation
         force_sparse: bool or None, force sparse/matrix-free representation
 
@@ -324,34 +332,47 @@ def get_operator_type(num_qubits, force_dense=None, force_sparse=None):
     if force_sparse:
         return "sparse"
 
-    # Automatic selection based on system size
-    # Threshold: 15 qubits = dimension 32768
-    # Dense matrix at 15 qubits: (32768)^2 * 16 bytes = 16 GB
-    dimension = 2 ** num_qubits
-    threshold = 32768  # 2^15
-
-    if dimension <= threshold:
-        logger.verbose(f"Using dense matrix representation for {num_qubits} qubits (dim={dimension})")
+    # Automatic selection based on memory requirements
+    # Dense matrix requires: dimension^2 * 16 bytes (complex128)
+    # where dimension = 2^num_qubits
+    #
+    # Work in log space to avoid overflow:
+    # log2(threshold_bytes) = log2(threshold_gb * 2^30) = log2(threshold_gb) + 30
+    # log2(required_bytes) = log2(2^(2*num_qubits) * 16) = 2*num_qubits + 4
+    log2_threshold_bytes = np.log2(memory_threshold_gb) + 30
+    log2_required_bytes = 2 * num_qubits + 4
+    memory_gb = 2 ** (log2_required_bytes - 30)
+    if log2_required_bytes <= log2_threshold_bytes:
+        # Compute actual memory for logging
+        logger.verbose(
+            f"Using dense matrix representation for {num_qubits} qubits "
+            f"(dim={2**num_qubits}, memory={memory_gb:.3f} GB)"
+        )
         return "dense"
     else:
-        logger.verbose(f"Using sparse/matrix-free representation for {num_qubits} qubits (dim={dimension})")
+        # Compute what memory would be required
+        logger.verbose(
+            f"Using sparse/matrix-free representation for {num_qubits} qubits "
+            f"(would require {memory_gb:.3f} GB)"
+        )
         return "sparse"
 
 
-def create_hamiltonian_operator(pauli_dict, num_qubits, force_dense=None, force_sparse=None):
+def create_hamiltonian_operator(pauli_dict, num_qubits, memory_threshold_gb, force_dense=None, force_sparse=None):
     """
     Create either a dense matrix or matrix-free operator for the Hamiltonian.
 
     Parameters:
         pauli_dict: dict, mapping Pauli strings to coefficients
         num_qubits: int, number of qubits
+        memory_threshold_gb: float, memory threshold in GB for dense representation
         force_dense: bool or None, force dense representation
         force_sparse: bool or None, force sparse/matrix-free representation
 
     Returns:
         numpy array (dense) or PauliStringOperator (sparse)
     """
-    operator_type = get_operator_type(num_qubits, force_dense, force_sparse)
+    operator_type = get_operator_type(num_qubits, memory_threshold_gb, force_dense, force_sparse)
 
     if operator_type == "dense":
         return pauli_dict_to_matrix(pauli_dict, num_qubits)

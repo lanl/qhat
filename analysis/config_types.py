@@ -162,6 +162,7 @@ class AnalysisConfiguration(ConfigurationBase):
         self.matrix_output_file = None
         self.numerical_simulation_inputs = None
         self.exact_matrix_output_file = None
+        self.matrix_memory_threshold_gb = 16.0
 
     def _generate_TOML_table(self):
         table = tomlkit.table()
@@ -169,6 +170,7 @@ class AnalysisConfiguration(ConfigurationBase):
         self.save_if_present(table, "matrix_output_file")
         self.save_if_present(table, "numerical_simulation_inputs")
         self.save_if_present(table, "exact_matrix_output_file")
+        self.save_if_present(table, "matrix_memory_threshold_gb")
         return table
 
 # -------------------------------------------------------------------------------------------------

@@ -145,16 +145,17 @@ def output_unitary_matrix(
 
 # -------------------------------------------------------------------------------------------------
 
-def _compute_exact_matrix(hamiltonian):
+def _compute_exact_matrix(hamiltonian, config_analysis):
     """
     Compute the exact matrix representation of the Hamiltonian.
 
     This computes the Hamiltonian matrix without any approximations (no Trotter,
-    no double-factorization). For small systems (≤15 qubits), returns a dense
-    matrix. For larger systems, returns a matrix-free operator.
+    no double-factorization). The choice between dense and sparse/matrix-free
+    representation is based on the memory threshold in config_analysis.
 
     Parameters:
         hamiltonian: The Hamiltonian object
+        config_analysis: Analysis configuration with matrix_memory_threshold_gb
 
     Returns:
         Dense numpy array (small systems) or PauliStringOperator (large systems)
@@ -164,7 +165,9 @@ def _compute_exact_matrix(hamiltonian):
     """
     logger.verbose("Computing exact Hamiltonian matrix...")
     try:
-        return hamiltonian.to_matrix()
+        return hamiltonian.to_matrix(
+            memory_threshold_gb=config_analysis.matrix_memory_threshold_gb
+        )
     except Exception as e:
         logger.info(
             f"ERROR: Failed to compute exact Hamiltonian matrix: {e}\n"
@@ -375,7 +378,7 @@ def analyze_algorithm(
                 "Exact matrix computation requires hamiltonian parameter. "
                 "Pass hamiltonian to analyze_algorithm()."
             )
-        exact_matrix = _compute_exact_matrix(hamiltonian)
+        exact_matrix = _compute_exact_matrix(hamiltonian, config_analysis)
 
     # Dispatch to requested analyses
     if config_analysis.resource_estimator is not None:

@@ -307,31 +307,57 @@ def test_pauli_operator_rmatvec():
 # =================================================================================================
 
 def test_get_operator_type_small():
-    """Test that small systems use dense representation."""
-    assert get_operator_type(10) == "dense"
-    assert get_operator_type(15) == "dense"
+    """Test that small systems use dense representation with 1 GB threshold."""
+    # 10 qubits: 2^10 = 1024, memory = 1024^2 * 16 bytes = 16 MB << 1 GB
+    assert get_operator_type(10, memory_threshold_gb=1.0) == "dense"
+    # 13 qubits: 2^13 = 8192, memory = 8192^2 * 16 bytes = 1 GB
+    assert get_operator_type(13, memory_threshold_gb=1.0) == "dense"
 
 
 def test_get_operator_type_large():
-    """Test that large systems use sparse representation."""
-    assert get_operator_type(16) == "sparse"
-    assert get_operator_type(20) == "sparse"
+    """Test that large systems use sparse representation with 1 GB threshold."""
+    # 14 qubits: 2^14 = 16384, memory = 16384^2 * 16 bytes = 4 GB > 1 GB
+    assert get_operator_type(14, memory_threshold_gb=1.0) == "sparse"
+    # 20 qubits: much larger
+    assert get_operator_type(20, memory_threshold_gb=1.0) == "sparse"
+
+
+def test_get_operator_type_custom_threshold():
+    """Test with different memory thresholds."""
+    # With 0.5 GB threshold: 12 qubits = 256 MB, should use dense
+    assert get_operator_type(12, memory_threshold_gb=0.5) == "dense"
+    # With 0.5 GB threshold: 13 qubits = 1 GB, should use sparse
+    assert get_operator_type(13, memory_threshold_gb=0.5) == "sparse"
+    # With 0.1 GB threshold: 11 qubits = 64 MB, should use dense
+    assert get_operator_type(11, memory_threshold_gb=0.1) == "dense"
+    # With 0.1 GB threshold: 12 qubits = 256 MB, should use sparse
+    assert get_operator_type(12, memory_threshold_gb=0.1) == "sparse"
 
 
 def test_get_operator_type_force_dense():
     """Test forcing dense representation."""
-    assert get_operator_type(20, force_dense=True) == "dense"
+    assert get_operator_type(20, memory_threshold_gb=1.0, force_dense=True) == "dense"
 
 
 def test_get_operator_type_force_sparse():
     """Test forcing sparse representation."""
-    assert get_operator_type(10, force_sparse=True) == "sparse"
+    assert get_operator_type(10, memory_threshold_gb=1.0, force_sparse=True) == "sparse"
 
 
 def test_get_operator_type_conflicting_forces():
     """Test error when forcing both dense and sparse."""
     with pytest.raises(ValueError, match="Cannot force both"):
-        get_operator_type(10, force_dense=True, force_sparse=True)
+        get_operator_type(10, memory_threshold_gb=1.0, force_dense=True, force_sparse=True)
+
+
+def test_get_operator_type_very_large():
+    """Test log-space calculation for very large qubit counts."""
+    # 50 qubits: 2^50 dimension, way too large for dense
+    assert get_operator_type(50, memory_threshold_gb=1.0) == "sparse"
+    # 40 qubits: 2^40 dimension, would require ~16 PB
+    assert get_operator_type(40, memory_threshold_gb=1.0) == "sparse"
+    # Even with huge threshold (1 PB), 50 qubits should be sparse
+    assert get_operator_type(50, memory_threshold_gb=1e6) == "sparse"
 
 
 # =================================================================================================
@@ -341,7 +367,7 @@ def test_get_operator_type_conflicting_forces():
 def test_create_hamiltonian_operator_dense():
     """Test creating dense operator for small system."""
     pauli_dict = {'XX': 1.0, 'ZZ': -1.0}
-    op = create_hamiltonian_operator(pauli_dict, 2)
+    op = create_hamiltonian_operator(pauli_dict, 2, memory_threshold_gb=1.0)
 
     assert isinstance(op, np.ndarray)
     assert op.shape == (4, 4)
@@ -350,24 +376,28 @@ def test_create_hamiltonian_operator_dense():
 def test_create_hamiltonian_operator_sparse():
     """Test creating sparse operator for large system."""
     pauli_dict = {'X' * 20: 1.0}
-    op = create_hamiltonian_operator(pauli_dict, 20)
+    op = create_hamiltonian_operator(pauli_dict, 20, memory_threshold_gb=1.0)
 
     assert isinstance(op, PauliStringOperator)
     assert op.shape == (2**20, 2**20)
 
 
 def test_create_hamiltonian_operator_forced_dense():
-    """Test forcing dense for large system."""
-    pauli_dict = {'X' * 20: 1.0}
-    op = create_hamiltonian_operator(pauli_dict, 20, force_dense=True)
+    """Test forcing dense for a system that would normally be sparse."""
+    # Use 12 qubits with 0.1 GB threshold
+    # 12 qubits: 4096^2 * 16 bytes = 268 MB > 0.1 GB threshold (so normally sparse)
+    # But 268 MB < 1 GB (safe to allocate)
+    pauli_dict = {'X' * 12: 1.0}
+    op = create_hamiltonian_operator(pauli_dict, 12, memory_threshold_gb=0.1, force_dense=True)
 
     assert isinstance(op, np.ndarray)
+    assert op.shape == (2**12, 2**12)
 
 
 def test_create_hamiltonian_operator_forced_sparse():
     """Test forcing sparse for small system."""
     pauli_dict = {'XX': 1.0}
-    op = create_hamiltonian_operator(pauli_dict, 2, force_sparse=True)
+    op = create_hamiltonian_operator(pauli_dict, 2, memory_threshold_gb=1.0, force_sparse=True)
 
     assert isinstance(op, PauliStringOperator)
 

@@ -190,14 +190,15 @@ class Hamiltonian:
         for pauli, coef in self.get_all_pauli_strings().items():
             groups.append(QubitOperator(pauli, coef))
         return groups
-    def to_matrix(self, force_dense=None, force_sparse=None):
+    def to_matrix(self, memory_threshold_gb, force_dense=None, force_sparse=None):
         """
         Convert the Hamiltonian to its exact matrix representation.
 
-        For small systems (≤15 qubits), returns a dense numpy array.
-        For large systems (>15 qubits), returns a matrix-free PauliStringOperator.
+        The choice between dense and sparse representation is based on the memory
+        threshold. Dense matrices require (2^num_qubits)^2 * 16 bytes.
 
         Parameters:
+            memory_threshold_gb: float, memory threshold in GB for dense representation
             force_dense: bool or None, force dense matrix representation
             force_sparse: bool or None, force matrix-free operator
 
@@ -209,7 +210,7 @@ class Hamiltonian:
 
         Example:
             >>> hamiltonian = Hamiltonian(...)
-            >>> H_exact = hamiltonian.to_matrix()
+            >>> H_exact = hamiltonian.to_matrix(memory_threshold_gb=16.0)
             >>> # For small systems: H_exact is numpy array
             >>> # For large systems: H_exact is PauliStringOperator
         """
@@ -222,9 +223,9 @@ class Hamiltonian:
         logger.verbose(f"Converting Hamiltonian to matrix for {num_qubits} qubits")
         logger.verbose(f"Hamiltonian has {len(pauli_dict)} Pauli terms")
 
-        # Create operator (dense or sparse based on system size)
+        # Create operator (dense or sparse based on memory threshold)
         return create_hamiltonian_operator(
-            pauli_dict, num_qubits,
+            pauli_dict, num_qubits, memory_threshold_gb,
             force_dense=force_dense,
             force_sparse=force_sparse
         )

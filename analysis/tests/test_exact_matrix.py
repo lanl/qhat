@@ -28,8 +28,8 @@ def test_hamiltonian_to_matrix_small_system():
     lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
     hamiltonian = Hamiltonian(lcps)
 
-    # Convert to matrix (should be dense for 2 qubits)
-    H_matrix = hamiltonian.to_matrix()
+    # Convert to matrix (should be dense for 2 qubits with 1 GB threshold)
+    H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 
     # Verify it's a dense numpy array
     assert isinstance(H_matrix, np.ndarray)
@@ -46,8 +46,8 @@ def test_hamiltonian_to_matrix_large_system():
     lcps = LinearCombinationOfPauliStrings(num_qubits=20, dense=pauli_data)
     hamiltonian = Hamiltonian(lcps)
 
-    # Convert to matrix (should be matrix-free for 20 qubits)
-    H_op = hamiltonian.to_matrix()
+    # Convert to matrix (should be matrix-free for 20 qubits with 1 GB threshold)
+    H_op = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 
     # Verify it's a matrix-free operator
     assert isinstance(H_op, PauliStringOperator)
@@ -60,7 +60,7 @@ def test_hamiltonian_to_matrix_force_dense():
     lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
     hamiltonian = Hamiltonian(lcps)
 
-    H_matrix = hamiltonian.to_matrix(force_dense=True)
+    H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0, force_dense=True)
     assert isinstance(H_matrix, np.ndarray)
 
 
@@ -70,7 +70,7 @@ def test_hamiltonian_to_matrix_force_sparse():
     lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
     hamiltonian = Hamiltonian(lcps)
 
-    H_op = hamiltonian.to_matrix(force_sparse=True)
+    H_op = hamiltonian.to_matrix(memory_threshold_gb=1.0, force_sparse=True)
     assert isinstance(H_op, PauliStringOperator)
 
 
@@ -82,7 +82,7 @@ def test_hamiltonian_to_matrix_known_eigenvalues():
     lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
     hamiltonian = Hamiltonian(lcps)
 
-    H_matrix = hamiltonian.to_matrix()
+    H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 
     eigenvalues = np.linalg.eigvalsh(H_matrix)
     expected = np.array([-1, -1, 1, 1])  # Sorted
@@ -96,7 +96,7 @@ def test_hamiltonian_to_matrix_identity():
     lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
     hamiltonian = Hamiltonian(lcps)
 
-    H_matrix = hamiltonian.to_matrix()
+    H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 
     expected = 2.5 * np.eye(4, dtype=complex)
     assert np.allclose(H_matrix, expected)
@@ -109,7 +109,7 @@ def test_hamiltonian_to_matrix_pauli_x():
     lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
     hamiltonian = Hamiltonian(lcps)
 
-    H_matrix = hamiltonian.to_matrix()
+    H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 
     # Verify it's Hermitian
     assert np.allclose(H_matrix, H_matrix.conj().T)
@@ -130,7 +130,7 @@ def test_hamiltonian_to_matrix_multiple_terms():
     lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
     hamiltonian = Hamiltonian(lcps)
 
-    H_matrix = hamiltonian.to_matrix()
+    H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 
     # Verify Hermiticity
     assert np.allclose(H_matrix, H_matrix.conj().T)
@@ -158,7 +158,7 @@ def test_exact_matrix_hermiticity():
         hamiltonian = Hamiltonian(lcps)
 
         # Force dense to make Hermiticity check easy
-        H_matrix = hamiltonian.to_matrix(force_dense=True)
+        H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0, force_dense=True)
 
         assert np.allclose(H_matrix, H_matrix.conj().T), \
             f"Matrix not Hermitian for {pauli_data}"
@@ -170,7 +170,7 @@ def test_exact_matrix_real_eigenvalues():
     lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
     hamiltonian = Hamiltonian(lcps)
 
-    H_matrix = hamiltonian.to_matrix()
+    H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
     eigenvalues = np.linalg.eigvalsh(H_matrix)
 
     # All eigenvalues should be real (imaginary part ~0)
@@ -183,7 +183,7 @@ def test_exact_matrix_energy_bounds():
     lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
     hamiltonian = Hamiltonian(lcps)
 
-    H_matrix = hamiltonian.to_matrix()
+    H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
     eigenvalues = np.linalg.eigvalsh(H_matrix)
 
     # For this Hamiltonian, eigenvalues should be in [-4, 4]
@@ -203,8 +203,8 @@ def test_matrix_free_operator_matvec():
     hamiltonian = Hamiltonian(lcps)
 
     # Get both dense and sparse versions
-    H_dense = hamiltonian.to_matrix(force_dense=True)
-    H_sparse = hamiltonian.to_matrix(force_sparse=True)
+    H_dense = hamiltonian.to_matrix(memory_threshold_gb=1.0, force_dense=True)
+    H_sparse = hamiltonian.to_matrix(memory_threshold_gb=1.0, force_sparse=True)
 
     # Test on a few different states
     test_states = [
@@ -235,7 +235,7 @@ def test_hamiltonian_from_pauli_strings():
     lcps = LinearCombinationOfPauliStrings(num_qubits=2, sparse=pauli_strings_sparse)
     hamiltonian = Hamiltonian(lcps)
 
-    H_matrix = hamiltonian.to_matrix()
+    H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 
     assert H_matrix.shape == (4, 4)
     assert np.allclose(H_matrix, H_matrix.conj().T)
@@ -251,7 +251,7 @@ def test_three_qubit_system():
     lcps = LinearCombinationOfPauliStrings(num_qubits=3, dense=pauli_data)
     hamiltonian = Hamiltonian(lcps)
 
-    H_matrix = hamiltonian.to_matrix()
+    H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 
     assert H_matrix.shape == (8, 8)
     assert np.allclose(H_matrix, H_matrix.conj().T)
@@ -272,7 +272,7 @@ def test_single_qubit_hamiltonian():
     lcps = LinearCombinationOfPauliStrings(num_qubits=1, dense=pauli_data)
     hamiltonian = Hamiltonian(lcps)
 
-    H_matrix = hamiltonian.to_matrix()
+    H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 
     assert H_matrix.shape == (2, 2)
     # Pauli X eigenvalues are ±1
@@ -286,7 +286,7 @@ def test_empty_hamiltonian():
     lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
     hamiltonian = Hamiltonian(lcps)
 
-    H_matrix = hamiltonian.to_matrix()
+    H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 
     expected = np.eye(4, dtype=complex)
     assert np.allclose(H_matrix, expected)
