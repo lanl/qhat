@@ -550,11 +550,8 @@ def error_analysis(
     # =============================================================================================
 
     if config_analysis.error_matrix_norms is not None:
-        # Normalize to list
-        if isinstance(config_analysis.error_matrix_norms, str):
-            norms_to_compute = [config_analysis.error_matrix_norms]
-        else:
-            norms_to_compute = config_analysis.error_matrix_norms
+        # Note: error_matrix_norms is normalized to list during validation
+        norms_to_compute = config_analysis.error_matrix_norms
 
         logger.info(f"Computing matrix norm errors: {norms_to_compute}")
 
@@ -714,11 +711,8 @@ def error_analysis(
     # =============================================================================================
 
     if config_analysis.error_state_inputs is not None:
-        # Normalize to list
-        if isinstance(config_analysis.error_state_inputs, str):
-            state_files = [config_analysis.error_state_inputs]
-        else:
-            state_files = config_analysis.error_state_inputs
+        # Note: error_state_inputs is normalized to list during validation
+        state_files = config_analysis.error_state_inputs
 
         logger.info(f"Computing state-dependent errors for {len(state_files)} state(s)")
 
@@ -824,17 +818,8 @@ def numerical_simulation(
     # Log matrix properties
     logger.verbose(f"Matrix shape: {unitary_matrix.shape}")
 
-    # Normalize input to list
-    inputs = config_analysis.numerical_simulation_inputs
-    if isinstance(inputs, str):
-        input_files = [inputs]
-    elif isinstance(inputs, list):
-        input_files = inputs
-    else:
-        raise ValueError(
-            f"numerical_simulation_inputs must be a string or list of strings, "
-            f"got {type(inputs)}"
-        )
+    # Note: numerical_simulation_inputs is normalized to list during validation
+    input_files = config_analysis.numerical_simulation_inputs
 
     logger.info(f"Running numerical simulation on {len(input_files)} input state(s)")
 
@@ -885,6 +870,36 @@ def numerical_simulation(
         })
 
     return {'simulations': results}
+
+# -------------------------------------------------------------------------------------------------
+# Helper functions
+# -------------------------------------------------------------------------------------------------
+
+def _normalize_string_or_list_to_list(value):
+    """
+    Normalize a configuration value that can be either a string or list into a list.
+
+    This is a common pattern for config options that accept either a single item (string)
+    or multiple items (list).
+
+    Parameters:
+        value: Either a string or a list of strings (or None)
+
+    Returns:
+        A list (or None if input was None)
+
+    Examples:
+        _normalize_string_or_list_to_list("item") -> ["item"]
+        _normalize_string_or_list_to_list(["a", "b"]) -> ["a", "b"]
+        _normalize_string_or_list_to_list(None) -> None
+    """
+    if value is None:
+        return None
+    elif isinstance(value, str):
+        return [value]
+    else:
+        # Already a list (or list-like)
+        return value
 
 # -------------------------------------------------------------------------------------------------
 # Functions to determine what expensive computations are required
@@ -1050,17 +1065,17 @@ def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfigura
             )
             config_analysis.eigendecomposition_matrices = 'both'
 
-    # Check matrix norm error dependencies
-    if config_analysis.error_matrix_norms is not None:
-        # Matrix norm errors require both exact and approximate matrices
-        # These will be computed automatically in analyze_algorithm (checked via requires_*_matrix)
-        pass
-
-    # Check state-dependent error dependencies
-    if config_analysis.error_state_inputs is not None:
-        # State errors require both exact and approximate matrices
-        # These will be computed automatically in analyze_algorithm (checked via requires_*_matrix)
-        pass
+    # Normalize string-or-list config values to always be lists
+    # This allows downstream code to always assume list type
+    config_analysis.error_matrix_norms = _normalize_string_or_list_to_list(
+        config_analysis.error_matrix_norms
+    )
+    config_analysis.error_state_inputs = _normalize_string_or_list_to_list(
+        config_analysis.error_state_inputs
+    )
+    config_analysis.numerical_simulation_inputs = _normalize_string_or_list_to_list(
+        config_analysis.numerical_simulation_inputs
+    )
 
 # -------------------------------------------------------------------------------------------------
 

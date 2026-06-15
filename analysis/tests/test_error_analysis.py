@@ -15,7 +15,7 @@ import tempfile
 import os
 from pathlib import Path
 
-from qhat.analysis.analysis import error_analysis
+from qhat.analysis.analysis import error_analysis, validate_and_autocomplete_analysis_config
 from qhat.analysis.config_types import AnalysisConfiguration
 from qhat.analysis.file_io import save_state
 
@@ -139,6 +139,7 @@ def test_frobenius_norm_zero_when_identical():
 
     config = AnalysisConfiguration()
     config.error_matrix_norms = 'frobenius'
+    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -166,6 +167,7 @@ def test_frobenius_norm_nonzero_when_different():
 
     config = AnalysisConfiguration()
     config.error_matrix_norms = 'frobenius'
+    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -197,6 +199,7 @@ def test_spectral_norm_zero_when_identical():
 
     config = AnalysisConfiguration()
     config.error_matrix_norms = 'spectral'
+    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -224,6 +227,7 @@ def test_spectral_norm_nonzero_when_different():
 
     config = AnalysisConfiguration()
     config.error_matrix_norms = 'spectral'
+    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -289,6 +293,7 @@ def test_state_error_zero_when_identical():
 
     config = AnalysisConfiguration()
     config.error_state_inputs = 'test_state.npy'
+    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -321,6 +326,7 @@ def test_state_error_nonzero_when_different():
 
     config = AnalysisConfiguration()
     config.error_state_inputs = 'test_state.npy'
+    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -406,8 +412,11 @@ def test_all_error_types_together():
 
     config = AnalysisConfiguration()
     config.enable_eigenvalue_errors = True
+    config.num_eigenvalues = 2  # Required for eigenvalue errors
+    config.eigendecomposition_matrices = 'both'  # Will be auto-set by validation, but explicit here
     config.error_matrix_norms = ['frobenius', 'spectral']
     config.error_state_inputs = 'test_state.npy'
+    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -513,6 +522,7 @@ def test_invalid_matrix_norm_type():
 
     config = AnalysisConfiguration()
     config.error_matrix_norms = 'invalid'
+    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with pytest.raises(ValueError, match="Unknown matrix norm type"):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -536,6 +546,7 @@ def test_missing_state_file():
 
     config = AnalysisConfiguration()
     config.error_state_inputs = 'nonexistent.npy'
+    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with pytest.raises(Exception):  # Will be FileNotFoundError or similar
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -570,6 +581,7 @@ def test_state_error_with_matrix_free_operators():
 
     config = AnalysisConfiguration()
     config.error_state_inputs = 'test_state.npy'
+    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -607,6 +619,7 @@ def test_frobenius_norm_with_matrix_free_small():
 
     config = AnalysisConfiguration()
     config.error_matrix_norms = 'frobenius'
+    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -690,6 +703,7 @@ def test_state_relative_error():
 
     config = AnalysisConfiguration()
     config.error_state_inputs = 'test_state.npy'
+    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
