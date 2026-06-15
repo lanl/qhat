@@ -883,6 +883,182 @@ def numerical_simulation(
     return {'simulations': results}
 
 # -------------------------------------------------------------------------------------------------
+# Functions to determine what expensive computations are required
+# -------------------------------------------------------------------------------------------------
+
+def requires_exact_eigendecomposition(config_analysis: AnalysisConfiguration) -> bool:
+    """
+    Determine if exact eigendecomposition needs to be computed.
+
+    Exact eigendecomposition is required for:
+    - Eigendecomposition analysis with eigendecomposition_matrices = 'exact' or 'both'
+    - Eigenvalue error analysis (always needs both eigendecompositions)
+
+    Parameters:
+        config_analysis: Analysis configuration
+
+    Returns:
+        True if exact eigendecomposition computation is needed, False otherwise
+    """
+    # Check if eigendecomposition is requested at all
+    num_eigenvalues = config_analysis.num_eigenvalues
+    eigendecomposition_requested = (
+        isinstance(num_eigenvalues, int) and num_eigenvalues > 0
+    ) or (
+        isinstance(num_eigenvalues, str) and num_eigenvalues.lower() == "all"
+    )
+
+    # Need exact eigendecomposition if:
+    # 1. Eigendecomposition requested and matrices setting includes 'exact' or 'both'
+    # 2. Eigenvalue error analysis is enabled (always needs both)
+    return (
+        (eigendecomposition_requested and
+         config_analysis.eigendecomposition_matrices in ['exact', 'both']) or
+        config_analysis.enable_eigenvalue_errors
+    )
+
+
+def requires_approximate_eigendecomposition(config_analysis: AnalysisConfiguration) -> bool:
+    """
+    Determine if approximate eigendecomposition needs to be computed.
+
+    Approximate eigendecomposition is required for:
+    - Eigendecomposition analysis with eigendecomposition_matrices = 'approximate' or 'both'
+    - Eigenvalue error analysis (always needs both eigendecompositions)
+
+    Parameters:
+        config_analysis: Analysis configuration
+
+    Returns:
+        True if approximate eigendecomposition computation is needed, False otherwise
+    """
+    # Check if eigendecomposition is requested at all
+    num_eigenvalues = config_analysis.num_eigenvalues
+    eigendecomposition_requested = (
+        isinstance(num_eigenvalues, int) and num_eigenvalues > 0
+    ) or (
+        isinstance(num_eigenvalues, str) and num_eigenvalues.lower() == "all"
+    )
+
+    # Need approximate eigendecomposition if:
+    # 1. Eigendecomposition requested and matrices setting includes 'approximate' or 'both'
+    # 2. Eigenvalue error analysis is enabled (always needs both)
+    return (
+        (eigendecomposition_requested and
+         config_analysis.eigendecomposition_matrices in ['approximate', 'both']) or
+        config_analysis.enable_eigenvalue_errors
+    )
+
+
+def requires_exact_matrix(config_analysis: AnalysisConfiguration) -> bool:
+    """
+    Determine if the exact Hamiltonian matrix needs to be computed.
+
+    The exact matrix is required for:
+    - Exact matrix output to file
+    - Exact eigendecomposition (which depends on the matrix)
+    - Matrix norm error analysis
+    - State-dependent error analysis
+
+    Parameters:
+        config_analysis: Analysis configuration
+
+    Returns:
+        True if exact matrix computation is needed, False otherwise
+    """
+    return (
+        config_analysis.exact_matrix_output_file is not None or
+        requires_exact_eigendecomposition(config_analysis) or
+        config_analysis.error_matrix_norms is not None or
+        config_analysis.error_state_inputs is not None
+    )
+
+
+def requires_approximate_matrix(config_analysis: AnalysisConfiguration) -> bool:
+    """
+    Determine if the approximate/unitary matrix needs to be computed.
+
+    The approximate matrix is required for:
+    - Matrix output to file
+    - Numerical simulation
+    - Approximate eigendecomposition (which depends on the matrix)
+    - Matrix norm error analysis
+    - State-dependent error analysis
+
+    Parameters:
+        config_analysis: Analysis configuration
+
+    Returns:
+        True if approximate matrix computation is needed, False otherwise
+    """
+    return (
+        config_analysis.matrix_output_file is not None or
+        config_analysis.numerical_simulation_inputs is not None or
+        requires_approximate_eigendecomposition(config_analysis) or
+        config_analysis.error_matrix_norms is not None or
+        config_analysis.error_state_inputs is not None
+    )
+
+# -------------------------------------------------------------------------------------------------
+
+def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfiguration) -> None:
+    """
+    Validate configuration consistency and auto-enable dependent analyses where appropriate.
+
+    This function is called early in driver.py, after loading configuration but before
+    loading the Hamiltonian. This allows for fail-fast behavior if configuration is invalid.
+
+    This function checks for:
+    1. Missing dependencies (raises errors if configuration is needed)
+    2. Opportunities to auto-enable analyses (logs when enabling)
+
+    Parameters:
+        config_analysis: Analysis configuration to validate and potentially modify
+
+    Raises:
+        ValueError: If configuration is inconsistent and cannot be auto-corrected
+
+    Note:
+        This function modifies the config_analysis object in-place when auto-enabling analyses.
+    """
+
+    # Check eigenvalue error analysis dependencies
+    if config_analysis.enable_eigenvalue_errors:
+        # Check if num_eigenvalues is configured
+        num_eigenvalues = config_analysis.num_eigenvalues
+        eigendecomposition_configured = (
+            isinstance(num_eigenvalues, int) and num_eigenvalues > 0
+        ) or (
+            isinstance(num_eigenvalues, str) and num_eigenvalues.lower() == "all"
+        )
+
+        if not eigendecomposition_configured:
+            raise ValueError(
+                "enable_eigenvalue_errors requires eigendecomposition. "
+                "Set num_eigenvalues to a positive integer or 'all'."
+            )
+
+        # Must compute both eigendecompositions to compare
+        if config_analysis.eigendecomposition_matrices != 'both':
+            logger.info(
+                "INFO: enable_eigenvalue_errors requires both exact and approximate eigendecompositions. "
+                f"Auto-setting eigendecomposition_matrices from '{config_analysis.eigendecomposition_matrices}' to 'both'."
+            )
+            config_analysis.eigendecomposition_matrices = 'both'
+
+    # Check matrix norm error dependencies
+    if config_analysis.error_matrix_norms is not None:
+        # Matrix norm errors require both exact and approximate matrices
+        # These will be computed automatically in analyze_algorithm (checked via requires_*_matrix)
+        pass
+
+    # Check state-dependent error dependencies
+    if config_analysis.error_state_inputs is not None:
+        # State errors require both exact and approximate matrices
+        # These will be computed automatically in analyze_algorithm (checked via requires_*_matrix)
+        pass
+
+# -------------------------------------------------------------------------------------------------
 
 def analyze_algorithm(
         config_analysis: AnalysisConfiguration,
@@ -891,20 +1067,20 @@ def analyze_algorithm(
 
     logger.info("Beginning algorithm analysis.")
 
-    # Validate at least one analysis requested
-    num_eigenvalues = config_analysis.num_eigenvalues
-    eigendecomposition_requested = (
-        isinstance(num_eigenvalues, int) and num_eigenvalues > 0
-    ) or (
-        isinstance(num_eigenvalues, str) and num_eigenvalues.lower() == "all"
-    )
+    # Note: Configuration validation happens in driver.py before Hamiltonian is loaded
 
+    # Check what analyses are requested
+    eigendecomposition_requested = (
+        requires_exact_eigendecomposition(config_analysis) or
+        requires_approximate_eigendecomposition(config_analysis)
+    )
     error_analysis_requested = (
         config_analysis.enable_eigenvalue_errors or
         config_analysis.error_matrix_norms is not None or
         config_analysis.error_state_inputs is not None
     )
 
+    # Validate at least one analysis requested
     if (config_analysis.resource_estimator is None and
         config_analysis.matrix_output_file is None and
         config_analysis.numerical_simulation_inputs is None and
@@ -925,27 +1101,23 @@ def analyze_algorithm(
 
     results = {}
 
-    # Check if any analysis needs the unitary matrix
-    needs_matrix = (
-        config_analysis.matrix_output_file is not None or
-        config_analysis.numerical_simulation_inputs is not None or
-        (eigendecomposition_requested and
-         config_analysis.eigendecomposition_matrices in ['approximate', 'both']) or
-        (error_analysis_requested)  # Error analysis always needs both
-    )
-
-    # Check if any analysis needs the exact Hamiltonian matrix
-    needs_exact_matrix = (
-        config_analysis.exact_matrix_output_file is not None or
-        (eigendecomposition_requested and
-         config_analysis.eigendecomposition_matrices in ['exact', 'both']) or
-        (error_analysis_requested)  # Error analysis always needs both
-    )
+    # Determine what expensive computations are needed using shared functions
+    needs_matrix = requires_approximate_matrix(config_analysis)
+    needs_exact_matrix = requires_exact_matrix(config_analysis)
 
     # Compute matrices once if needed
     unitary_matrix = None
     if needs_matrix:
         unitary_matrix = _compute_unitary_matrix(algorithm)
+
+        # Opportunistic analysis: enable matrix output if not already set
+        if config_analysis.matrix_output_file is None:
+            default_filename = "unitary_matrix.npz"
+            logger.info(
+                f"INFO: Unitary matrix computed for other analyses. "
+                f"Auto-enabling matrix output to '{default_filename}' (essentially free)."
+            )
+            config_analysis.matrix_output_file = default_filename
 
     exact_matrix = None
     if needs_exact_matrix:
@@ -955,6 +1127,15 @@ def analyze_algorithm(
                 "Pass hamiltonian to analyze_algorithm()."
             )
         exact_matrix = _compute_exact_matrix(hamiltonian, config_analysis)
+
+        # Opportunistic analysis: enable exact matrix output if not already set
+        if config_analysis.exact_matrix_output_file is None:
+            default_filename = "exact_hamiltonian.npz"
+            logger.info(
+                f"INFO: Exact Hamiltonian matrix computed for other analyses. "
+                f"Auto-enabling exact matrix output to '{default_filename}' (essentially free)."
+            )
+            config_analysis.exact_matrix_output_file = default_filename
 
     # Dispatch to requested analyses
     if config_analysis.resource_estimator is not None:
