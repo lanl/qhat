@@ -26,14 +26,14 @@ from qhat.analysis.file_io import save_state
 
 def test_eigenvalue_error_zero_when_identical():
     """Test that eigenvalue error is zero when matrices are identical."""
-    from qhat.analysis.file_io import save_eigendecomposition
+    from qhat.analysis.file_io import save_eigendecomposition, load_eigendecomposition
 
     # Create identical eigendecompositions
     eigenvalues = np.array([1.0, 2.0, 3.0])
     eigenvectors = np.eye(3, dtype=complex)
 
     config = AnalysisConfiguration()
-    config.error_num_eigenvalues = 3
+    config.enable_eigenvalue_errors = True
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -49,13 +49,19 @@ def test_eigenvalue_error_zero_when_identical():
                 matrix_type='approximate', num_eigenvalues=3, which_eigenvalues='smallest'
             )
 
+            # Load eigendecompositions
+            exact_eigendecomp = load_eigendecomposition('exact_eigendecomposition.npz')
+            approx_eigendecomp = load_eigendecomposition('approximate_eigendecomposition.npz')
+
             # Compute errors
             results = error_analysis(
                 config,
                 hamiltonian=None,
                 algorithm=None,
                 exact_matrix=None,
-                unitary_matrix=None
+                unitary_matrix=None,
+                exact_eigendecomp=exact_eigendecomp,
+                approx_eigendecomp=approx_eigendecomp
             )
 
             # Verify zero errors
@@ -71,7 +77,7 @@ def test_eigenvalue_error_zero_when_identical():
 
 def test_eigenvalue_error_nonzero_when_different():
     """Test that eigenvalue error is nonzero when matrices differ."""
-    from qhat.analysis.file_io import save_eigendecomposition
+    from qhat.analysis.file_io import save_eigendecomposition, load_eigendecomposition
 
     # Create different eigendecompositions
     exact_eigenvalues = np.array([1.0, 2.0, 3.0])
@@ -79,7 +85,7 @@ def test_eigenvalue_error_nonzero_when_different():
     eigenvectors = np.eye(3, dtype=complex)
 
     config = AnalysisConfiguration()
-    config.error_num_eigenvalues = 3
+    config.enable_eigenvalue_errors = True
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -95,13 +101,19 @@ def test_eigenvalue_error_nonzero_when_different():
                 matrix_type='approximate', num_eigenvalues=3, which_eigenvalues='smallest'
             )
 
+            # Load eigendecompositions
+            exact_eigendecomp = load_eigendecomposition('exact_eigendecomposition.npz')
+            approx_eigendecomp = load_eigendecomposition('approximate_eigendecomposition.npz')
+
             # Compute errors
             results = error_analysis(
                 config,
                 hamiltonian=None,
                 algorithm=None,
                 exact_matrix=None,
-                unitary_matrix=None
+                unitary_matrix=None,
+                exact_eigendecomp=exact_eigendecomp,
+                approx_eigendecomp=approx_eigendecomp
             )
 
             # Verify nonzero errors
@@ -382,7 +394,7 @@ def test_state_error_multiple_states():
 
 def test_all_error_types_together():
     """Test computing all three error types in one analysis."""
-    from qhat.analysis.file_io import save_eigendecomposition
+    from qhat.analysis.file_io import save_eigendecomposition, load_eigendecomposition
 
     # Setup matrices
     exact = np.diag([1.0, 2.0])
@@ -393,7 +405,7 @@ def test_all_error_types_together():
     eigenvectors = np.eye(2, dtype=complex)
 
     config = AnalysisConfiguration()
-    config.error_num_eigenvalues = 2
+    config.enable_eigenvalue_errors = True
     config.error_matrix_norms = ['frobenius', 'spectral']
     config.error_state_inputs = 'test_state.npy'
 
@@ -411,6 +423,10 @@ def test_all_error_types_together():
                 matrix_type='approximate', num_eigenvalues=2, which_eigenvalues='smallest'
             )
 
+            # Load eigendecompositions
+            exact_eigendecomp = load_eigendecomposition('exact_eigendecomposition.npz')
+            approx_eigendecomp = load_eigendecomposition('approximate_eigendecomposition.npz')
+
             # Save state
             save_state('test_state.npy', state)
 
@@ -420,7 +436,9 @@ def test_all_error_types_together():
                 hamiltonian=None,
                 algorithm=None,
                 exact_matrix=exact,
-                unitary_matrix=approx
+                unitary_matrix=approx,
+                exact_eigendecomp=exact_eigendecomp,
+                approx_eigendecomp=approx_eigendecomp
             )
 
             # Verify all three types present
@@ -435,13 +453,13 @@ def test_all_error_types_together():
 
 def test_error_output_file_created():
     """Test that error_analysis.npz file is created."""
-    from qhat.analysis.file_io import save_eigendecomposition
+    from qhat.analysis.file_io import save_eigendecomposition, load_eigendecomposition
 
     eigenvalues = np.array([1.0, 2.0])
     eigenvectors = np.eye(2, dtype=complex)
 
     config = AnalysisConfiguration()
-    config.error_num_eigenvalues = 2
+    config.enable_eigenvalue_errors = True
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -457,13 +475,19 @@ def test_error_output_file_created():
                 matrix_type='approximate', num_eigenvalues=2, which_eigenvalues='smallest'
             )
 
+            # Load eigendecompositions
+            exact_eigendecomp = load_eigendecomposition('exact_eigendecomposition.npz')
+            approx_eigendecomp = load_eigendecomposition('approximate_eigendecomposition.npz')
+
             # Compute errors
             results = error_analysis(
                 config,
                 hamiltonian=None,
                 algorithm=None,
                 exact_matrix=None,
-                unitary_matrix=None
+                unitary_matrix=None,
+                exact_eigendecomp=exact_eigendecomp,
+                approx_eigendecomp=approx_eigendecomp
             )
 
             # Verify file created
@@ -610,14 +634,14 @@ def test_frobenius_norm_with_matrix_free_small():
 
 def test_eigenvalue_relative_error():
     """Test that relative eigenvalue errors are computed correctly."""
-    from qhat.analysis.file_io import save_eigendecomposition
+    from qhat.analysis.file_io import save_eigendecomposition, load_eigendecomposition
 
     exact_eigenvalues = np.array([10.0, 20.0])
     approx_eigenvalues = np.array([11.0, 18.0])
     eigenvectors = np.eye(2, dtype=complex)
 
     config = AnalysisConfiguration()
-    config.error_num_eigenvalues = 2
+    config.enable_eigenvalue_errors = True
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -632,12 +656,18 @@ def test_eigenvalue_relative_error():
                 matrix_type='approximate', num_eigenvalues=2, which_eigenvalues='smallest'
             )
 
+            # Load eigendecompositions
+            exact_eigendecomp = load_eigendecomposition('exact_eigendecomposition.npz')
+            approx_eigendecomp = load_eigendecomposition('approximate_eigendecomposition.npz')
+
             results = error_analysis(
                 config,
                 hamiltonian=None,
                 algorithm=None,
                 exact_matrix=None,
-                unitary_matrix=None
+                unitary_matrix=None,
+                exact_eigendecomp=exact_eigendecomp,
+                approx_eigendecomp=approx_eigendecomp
             )
 
             # Check relative errors

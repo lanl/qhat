@@ -295,20 +295,21 @@ analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both
 # =================================================================================================
 # Compare exact and approximate representations using three types of error metrics
 
-analysis.error_num_eigenvalues = 1  # Compare ground state energies
+analysis.enable_eigenvalue_errors = True  # Compare all eigenvalues from eigendecomposition
 analysis.error_matrix_norms = "frobenius"  # Options: "frobenius", "spectral", or ["frobenius", "spectral"]
 analysis.error_state_inputs = "examples/initial_state.npy"  # Can be string or list
 
 # This analysis computes three independent error types:
-#   1. Eigenvalue errors: Compare k smallest eigenvalues (typically k=1 for ground state)
+#   1. Eigenvalue errors: Compare all eigenvalues computed in the eigendecomposition
 #   2. Matrix norm errors: Frobenius and/or spectral norms of difference matrix
 #   3. State-dependent errors: ||H_exact|ψ⟩ - H_approx|ψ⟩|| for specific states
 
 # Configuration options:
-#   error_num_eigenvalues:
-#     - 0 (default): Eigenvalue errors disabled
-#     - Positive int (e.g., 1): Compare k eigenvalues
-#     - Requires eigendecompositions (will compute if not already done)
+#   enable_eigenvalue_errors:
+#     - False (default): Eigenvalue errors disabled
+#     - True: Compute errors for ALL eigenvalues from eigendecomposition
+#     - Requires eigendecompositions (set eigendecomposition_matrices = "both")
+#     - The number of eigenvalues compared is determined by num_eigenvalues
 #
 #   error_matrix_norms:
 #     - None (default): Matrix norm errors disabled
@@ -325,8 +326,8 @@ analysis.error_state_inputs = "examples/initial_state.npy"  # Can be string or l
 
 # Examples:
 
-# Ground state energy comparison (most common, always recommended)
-# analysis.error_num_eigenvalues = 1
+# Eigenvalue error comparison (compare all eigenvalues from eigendecomposition)
+# analysis.enable_eigenvalue_errors = True
 
 # Matrix norms (physical bounds, but expensive for large systems)
 # analysis.error_matrix_norms = "frobenius"  # Fast
@@ -337,12 +338,12 @@ analysis.error_state_inputs = "examples/initial_state.npy"  # Can be string or l
 # analysis.error_state_inputs = ["examples/ground.npy", "examples/excited.npy"]
 
 # All three error types (comprehensive validation for small-medium systems)
-# analysis.error_num_eigenvalues = 1
+# analysis.enable_eigenvalue_errors = True
 # analysis.error_matrix_norms = "frobenius"
 # analysis.error_state_inputs = ["examples/ground.npy", "examples/excited.npy"]
 
 # Minimal setup for large systems
-# analysis.error_num_eigenvalues = 1  # Ground state only
+# analysis.enable_eigenvalue_errors = True  # Compare eigenvalues
 # analysis.error_state_inputs = "examples/ground.npy"  # Scales well
 # # Skip error_matrix_norms for large systems (too slow)
 

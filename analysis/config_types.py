@@ -170,7 +170,7 @@ class AnalysisConfiguration(ConfigurationBase):
         self.num_eigenvalues = 0
         self.eigendecomposition_matrices = 'approximate'
         self.which_eigenvalues = 'smallest'
-        self.error_num_eigenvalues = 0
+        self.enable_eigenvalue_errors = False
         self.error_matrix_norms = None
         self.error_state_inputs = None
 
@@ -184,7 +184,7 @@ class AnalysisConfiguration(ConfigurationBase):
         self.save_if_present(table, "num_eigenvalues")
         self.save_if_present(table, "eigendecomposition_matrices")
         self.save_if_present(table, "which_eigenvalues")
-        self.save_if_present(table, "error_num_eigenvalues")
+        self.save_if_present(table, "enable_eigenvalue_errors")
         self.save_if_present(table, "error_matrix_norms")
         self.save_if_present(table, "error_state_inputs")
         return table

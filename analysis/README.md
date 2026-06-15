@@ -290,11 +290,12 @@ There are many details of the algorithm that may be worth analyzing. The availab
 
   **Configuration parameters**:
   
-  - **`error_num_eigenvalues`**: Number of eigenvalues to compare (default: 0, disabled)
-    - Set to positive integer (e.g., `1` for ground state energy comparison)
-    - Compares the k smallest eigenvalues from exact vs approximate
-    - Requires eigendecompositions (will compute if not already available)
-    - **Best for**: Validating ground state energy accuracy
+  - **`enable_eigenvalue_errors`**: Enable eigenvalue error comparison (default: False, disabled)
+    - Set to `True` to compute errors for ALL eigenvalues from the eigendecomposition
+    - The number of eigenvalues compared is determined by `num_eigenvalues` setting
+    - Compares all eigenvalues computed in both exact and approximate eigendecompositions
+    - Requires `eigendecomposition_matrices = "both"` to ensure both decompositions are computed
+    - **Best for**: Validating eigenvalue accuracy across the spectrum
 
   - **`error_matrix_norms`**: Which matrix norms to compute (default: None, disabled)
     - Single string: `"frobenius"` or `"spectral"`
@@ -331,8 +332,8 @@ There are many details of the algorithm that may be worth analyzing. The availab
 
   **Examples**:
   ```python
-  # Ground state energy comparison (most common)
-  analysis.error_num_eigenvalues = 1
+  # Eigenvalue error comparison (compares all eigenvalues from eigendecomposition)
+  analysis.enable_eigenvalue_errors = True
 
   # Matrix norm errors (physical bounds)
   analysis.error_matrix_norms = "frobenius"  # Fast
@@ -345,13 +346,13 @@ There are many details of the algorithm that may be worth analyzing. The availab
   analysis.error_state_inputs = ["ground.npy", "excited.npy"]
 
   # All three error types together (comprehensive validation)
-  analysis.error_num_eigenvalues = 1
+  analysis.enable_eigenvalue_errors = True
   analysis.error_matrix_norms = "frobenius"
   analysis.error_state_inputs = ["ground.npy", "excited.npy"]
   ```
 
   **When to use each error type**:
-  - **Eigenvalue errors**: Always use for ground state energy validation (k=1)
+  - **Eigenvalue errors**: Use when you want to validate all eigenvalues computed in the eigendecomposition
   - **Matrix norm errors**: Use for physical bounds, but expensive for large systems
   - **State errors**: Use for specific physically relevant states, scales best
 

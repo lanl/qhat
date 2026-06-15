@@ -479,7 +479,7 @@ def error_analysis(
     Compute error metrics comparing exact and approximate representations.
 
     Three independent error types:
-    1. Eigenvalue errors (if error_num_eigenvalues > 0)
+    1. Eigenvalue errors (if enable_eigenvalue_errors is True)
     2. Matrix norm errors (if error_matrix_norms is not None)
     3. State-dependent errors (if error_state_inputs is not None)
 
@@ -507,54 +507,38 @@ def error_analysis(
     # 1. EIGENVALUE ERROR
     # =============================================================================================
 
-    if config_analysis.error_num_eigenvalues > 0:
-        logger.info(f"Computing eigenvalue errors for {config_analysis.error_num_eigenvalues} eigenvalues")
+    if config_analysis.enable_eigenvalue_errors:
+        logger.info("Computing eigenvalue errors for all eigenvalues from eigendecomposition")
 
-        # Load or compute eigendecompositions
-        if exact_eigendecomp is None:
-            if os.path.exists('exact_eigendecomposition.npz'):
-                exact_eigendecomp = load_eigendecomposition('exact_eigendecomposition.npz')
-            else:
-                logger.info("Computing exact eigendecomposition for error analysis")
-                # Compute it
-                config_temp = AnalysisConfiguration()
-                config_temp.num_eigenvalues = config_analysis.error_num_eigenvalues
-                config_temp.eigendecomposition_matrices = 'exact'
-                config_temp.which_eigenvalues = 'smallest'
-                eig_results = eigendecomposition_analysis(
-                    config_temp, hamiltonian, algorithm,
-                    exact_matrix=exact_matrix, unitary_matrix=None
-                )
-                exact_eigendecomp = load_eigendecomposition(eig_results['exact_eigendecomposition']['file'])
+        if exact_eigendecomp is None or approx_eigendecomp is None:
+            raise ValueError(
+                "Both eigendecompositions must be computed in order to compare eigenvalues. "
+                "Ensure eigendecomposition_matrices is set to 'both' when enable_eigenvalue_errors is True."
+            )
 
-        if approx_eigendecomp is None:
-            if os.path.exists('approximate_eigendecomposition.npz'):
-                approx_eigendecomp = load_eigendecomposition('approximate_eigendecomposition.npz')
-            else:
-                logger.info("Computing approximate eigendecomposition for error analysis")
-                # Compute it
-                config_temp = AnalysisConfiguration()
-                config_temp.num_eigenvalues = config_analysis.error_num_eigenvalues
-                config_temp.eigendecomposition_matrices = 'approximate'
-                config_temp.which_eigenvalues = 'smallest'
-                eig_results = eigendecomposition_analysis(
-                    config_temp, hamiltonian, algorithm,
-                    exact_matrix=None, unitary_matrix=unitary_matrix
-                )
-                approx_eigendecomp = load_eigendecomposition(eig_results['approximate_eigendecomposition']['file'])
+        # Get all eigenvalues from the eigendecompositions
+        exact_eigs = exact_eigendecomp['eigenvalues']
+        approx_eigs = approx_eigendecomp['eigenvalues']
 
-        # Compare eigenvalues
-        exact_eigs = exact_eigendecomp['eigenvalues'][:config_analysis.error_num_eigenvalues]
-        approx_eigs = approx_eigendecomp['eigenvalues'][:config_analysis.error_num_eigenvalues]
+        # Verify that the same number of eigenvalues were computed
+        if len(exact_eigs) != len(approx_eigs):
+            raise ValueError(
+                f"Mismatch in number of eigenvalues: exact has {len(exact_eigs)}, "
+                f"approximate has {len(approx_eigs)}. Both eigendecompositions must compute "
+                "the same number of eigenvalues."
+            )
 
+        # Compare all eigenvalues
         absolute_errors = exact_eigs - approx_eigs
         relative_errors = absolute_errors / np.abs(exact_eigs)
 
+        num_eigenvalues = len(exact_eigs)
+        logger.info(f"Computed errors for {num_eigenvalues} eigenvalues")
         logger.info(f"Eigenvalue absolute error range: [{absolute_errors.min():.6e}, {absolute_errors.max():.6e}]")
         logger.info(f"Eigenvalue relative error range: [{relative_errors.min():.6e}, {relative_errors.max():.6e}]")
 
         results['eigenvalue_errors'] = {
-            'num_eigenvalues': config_analysis.error_num_eigenvalues,
+            'num_eigenvalues': num_eigenvalues,
             'absolute_errors': absolute_errors.tolist(),
             'relative_errors': relative_errors.tolist(),
             'max_absolute_error': float(np.abs(absolute_errors).max()),
@@ -916,7 +900,7 @@ def analyze_algorithm(
     )
 
     error_analysis_requested = (
-        config_analysis.error_num_eigenvalues > 0 or
+        config_analysis.enable_eigenvalue_errors or
         config_analysis.error_matrix_norms is not None or
         config_analysis.error_state_inputs is not None
     )
@@ -934,7 +918,7 @@ def analyze_algorithm(
             "  - numerical_simulation_inputs (e.g., 'state.npy' or ['state1.npy', 'state2.npy'])\n"
             "  - exact_matrix_output_file (e.g., 'exact_hamiltonian.npz')\n"
             "  - num_eigenvalues (e.g., 5 or 'all')\n"
-            "  - error_num_eigenvalues (e.g., 1)\n"
+            "  - enable_eigenvalue_errors (True to compute errors for all eigenvalues)\n"
             "  - error_matrix_norms (e.g., 'frobenius' or ['frobenius', 'spectral'])\n"
             "  - error_state_inputs (e.g., 'state.npy')"
         )
