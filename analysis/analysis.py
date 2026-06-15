@@ -558,16 +558,18 @@ def error_analysis(
 
         logger.info(f"Computing matrix norm errors: {norms_to_compute}")
 
-        # Get matrices if not provided
+        # Require matrices to be provided by caller
         if exact_matrix is None:
-            if hamiltonian is None:
-                raise ValueError("hamiltonian required for matrix norm error analysis")
-            exact_matrix = _compute_exact_matrix(hamiltonian)
+            raise ValueError(
+                "Matrix norm error analysis requires the exact Hamiltonian matrix, but it was not computed. "
+                "This is an internal error - matrix should have been computed based on your configuration."
+            )
 
         if unitary_matrix is None:
-            if algorithm is None:
-                raise ValueError("algorithm required for matrix norm error analysis")
-            unitary_matrix = _compute_unitary_matrix(algorithm)
+            raise ValueError(
+                "Matrix norm error analysis requires the approximate/unitary matrix, but it was not computed. "
+                "This is an internal error - matrix should have been computed based on your configuration."
+            )
 
         # Check if matrices are dense or matrix-free
         is_exact_dense = isinstance(exact_matrix, np.ndarray)
@@ -720,16 +722,18 @@ def error_analysis(
 
         logger.info(f"Computing state-dependent errors for {len(state_files)} state(s)")
 
-        # Get matrices/operators if not provided
+        # Require matrices to be provided by caller
         if exact_matrix is None:
-            if hamiltonian is None:
-                raise ValueError("hamiltonian required for state-dependent error analysis")
-            exact_matrix = _compute_exact_matrix(hamiltonian)
+            raise ValueError(
+                "State-dependent error analysis requires the exact Hamiltonian matrix, but it was not computed. "
+                "This is an internal error - matrix should have been computed based on your configuration."
+            )
 
         if unitary_matrix is None:
-            if algorithm is None:
-                raise ValueError("algorithm required for state-dependent error analysis")
-            unitary_matrix = _compute_unitary_matrix(algorithm)
+            raise ValueError(
+                "State-dependent error analysis requires the approximate/unitary matrix, but it was not computed. "
+                "This is an internal error - matrix should have been computed based on your configuration."
+            )
 
         state_errors = []
 
