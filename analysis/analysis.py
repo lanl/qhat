@@ -559,13 +559,11 @@ def error_analysis(
         if exact_matrix is None:
             raise ValueError(
                 "Matrix norm error analysis requires the exact Hamiltonian matrix, but it was not computed. "
-                "This is an internal error - matrix should have been computed based on your configuration."
             )
 
         if unitary_matrix is None:
             raise ValueError(
                 "Matrix norm error analysis requires the approximate/unitary matrix, but it was not computed. "
-                "This is an internal error - matrix should have been computed based on your configuration."
             )
 
         # Check if matrices are dense or matrix-free
@@ -720,13 +718,11 @@ def error_analysis(
         if exact_matrix is None:
             raise ValueError(
                 "State-dependent error analysis requires the exact Hamiltonian matrix, but it was not computed. "
-                "This is an internal error - matrix should have been computed based on your configuration."
             )
 
         if unitary_matrix is None:
             raise ValueError(
                 "State-dependent error analysis requires the approximate/unitary matrix, but it was not computed. "
-                "This is an internal error - matrix should have been computed based on your configuration."
             )
 
         state_errors = []
@@ -1077,6 +1073,25 @@ def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfigura
         config_analysis.numerical_simulation_inputs
     )
 
+    # Check if matrices will be computed and auto-enable output if not already set
+    if requires_approximate_matrix(config_analysis):
+        if config_analysis.matrix_output_file is None:
+            default_filename = "unitary_matrix.npz"
+            logger.info(
+                f"INFO: Approximate/unitary matrix will be computed for requested analyses. "
+                f"Auto-enabling matrix output to '{default_filename}' (essentially free)."
+            )
+            config_analysis.matrix_output_file = default_filename
+
+    if requires_exact_matrix(config_analysis):
+        if config_analysis.exact_matrix_output_file is None:
+            default_filename = "exact_hamiltonian.npz"
+            logger.info(
+                f"INFO: Exact Hamiltonian matrix will be computed for requested analyses. "
+                f"Auto-enabling exact matrix output to '{default_filename}' (essentially free)."
+            )
+            config_analysis.exact_matrix_output_file = default_filename
+
 # -------------------------------------------------------------------------------------------------
 
 def analyze_algorithm(
@@ -1125,18 +1140,10 @@ def analyze_algorithm(
     needs_exact_matrix = requires_exact_matrix(config_analysis)
 
     # Compute matrices once if needed
+    # Note: Opportunistic matrix output enabling happens during validation in driver.py
     unitary_matrix = None
     if needs_matrix:
         unitary_matrix = _compute_unitary_matrix(algorithm)
-
-        # Opportunistic analysis: enable matrix output if not already set
-        if config_analysis.matrix_output_file is None:
-            default_filename = "unitary_matrix.npz"
-            logger.info(
-                f"INFO: Unitary matrix computed for other analyses. "
-                f"Auto-enabling matrix output to '{default_filename}' (essentially free)."
-            )
-            config_analysis.matrix_output_file = default_filename
 
     exact_matrix = None
     if needs_exact_matrix:
@@ -1146,15 +1153,6 @@ def analyze_algorithm(
                 "Pass hamiltonian to analyze_algorithm()."
             )
         exact_matrix = _compute_exact_matrix(hamiltonian, config_analysis)
-
-        # Opportunistic analysis: enable exact matrix output if not already set
-        if config_analysis.exact_matrix_output_file is None:
-            default_filename = "exact_hamiltonian.npz"
-            logger.info(
-                f"INFO: Exact Hamiltonian matrix computed for other analyses. "
-                f"Auto-enabling exact matrix output to '{default_filename}' (essentially free)."
-            )
-            config_analysis.exact_matrix_output_file = default_filename
 
     # Dispatch to requested analyses
     if config_analysis.resource_estimator is not None:

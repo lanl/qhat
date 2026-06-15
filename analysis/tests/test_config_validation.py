@@ -112,3 +112,48 @@ def test_no_analyses_configured():
 
     # Should pass - the "no analyses requested" check happens in analyze_algorithm
     validate_and_autocomplete_analysis_config(config)
+
+
+def test_opportunistic_matrix_output_for_numerical_simulation():
+    """Test that matrix output is auto-enabled when matrices will be computed."""
+    config = AnalysisConfiguration()
+    config.numerical_simulation_inputs = 'state.npy'
+
+    # Before validation
+    assert config.matrix_output_file is None
+
+    # Validate - should auto-enable matrix output
+    validate_and_autocomplete_analysis_config(config)
+
+    # After validation
+    assert config.matrix_output_file == 'unitary_matrix.npz'
+
+
+def test_opportunistic_exact_matrix_output_for_error_analysis():
+    """Test that exact matrix output is auto-enabled for error analyses."""
+    config = AnalysisConfiguration()
+    config.error_matrix_norms = 'frobenius'
+
+    # Before validation
+    assert config.exact_matrix_output_file is None
+    assert config.matrix_output_file is None
+
+    # Validate - should auto-enable both matrix outputs
+    validate_and_autocomplete_analysis_config(config)
+
+    # After validation
+    assert config.exact_matrix_output_file == 'exact_hamiltonian.npz'
+    assert config.matrix_output_file == 'unitary_matrix.npz'
+
+
+def test_no_opportunistic_enabling_when_already_set():
+    """Test that opportunistic enabling respects existing settings."""
+    config = AnalysisConfiguration()
+    config.numerical_simulation_inputs = 'state.npy'
+    config.matrix_output_file = 'my_custom_name.npz'
+
+    # Validate - should NOT change the custom filename
+    validate_and_autocomplete_analysis_config(config)
+
+    # Should keep custom name
+    assert config.matrix_output_file == 'my_custom_name.npz'
