@@ -235,13 +235,13 @@ analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both
 # analysis.eigendecomposition_matrices = "exact"
 
 # =================================================================================================
-# 5. EIGENDECOMPOSITION ANALYSIS (Branch 2: Now Available!)
+# 5. EIGENDECOMPOSITION ANALYSIS
 # =================================================================================================
 # Compute eigenvalues and eigenvectors of exact and/or approximate matrices
 
-# analysis.num_eigenvalues = 5  # Compute 5 eigenvalues (use sparse methods)
-# analysis.eigendecomposition_matrices = "both"  # Options: "exact", "approximate", "both"
-# analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both"
+analysis.num_eigenvalues = 5  # Compute 5 eigenvalues (use sparse methods)
+analysis.eigendecomposition_matrices = "both"  # Options: "exact", "approximate", "both"
+analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both"
 
 # This analysis computes eigendecompositions for validation and comparison:
 #   - Ground state energy (use num_eigenvalues=1, which_eigenvalues="smallest")
@@ -264,13 +264,6 @@ analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both
 #     - "smallest" (default): Algebraically smallest (most negative, ground state)
 #     - "largest": Algebraically largest (most positive)
 #     - "both": Compute smallest AND largest (returns 2k eigenvalues)
-#
-# System size guidance:
-#   - ≤10 qubits: "all" feasible
-#   - 10-12 qubits: "all" possible but expensive
-#   - ≥12 qubits: Use partial (specify k=5-10)
-#   - 20+ qubits: MUST use partial
-#   - 25-30 qubits: Partial still scales well
 
 # Output files:
 #   - exact_eigendecomposition.npz (if "exact" or "both")
@@ -298,13 +291,13 @@ analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both
 # analysis.eigendecomposition_matrices = "exact"
 
 # =================================================================================================
-# 6. ERROR ANALYSIS (Branch 3: Now Available!)
+# 6. ERROR ANALYSIS
 # =================================================================================================
 # Compare exact and approximate representations using three types of error metrics
 
-# analysis.error_num_eigenvalues = 1  # Compare ground state energies
-# analysis.error_matrix_norms = "frobenius"  # Options: "frobenius", "spectral", or ["frobenius", "spectral"]
-# analysis.error_state_inputs = "examples/initial_state.npy"  # Can be string or list
+analysis.error_num_eigenvalues = 1  # Compare ground state energies
+analysis.error_matrix_norms = "frobenius"  # Options: "frobenius", "spectral", or ["frobenius", "spectral"]
+analysis.error_state_inputs = "examples/initial_state.npy"  # Can be string or list
 
 # This analysis computes three independent error types:
 #   1. Eigenvalue errors: Compare k smallest eigenvalues (typically k=1 for ground state)
@@ -322,19 +315,11 @@ analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both
 #     - "frobenius": Fast element-wise difference norm
 #     - "spectral": Physically meaningful worst-case norm (slower)
 #     - ["frobenius", "spectral"]: Both norms
-#     - For large systems (>15 qubits): Uses matrix-free computation (can be slow)
 #
 #   error_state_inputs:
 #     - None (default): State-dependent errors disabled
 #     - String or list of .npy files containing quantum states
-#     - Best-scaling error metric (can reach 30 qubits)
 #     - Fast: just applies operators to states
-
-# System size guidance:
-#   - ≤15 qubits: All error types fast
-#   - 16-20 qubits: Matrix norms slow, eigenvalue+state errors fast
-#   - 20-30 qubits: Use eigenvalue + state errors, avoid matrix norms
-#   - Production: error_num_eigenvalues=1 + error_state_inputs for best performance
 
 # Output: error_analysis.npz containing all computed errors
 
@@ -356,7 +341,7 @@ analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both
 # analysis.error_matrix_norms = "frobenius"
 # analysis.error_state_inputs = ["examples/ground.npy", "examples/excited.npy"]
 
-# Minimal setup for large systems (20+ qubits)
+# Minimal setup for large systems
 # analysis.error_num_eigenvalues = 1  # Ground state only
 # analysis.error_state_inputs = "examples/ground.npy"  # Scales well
 # # Skip error_matrix_norms for large systems (too slow)
