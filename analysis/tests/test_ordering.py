@@ -5,6 +5,7 @@ Tests include:
 - Default ordering preserves input order and returns a dictionary.
 - Empty input returns an empty dictionary.
 - group_evolve_xyz correctly handles Y-only Pauli terms.
+- group_evolve_xyz safely handles identity-only Pauli terms.
 - group_evolve_xyz rejects mixed Pauli terms.
 """
 
