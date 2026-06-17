@@ -42,6 +42,16 @@ def test_group_evolve_xyz_handles_y_only_terms():
     assert isinstance(ordered, dict)
     assert list(ordered.keys()) == ["XII", "YII", "ZII"]
 
+def test_group_evolve_xyz_handles_identity_only_terms():
+    pauli_strings = {
+        "III": 0.5,
+        "YII": 1.0,
+        "ZII": 2.0,
+    }
+
+    ordered = reorder_paulis(pauli_strings, "group_evolve_xyz")
+
+    assert list(ordered.keys()) == ["III", "YII", "ZII"]
 
 def test_group_evolve_xyz_rejects_mixed_pauli_terms():
     pauli_strings = {
