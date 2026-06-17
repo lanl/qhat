@@ -27,7 +27,7 @@ def reorder_paulis(pauli_strings, ordering_method):
             "This method currently only accepts pauli strings written in 'string' format (e.g. XIIYZIX)"
         )
 
-    if ordering_method == None:
+    if ordering_method is None:
         return dict(pauli_string_list)
     elif ordering_method == "magnitude":
         return magnitude(pauli_string_list)
