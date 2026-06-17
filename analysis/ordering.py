@@ -11,6 +11,9 @@ def reorder_paulis(pauli_strings, ordering_method):
     #   meaning that if it referenced again later, it will produce an empty list
     pauli_string_list = list(pauli_strings.items())
 
+    if not pauli_string_list:
+        return {}
+
     #TODO: not a very thorough validation and it's a bit ugly
     if not isinstance(pauli_string_list[0][0], str):
         raise Exception("This method currently only accepts pauli strings written in 'string' format (e.g. XIIYZIX)")
