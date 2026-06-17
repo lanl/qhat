@@ -1,16 +1,22 @@
-
-
 #TODO: The type of pauli_strings is a generator object; is it necessary for the output to also be a generator object,
 #  or is an explicit list fine?
 # Some of this stuff is a bit messy and different from the code I originally wrote since my own code had a Pauli Term class
 # instead of just a generator/list of raw data. This stuff could possibly be cleaned up by 
 # My old code is spread across multiple disjoint files, some of which assume a string format and others a tuple format;
 # might be good to revisit this decision. Currently, I assume a string format.
+
 def reorder_paulis(pauli_strings, ordering_method):
-    # note that this pauli_strings is a generateor, this "exhausts" the generator;
-    #   meaning that if it referenced again later, it will produce an empty list
+    """
+    Reorder Pauli-string terms for Trotterized time evolution.
+
+    The input is expected to be a mapping from dense Pauli strings to coefficients, for example {"XII": 0.5, "ZZI": -1.2}. 
+    The returned dictionary contains the same Pauli terms and coefficients, but inserted in the order selected by ordering_method.
+
+    If ordering_method is None, the original input order is preserved.
+    """
     pauli_string_list = list(pauli_strings.items())
 
+    # Nothing to reorder; return an empty mapping so callers can still use .items().
     if not pauli_string_list:
         return {}
 
