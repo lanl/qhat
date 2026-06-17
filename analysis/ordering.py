@@ -1,5 +1,6 @@
-# TODO: The type of pauli_strings is a generator object; is it necessary for the output to also be a generator object,
-#  or is an explicit list fine?
+# TODO: This function currently expects pauli_strings to be a mapping from
+# dense Pauli-string keys to coefficients, e.g. {"XII": 0.5}. Future cleanup
+# may add support for generator inputs or a dedicated Pauli term type.
 # Some of this stuff is a bit messy and different from the code I originally wrote since my own code had a Pauli Term class
 # instead of just a generator/list of raw data. This stuff could possibly be cleaned up by
 # My old code is spread across multiple disjoint files, some of which assume a string format and others a tuple format;
