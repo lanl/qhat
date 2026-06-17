@@ -85,6 +85,7 @@ def group_evolve_xyz(terms):
 
         if len(pauli_types) == 0:
             Xs.append(term)
+            continue
         else:
             pauli_type = list(pauli_types)[0]  # extract the one pauli type
 
