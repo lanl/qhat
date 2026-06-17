@@ -68,7 +68,7 @@ def group_evolve_xyz(terms):
         
         if pauli_type == "X":
             Xs.append(term)
-        elif pauli_types == "Y":
+        elif pauli_type == "Y":
             Ys.append(term)
         elif pauli_type == "Z":
             Zs.append(term)
