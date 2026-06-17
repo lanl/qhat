@@ -73,10 +73,8 @@ def group_evolve_xyz(terms):
     Zs = []
     for term in terms:
         pauli_string = term[0]
-        pauli_types = set(
-            pauli_string
-        )  # throw out duplicates to see which pauli types exist (I, X, Y, Z)
-        pauli_types.discard("I")  # throw out the identity I if it exists in the string
+        pauli_types = set(pauli_string)  # throw out duplicates to see which pauli types exist (I, X, Y, Z)
+        pauli_types.discard("I") # throw out the identity I if it exists in the string
         if len(pauli_types) > 1:
             raise Exception(
                 f"Cannot use this method, group_evolve_xyz can only be used if every pauli term has at most \
