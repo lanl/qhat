@@ -24,9 +24,7 @@ def reorder_paulis(pauli_strings, ordering_method):
 
     # TODO: not a very thorough validation and it's a bit ugly
     if not isinstance(pauli_string_list[0][0], str):
-        raise Exception(
-            "This method currently only accepts pauli strings written in 'string' format (e.g. XIIYZIX)"
-        )
+        raise Exception("This method currently only accepts pauli strings written in 'string' format (e.g. XIIYZIX)")
 
     if ordering_method is None:
         return dict(pauli_string_list)
@@ -37,9 +35,7 @@ def reorder_paulis(pauli_strings, ordering_method):
     elif ordering_method == "group_evolve_xyz":
         return group_evolve_xyz(pauli_string_list)
     else:
-        raise Exception(
-            f"The Trotter ordering method {ordering_method} is not currently supported."
-        )
+        raise Exception(f"The Trotter ordering method {ordering_method} is not currently supported.")
 
 
 def magnitude(terms):
@@ -76,10 +72,7 @@ def group_evolve_xyz(terms):
         pauli_types = set(pauli_string)  # throw out duplicates to see which pauli types exist (I, X, Y, Z)
         pauli_types.discard("I") # throw out the identity I if it exists in the string
         if len(pauli_types) > 1:
-            raise Exception(
-                f"Cannot use this method, group_evolve_xyz can only be used if every pauli term has at most \
-                            one non-identity pauli type, but this Hamiltonian has the string {pauli_string}"
-            )
+            raise Exception(f"Cannot use this method, group_evolve_xyz can only be used if every pauli term has at most one non-identity pauli type, but this Hamiltonian has the string {pauli_string}")
 
         if len(pauli_types) == 0:
             Xs.append(term)
@@ -94,8 +87,6 @@ def group_evolve_xyz(terms):
         elif pauli_type == "Z":
             Zs.append(term)
         else:
-            raise Exception(
-                f"Unsupported Pauli type: {pauli_type}. The only allowable Pauli types are I, X, Y, Z."
-            )
+            raise Exception(f"Unsupported Pauli type: {pauli_type}. The only allowable Pauli types are I, X, Y, Z.")
 
     return dict(Xs + Ys + Zs)
