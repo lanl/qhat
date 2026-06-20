@@ -15,8 +15,8 @@ _VALID_OPERATORS = frozenset("IXYZ")
 def _validate_num_qubits(num_qubits: int) -> int:
     if isinstance(num_qubits, bool) or not isinstance(num_qubits, Integral):
         raise TypeError("num_qubits must be an integer.")
-    if num_qubits <= 0:
-        raise ValueError("num_qubits must be positive.")
+    if num_qubits < 0:
+        raise ValueError("num_qubits must be non-negative.")
     return int(num_qubits)
 
 
@@ -84,9 +84,6 @@ class PauliString:
         """Construct a Pauli string from a dense value such as ``"IXYZ"``."""
         if not isinstance(value, str):
             raise TypeError("Dense Pauli input must be a string.")
-        if not value:
-            raise ValueError("A dense Pauli string cannot be empty.")
-
         invalid = next(
             (operator for operator in value if operator not in _VALID_OPERATORS),
             None,

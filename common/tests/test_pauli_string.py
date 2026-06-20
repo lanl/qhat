@@ -50,16 +50,24 @@ def test_identity_pauli_string():
     assert pauli.to_sparse() == ()
 
 
-@pytest.mark.parametrize("value", ["", "IXA", "xyz"])
+def test_zero_qubit_identity_pauli_string():
+    dense = PauliString.from_dense("")
+    sparse = PauliString.from_sparse((), num_qubits=0)
+
+    assert dense == sparse
+    assert dense.to_dense() == ""
+    assert dense.to_sparse() == ()
+
+
+@pytest.mark.parametrize("value", ["IXA", "xyz"])
 def test_invalid_dense_input(value):
     with pytest.raises(ValueError):
         PauliString.from_dense(value)
 
 
-@pytest.mark.parametrize("num_qubits", [0, -1])
-def test_num_qubits_must_be_positive(num_qubits):
-    with pytest.raises(ValueError, match="positive"):
-        PauliString.from_sparse((), num_qubits=num_qubits)
+def test_num_qubits_cannot_be_negative():
+    with pytest.raises(ValueError, match="non-negative"):
+        PauliString.from_sparse((), num_qubits=-1)
 
 
 @pytest.mark.parametrize(
