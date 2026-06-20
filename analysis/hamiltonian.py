@@ -18,6 +18,7 @@ from pyscf import ao2mo, gto, lib, scf
 from qhat.analysis.config_types import GeneralConfiguration, HamiltonianConfiguration, value
 from qhat.common.bosons_binary import BosonicBinaryEncoding
 from qhat.common.MixedFermionBosonOperator import MixedFermionBosonOperator
+from qhat.common.pauli_string import PauliString
 
 logger = logging.getLogger(__name__)
 
@@ -38,62 +39,65 @@ bosonic_mapping = {
 
 # -------------------------------------------------------------------------------------------------
 
-# TODO: These are generally useful utilities.  Where should they live?
 def sparse_to_dense_pauli(sparse_pauli, num_qubits):
-    dense_pauli = ["I",] * num_qubits
-    for idx, op in sparse_pauli:
-        dense_pauli[idx] = op
-    return "".join(dense_pauli)
+    """Compatibility wrapper for converting a sparse Pauli tuple to a string."""
+    return PauliString.from_sparse(sparse_pauli, num_qubits).to_dense()
+
+
 def dense_to_sparse_pauli(dense_pauli):
-    sparse_pauli = tuple()
-    for idx, op in enumerate(dense_pauli):
-        if op in ["X", "Y", "Z"]:
-            sparse_pauli = (*sparse_pauli, (idx,op))
-        elif op != "I":
-            raise ValueError(f"Invalid character in dense pauli string: \"{op}\".")
-    return sparse_pauli
+    """Compatibility wrapper for converting a Pauli string to a sparse tuple."""
+    try:
+        return PauliString.from_dense(dense_pauli).to_sparse()
+    except ValueError as exc:
+        raise ValueError(f"Invalid character in dense pauli string: \"{dense_pauli}\".") from exc
 
 # -------------------------------------------------------------------------------------------------
 
 class LinearCombinationOfPauliStrings:
     def __init__(self, **kwargs):
-        self._nq = None
-        self._format = None
-        self._data = None
-        self._nq = kwargs["num_qubits"]
-        for f in [ "dense", "sparse" ]:
-            if f in kwargs:
-                if self._format is not None:
-                    raise ValueError(
-                        "Too many formats provided to LinearCombinationOfPauliStrings.")
-                self._format = f
-                self._data = kwargs[f]
-                assert isinstance(self._data, dict)
-        if self._format is None:
+        formats = [fmt for fmt in ["dense", "sparse"] if fmt in kwargs]
+        if not formats:
             raise ValueError("No data provided to LinearCombinationOfPauliStrings.")
+        if len(formats) > 1:
+            raise ValueError("Too many formats provided to LinearCombinationOfPauliStrings.")
+
+        input_format = formats[0]
+        input_data = kwargs[input_format]
+        if not isinstance(input_data, dict):
+            raise TypeError("Pauli string data must be provided as a dictionary.")
+
+        identity = PauliString.from_sparse((), kwargs["num_qubits"])
+        self._nq = identity.num_qubits
+        self._data = {}
+        for raw_pauli, coefficient in input_data.items():
+            if input_format == "dense":
+                pauli = PauliString.from_dense(raw_pauli)
+                if pauli.num_qubits != self._nq:
+                    raise ValueError(
+                        f"Dense Pauli string {raw_pauli!r} has length "
+                        f"{pauli.num_qubits}, expected {self._nq}."
+                    )
+            else:
+                pauli = PauliString.from_sparse(raw_pauli, self._nq)
+            self._data[pauli] = self._data.get(pauli, 0.0) + coefficient
+
     def num_qubits(self):
         return self._nq
+
+    def get_pauli_strings(self):
+        """Return a copy of the canonical PauliString-keyed coefficient dictionary."""
+        return dict(self._data)
+
     def get_dense_pauli_strings(self):
-        if self._format == "dense":
-            return self._data
-        elif self._format == "sparse":
-            return {sparse_to_dense_pauli(pauli, self._nq) : coef
-                    for pauli, coef in self._data.items()}
-        else:
-            raise ValueError("Invalid data format \"{self._format}\".")
+        return {pauli.to_dense() : coef for pauli, coef in self._data.items()}
+
     def get_sparse_pauli_strings(self):
-        if self._format == "dense":
-            return {dense_to_sparse_pauli(pauli) : coef for pauli, coef in self._data.items()}
-        elif self._format == "sparse":
-            return self._data
-        else:
-            raise ValueError("Invalid data format \"{self._format}\".")
+        return {pauli.to_sparse() : coef for pauli, coef in self._data.items()}
+
     def energy_shift(self, shift):
-        all_identity = tuple()
-        if self._format == "dense":
-            all_identity = sparse_to_dense_pauli(all_identity, self._nq)
-        identity_coefficient = self._data.get(all_identity, 0.0) + shift
-        self._data[all_identity] = identity_coefficient
+        identity = PauliString.from_sparse((), self._nq)
+        identity_coefficient = self._data.get(identity, 0.0) + shift
+        self._data[identity] = identity_coefficient
 
 # -------------------------------------------------------------------------------------------------
 
@@ -142,6 +146,8 @@ class Hamiltonian:
         # -- If return_as == "strings": The Pauli string is encoded as a character string, where
         #    each character is a Pauli matrix, explicitly including identity entries.  For example,
         #    assuming 6 qubits, "XIIZII".
+        # -- If return_as == "objects": Keys are immutable PauliString instances that can provide
+        #    either representation on demand.
         # TODO: I'd prefer that the flag identify not the data structure but the concept: dense vs
         #       sparse, rather than strings vs tuples.
         if return_as == "tuples":
@@ -158,16 +164,18 @@ class Hamiltonian:
                 raise TypeError(
                     f"Unable to generate Pauli strings from object of type \"{type(self._H)}\".")
         elif return_as == "strings":
+            as_objects = self.get_all_pauli_strings(return_as="objects")
+            return {pauli.to_dense() : coef for pauli, coef in as_objects.items()}
+        elif return_as == "objects":
             if isinstance(self._H, LinearCombinationOfPauliStrings):
-                return self._H.get_dense_pauli_strings()
-            else:
-                as_tuples = self.get_all_pauli_strings(return_as="tuples")
-                Nq = self.num_qubits()
-                return {sparse_to_dense_pauli(pauli, Nq) : coef
+                return self._H.get_pauli_strings()
+            as_tuples = self.get_all_pauli_strings(return_as="tuples")
+            Nq = self.num_qubits()
+            return {PauliString.from_sparse(pauli, Nq) : coef
                     for pauli, coef in as_tuples.items()}
         else:
             raise ValueError("  ".join([
-                "The value of return_as must be \"tuples\" or \"strings\".",
+                "The value of return_as must be \"tuples\", \"strings\", or \"objects\".",
                 f"Unable to return result as \"{return_as}\".",
                 ]))
     def get_grouped_terms(self):
