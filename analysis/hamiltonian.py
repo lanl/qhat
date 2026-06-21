@@ -46,10 +46,7 @@ def sparse_to_dense_pauli(sparse_pauli, num_qubits):
 
 def dense_to_sparse_pauli(dense_pauli):
     """Compatibility wrapper for converting a Pauli string to a sparse tuple."""
-    try:
-        return PauliString.from_dense(dense_pauli).to_sparse()
-    except ValueError as exc:
-        raise ValueError(f"Invalid character in dense pauli string: \"{dense_pauli}\".") from exc
+    return PauliString.from_dense(dense_pauli).to_sparse()
 
 # -------------------------------------------------------------------------------------------------
 
