@@ -80,7 +80,7 @@ class TestUtilityFunctions:
 
     def test_dense_to_sparse_invalid_char(self):
         """Test that invalid characters raise ValueError."""
-        with pytest.raises(ValueError, match="Invalid character"):
+        with pytest.raises(ValueError, match="Invalid Pauli operator 'Q'"):
             dense_to_sparse_pauli("XQZI")
 
     def test_round_trip_conversion(self):
