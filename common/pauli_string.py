@@ -107,11 +107,7 @@ class PauliString:
         num_qubits: int,
     ) -> "PauliString":
         """Construct from sparse ``(index, operator)`` pairs or a mapping."""
-        num_qubits = _validate_num_qubits(num_qubits)
-        return cls(
-            num_qubits=num_qubits,
-            _operators=_normalize_sparse(operators, num_qubits),
-        )
+        return cls(num_qubits=num_qubits, _operators=operators)
 
     def to_dense(self) -> str:
         """Return the full dense string, including identity operators."""

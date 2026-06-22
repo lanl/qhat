@@ -108,6 +108,21 @@ hamiltonian.load_second_quantization("file.npz",
 hamiltonian.load_second_quantization("data.h5")
 ```
 
+### Accessing Pauli Strings in Python
+
+For a `Hamiltonian` instance, request `PauliString` keys to work without committing to a dense or
+sparse representation:
+
+```python
+pauli_terms = physical_hamiltonian.get_all_pauli_strings(return_as="objects")
+
+for pauli, coefficient in pauli_terms.items():
+    print(pauli.to_dense(), pauli.to_sparse_dict(), coefficient)
+```
+
+Use `return_as="strings"` for dense-string keys or `return_as="tuples"` for the existing sparse
+tuple keys. The `objects` form is useful when a caller needs both representations.
+
 ### Encoding as a Unitary
 
 Currently all of our applications involve encoding the Hamiltonian ($\hat{H}$) as a time-evolution

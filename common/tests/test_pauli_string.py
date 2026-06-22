@@ -33,6 +33,13 @@ def test_pauli_string_can_be_a_dictionary_key():
     assert hamiltonian[PauliString.from_sparse(((0, "X"),), 3)] == 0.5
 
 
+def test_string_representations():
+    pauli = PauliString.from_dense("IIXYIZ")
+
+    assert str(pauli) == "IIXYIZ"
+    assert repr(pauli) == "PauliString.from_dense('IIXYIZ')"
+
+
 def test_sparse_input_is_sorted_and_drops_identity_operators():
     pauli = PauliString.from_sparse(
         ((3, "Z"), (0, "I"), (1, "X")),
