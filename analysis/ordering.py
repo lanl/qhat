@@ -92,6 +92,8 @@ def group_evolve_xyz(terms):
             Zs.append(term)
         else:
             raise Exception(f"Unsupported Pauli type: {pauli_type}. The only allowable Pauli types are I, X, Y, Z.")
+        
+    return dict(Xs + Ys + Zs)
 
 def group_evolve_greedy(pauli_string_list):
     G = create_commutativity_graph(pauli_string_list, pauli_string_format = "explicit")
