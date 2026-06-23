@@ -76,6 +76,9 @@ class PauliString:
     def __post_init__(self) -> None:
         num_qubits = _validate_num_qubits(self.num_qubits)
         operators = _normalize_sparse(self._operators, num_qubits)
+
+        # PauliString is frozen, so normal assignment would raise FrozenInstanceError.
+        # Use object.__setattr__ only during initialization to store canonical values.
         object.__setattr__(self, "num_qubits", num_qubits)
         object.__setattr__(self, "_operators", operators)
 
