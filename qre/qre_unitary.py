@@ -155,7 +155,13 @@ def encode_ramped_trotter(
     Nsteps = max(1, math.ceil(Nsteps0))
     config_general.log(f"-- using {method} Trotter formula with {Nsteps} steps ({Nsteps0})")
 
+    # get the pauli strings
     pauli_strings = hamiltonian.get_all_pauli_strings(return_as='strings')
+
+    # reorder the pauli strings, using ordering method from config file
+    #   I feel like there is a bit of "unclean" code here. Basically, we go from a
+    #   a dict, the reorder method 
+    config_general.log_verbose(f"-- Reordering pauli strings using the method: config_unitary.ordering_method")
     pauli_strings = reorder_paulis(pauli_strings, config_unitary.ordering_method)
 
     # Import the appropriate implementation
