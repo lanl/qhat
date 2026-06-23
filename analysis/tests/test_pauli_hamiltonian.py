@@ -3,7 +3,6 @@ Tests for Pauli string Hamiltonian loading and LinearCombinationOfPauliStrings c
 
 Tests cover:
 - LinearCombinationOfPauliStrings class functionality
-- Utility functions (dense/sparse conversion)
 - File loading (dense and sparse formats)
 - Hermitian validation
 - Integration with Hamiltonian API
@@ -22,9 +21,7 @@ from qhat.analysis.config_types import (
 from qhat.analysis.hamiltonian import (
     Hamiltonian,
     LinearCombinationOfPauliStrings,
-    dense_to_sparse_pauli,
     load_pauli,
-    sparse_to_dense_pauli,
 )
 from qhat.common.pauli_string import PauliString
 
@@ -38,63 +35,6 @@ def general_config():
     """Create a single GeneralConfiguration for the entire test session."""
     user_config = GeneralConfigurationUser()
     return GeneralConfiguration(user_config)
-
-
-# ==================================================================================
-# Test: Utility functions
-# ==================================================================================
-
-class TestUtilityFunctions:
-    """Test sparse_to_dense_pauli and dense_to_sparse_pauli conversions."""
-
-    def test_sparse_to_dense_identity(self):
-        """Test converting identity (empty sparse) to dense."""
-        assert sparse_to_dense_pauli(tuple(), 4) == "IIII"
-        assert sparse_to_dense_pauli(tuple(), 1) == "I"
-
-    def test_sparse_to_dense_single_op(self):
-        """Test converting single Pauli operator."""
-        assert sparse_to_dense_pauli(((0, 'X'),), 4) == "XIII"
-        assert sparse_to_dense_pauli(((2, 'Z'),), 4) == "IIZI"
-        assert sparse_to_dense_pauli(((3, 'Y'),), 5) == "IIIYI"
-
-    def test_sparse_to_dense_multi_op(self):
-        """Test converting multiple Pauli operators."""
-        assert sparse_to_dense_pauli(((0, 'X'), (2, 'Z')), 4) == "XIZI"
-        assert sparse_to_dense_pauli(((1, 'Y'), (3, 'Z')), 5) == "IYIZI"
-
-    def test_dense_to_sparse_identity(self):
-        """Test converting dense identity to sparse."""
-        assert dense_to_sparse_pauli("IIII") == tuple()
-        assert dense_to_sparse_pauli("I") == tuple()
-
-    def test_dense_to_sparse_single_op(self):
-        """Test converting single operator from dense."""
-        assert dense_to_sparse_pauli("XIII") == ((0, 'X'),)
-        assert dense_to_sparse_pauli("IIZI") == ((2, 'Z'),)
-
-    def test_dense_to_sparse_multi_op(self):
-        """Test converting multiple operators from dense."""
-        assert dense_to_sparse_pauli("XIZI") == ((0, 'X'), (2, 'Z'))
-        assert dense_to_sparse_pauli("XYZ") == ((0, 'X'), (1, 'Y'), (2, 'Z'))
-
-    def test_dense_to_sparse_invalid_char(self):
-        """Test that invalid characters raise ValueError."""
-        with pytest.raises(ValueError, match="Invalid Pauli operator 'Q'"):
-            dense_to_sparse_pauli("XQZI")
-
-    def test_round_trip_conversion(self):
-        """Test that converting back and forth preserves the Pauli string."""
-        test_cases = [
-            ("IIII", 4),
-            ("XIII", 4),
-            ("XYZI", 4),
-            ("XYZIXYZ", 7),
-        ]
-        for dense, nq in test_cases:
-            sparse = dense_to_sparse_pauli(dense)
-            dense_back = sparse_to_dense_pauli(sparse, nq)
-            assert dense == dense_back
 
 
 # ==================================================================================

@@ -39,17 +39,6 @@ bosonic_mapping = {
 
 # -------------------------------------------------------------------------------------------------
 
-def sparse_to_dense_pauli(sparse_pauli, num_qubits):
-    """Compatibility wrapper for converting a sparse Pauli tuple to a string."""
-    return PauliString.from_sparse(sparse_pauli, num_qubits).to_dense()
-
-
-def dense_to_sparse_pauli(dense_pauli):
-    """Compatibility wrapper for converting a Pauli string to a sparse tuple."""
-    return PauliString.from_dense(dense_pauli).to_sparse()
-
-# -------------------------------------------------------------------------------------------------
-
 class LinearCombinationOfPauliStrings:
     def __init__(self, **kwargs):
         formats = [fmt for fmt in ["dense", "sparse"] if fmt in kwargs]

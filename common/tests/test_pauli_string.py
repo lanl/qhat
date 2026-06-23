@@ -40,6 +40,44 @@ def test_string_representations():
     assert repr(pauli) == "PauliString.from_dense('IIXYIZ')"
 
 
+@pytest.mark.parametrize(
+    "dense, sparse",
+    [
+        ("IIII", ()),
+        ("I", ()),
+        ("XIII", ((0, "X"),)),
+        ("IIZI", ((2, "Z"),)),
+        ("XIZI", ((0, "X"), (2, "Z"))),
+        ("XYZ", ((0, "X"), (1, "Y"), (2, "Z"))),
+    ],
+)
+def test_dense_to_sparse_conversions(dense, sparse):
+    assert PauliString.from_dense(dense).to_sparse() == sparse
+
+
+@pytest.mark.parametrize(
+    "sparse, num_qubits, dense",
+    [
+        ((), 4, "IIII"),
+        ((), 1, "I"),
+        (((0, "X"),), 4, "XIII"),
+        (((2, "Z"),), 4, "IIZI"),
+        (((3, "Y"),), 5, "IIIYI"),
+        (((0, "X"), (2, "Z")), 4, "XIZI"),
+        (((1, "Y"), (3, "Z")), 5, "IYIZI"),
+    ],
+)
+def test_sparse_to_dense_conversions(sparse, num_qubits, dense):
+    assert PauliString.from_sparse(sparse, num_qubits).to_dense() == dense
+
+
+@pytest.mark.parametrize("dense", ["IIII", "XIII", "XYZI", "XYZIXYZ"])
+def test_round_trip_conversion_preserves_dense_string(dense):
+    pauli = PauliString.from_dense(dense)
+
+    assert PauliString.from_sparse(pauli.to_sparse(), len(pauli)).to_dense() == dense
+
+
 def test_sparse_input_is_sorted_and_drops_identity_operators():
     pauli = PauliString.from_sparse(
         ((3, "Z"), (0, "I"), (1, "X")),
@@ -70,6 +108,11 @@ def test_zero_qubit_identity_pauli_string():
 def test_invalid_dense_input(value):
     with pytest.raises(ValueError):
         PauliString.from_dense(value)
+
+
+def test_invalid_dense_input_identifies_invalid_operator():
+    with pytest.raises(ValueError, match="Invalid Pauli operator 'Q'"):
+        PauliString.from_dense("XQZI")
 
 
 def test_num_qubits_cannot_be_negative():
