@@ -29,12 +29,13 @@
 
 import logging
 import math
+from dataclasses import dataclass
 
 from pyLIQTR.PhaseEstimation.pe import PhaseEstimation
 from pyLIQTR.qubitization.phase_estimation import QubitizedPhaseEstimation
 from qualtran.bloqs.phase_estimation import TextbookQPE
 
-from qhat.analysis.config_types import AlgorithmConfiguration, GeneralConfiguration
+from qhat.analysis.config_types import AlgorithmConfiguration, GeneralConfiguration, value
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +141,17 @@ def build_controlled_time_evolution(
 
 # -------------------------------------------------------------------------------------------------
 
+@dataclass(frozen=True)
+class PRQPEAlgorithm:
+    """Inert carrier of prqpe algorithm-level knobs. Builds no bloq; the prqpe estimator is analytic."""
+    method: str = "partially_randomized"
+    overlap: float = 1.0
+    xi: float | None = None
+    randomizer: str = "rte"
+    commuting_group_size: int | None = None
+
+# -------------------------------------------------------------------------------------------------
+
 def build_algorithm(
         config_algorithm: AlgorithmConfiguration,
         unitary,
@@ -158,6 +170,14 @@ def build_algorithm(
         return build_time_evolution(config_algorithm, unitary)
     elif config_algorithm.method.lower() in ("controlled time evolution",):
         return build_controlled_time_evolution(config_algorithm, unitary)
+    elif config_algorithm.method.lower() in ("qpe: partially randomized",):
+        return PRQPEAlgorithm(
+            method="partially_randomized",
+            overlap=value(config_algorithm.overlap, 1.0),
+            xi=config_algorithm.xi,
+            randomizer=value(config_algorithm.randomizer, "rte"),
+            commuting_group_size=config_algorithm.commuting_group_size,
+        )
     else:
         raise ValueError(f"Invalid algorithm method \"{config_algorithm.method}\".")
 

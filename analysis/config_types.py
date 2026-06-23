@@ -127,6 +127,9 @@ class UnitaryConfiguration(ConfigurationBase):
         self._only_once()
         self.method = "double factorization"
         self.energy_error = kwargs["energy_error"]
+    def encode_none(self):
+        self._only_once()
+        self.method = "none"
     def _generate_TOML_table(self):
         table = tomlkit.table()
         table["method"] = self.method
@@ -146,12 +149,20 @@ class AlgorithmConfiguration(ConfigurationBase):
         self.num_phase_qubits = None
         self.probability_of_failure = None
         self.energy_error = None
+        self.overlap = None
+        self.xi = None
+        self.randomizer = None
+        self.commuting_group_size = None
     def _generate_TOML_table(self):
         table = tomlkit.table()
         table["method"] = self.method
         self.save_if_present(table, "num_phase_qubits")
         self.save_if_present(table, "probability_of_failure")
         self.save_if_present(table, "energy_error")
+        self.save_if_present(table, "overlap")
+        self.save_if_present(table, "xi")
+        self.save_if_present(table, "randomizer")
+        self.save_if_present(table, "commuting_group_size")
         return table
 
 # -------------------------------------------------------------------------------------------------
@@ -166,6 +177,10 @@ class AnalysisConfiguration(ConfigurationBase):
         self.num_eigenvalues = 0
         self.eigendecomposition_matrices = 'approximate'
         self.which_eigenvalues = 'smallest'
+        self.prqpe_C_gs = None
+        self.prqpe_cgs_rule = None
+        self.prqpe_cgs_max_qubits = 14
+        self.prqpe_target_precision = 0.0016
 
     def _generate_TOML_table(self):
         table = tomlkit.table()
@@ -177,6 +192,11 @@ class AnalysisConfiguration(ConfigurationBase):
         self.save_if_present(table, "num_eigenvalues")
         self.save_if_present(table, "eigendecomposition_matrices")
         self.save_if_present(table, "which_eigenvalues")
+        self.save_if_present(table, "prqpe_C_gs")
+        if self.prqpe_cgs_rule is not None:
+            table["prqpe_cgs_rule"] = list(self.prqpe_cgs_rule)   # tomlkit needs a list, not a tuple
+        self.save_if_present(table, "prqpe_cgs_max_qubits")
+        self.save_if_present(table, "prqpe_target_precision")
         return table
 
 # -------------------------------------------------------------------------------------------------

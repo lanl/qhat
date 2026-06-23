@@ -8,6 +8,7 @@ from qualtran.resource_counting import get_cost_value, QubitCount
 
 from qhat.analysis.config_types import AnalysisConfiguration, GeneralConfiguration
 from qhat.analysis.file_io import save_matrix, load_state, save_state
+from qhat.analysis.prqpe_adapter import resource_estimation_prqpe
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +50,15 @@ def resource_estimation_pyliqtr(
 
 def estimate_resources(
         config_analysis: AnalysisConfiguration,
-        algorithm) -> dict:
+        algorithm,
+        hamiltonian=None) -> dict:
 
     if config_analysis.resource_estimator.lower() == "pyliqtr":
         return resource_estimation_pyliqtr(config_analysis, algorithm)
     elif config_analysis.resource_estimator.lower() == "cirq":
         return resource_estimation_cirq(config_analysis, algorithm)
+    elif config_analysis.resource_estimator.lower() == "prqpe":
+        return resource_estimation_prqpe(config_analysis, algorithm, hamiltonian=hamiltonian)
     else:
         raise ValueError(
                 f"Invalid resource estimator method \"{config_analysis.resource_estimator}\".")
@@ -590,7 +594,7 @@ def analyze_algorithm(
     # Dispatch to requested analyses
     if config_analysis.resource_estimator is not None:
         logger.info(f"Performing resource estimation using {config_analysis.resource_estimator}.")
-        results["resource_estimates"] = estimate_resources(config_analysis, algorithm)
+        results["resource_estimates"] = estimate_resources(config_analysis, algorithm, hamiltonian=hamiltonian)
 
     if config_analysis.matrix_output_file is not None:
         logger.info("Generating unitary matrix output.")
