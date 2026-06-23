@@ -65,6 +65,8 @@ class LinearCombinationOfPauliStrings:
                     )
             else:
                 pauli = PauliString.from_sparse(raw_pauli, self._nq)
+
+            # Combine coefficients for inputs that canonicalize to the same PauliString.    
             self._data[pauli] = self._data.get(pauli, 0.0) + coefficient
 
     def num_qubits(self):
