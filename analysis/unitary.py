@@ -49,7 +49,9 @@ def encode_pauli_lcu(
     #       a ChemicalHamiltonian (see details in encode_linear_t for current problems there).  Can
     #       the ElectronicStructure be wrapped in a ChemicalHamiltonian?  Can methods other than
     #       Linear T use an ElectronicStructure?
-    problem_instance = ChemicalHamiltonian(mol_ham=hamiltonian, mol_name="molecular hamiltonian")
+    problem_instance = ChemicalHamiltonian(
+            mol_ham=hamiltonian.get_core_operator(),
+            mol_name="molecular hamiltonian")
     # TODO: Do we want to exercise any of the other options to PauliStringLCU?
     return PauliStringLCU(
             ProblemInstance=problem_instance,

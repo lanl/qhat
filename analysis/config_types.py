@@ -123,6 +123,10 @@ class UnitaryConfiguration(ConfigurationBase):
         self.trotter_implementation = kwargs.get("trotter_implementation", "flattened")
         self.trotter_combine_terms = kwargs.get("trotter_combine_terms", True)
         self.ordering_method = kwargs.get("ordering_method", None)
+    def encode_pauli_lcu(self, **kwargs):
+        self._only_once()
+        self.method = "pauli lcu"
+        self.energy_error = kwargs["energy_error"]
     def encode_double_factorization(self, **kwargs):
         self._only_once()
         self.method = "double factorization"

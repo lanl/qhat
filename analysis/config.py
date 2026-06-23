@@ -1,4 +1,5 @@
 my_method = "Trotter"
+#my_method = "pauli-lcu"
 #my_method = "double-factorization"
 
 # this configuration file assumes equipartition of energy between Trotterization error and phase
@@ -27,6 +28,8 @@ if my_method == "Trotter":
             trotter_combine_terms = True,
             ordering_method = "lexicographical"
             )
+elif my_method == "pauli-lcu":
+    unitary.encode_pauli_lcu(energy_error=1.0e-4)
 elif my_method == "double-factorization":
     unitary.encode_double_factorization(energy_error=1.0e-4)
 else:
@@ -39,6 +42,9 @@ if my_method == "Trotter":
     algorithm.method = "QPE: qualtran textbook"
     algorithm.energy_error = 0.5 * energy_error
     algorithm.probability_of_failure = 0.01
+elif my_method == "pauli-lcu":
+    algorithm.method = "QPE: pyLIQTR qubitized"
+    algorithm.num_phase_qubits = 12
 elif my_method == "double-factorization":
     algorithm.method = "QPE: pyLIQTR qubitized"
     algorithm.num_phase_qubits = 12
