@@ -74,7 +74,7 @@ class LinearCombinationOfPauliStrings:
 
     def get_pauli_strings(self):
         """Return a copy of the canonical PauliString-keyed coefficient dictionary."""
-        return dict(self._data)
+        return self._data.copy()
 
     def get_dense_pauli_strings(self):
         return {pauli.to_dense() : coef for pauli, coef in self._data.items()}
