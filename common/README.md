@@ -5,6 +5,25 @@ be used directly by users.
 
 ## Pauli String and Time Evolution
 
+### Representation-Independent Pauli Strings
+
+`pauli_string.py` provides an immutable, hashable `PauliString` value type. Construct a value from
+either a dense string or a sparse mapping, then request the representation needed by the caller:
+
+```python
+from qhat.common.pauli_string import PauliString
+
+dense = PauliString.from_dense("IIXYIZ")
+sparse = PauliString.from_sparse({2: "X", 3: "Y", 5: "Z"}, num_qubits=6)
+
+assert dense == sparse
+assert dense.to_dense() == "IIXYIZ"
+assert dense.to_sparse() == ((2, "X"), (3, "Y"), (5, "Z"))
+assert dense.to_sparse_dict() == {2: "X", 3: "Y", 5: "Z"}
+```
+
+Coefficients remain separate so `PauliString` values can be used as Hamiltonian dictionary keys.
+
 ### Core Evolution Modules
 
 - **`pauli_string_evolution.py`**: Implements time evolution under a single Pauli string Hamiltonian:

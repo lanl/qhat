@@ -3,7 +3,6 @@ Tests for Pauli string Hamiltonian loading and LinearCombinationOfPauliStrings c
 
 Tests cover:
 - LinearCombinationOfPauliStrings class functionality
-- Utility functions (dense/sparse conversion)
 - File loading (dense and sparse formats)
 - Hermitian validation
 - Integration with Hamiltonian API
@@ -22,10 +21,9 @@ from qhat.analysis.config_types import (
 from qhat.analysis.hamiltonian import (
     Hamiltonian,
     LinearCombinationOfPauliStrings,
-    dense_to_sparse_pauli,
     load_pauli,
-    sparse_to_dense_pauli,
 )
+from qhat.common.pauli_string import PauliString
 
 
 # ==================================================================================
@@ -40,63 +38,6 @@ def general_config():
 
 
 # ==================================================================================
-# Test: Utility functions
-# ==================================================================================
-
-class TestUtilityFunctions:
-    """Test sparse_to_dense_pauli and dense_to_sparse_pauli conversions."""
-
-    def test_sparse_to_dense_identity(self):
-        """Test converting identity (empty sparse) to dense."""
-        assert sparse_to_dense_pauli(tuple(), 4) == "IIII"
-        assert sparse_to_dense_pauli(tuple(), 1) == "I"
-
-    def test_sparse_to_dense_single_op(self):
-        """Test converting single Pauli operator."""
-        assert sparse_to_dense_pauli(((0, 'X'),), 4) == "XIII"
-        assert sparse_to_dense_pauli(((2, 'Z'),), 4) == "IIZI"
-        assert sparse_to_dense_pauli(((3, 'Y'),), 5) == "IIIYI"
-
-    def test_sparse_to_dense_multi_op(self):
-        """Test converting multiple Pauli operators."""
-        assert sparse_to_dense_pauli(((0, 'X'), (2, 'Z')), 4) == "XIZI"
-        assert sparse_to_dense_pauli(((1, 'Y'), (3, 'Z')), 5) == "IYIZI"
-
-    def test_dense_to_sparse_identity(self):
-        """Test converting dense identity to sparse."""
-        assert dense_to_sparse_pauli("IIII") == tuple()
-        assert dense_to_sparse_pauli("I") == tuple()
-
-    def test_dense_to_sparse_single_op(self):
-        """Test converting single operator from dense."""
-        assert dense_to_sparse_pauli("XIII") == ((0, 'X'),)
-        assert dense_to_sparse_pauli("IIZI") == ((2, 'Z'),)
-
-    def test_dense_to_sparse_multi_op(self):
-        """Test converting multiple operators from dense."""
-        assert dense_to_sparse_pauli("XIZI") == ((0, 'X'), (2, 'Z'))
-        assert dense_to_sparse_pauli("XYZ") == ((0, 'X'), (1, 'Y'), (2, 'Z'))
-
-    def test_dense_to_sparse_invalid_char(self):
-        """Test that invalid characters raise ValueError."""
-        with pytest.raises(ValueError, match="Invalid character"):
-            dense_to_sparse_pauli("XQZI")
-
-    def test_round_trip_conversion(self):
-        """Test that converting back and forth preserves the Pauli string."""
-        test_cases = [
-            ("IIII", 4),
-            ("XIII", 4),
-            ("XYZI", 4),
-            ("XYZIXYZ", 7),
-        ]
-        for dense, nq in test_cases:
-            sparse = dense_to_sparse_pauli(dense)
-            dense_back = sparse_to_dense_pauli(sparse, nq)
-            assert dense == dense_back
-
-
-# ==================================================================================
 # Test: LinearCombinationOfPauliStrings class
 # ==================================================================================
 
@@ -108,16 +49,18 @@ class TestLinearCombinationOfPauliStrings:
         data = {"IIII": 1.0, "XIII": 0.5}
         lcps = LinearCombinationOfPauliStrings(num_qubits=4, dense=data)
         assert lcps.num_qubits() == 4
-        assert lcps._format == "dense"
         assert len(lcps._data) == 2
+        assert all(isinstance(pauli, PauliString) for pauli in lcps._data)
+        assert lcps._data[PauliString.from_dense("XIII")] == 0.5
 
     def test_sparse_format_init(self):
         """Test initialization with sparse format."""
         data = {tuple(): 1.0, ((0, 'X'),): 0.5}
         lcps = LinearCombinationOfPauliStrings(num_qubits=4, sparse=data)
         assert lcps.num_qubits() == 4
-        assert lcps._format == "sparse"
         assert len(lcps._data) == 2
+        assert all(isinstance(pauli, PauliString) for pauli in lcps._data)
+        assert lcps._data[PauliString.from_dense("XIII")] == 0.5
 
     def test_no_data_raises_error(self):
         """Test that initialization without data raises ValueError."""
@@ -169,29 +112,42 @@ class TestLinearCombinationOfPauliStrings:
         expected = {"IIII": 1.0, "XIII": 0.5, "IXZI": 0.3}
         assert dense_result == expected
 
+    def test_equivalent_sparse_keys_are_combined(self):
+        """Equivalent sparse orderings represent one Pauli string."""
+        sparse_data = {
+            ((0, 'X'), (1, 'Y'), (2, 'Z')): 0.25,
+            ((2, 'Z'), (1, 'Y'), (0, 'X')): -0.15,
+        }
+        lcps = LinearCombinationOfPauliStrings(num_qubits=4, sparse=sparse_data)
+
+        assert lcps.get_dense_pauli_strings() == {"XYZI": pytest.approx(0.10)}
+
     def test_energy_shift_dense(self):
         """Test energy shift with dense format."""
         data = {"IIII": 1.0, "XIII": 0.5}
         lcps = LinearCombinationOfPauliStrings(num_qubits=4, dense=data)
         lcps.energy_shift(2.5)
-        assert lcps._data["IIII"] == 3.5
-        assert lcps._data["XIII"] == 0.5
+        result = lcps.get_dense_pauli_strings()
+        assert result["IIII"] == 3.5
+        assert result["XIII"] == 0.5
 
     def test_energy_shift_sparse(self):
         """Test energy shift with sparse format."""
         data = {tuple(): 1.0, ((0, 'X'),): 0.5}
         lcps = LinearCombinationOfPauliStrings(num_qubits=4, sparse=data)
         lcps.energy_shift(2.5)
-        assert lcps._data[tuple()] == 3.5
-        assert lcps._data[((0, 'X'),)] == 0.5
+        result = lcps.get_sparse_pauli_strings()
+        assert result[tuple()] == 3.5
+        assert result[((0, 'X'),)] == 0.5
 
     def test_energy_shift_adds_identity(self):
         """Test that energy shift adds identity term if not present."""
         data = {"XIII": 0.5}
         lcps = LinearCombinationOfPauliStrings(num_qubits=4, dense=data)
         lcps.energy_shift(2.5)
-        assert lcps._data["IIII"] == 2.5
-        assert lcps._data["XIII"] == 0.5
+        result = lcps.get_dense_pauli_strings()
+        assert result["IIII"] == 2.5
+        assert result["XIII"] == 0.5
 
 
 # ==================================================================================
@@ -506,6 +462,16 @@ class TestHamiltonianIntegration:
         assert pauli_dict["IIII"] == 2.5
         assert pauli_dict["XIII"] == 0.5
 
+    def test_get_all_pauli_strings_objects(self, sample_hamiltonian):
+        """Test getting representation-independent PauliString keys."""
+        H, _, _ = sample_hamiltonian
+        pauli_dict = H.get_all_pauli_strings(return_as="objects")
+
+        assert len(pauli_dict) == 10
+        assert all(isinstance(pauli, PauliString) for pauli in pauli_dict)
+        assert pauli_dict[PauliString.from_dense("IIII")] == 2.5
+        assert pauli_dict[PauliString.from_sparse(((0, 'X'),), 4)] == 0.5
+
     def test_energy_bounds(self, sample_hamiltonian):
         """Test energy bounds computation."""
         H, config_gen, config_ham = sample_hamiltonian
@@ -677,10 +643,10 @@ class TestEdgeCases:
         # Verify basic properties
         assert H.num_qubits() == 4
         pauli_dict = H.get_all_pauli_strings(return_as="tuples")
-        assert len(pauli_dict) == 10
+        assert len(pauli_dict) == 9
 
         # Verify specific terms
         assert pauli_dict[tuple()] == 2.5
         assert pauli_dict[((0, 'X'),)] == 0.5
         assert pauli_dict[((0, 'X'), (1, 'X'))] == 1.2
-        assert pauli_dict[((0, 'X'), (1, 'Y'), (2, 'Z'))] == 0.25
+        assert pauli_dict[((0, 'X'), (1, 'Y'), (2, 'Z'))] == pytest.approx(0.10)
