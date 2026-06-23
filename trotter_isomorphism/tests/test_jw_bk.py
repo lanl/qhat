@@ -3,8 +3,12 @@ import pytest
 
 openfermion = pytest.importorskip("openfermion")
 
-from qhat.trotter_isomorphism.comparison import compare_jw_bk_operator_norm_errors
-from qhat.trotter_isomorphism.jw_bk import build_clifford_from_z_map, build_jw_bk_analysis
+try:
+    from qhat.trotter_isomorphism.comparison import compare_jw_bk_operator_norm_errors
+    from qhat.trotter_isomorphism.jw_bk import build_clifford_from_z_map, build_jw_bk_analysis
+except ModuleNotFoundError:
+    from trotter_isomorphism.comparison import compare_jw_bk_operator_norm_errors
+    from trotter_isomorphism.jw_bk import build_clifford_from_z_map, build_jw_bk_analysis
 
 
 def test_build_jw_bk_analysis_for_two_mode_hopping_operator():

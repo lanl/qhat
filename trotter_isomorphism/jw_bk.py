@@ -9,11 +9,11 @@ import numpy as np
 from openfermion import count_qubits
 from openfermion.transforms import bravyi_kitaev, jordan_wigner
 
-from qhat.trotter_isomorphism.majorana import (
+from .majorana import (
     fermion_operator_to_majorana_operator_dict,
     majorana_monomial_as_fermion_operator,
 )
-from qhat.trotter_isomorphism.pauli_keys import (
+from .pauli_keys import (
     PauliKey,
     anticommutes,
     clean_qubit_operator,
@@ -21,7 +21,7 @@ from qhat.trotter_isomorphism.pauli_keys import (
     pauli_key,
     qubit_operator_to_matrix,
 )
-from qhat.trotter_isomorphism.states import bits_from_index, index_from_bits
+from .states import bits_from_index, index_from_bits
 
 
 @dataclass(frozen=True)
