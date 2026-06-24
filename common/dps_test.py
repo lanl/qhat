@@ -4,12 +4,10 @@ from cirq import LineQubit, X, Y, Z, DensePauliString
 from numpy import exp
 from pyLIQTR.utils.pauli_string_manip import convert_to_dense_pauli_string
 from qualtran.bloqs.basic_gates import XGate, YGate
-from qualtran.bloqs.phase_estimation import TextbookQPE
 from qualtran.cirq_interop import CirqGateAsBloq
-from qualtran.cirq_interop.t_complexity_protocol import t_complexity, TComplexity
+from qualtran.cirq_interop.t_complexity_protocol import t_complexity
 
 from qhat.common.dense_pauli_exp import DensePauliString
-from qhat.common.trotter_flattened import build_ramped_trotterized_unitary
 
 class BasicBloqs:
     def n_qubits(self):

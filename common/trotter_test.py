@@ -2,9 +2,7 @@
 
 from cirq import LineQubit
 from numpy import exp
-from pyLIQTR.utils.pauli_string_manip import convert_to_dense_pauli_string
 from qualtran.bloqs.phase_estimation import TextbookQPE
-from qualtran.cirq_interop import CirqGateAsBloq
 from qualtran.cirq_interop.t_complexity_protocol import t_complexity, TComplexity
 
 from qhat.common.dense_pauli_exp import DensePauliString
