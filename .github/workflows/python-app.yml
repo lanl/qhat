@@ -71,6 +71,12 @@ jobs:
             script: driver.py
             config_file: ''
 
+          - name: analysis-pauli-lcu
+            directory: analysis
+            script: driver.py
+            config_file: config-pl.py
+            config_setup: 'sed -e ''s/^my_method = "Trotter"/my_method = "pauli-lcu"/'' config.py > config-pl.py'
+
           - name: analysis-dbl-factor
             directory: analysis
             script: driver.py
