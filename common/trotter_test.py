@@ -1,13 +1,12 @@
 # TODO: This file is nowhere near complete testing.  It's at best a quick sanity-check.
 
 from cirq import LineQubit
-from dense_pauli_exp import DensePauliString
 from numpy import exp
-from pyLIQTR.utils.pauli_string_manip import convert_to_dense_pauli_string
 from qualtran.bloqs.phase_estimation import TextbookQPE
-from qualtran.cirq_interop import CirqGateAsBloq
 from qualtran.cirq_interop.t_complexity_protocol import t_complexity, TComplexity
-from trotter import build_ramped_trotterized_unitary
+
+from qhat.common.dense_pauli_exp import DensePauliString
+from qhat.common.trotter_flattened import build_ramped_trotterized_unitary
 
 class BasicBloqs:
     def n_qubits(self):
@@ -26,7 +25,7 @@ class BasicBloqs:
 
 def build_unitary(problem_instance, coefficients, timestep, numsteps):
     rtu = build_ramped_trotterized_unitary(
-            problem_instance,
+            problem_instance.yield_PauliLCU_Info("strings"),
             method=coefficients,
             timestep=timestep,
             numsteps=numsteps)
@@ -60,7 +59,7 @@ def build_unitary(problem_instance, coefficients, timestep, numsteps):
     print(f'            Rotations: {tc_q.rotations - k * tc_c.rotations:g}')
     print(f'            Cliffords: {tc_q.clifford - k * tc_c.clifford:g}')
 
-def main():
+def test():
     problem_instance = BasicBloqs()
 
     ramp_cost = TComplexity()
@@ -90,4 +89,4 @@ def main():
     build_unitary(problem_instance, coef3, dt, n3)
 
 if __name__ == "__main__":
-    main()
+    test()
