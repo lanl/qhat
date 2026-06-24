@@ -2,13 +2,12 @@
 
 This repository contains prototype Python code for estimating quantum resources for spectrum-amplified sum-of-squares electronic-structure simulation, abbreviated here as **SOSSA**.
 
-The workflow is:
+The current implementation is centered on a single Python class, `ResourceEstimates`, in the `SOSSA_resource_estimates.py` module. The class now handles both parts of the workflow:
 
-1. Build molecular one- and two-electron integrals.
-2. Solve a spin-free or spin-explicit sum-of-squares semidefinite program.
-3. Factor the SDP Gram matrices into SOS generator coefficients.
-4. Estimate a sparse support size `d_sparse` from the nonzero entries of the lowercase generator coefficients `g`, `gbar`, `d`, and `q`.
-5. Use `d_sparse` in a sparse-qubitization-style resource model for Toffoli and logical-qubit estimates.
+1. Build and solve the spin-free or spin-explicit SOS semidefinite program.
+2. Factor the SDP Gram matrices into SOS generator coefficients.
+3. Estimate the sparse support size `d_sparse` from the nonzero entries of the lowercase generator coefficients `g`, `gbar`, `d`, and `q`.
+4. Configure and compute sparse-qubitization-style Toffoli and logical-qubit resource estimates.
 
 The implementation is intended for research prototyping and model comparison, not as a finalized fault-tolerant resource estimator.
 
@@ -18,17 +17,22 @@ The implementation is intended for research prototyping and model comparison, no
 
 ```text
 .
-├── one_norm_SOSSA_SDP.py
-├── SOSSA_resource_count.py
+├── SOSSA_resource_estimates.py
 ├── test_run_SOSSA.ipynb
 └── README.md
 ```
 
-### `one_norm_SOSSA_SDP.py`
+### `SOSSA_resource_estimates.py`
 
-Contains the `ChemSOSSDP` class.
+Contains the single main class:
 
-This class builds and solves the SOS semidefinite program based on the spin-free / spin-explicit algebra in Appendix G of the SOSSA paper.
+```python
+ResourceEstimates
+```
+
+`ResourceEstimates` combines the functionality that was previously split across separate SDP and resource-counting classes.
+
+It builds and solves the SOS semidefinite program based on the spin-free / spin-explicit algebra in Appendix G of the SOSSA paper.
 
 The SDP variables are uppercase Gram/PSD matrices:
 
@@ -65,27 +69,21 @@ d_sparse = nnz(g) + nnz(gbar) + nnz(d) + nnz(q)
 
 after applying a user-specified threshold.
 
-### `SOSSA_resource_count.py`
+The same class then converts the SOSSA quantities into rough Toffoli and logical-qubit estimates using a sparse-QROM/QROAM-inspired block-encoding model.
 
-Contains the `SOSSAResourceEstimates` class.
+Resource estimates can be computed in two ways:
 
-This class converts SOSSA quantities into rough Toffoli and logical-qubit estimates using a sparse-QROM/QROAM-inspired block-encoding model.
+1. **Preferred sparse mode**
 
-It supports two modes:
+   After `solve()` succeeds, call `estimate_resources(...)`. By default, this uses `Lambda`, `E_SOS`, total SOS rank `R`, and `d_sparse` from the most recent successful solve.
 
-1. **Dense fallback mode**
+2. **Dense fallback mode**
 
-   If `d_sparse=None`, the table size is estimated from a dense formula depending on the number of spin orbitals and the SOS rank.
-
-2. **Generator-coefficient sparse mode**
-
-   If `d_sparse` is provided, the class uses it directly as the sparse table size.
-
-This second mode is the preferred mode for the current code.
+   If `d_sparse` is not supplied or available, the table size is estimated from a dense formula depending on the number of spin orbitals and the SOS rank.
 
 ### `test_run_SOSSA.ipynb`
 
-Example notebook for building molecular integrals, running the SOS SDP, extracting `d_sparse`, and computing SOSSA resource estimates.
+Example notebook for building molecular integrals, running the SOS SDP, extracting `d_sparse`, and computing SOSSA resource estimates with the unified `ResourceEstimates` class.
 
 ---
 
@@ -101,7 +99,7 @@ conda activate sossa
 Install core dependencies:
 
 ```bash
-pip install numpy scipy cvxpy pyscf jupyter
+pip install numpy scipy cvxpy pyscf jupyter matplotlib
 ```
 
 Optional but recommended:
@@ -119,8 +117,7 @@ pip install mosek
 ```python
 from pyscf import gto, scf, ao2mo
 
-from one_norm_SOSSA_SDP import ChemSOSSDP
-from SOSSA_resource_count import SOSSAResourceEstimates
+from SOSSA_resource_estimates import ResourceEstimates
 ```
 
 Build a molecule and molecular-orbital integrals:
@@ -150,10 +147,10 @@ eri_mo = ao2mo.kernel(mol, C)
 h2_mo = ao2mo.restore(1, eri_mo, nao)
 ```
 
-Solve the SOS SDP:
+Create the unified SOSSA estimator and solve the SOS SDP:
 
 ```python
-solver = ChemSOSSDP(
+solver = ResourceEstimates(
     norb=nao,
     h1=h1_mo,
     h2=h2_mo,
@@ -180,32 +177,46 @@ print(out["total_rank"])
 print(out["sos_support"])
 ```
 
-Extract the sparse support:
+Extract the sparse support if desired:
 
 ```python
 d_sparse = out["sos_support"]["d_sparse"]
 ```
 
-Run the SOSSA resource estimator:
+Run the SOSSA resource estimator from the same object:
 
 ```python
 epsilon = 1.0e-3
 M_spin_orbitals = 2 * nao
 
-estimates = SOSSAResourceEstimates(
-    Lambda=out["Lambda"],
-    E_SOS=out["ESOS"],
+resource_summary = solver.estimate_resources(
     E_0=E_hf,
     eps_qpe=epsilon,
-    M=M_spin_orbitals,
-    R=out["total_rank"],
+    M_spin_orbitals=M_spin_orbitals,
     bits_precision=20,
-    k_r=None,
     optimum=True,
-    d_sparse=d_sparse,
+    reduced_diagonal_doublets=True,
+    real_coefficients=True,
+    include_a16_overheads=True,
+    include_qpe_qubits=True,
 )
 
-print(estimates.summary())
+print(resource_summary)
+```
+
+`estimate_resources(...)` automatically uses `Lambda`, `E_SOS`, `R`, and `d_sparse` from the most recent successful `solve()` call unless you explicitly override them.
+
+You can also configure the resource-estimation parameters first and call `summary()` later:
+
+```python
+solver.configure_resource_estimates(
+    E_0=E_hf,
+    eps_qpe=epsilon,
+    M_spin_orbitals=M_spin_orbitals,
+    bits_precision=20,
+)
+
+print(solver.summary())
 ```
 
 ---
@@ -236,16 +247,30 @@ out["sos_support"]["nnz_d"]
 out["sos_support"]["nnz_q"]
 ```
 
-The resource estimator summary contains fields like:
+The resource-estimate summary contains fields like:
 
 ```python
-estimates.summary()["lambda_eff"]
-estimates.summary()["num_walk_steps"]
-estimates.summary()["block_encoding_toffoli"]
-estimates.summary()["walk_toffoli"]
-estimates.summary()["total_toffoli"]
-estimates.summary()["logical_qubits"]
+resource_summary["lambda_eff"]
+resource_summary["num_walk_steps"]
+resource_summary["block_encoding_toffoli"]
+resource_summary["walk_toffoli"]
+resource_summary["total_toffoli"]
+resource_summary["logical_qubits"]
 ```
+
+The class also exposes helper methods such as:
+
+```python
+solver.support_summary()
+solver.lambda_eff()
+solver.num_walk_steps()
+solver.block_encoding_toffoli()
+solver.walk_toffoli()
+solver.toffoli_count()
+solver.qubit_count()
+```
+
+These methods require resource-estimation parameters to be configured first, either through `estimate_resources(...)` or `configure_resource_estimates(...)`.
 
 ---
 
@@ -295,17 +320,19 @@ d_sparse = nnz(g) + nnz(gbar)
 
 ### Spatial orbitals vs spin orbitals
 
-`ChemSOSSDP` expects `norb` to be the number of **spatial orbitals**.
+`ResourceEstimates` expects `norb` to be the number of **spatial orbitals** when constructing the SDP problem.
 
 ```python
-solver = ChemSOSSDP(norb=nao, ...)
+solver = ResourceEstimates(norb=nao, h1=h1_mo, h2=h2_mo)
 ```
 
-`SOSSAResourceEstimates` expects `M` to be the number of **spin orbitals**.
+The resource-estimation part expects `M_spin_orbitals` to be the number of **spin orbitals**.
 
 ```python
-M = 2 * nao
+M_spin_orbitals = 2 * nao
 ```
+
+If `M_spin_orbitals` is omitted from `configure_resource_estimates(...)` or `estimate_resources(...)`, the class defaults to `2 * norb`.
 
 ### Energy quantities
 
@@ -316,7 +343,13 @@ M = 2 * nao
 The effective spectrum-amplified normalization is modeled as:
 
 ```text
-lambda_eff = sqrt(|E_0 - E_SOS| * |2 Lambda - |E_0 - E_SOS||)
+lambda_eff = sqrt(E_gap * abs(2 Lambda - E_gap))
+```
+
+where the implementation defines
+
+```text
+E_gap = abs(abs(E_0) - E_SOS)
 ```
 
 ### Solver choices
@@ -345,11 +378,12 @@ Run the cells in order.
 
 The notebook demonstrates:
 
-1. Building molecular integrals with PySCF.
-2. Solving the SOS SDP.
-3. Extracting `d_sparse`.
-4. Running the resource estimator.
-5. Printing Toffoli and logical-qubit counts.
+1. Importing `ResourceEstimates` from `SOSSA_resource_estimates`.
+2. Building molecular integrals with PySCF.
+3. Solving the SOS SDP with `solver.solve()`.
+4. Extracting `d_sparse` from `out["sos_support"]`.
+5. Running resource estimates with `solver.estimate_resources(...)`.
+6. Printing Toffoli and logical-qubit counts.
 
 ---
 
