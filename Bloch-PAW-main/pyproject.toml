@@ -1,0 +1,25 @@
+[project]
+name = "bloch-paw"
+version = "0.1.0"
+description = "Quantum resource estimation for periodic materials using the Bloch-UPAW framework"
+requires-python = ">=3.12"
+dependencies = [
+    "ase==3.26.0",
+    "gpaw>=25.7.0",
+    "h5py>=3.14.0",
+    "jupyter>=1.1.1",
+    "numpy==2.3.0",
+    "scipy==1.15.3",
+]
+
+[tool.setuptools]
+packages = ["bloch_paw"]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0", "pytest-cov"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: marks tests that require GPAW data files (deselect with '-m \"not integration\"')",
+]
