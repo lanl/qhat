@@ -62,8 +62,6 @@ def test_exact_faster_for_small_N():
     rel_diff_c2 = abs(c2_ex - c2_mc) / c2_ex if c2_ex > 0 else 0
     print(f"\nRelative differences: C1={100*rel_diff_c1:.1f}%, C2={100*rel_diff_c2:.1f}%")
 
-    return time_mc, time_ex
-
 
 def test_auto_exact_switches():
     """Auto-exact should switch to exact for small N."""
