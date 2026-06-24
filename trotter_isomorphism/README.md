@@ -1,67 +1,797 @@
-# Trotter Isomorphism
+# Trotter Isomorphism Utilities
 
-This package compares Jordan-Wigner (JW) and Bravyi-Kitaev (BK) Pauli
-Hamiltonians that come from the same fermionic Hamiltonian.
+This module provides diagnostic tools for comparing Jordan-Wigner (JW) and Bravyi-Kitaev (BK) Pauli Hamiltonians that come from the same fermionic Hamiltonian.
 
-It answers two questions:
+The main goal is to check whether JW and BK produce the same **ideal mathematical Trotter error** when the Pauli terms and initial states are matched consistently.
 
-- Are the JW and BK Pauli commutation graphs isomorphic?
-- When the JW and BK product-formula terms are matched by that isomorphism, are
-  the ideal Trotter errors the same?
+The module checks three things:
 
-The intended QHAT workflow is:
+1. Whether the JW and BK Pauli commutation graphs are isomorphic.
+2. Whether the JW and BK operator-norm Trotter errors agree.
+3. Whether the JW and BK state-dependent Trotter overlap errors agree.
 
-1. Use `hamiltonian_generator` to build an active-space fermionic Hamiltonian.
-2. Convert that `InteractionOperator` to an OpenFermion `FermionOperator`.
-3. Build matched JW/BK data with `build_jw_bk_analysis`.
-4. Compare graph isomorphism, operator-norm Trotter error, and state-overlap
-   Trotter error.
+This is a diagnostic module. It does not claim that JW and BK have the same circuit depth, gate count, Pauli weight, hardware noise, or compiled performance.
 
-## Importing From A Checkout
+---
 
-From the repository checkout, put the parent directory of `qhat` on
-`PYTHONPATH`:
+## Main Idea
 
-```bash
-export PYTHONPATH=/path/to/Repos
+JW and BK are two different qubit encodings of the same fermionic Hamiltonian.
+
+The original object is the fermionic Hamiltonian:
+
+```text
+fermionic Hamiltonian
 ```
 
-For this local checkout:
+JW and BK map this same object into different Pauli-coordinate systems:
 
-```bash
-export PYTHONPATH=/Users/albertlee0125/Repos
+```text
+fermionic Hamiltonian
+        |
+        |-- Jordan-Wigner mapping  -> H_JW
+        |
+        |-- Bravyi-Kitaev mapping  -> H_BK
 ```
 
-Then import with:
+The Pauli strings may look different, but they represent the same underlying fermionic terms.
+
+This module builds the JW/BK correspondence using Majorana operators. The fermionic Hamiltonian is expanded into Majorana monomials:
+
+```text
+gamma_S
+```
+
+Each Majorana monomial has a JW Pauli image and a BK Pauli image:
+
+```text
+JW(gamma_S) -> BK(gamma_S)
+```
+
+This gives a direct Pauli-string correspondence between JW and BK without relying on a generic graph-isomorphism algorithm.
+
+---
+
+## Why The JW/BK Errors Should Match
+
+For standard untapered JW and BK mappings with the same spin-orbital ordering, the two qubit Hamiltonians are related by a Clifford/permutation unitary `C`:
+
+```text
+H_BK = C H_JW C^dag
+```
+
+The Majorana-labeled map gives a matched Pauli term ordering:
+
+```text
+P_j^JW -> P_j^BK = C P_j^JW C^dag
+```
+
+For a product formula built from this matched ordering,
+
+```text
+U_trotter,BK = C U_trotter,JW C^dag
+U_exact,BK   = C U_exact,JW C^dag
+```
+
+Therefore the BK error matrix is just the JW error matrix in a different qubit basis:
+
+```text
+E_BK = U_trotter,BK - U_exact,BK
+     = C (U_trotter,JW - U_exact,JW) C^dag
+     = C E_JW C^dag
+```
+
+Since unitary conjugation preserves operator norms,
+
+```text
+||E_BK||_2 = ||E_JW||_2
+```
+
+For state-dependent comparisons, the initial state must also be transformed consistently:
+
+```text
+|psi0>_BK = C |psi0>_JW
+```
+
+Then the overlap amplitudes agree:
+
+```text
+<psi0_JW| U_trotter,JW^dag U_exact,JW |psi0_JW>
+=
+<psi0_BK| U_trotter,BK^dag U_exact,BK |psi0_BK>
+```
+
+This equality is for **ideal mathematical product formulas**. It can be broken in practice by different term orderings, circuit compilation, finite precision synthesis, qubit connectivity, measurement noise, or hardware noise.
+
+---
+
+## Repository Import Setup
+
+From the QHAT repository root, put the parent directory of `qhat` on `PYTHONPATH`.
+
+If the current directory is the QHAT checkout:
+
+```bash
+cd /path/to/qhat
+export PYTHONPATH="$(dirname "$PWD"):$PYTHONPATH"
+```
+
+Check that QHAT imports correctly:
+
+```bash
+python -c "import qhat; print('qhat import ok')"
+```
+
+Then the module can be imported with:
 
 ```python
-from qhat.trotter_isomorphism import build_jw_bk_analysis
+from qhat.trotter_isomorphism.jw_bk import build_jw_bk_analysis
 ```
 
-## Method Numbers
+---
+
+## Product Formula Method Numbers
 
 The `method` argument selects the product formula:
 
-| Method | Meaning |
-| --- | --- |
-| `1` or `"first order"` | First-order Lie-Trotter formula |
+| Method                  | Meaning                               |
+| ----------------------- | ------------------------------------- |
+| `1` or `"first order"`  | First-order Lie-Trotter formula       |
 | `2` or `"second order"` | Second-order symmetric/Strang formula |
-| `4` or `"fourth order"` | Fourth-order Suzuki composition |
-| `8` or `"eighth order"` | Eighth-order Morales-style coefficient set |
+| `4` or `"fourth order"` | Fourth-order Suzuki composition       |
+| `8` or `"eighth order"` | Eighth-order coefficient set          |
 
-For a fixed matched term order, increasing `num_steps` decreases the time step
-`dt = time / num_steps`.
+For a fixed total evolution time,
+
+```text
+dt = time / num_steps
+```
+
+Increasing `num_steps` decreases the Trotter step size.
+
+---
+
+## Important Input Rule
+
+The Majorana-based JW/BK isomorphism should start from the **active-space fermionic Hamiltonian**, not from the final JW or BK `.dat` file.
+
+Use one of these files generated by QHAT:
+
+```text
+[file_stub]_[active-space-tag].pickle
+[file_stub]_[active-space-tag].tensors.npz
+```
+
+The `.dat` files are already mapped Pauli Hamiltonians:
+
+```text
+[file_stub]_[active-space-tag]_jw.dat
+[file_stub]_[active-space-tag]_bk.dat
+```
+
+They are useful for inspection, but they do not contain the original Majorana-label information needed to build the JW-to-BK correspondence.
+
+The correct workflow is:
+
+```text
+QHAT active-space fermionic Hamiltonian
+        |
+        v
+OpenFermion FermionOperator
+        |
+        v
+Majorana expansion
+        |
+        +--> JW(gamma_S)
+        |
+        +--> BK(gamma_S)
+        |
+        v
+JW Pauli string -> BK Pauli string
+```
+
+---
+
+## Smallest Smoke Test: Hydrogen Atom
+
+A single hydrogen atom in STO-3G is the smallest useful QHAT smoke test.
+
+This system has:
+
+```text
+1 electron
+1 spatial orbital
+2 spin orbitals
+2 qubits
+```
+
+Because it only produces diagonal `Z`-type Pauli terms, the Trotter error should be zero up to floating-point roundoff. This makes it a good package-validation test, but not a strong noncommutation test.
+
+The hydrogen test verifies:
+
+1. QHAT can generate the active-space Hamiltonian.
+2. The module can load the active-space fermionic Hamiltonian.
+3. The module can expand the Hamiltonian into Majorana monomials.
+4. The module can build the JW-to-BK Pauli-string map.
+5. The graph-isomorphism check passes.
+6. The Clifford conjugation check passes.
+7. The JW and BK Trotter errors match.
+
+---
+
+## Generate The Hydrogen Hamiltonian With QHAT
+
+From the QHAT repository root:
+
+```bash
+mkdir -p local_configs
+mkdir -p /tmp/qhat_h_atom_smoke
+```
+
+Create the JW configuration:
+
+```bash
+cat > local_configs/h_atom_jw.py <<'EOF'
+general.print_verbose()
+general.file_stub = "/tmp/qhat_h_atom_smoke/h_atom"
+general.file_format = "default"
+general.logfile = "/tmp/qhat_h_atom_smoke/h_atom_jw.log"
+
+hamiltonian.add_atom("H", 0.0, 0.0, 0.0)
+
+hamiltonian.basis = "sto-3g"
+
+hamiltonian.num_active_occupied = 1
+hamiltonian.num_active_vacant = 1
+
+hamiltonian.f2q_mapping = "JW"
+EOF
+```
+
+Run the generator:
+
+```bash
+python hamiltonian_generator/hamgen.py local_configs/h_atom_jw.py
+```
+
+Create the BK configuration:
+
+```bash
+cat > local_configs/h_atom_bk.py <<'EOF'
+general.print_verbose()
+general.file_stub = "/tmp/qhat_h_atom_smoke/h_atom"
+general.file_format = "default"
+general.logfile = "/tmp/qhat_h_atom_smoke/h_atom_bk.log"
+
+hamiltonian.add_atom("H", 0.0, 0.0, 0.0)
+
+hamiltonian.basis = "sto-3g"
+
+hamiltonian.num_active_occupied = 1
+hamiltonian.num_active_vacant = 1
+
+hamiltonian.f2q_mapping = "BK"
+EOF
+```
+
+Run the generator:
+
+```bash
+python hamiltonian_generator/hamgen.py local_configs/h_atom_bk.py
+```
+
+Check the output directory:
+
+```bash
+ls -lh /tmp/qhat_h_atom_smoke
+```
+
+Expected files include:
+
+```text
+h_atom.pickle
+h_atom_as-001-001.pickle
+h_atom_as-001-001.tensors.npz
+h_atom_as-001-001_jw.dat
+h_atom_as-001-001_jw.npy
+h_atom_as-001-001_bk.dat
+h_atom_as-001-001_bk.npy
+h_atom_jw.log
+h_atom_bk.log
+```
+
+Inspect the mapped Pauli Hamiltonians:
+
+```bash
+cat /tmp/qhat_h_atom_smoke/h_atom_as-001-001_jw.dat
+cat /tmp/qhat_h_atom_smoke/h_atom_as-001-001_bk.dat
+```
+
+For the hydrogen smoke test, the JW output should contain four terms of the form:
+
+```text
+II
+ZI
+IZ
+ZZ
+```
+
+The BK output should contain the same physical terms but with a different Pauli labeling.
+
+---
+
+## Check The Majorana-Based JW/BK Isomorphism
+
+Create a local smoke-test script:
+
+```bash
+cat > local_configs/check_h_atom_majorana_isomorphism.py <<'EOF'
+import pickle
+
+from openfermion.transforms import get_fermion_operator
+
+from qhat.trotter_isomorphism.jw_bk import (
+    build_jw_bk_analysis,
+    verify_graph_isomorphism,
+)
+from qhat.trotter_isomorphism.majorana import (
+    fermion_operator_to_majorana_operator_dict,
+)
+from qhat.trotter_isomorphism.pauli_keys import format_pauli_key
+
+
+active_pickle = "/tmp/qhat_h_atom_smoke/h_atom_as-001-001.pickle"
+
+with open(active_pickle, "rb") as f:
+    active_hamiltonian = pickle.load(f)
+
+fermion_op = get_fermion_operator(active_hamiltonian)
+
+print("Hydrogen atom Majorana JW/BK smoke test")
+print("======================================")
+print(f"active pickle = {active_pickle}")
+print(f"n_qubits      = {active_hamiltonian.n_qubits}")
+print()
+
+print("FermionOperator")
+print("---------------")
+print(fermion_op)
+print()
+
+majorana_terms = fermion_operator_to_majorana_operator_dict(
+    fermion_op,
+    atol=1e-10,
+)
+
+print("Majorana expansion")
+print("------------------")
+print(f"number of Majorana monomials = {len(majorana_terms)}")
+for label, coeff in sorted(majorana_terms.items()):
+    print(f"gamma{label}: {coeff}")
+print()
+
+analysis = build_jw_bk_analysis(
+    fermion_op,
+    n_qubits=active_hamiltonian.n_qubits,
+    atol=1e-10,
+    remove_identity=False,
+    build_matrices=True,
+)
+
+print("Graph-isomorphism check")
+print("----------------------")
+print(f"JW vertices = {len(analysis.jw_to_bk)}")
+print(f"BK vertices = {len(analysis.bk_to_jw)}")
+print(f"verified    = {verify_graph_isomorphism(analysis.jw_to_bk)}")
+print()
+
+print("Majorana-induced JW -> BK Pauli map")
+print("-----------------------------------")
+for jw_key in sorted(analysis.jw_to_bk, key=format_pauli_key):
+    bk_key = analysis.jw_to_bk[jw_key]
+    print(f"{format_pauli_key(jw_key):10s} -> {format_pauli_key(bk_key)}")
+print()
+
+print("Matched JW/BK terms")
+print("-------------------")
+for (jw_key, jw_coeff), (bk_key, bk_coeff) in zip(
+    analysis.jw_terms,
+    analysis.bk_terms,
+):
+    print(
+        f"JW {format_pauli_key(jw_key):10s} coeff={jw_coeff.real:+.16e}"
+        f"   -->   BK {format_pauli_key(bk_key):10s} coeff={bk_coeff.real:+.16e}"
+    )
+print()
+
+print("Dense-matrix sanity checks")
+print("--------------------------")
+print(f"H_jw shape = {analysis.H_jw.shape}")
+print(f"H_bk shape = {analysis.H_bk.shape}")
+print("done")
+EOF
+```
+
+Run it:
+
+```bash
+python local_configs/check_h_atom_majorana_isomorphism.py
+```
+
+For the hydrogen atom, the expected JW-to-BK Pauli map is:
+
+```text
+I          -> I
+Z0         -> Z0
+Z0 Z1      -> Z1
+Z1         -> Z0 Z1
+```
+
+This means the same Majorana/fermionic term is represented by different Pauli strings in JW and BK.
+
+For example:
+
+```text
+JW Z1 -> BK Z0 Z1
+```
+
+This does not mean the terms are physically different. It means that JW and BK store the same occupation/parity information in different qubit coordinates.
+
+---
+
+## Hydrogen Interpretation
+
+For H/STO-3G with two spin orbitals, the computational basis is the active-space occupation basis:
+
+| Qubit state | Occupation meaning | Electron number             |   |
+| ----------- | ------------------ | --------------------------- | - |
+| `           | 00>`               | no occupied spin orbitals   | 0 |
+| `           | 10>`               | spin orbital 0 occupied     | 1 |
+| `           | 01>`               | spin orbital 1 occupied     | 1 |
+| `           | 11>`               | both spin orbitals occupied | 2 |
+
+The physical hydrogen reference state in this setup is:
+
+```text
+|10>
+```
+
+This means spin orbital 0 is occupied and spin orbital 1 is empty.
+
+The Hamiltonian matrix is still `4 x 4` because two qubits span all four occupation configurations. The physically relevant hydrogen state is in the one-electron sector.
+
+---
+
+## Check Operator-Norm And State-Dependent Trotter Error
+
+Create a local Trotter-error smoke-test script:
+
+```bash
+cat > local_configs/check_h_atom_trotter_error.py <<'EOF'
+import pickle
+import numpy as np
+from scipy.linalg import norm
+
+from openfermion.transforms import get_fermion_operator
+
+from qhat.trotter_isomorphism.jw_bk import (
+    build_clifford_from_z_map,
+    build_jw_bk_analysis,
+    verify_graph_isomorphism,
+)
+from qhat.trotter_isomorphism.comparison import (
+    compare_jw_bk_operator_norm_errors,
+    bitstring_overlap_comparison,
+)
+from qhat.trotter_isomorphism.pauli_keys import format_pauli_key
+
+
+active_pickle = "/tmp/qhat_h_atom_smoke/h_atom_as-001-001.pickle"
+
+time = 1.0
+num_steps = 1
+method = 1
+
+psi0_bitstring = "10"
+
+with open(active_pickle, "rb") as f:
+    active_hamiltonian = pickle.load(f)
+
+fermion_op = get_fermion_operator(active_hamiltonian)
+
+analysis = build_jw_bk_analysis(
+    fermion_op,
+    n_qubits=active_hamiltonian.n_qubits,
+    atol=1e-10,
+    remove_identity=False,
+    build_matrices=True,
+)
+
+C_jw_to_bk, B, A = build_clifford_from_z_map(
+    analysis.jw_to_bk,
+    analysis.n_qubits,
+)
+
+print("Hydrogen atom JW/BK Trotter-error smoke test")
+print("============================================")
+print(f"active pickle = {active_pickle}")
+print(f"n_qubits      = {analysis.n_qubits}")
+print(f"time          = {time}")
+print(f"num_steps     = {num_steps}")
+print(f"method        = {method}")
+print(f"psi0 JW       = |{psi0_bitstring}>")
+print()
+
+print("Graph-isomorphism check")
+print("----------------------")
+print(f"JW vertices = {len(analysis.jw_to_bk)}")
+print(f"BK vertices = {len(analysis.bk_to_jw)}")
+print(f"verified    = {verify_graph_isomorphism(analysis.jw_to_bk)}")
+print()
+
+print("Matched JW/BK term order")
+print("------------------------")
+for (jw_key, jw_coeff), (bk_key, bk_coeff) in zip(
+    analysis.jw_terms,
+    analysis.bk_terms,
+):
+    print(
+        f"JW {format_pauli_key(jw_key):8s} {jw_coeff.real:+.16e}"
+        f"   -->   BK {format_pauli_key(bk_key):8s} {bk_coeff.real:+.16e}"
+    )
+print()
+
+print("Clifford sanity check")
+print("---------------------")
+unitarity_error = norm(
+    C_jw_to_bk.conj().T @ C_jw_to_bk - np.eye(2**analysis.n_qubits),
+    ord=2,
+)
+hamiltonian_conjugation_error = norm(
+    C_jw_to_bk @ analysis.H_jw @ C_jw_to_bk.conj().T - analysis.H_bk,
+    ord=2,
+)
+print(f"||C^dag C - I||_2         = {unitarity_error:.16e}")
+print(f"||C H_JW C^dag - H_BK||_2 = {hamiltonian_conjugation_error:.16e}")
+print()
+
+operator_result = compare_jw_bk_operator_norm_errors(
+    H_jw=analysis.H_jw,
+    H_bk=analysis.H_bk,
+    jw_terms=analysis.jw_terms,
+    bk_terms=analysis.bk_terms,
+    time=time,
+    num_steps=num_steps,
+    n_qubits=analysis.n_qubits,
+    method=method,
+)
+
+print("Operator-norm Trotter error")
+print("---------------------------")
+print(f"JW error = {operator_result['error_jw']:.16e}")
+print(f"BK error = {operator_result['error_bk']:.16e}")
+print(f"|diff|   = {operator_result['error_difference']:.16e}")
+print()
+
+state_result = bitstring_overlap_comparison(
+    psi0=psi0_bitstring,
+    C_jw_to_bk=C_jw_to_bk,
+    H_jw=analysis.H_jw,
+    H_bk=analysis.H_bk,
+    jw_terms=analysis.jw_terms,
+    bk_terms=analysis.bk_terms,
+    time=time,
+    num_steps=num_steps,
+    n_qubits=analysis.n_qubits,
+    method=method,
+)
+
+print("State-dependent Trotter overlap")
+print("--------------------------------")
+print(f"JW amplitude      = {state_result['amp_jw']}")
+print(f"BK amplitude      = {state_result['amp_bk']}")
+print(f"JW fidelity       = {state_result['fidelity_jw']:.16e}")
+print(f"BK fidelity       = {state_result['fidelity_bk']:.16e}")
+print(f"JW infidelity     = {state_result['infidelity_jw']:.16e}")
+print(f"BK infidelity     = {state_result['infidelity_bk']:.16e}")
+print(f"|amplitude diff|  = {state_result['amplitude_difference']:.16e}")
+print(f"|fidelity diff|   = {state_result['fidelity_difference']:.16e}")
+print(f"|infidelity diff| = {state_result['infidelity_difference']:.16e}")
+EOF
+```
+
+Run it:
+
+```bash
+python local_configs/check_h_atom_trotter_error.py
+```
+
+For the hydrogen atom, all Pauli terms are `Z`-type and commute. Therefore the first-order product formula is mathematically exact. The expected operator-norm error is zero up to floating-point roundoff:
+
+```text
+JW error ≈ 0
+BK error ≈ 0
+|diff|   ≈ 0
+```
+
+The state-dependent fidelity should be one up to floating-point roundoff:
+
+```text
+JW fidelity ≈ 1
+BK fidelity ≈ 1
+```
+
+If the printed infidelity is a tiny negative number such as `-4e-16`, that is just floating-point roundoff.
+
+---
+
+## Comparing The Commutation-Graph Isomorphism
+
+The commutation graph uses Pauli strings as vertices. Two vertices are connected if the corresponding Pauli strings anticommute.
+
+The isomorphism is built by mapping each Majorana monomial through JW and BK:
+
+```text
+JW(gamma_S) -> BK(gamma_S)
+```
+
+Use:
+
+```python
+from qhat.trotter_isomorphism.jw_bk import build_jw_bk_analysis, verify_graph_isomorphism
+from qhat.trotter_isomorphism.pauli_keys import anticommutes
+
+analysis = build_jw_bk_analysis(
+    fermion_op,
+    n_qubits=n_qubits,
+    atol=1e-10,
+    remove_identity=False,
+    build_matrices=False,
+)
+
+assert verify_graph_isomorphism(analysis.jw_to_bk)
+
+jw_vertices = list(analysis.jw_to_bk.keys())
+
+for i, p in enumerate(jw_vertices):
+    for q in jw_vertices[i + 1:]:
+        assert anticommutes(p, q) == anticommutes(
+            analysis.jw_to_bk[p],
+            analysis.jw_to_bk[q],
+        )
+```
+
+For the hydrogen smoke test, the graph is trivial because all terms commute. This is still useful for validating the pipeline, but it is not enough to stress the noncommutation structure. The next useful molecule is H2/STO-3G.
+
+---
+
+## H2 As The First Nontrivial Test
+
+Hydrogen atom is the smallest smoke test, but H2/STO-3G is the first useful nontrivial molecular example because it produces `X` and `Y` Pauli strings.
+
+For H2/STO-3G with four active spin orbitals, the JW Hamiltonian contains terms such as:
+
+```text
+X0 X1 Y2 Y3
+X0 Y1 Y2 X3
+Y0 X1 X2 Y3
+Y0 Y1 X2 X3
+```
+
+These do not all commute, so the Trotter error is nonzero.
+
+The expected result is not that JW and BK have zero error. The expected result is that their ideal errors are the same when the matched Majorana-induced ordering is used:
+
+```text
+JW operator-norm error ≈ BK operator-norm error
+JW state-dependent error ≈ BK state-dependent error
+```
+
+---
+
+## Comparing Operator-Norm Trotter Error
+
+Use `compare_jw_bk_operator_norm_errors`:
+
+```python
+from qhat.trotter_isomorphism.comparison import compare_jw_bk_operator_norm_errors
+
+result = compare_jw_bk_operator_norm_errors(
+    H_jw=analysis.H_jw,
+    H_bk=analysis.H_bk,
+    jw_terms=analysis.jw_terms,
+    bk_terms=analysis.bk_terms,
+    time=1.0,
+    num_steps=4,
+    n_qubits=analysis.n_qubits,
+    method=2,
+)
+
+print(result["error_jw"])
+print(result["error_bk"])
+print(result["error_difference"])
+```
+
+This computes:
+
+```text
+||U_trotter,JW - U_exact,JW||_2
+||U_trotter,BK - U_exact,BK||_2
+```
+
+The dense comparison is intended for small active spaces because it constructs `2^n x 2^n` matrices and matrix exponentials.
+
+---
+
+## Comparing State-Dependent Error
+
+Use a JW initial state and transform it into the corresponding BK state with the Clifford/permutation matrix `C`.
+
+```python
+from qhat.trotter_isomorphism.jw_bk import build_clifford_from_z_map
+from qhat.trotter_isomorphism.comparison import compare_state_dependent_trotter_error
+from qhat.trotter_isomorphism.states import bitstring_state
+
+C, B, A = build_clifford_from_z_map(
+    analysis.jw_to_bk,
+    analysis.n_qubits,
+)
+
+psi0_jw = bitstring_state([1, 1, 0, 0])
+
+result = compare_state_dependent_trotter_error(
+    psi0_jw=psi0_jw,
+    C_jw_to_bk=C,
+    H_jw=analysis.H_jw,
+    H_bk=analysis.H_bk,
+    jw_terms=analysis.jw_terms,
+    bk_terms=analysis.bk_terms,
+    time=0.7,
+    num_steps=2,
+    n_qubits=analysis.n_qubits,
+    method=2,
+)
+
+print(result["amp_jw"])
+print(result["amp_bk"])
+print(result["fidelity_difference"])
+```
+
+The overlap amplitude is:
+
+```text
+<psi0| U_trotter^dag U_exact |psi0>
+```
+
+The fidelity is the squared magnitude of this amplitude. The infidelity is:
+
+```text
+1 - fidelity
+```
+
+For a correct JW/BK comparison, the BK initial state must be the transformed JW state:
+
+```text
+|psi0>_BK = C |psi0>_JW
+```
+
+Using the same raw bitstring in JW and BK is generally not the correct physical comparison.
+
+---
 
 ## Quick Example With A FermionOperator
 
+This example does not use QHAT Hamiltonian Generator. It directly constructs a small OpenFermion `FermionOperator`.
+
 ```python
-import numpy as np
 from scipy.linalg import norm
 from openfermion import FermionOperator
 
-from qhat.trotter_isomorphism import (
+from qhat.trotter_isomorphism.jw_bk import (
     build_clifford_from_z_map,
     build_jw_bk_analysis,
+)
+from qhat.trotter_isomorphism.comparison import (
     compare_jw_bk_operator_norm_errors,
 )
 
@@ -81,8 +811,15 @@ analysis = build_jw_bk_analysis(
     build_matrices=True,
 )
 
-C, B, A = build_clifford_from_z_map(analysis.jw_to_bk, analysis.n_qubits)
-conjugation_error = norm(C @ analysis.H_jw @ C.conj().T - analysis.H_bk, ord=2)
+C, B, A = build_clifford_from_z_map(
+    analysis.jw_to_bk,
+    analysis.n_qubits,
+)
+
+conjugation_error = norm(
+    C @ analysis.H_jw @ C.conj().T - analysis.H_bk,
+    ord=2,
+)
 
 result = compare_jw_bk_operator_norm_errors(
     H_jw=analysis.H_jw,
@@ -96,263 +833,22 @@ result = compare_jw_bk_operator_norm_errors(
 )
 
 print(conjugation_error)
-print(result["error_jw"], result["error_bk"], result["error_difference"])
-```
-
-Expected result: `conjugation_error` and `error_difference` should be close to
-machine precision.
-
-## Using QHAT Hamiltonian Generator
-
-This example builds H2/STO-3G through QHAT's Hamiltonian Generator functions,
-then compares JW and BK Trotter errors.
-
-OpenFermion may try to cache molecule HDF5 files in its installed package
-directory. When running from a restricted environment, redirect its data
-directory to a writable location before calling the generator.
-
-```python
-import logging
-import numpy as np
-from scipy.linalg import norm
-from openfermion.transforms import get_fermion_operator
-import openfermion.config as of_config
-import openfermion.chem.molecular_data as molecular_data
-
-from qhat.common.logging_utils import configure_logging
-from qhat.hamiltonian_generator.hamgen import compute_Hartree_Fock, apply_active_space
-from qhat.hamiltonian_generator.hamgen_types import (
-    GeneralConfigurationUser,
-    HamiltonianConfiguration,
-    State,
-)
-from qhat.trotter_isomorphism import (
-    build_clifford_from_z_map,
-    build_jw_bk_analysis,
-    compare_jw_bk_operator_norm_errors,
-)
-
-of_config.DATA_DIRECTORY = "/private/tmp/qhat_hamgen_compare"
-molecular_data.DATA_DIRECTORY = "/private/tmp/qhat_hamgen_compare"
-
-configure_logging(level="warning")
-logging.getLogger("pyscf").setLevel(logging.ERROR)
-
-general = GeneralConfigurationUser()
-general.file_stub = "/private/tmp/qhat_hamgen_compare/h2_sto3g"
-general.logfile = "/private/tmp/qhat_hamgen_compare/hamgen.log"
-
-hamiltonian = HamiltonianConfiguration()
-hamiltonian.add_atom("H", 0.0, 0.0, 0.0)
-hamiltonian.add_atom("H", 0.7414, 0.0, 0.0)
-hamiltonian.basis = "sto-3g"
-hamiltonian.num_active_occupied = 2
-hamiltonian.num_active_vacant = 2
-
-state = State("hamgen H2 comparison", general, hamiltonian)
-
-hf = compute_Hartree_Fock(state)
-active_ham = apply_active_space(state, hf)
-fermion_op = get_fermion_operator(active_ham)
-
-analysis = build_jw_bk_analysis(
-    fermion_op,
-    n_qubits=active_ham.n_qubits,
-    atol=1e-10,
-    remove_identity=False,
-    build_matrices=True,
-)
-
-C, B, A = build_clifford_from_z_map(analysis.jw_to_bk, analysis.n_qubits)
-print(norm(C @ analysis.H_jw @ C.conj().T - analysis.H_bk, ord=2))
-
-for method in (1, 2, 4):
-    for num_steps in (1, 2, 5):
-        result = compare_jw_bk_operator_norm_errors(
-            H_jw=analysis.H_jw,
-            H_bk=analysis.H_bk,
-            jw_terms=analysis.jw_terms,
-            bk_terms=analysis.bk_terms,
-            time=0.7,
-            num_steps=num_steps,
-            n_qubits=analysis.n_qubits,
-            method=method,
-        )
-        print(method, num_steps, result)
-```
-
-For H2/STO-3G with all four spin orbitals active, this produced:
-
-```text
-JW/BK Pauli vertices: 15 / 15
-JW/BK noncommuting edges: 16 / 16
-||C H_JW C^dag - H_BK||_2: 0.000e+00
-```
-
-and the ideal operator-norm Trotter errors agreed to floating-point precision:
-
-```text
-method  steps       JW error              BK error              |diff|
-1       1      6.7541123070063658e-02  6.7541123070063672e-02  1.388e-17
-1       2      1.2549311368744981e-02  1.2549311368744999e-02  1.735e-17
-1       5      2.4270373388112477e-03  2.4270373388112477e-03  0.000e+00
-2       1      1.2549311368744981e-02  1.2549311368744999e-02  1.735e-17
-2       2      3.0869899813873191e-03  3.0869899813873191e-03  0.000e+00
-2       5      4.9171238123811687e-04  4.9171238123811687e-04  0.000e+00
-4       1      8.5450393644864267e-05  8.5450393644864267e-05  0.000e+00
-4       2      5.2007589982979328e-06  5.2007589982979328e-06  0.000e+00
-4       5      1.3217750866465288e-07  1.3217750866465288e-07  0.000e+00
-```
-
-## Comparing The Isomorphism
-
-The isomorphism is built by expanding the original fermionic Hamiltonian into
-Majorana monomials. Each Majorana monomial has both a JW Pauli image and a BK
-Pauli image. The map is:
-
-```text
-JW(gamma_S) -> BK(gamma_S)
-```
-
-Use:
-
-```python
-from qhat.trotter_isomorphism import build_jw_bk_analysis, anticommutes
-
-analysis = build_jw_bk_analysis(fermion_op, n_qubits=n_qubits)
-
-jw_vertices = list(analysis.jw_to_bk.keys())
-bk_vertices = [analysis.jw_to_bk[p] for p in jw_vertices]
-
-for i, p in enumerate(jw_vertices):
-    for q in jw_vertices[i + 1:]:
-        assert anticommutes(p, q) == anticommutes(analysis.jw_to_bk[p], analysis.jw_to_bk[q])
-```
-
-`build_jw_bk_analysis` already calls this verification internally through
-`verify_graph_isomorphism`.
-
-## Comparing Operator-Norm Trotter Error
-
-Use `compare_jw_bk_operator_norm_errors`:
-
-```python
-from qhat.trotter_isomorphism import compare_jw_bk_operator_norm_errors
-
-result = compare_jw_bk_operator_norm_errors(
-    H_jw=analysis.H_jw,
-    H_bk=analysis.H_bk,
-    jw_terms=analysis.jw_terms,
-    bk_terms=analysis.bk_terms,
-    time=1.0,
-    num_steps=4,
-    n_qubits=analysis.n_qubits,
-    method=2,
-)
-
 print(result["error_jw"])
 print(result["error_bk"])
 print(result["error_difference"])
 ```
 
-The dense comparison is intended for small active spaces because it constructs
-`2^n x 2^n` matrices and matrix exponentials.
+Expected result: `conjugation_error` and `error_difference` should be close to machine precision.
 
-## Comparing State-Dependent Error
-
-For a state-dependent diagnostic, transform the JW initial state into BK with
-the Clifford/permutation matrix `C`:
-
-```python
-from qhat.trotter_isomorphism import (
-    bitstring_state,
-    build_clifford_from_z_map,
-    compare_state_dependent_trotter_error,
-)
-
-C, B, A = build_clifford_from_z_map(analysis.jw_to_bk, analysis.n_qubits)
-psi0_jw = bitstring_state([1, 1, 0, 0])
-
-result = compare_state_dependent_trotter_error(
-    psi0_jw=psi0_jw,
-    C_jw_to_bk=C,
-    H_jw=analysis.H_jw,
-    H_bk=analysis.H_bk,
-    jw_terms=analysis.jw_terms,
-    bk_terms=analysis.bk_terms,
-    time=0.7,
-    num_steps=2,
-    n_qubits=analysis.n_qubits,
-    method=2,
-)
-
-print(result["amp_jw"], result["amp_bk"])
-print(result["fidelity_difference"])
-```
-
-## Why The Ideal Errors Are The Same
-
-JW and BK are different qubit encodings of the same fermionic operator. For the
-standard BK transform, there is a Clifford/permutation unitary `C` such that:
-
-```text
-H_BK = C H_JW C^dag
-```
-
-The Majorana-labeled map gives a matched term ordering:
-
-```text
-P_j^JW -> P_j^BK = C P_j^JW C^dag
-```
-
-For any product formula built from that matched order,
-
-```text
-U_trotter,BK = C U_trotter,JW C^dag
-U_exact,BK   = C U_exact,JW C^dag
-```
-
-Therefore the BK error matrix is just a unitary conjugation of the JW error
-matrix:
-
-```text
-E_BK = U_trotter,BK - U_exact,BK
-     = C (U_trotter,JW - U_exact,JW) C^dag
-     = C E_JW C^dag
-```
-
-Unitary conjugation preserves operator norms, so:
-
-```text
-||E_BK||_2 = ||E_JW||_2
-```
-
-For state-dependent overlap, the BK initial state must also be transformed:
-
-```text
-|psi0>_BK = C |psi0>_JW
-```
-
-With that state convention, the overlap amplitudes agree:
-
-```text
-<psi0_JW| U_trotter,JW^dag U_exact,JW |psi0_JW>
-=
-<psi0_BK| U_trotter,BK^dag U_exact,BK |psi0_BK>
-```
-
-This equality is for ideal mathematical product formulas. Hardware compilation,
-finite precision synthesis, measurement noise, or different term orderings can
-break the practical equality.
+---
 
 ## Running Tests
 
+From the QHAT repository root:
+
 ```bash
-PYTHONPATH=/Users/albertlee0125/Repos python -m pytest -q trotter_isomorphism/tests
+export PYTHONPATH="$(dirname "$PWD"):$PYTHONPATH"
+python -m pytest -q trotter_isomorphism/tests
 ```
 
-With OpenFermion installed, the current tests pass:
-
-```text
-6 passed
-```
+With OpenFermion installed, the tests should pass.
