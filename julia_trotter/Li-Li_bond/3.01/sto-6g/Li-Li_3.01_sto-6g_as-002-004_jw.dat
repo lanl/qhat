@@ -1,0 +1,51 @@
+# number of frozen, occupied, single-occupancy orbitals = 4
+# number of active, occupied, single-occupancy orbitals = 2
+# number of active, vacant, single-occupancy orbitals = 4
+# number of frozen, vacant, single-occupancy orbitals = 10
+# size of active space = 6
+# number of qubits = 6
+# basis set = sto-6g
+# interatomic separation (angstroms) = 3.0147
+# fermion-to-qubit operator mapping = jordan-wigner
+# number of terms in sum of Pauli strings = 34
+# one-norm of sum of Pauli strings (Hartrees) = 15.908049031021422
+# eigenvalue lower bound from shifted one-norm (Hartrees) = -15.908049031021422
+# eigenvalue upper bound from shifted one-norm (Hartrees) = -13.03563924572238
+# Hartree-Fock energy (Hartrees) = -14.805407196271492
+# runtime for Hartree-Fock calculation (seconds) = 0.40982580184936523
+# runtime for active space calculation (seconds) = 0.0012407302856445312
+# runtime for fermion-to-qubit calculation (seconds) = 0.002279996871948242
+-1.44718441383719014e+01 IIIIII
+-6.36499457361266452e-02 ZIIIII
+-6.36499457361266452e-02 IZIIII
+-9.97722812110245216e-02 IIZIII
+-9.97722812110245216e-02 IIIZII
+-1.18260860335089812e-01 IIIIZI
+-1.18260860335089812e-01 IIIIIZ
+ 6.42587990302877221e-02 ZZIIII
+ 4.01776341795666431e-02 ZIZIII
+ 5.10612650324448331e-02 ZIIZII
+ 4.84406054711253586e-02 ZIIIZI
+ 5.84782029625331712e-02 ZIIIIZ
+ 5.10612650324448331e-02 IZZIII
+ 4.01776341795666431e-02 IZIZII
+ 5.84782029625331712e-02 IZIIZI
+ 4.84406054711253586e-02 IZIIIZ
+ 5.51780633322196470e-02 IIZZII
+ 4.57892057579292189e-02 IIZIZI
+ 5.11191158591356443e-02 IIZIIZ
+ 5.11191158591356443e-02 IIIZZI
+ 4.57892057579292189e-02 IIIZIZ
+ 5.82652434150869314e-02 IIIIZZ
+-1.08836308528781935e-02 XXYYII
+ 1.08836308528781935e-02 XYYXII
+ 1.08836308528781935e-02 YXXYII
+-1.08836308528781935e-02 YYXXII
+-1.00375974914078091e-02 XXIIYY
+ 1.00375974914078091e-02 XYIIYX
+ 1.00375974914078091e-02 YXIIXY
+-1.00375974914078091e-02 YYIIXX
+-5.32991010120642539e-03 IIXXYY
+ 5.32991010120642539e-03 IIXYYX
+ 5.32991010120642539e-03 IIYXXY
+-5.32991010120642539e-03 IIYYXX
