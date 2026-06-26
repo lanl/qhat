@@ -6,7 +6,7 @@ pieces are
 - [`hamiltonian_generator`](/hamiltonian_generator): generate a Hamiltonian from a description of a molecule
 - [`analysis`](/analysis): analysis of quantum algorithms involving Hamiltonians
 - [`common`](/common): modules used by other parts of QHAT
-- [`julia_trotter`](/julia_troter): julia scripts to compute trotter error for time evolution and ground state energy.
+- [`julia_trotter`](/julia_trotter): julia scripts to compute trotter error for time evolution and ground state energy.
 
 See the README file in each directory for component-specific documentation.
 
