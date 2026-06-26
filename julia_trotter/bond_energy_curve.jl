@@ -13,14 +13,13 @@
 #   --vacant N           Active vacant single-occupancy orbitals (default: 4)
 #   --encoding jw|bk     Fermion-to-qubit encoding (default: jw)
 #   --out PATH           Plot output path
+#   --arnoldi            Use matrix-free Arnoldi instead of full-unitary Arpack
 # =============================================================================
 
-using ArnoldiMethod, Arpack, LinearAlgebra, LinearMaps, Printf, Plots, SparseArrays
+using Arpack, LinearAlgebra, Printf, Plots
 
 include("src/parser.jl")
-include("src/hamiltonian_utils.jl")
-include("src/error_bounds.jl")
-include("src/statevector_simulators.jl")
+include("src/trotter_spectral_energy.jl")
 
 const DEFAULT_ROOT = "Li-Li_bond"
 const DEFAULT_BASIS = "hgbs-5"
@@ -29,7 +28,6 @@ const DEFAULT_VACANT = 4
 const DEFAULT_ENCODING = "jw"
 const TROTTER_STEPS = [1, 5]
 const TOTAL_TIME = π
-const DEFAULT_NEV = 4
 
 function usage()
     println("""
@@ -42,6 +40,7 @@ Options:
   --vacant N           Active vacant single-occupancy orbitals (default: $(DEFAULT_VACANT))
   --encoding jw|bk     Fermion-to-qubit encoding (default: $(DEFAULT_ENCODING))
   --out PATH           Plot output path
+  --arnoldi            Use matrix-free Arnoldi instead of full-unitary Arpack
   --help               Show this message
 """)
 end
@@ -57,6 +56,7 @@ function parse_cli(args)
     vacant = DEFAULT_VACANT
     encoding = DEFAULT_ENCODING
     outpath = nothing
+    method = :arpack
 
     i = 1
     while i <= length(args)
@@ -79,6 +79,9 @@ function parse_cli(args)
         elseif arg == "--out"
             outpath = require_value(args, i, arg)
             i += 2
+        elseif arg == "--arnoldi"
+            method = :arnoldi
+            i += 1
         else
             error("Unknown option: $arg")
         end
@@ -93,7 +96,8 @@ function parse_cli(args)
         electrons=electrons,
         vacant=vacant,
         encoding=encoding,
-        outpath=outpath
+        outpath=outpath,
+        method=method
     )
 end
 
@@ -125,22 +129,6 @@ function metadata_energy(meta::Dict{String,String})
     return nothing
 end
 
-function metadata_one_norm(meta::Dict{String,String})
-    for key in ("one-norm of sum of Pauli strings", "one-norm of sum of Pauli strings (Hartrees)")
-        haskey(meta, key) && return parse(Float64, meta[key])
-    end
-    error("Hamiltonian metadata does not contain one-norm of sum of Pauli strings")
-end
-
-function normalization_info(meta::Dict{String,String}, ham::Dict{String,ComplexF64})
-    nqubits = parse(Int, meta["number of qubits"])
-    id_key = "I"^nqubits
-    shift = haskey(ham, id_key) ? real(ham[id_key]) : 0.0
-    norm_bound = metadata_one_norm(meta) - abs(shift)
-    normalization = 2 * max(1.0, norm_bound)
-    return (shift=shift, normalization=normalization)
-end
-
 function compute_ground_energy(meta::Dict{String,String}, ham::Dict{String,ComplexF64})
     nqubits = parse(Int, meta["number of qubits"])
     H = build_sparse_hamiltonian(ham, nqubits)
@@ -148,132 +136,11 @@ function compute_ground_energy(meta::Dict{String,String}, ham::Dict{String,Compl
     return real(vals[1])
 end
 
-function cosine_value_to_energy(cosine_eigenvalue::Real, shift::Real, normalization::Real)
-    theta = acos(clamp(cosine_eigenvalue / 2, -1.0, 1.0))
-    return shift + normalization * (theta / TOTAL_TIME - 0.5)
+function trotter_order()
+    return :second
 end
 
-function candidate_count(n::Int)
-    return min(DEFAULT_NEV, n - 1)
-end
-
-function krylov_dimension(n::Int, nev::Int)
-    return min(40, n - 1)
-end
-
-function build_trotter_terms(ham::Dict{String,ComplexF64}, nqubits::Int)
-    id_key = "I"^nqubits
-    terms = Tuple{Float64,SparseMatrixCSC{ComplexF64,Int}}[]
-
-    for (k, v) in ham
-        k == id_key && continue
-        @assert imag(v) ≈ 0.0 "Coefficient not real for $k"
-        push!(terms, (real(v), SparseMatrixCSC{ComplexF64,Int}(sparse(OP_from_string(k)))))
-    end
-
-    return terms
-end
-
-function apply_second_order_trotter_step!(
-    psi::Vector{ComplexF64},
-    terms::Vector{Tuple{Float64,SparseMatrixCSC{ComplexF64,Int}}},
-    dt::Real,
-    normalization::Real
-)
-    half_dt = dt / (2 * normalization)
-
-    for (coeff, P) in terms
-        apply_pauli_rotation!(psi, P, coeff, half_dt)
-    end
-
-    for (coeff, P) in reverse(terms)
-        apply_pauli_rotation!(psi, P, coeff, half_dt)
-    end
-
-    return psi
-end
-
-function apply_second_order_trotter_adjoint_step!(
-    psi::Vector{ComplexF64},
-    terms::Vector{Tuple{Float64,SparseMatrixCSC{ComplexF64,Int}}},
-    dt::Real,
-    normalization::Real
-)
-    half_dt = -dt / (2 * normalization)
-
-    for (coeff, P) in terms
-        apply_pauli_rotation!(psi, P, coeff, half_dt)
-    end
-
-    for (coeff, P) in reverse(terms)
-        apply_pauli_rotation!(psi, P, coeff, half_dt)
-    end
-
-    return psi
-end
-
-function apply_trotter_unitary(
-    x::AbstractVector{ComplexF64},
-    terms::Vector{Tuple{Float64,SparseMatrixCSC{ComplexF64,Int}}},
-    nsteps::Int,
-    normalization::Real
-)
-    psi = copy(Vector{ComplexF64}(x))
-    dt = TOTAL_TIME / nsteps
-
-    for _ in 1:nsteps
-        apply_second_order_trotter_step!(psi, terms, dt, normalization)
-    end
-
-    return exp(-im * TOTAL_TIME / 2) * psi
-end
-
-function apply_trotter_unitary_adjoint(
-    x::AbstractVector{ComplexF64},
-    terms::Vector{Tuple{Float64,SparseMatrixCSC{ComplexF64,Int}}},
-    nsteps::Int,
-    normalization::Real
-)
-    psi = copy(Vector{ComplexF64}(x))
-    dt = TOTAL_TIME / nsteps
-
-    for _ in 1:nsteps
-        apply_second_order_trotter_adjoint_step!(psi, terms, dt, normalization)
-    end
-
-    return exp(im * TOTAL_TIME / 2) * psi
-end
-
-function trotter_energy(meta::Dict{String,String}, ham::Dict{String,ComplexF64}, nsteps::Int)
-    nqubits = parse(Int, meta["number of qubits"])
-    nelectrons = parse(Int, meta["number of active, occupied, single-occupancy orbitals"])
-    norm_info = normalization_info(meta, ham)
-    terms = build_trotter_terms(ham, nqubits)
-    n = 2^nqubits
-    nev = candidate_count(n)
-    maxdim = krylov_dimension(n, nev)
-    mindim = min(maxdim, max(nev, 20))
-    stateHF = construct_hf_state(nqubits, nelectrons)
-    C = LinearMap{ComplexF64}(
-        x -> apply_trotter_unitary(x, terms, nsteps, norm_info.normalization) +
-             apply_trotter_unitary_adjoint(x, terms, nsteps, norm_info.normalization),
-        n;
-        ismutating=false
-    )
-
-    schur, _ = partialschur(
-        C;
-        v1=stateHF,
-        nev=nev,
-        which=:LR,
-        mindim=mindim,
-        maxdim=maxdim
-    )
-    energies = cosine_value_to_energy.(real.(diag(schur.R)), norm_info.shift, norm_info.normalization)
-    return minimum(real.(energies))
-end
-
-function parse_energies(path::AbstractString)
+function parse_energies(path::AbstractString, opts)
     meta, ham = parse_hamiltonian_file(path)
 
     exact_ref = Ref{Float64}()
@@ -287,7 +154,14 @@ function parse_energies(path::AbstractString)
     for nsteps in TROTTER_STEPS
         energy_ref = Ref{Float64}()
         elapsed = @elapsed begin
-            energy_ref[] = trotter_energy(meta, ham, nsteps)
+            energy_ref[] = trotter_energy(
+                meta,
+                ham,
+                nsteps;
+                method=opts.method,
+                order=trotter_order(),
+                time=TOTAL_TIME
+            )
         end
         trotter[nsteps] = energy_ref[]
         trotter_seconds[nsteps] = elapsed
@@ -334,7 +208,7 @@ function collect_curve_points(opts; stream_rows::Bool=false)
         path = joinpath(basis_dir, filename)
         isfile(path) || continue
 
-        energies = parse_energies(path)
+        energies = parse_energies(path, opts)
 
         push!(points, (
             bond_length=parse(Float64, bond),

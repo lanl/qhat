@@ -6,11 +6,11 @@ This directory contains a self-contained version of the quantum simulation code 
 
 - **`src/`** - Core simulation modules (copied from parent repo)
 - **`Li-Li_jw/`** - Test Hamiltonians for Li-Li molecule (4-16 qubits, Jordan-Wigner encoding)
+- **`He-He/`** - Test Hamiltonians for He-He molecule
 - **`Li-Li_bond/`** - Li-Li Hamiltonians across multiple bond lengths, bases, active spaces, and encodings
 - **`trotter_expts.jl`** - Trotter error demonstration script
 - **`trotter_ground_energy.jl`** - Compute exact metadata energy and Trotter-derived ground energies for one Hamiltonian
 - **`bond_energy_curve.jl`** - Exact plus second-order Trotter energy-vs-bond-length curves
-- **`first_order_bond_energy_curve.jl`** - Exact plus first-order Trotter energy-vs-bond-length curves
 - **`Project.toml`** - Julia package dependencies
 
 ## Quick Start
@@ -35,12 +35,13 @@ Reads a single Hamiltonian, builds second-order Trotter product unitaries, and r
 - metadata ground-state energy
 - Trotter-derived ground-state energies for `nsteps = 1, 5, 10`
 
-By default it uses a partial eigensolve on `U + U'`. You can switch to Arnoldi with the Hartree-Fock start vector:
+The default Hamiltonian is `He-He/He-He_2.40_hgbs-5_as-004-004_jw.dat`.
+By default it uses Arpack on `U + U'`. Pass `--arnoldi` to use matrix-free Arnoldi with the Hartree-Fock start vector:
 
 ```bash
 julia --project=. trotter_ground_energy.jl
 julia --project=. trotter_ground_energy.jl --arnoldi
-julia --project=. trotter_ground_energy.jl --arnoldi Li-Li_jw/Li-Li_2.90_hgbs-5_as-004-004_jw.dat
+julia --project=. trotter_ground_energy.jl --arnoldi He-He/He-He_2.40_hgbs-5_as-004-004_jw.dat
 ```
 
 ### `bond_energy_curve.jl`
@@ -66,23 +67,12 @@ Examples:
 
 ```bash
 julia --project=. bond_energy_curve.jl
+julia --project=. bond_energy_curve.jl --arnoldi
 julia --project=. bond_energy_curve.jl --basis hgbs-5 --electrons 4 --vacant 8 --encoding jw
 julia --project=. bond_energy_curve.jl --basis sto-6g --electrons 4 --vacant 8 --encoding jw
 ```
 
 The default curve is `hgbs-5`, `as-004-004`, `jw`.
-
-### `first_order_bond_energy_curve.jl`
-
-Same interface as `bond_energy_curve.jl`, but the Trotter overlay uses first-order Trotter instead of second-order Trotter.
-
-Examples:
-
-```bash
-julia --project=. first_order_bond_energy_curve.jl
-julia --project=. first_order_bond_energy_curve.jl --basis hgbs-5 --electrons 4 --vacant 8 --encoding jw
-julia --project=. first_order_bond_energy_curve.jl --basis sto-6g --electrons 4 --vacant 8 --encoding jw
-```
 
 ## Bond-Length Data Layout
 
@@ -146,5 +136,5 @@ The `Li-Li_bond/` directory contains bond-length scans for:
 For the curve scripts:
 - exact energies come from metadata if present, otherwise from sparse eigensolves of the Hamiltonian
 - Trotter energies are extracted from the largest eigenvalues of `U + U'`
-- the Trotter curve code uses matrix-free Arnoldi actions for `U + U'`, which is important for larger active spaces
-
+- the default Trotter eigensolver is Arpack on the full Trotter unitary
+- passing `--arnoldi` switches to matrix-free Arnoldi actions for `U + U'`, which avoids constructing the full unitary
