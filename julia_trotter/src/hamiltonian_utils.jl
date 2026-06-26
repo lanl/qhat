@@ -31,7 +31,14 @@ function normalize_hamiltonian(meta::Dict{String,String}, ham::Dict{String,Compl
     id_key = "I"^nqubits
 
     shift = haskey(ham, id_key) ? real(ham[id_key]) : 0.0
-    norm_bound = parse(Float64, meta["one-norm of sum of Pauli strings"]) - abs(shift)
+    one_norm_key = if haskey(meta, "one-norm of sum of Pauli strings")
+        "one-norm of sum of Pauli strings"
+    elseif haskey(meta, "one-norm of sum of Pauli strings (Hartrees)")
+        "one-norm of sum of Pauli strings (Hartrees)"
+    else
+        error("Hamiltonian metadata does not contain one-norm of sum of Pauli strings")
+    end
+    norm_bound = parse(Float64, meta[one_norm_key]) - abs(shift)
     normalization = 2 * (norm_bound < 1.0 ? 1.0 : norm_bound)
 
     return (shift=shift, norm_bound=norm_bound, normalization=normalization)
