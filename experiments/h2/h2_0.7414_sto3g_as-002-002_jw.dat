@@ -1,0 +1,32 @@
+# number of frozen, occupied, single-occupancy orbitals = 0
+# number of active, occupied, single-occupancy orbitals = 2
+# number of active, vacant, single-occupancy orbitals = 2
+# number of frozen, vacant, single-occupancy orbitals = 0
+# size of active space = 4
+# number of qubits = 4
+# basis set = sto-3g
+# interatomic separation (angstroms) = 0.7414
+# fermion-to-qubit operator mapping = jordan-wigner
+# number of terms in sum of Pauli strings = 15
+# one-norm of sum of Pauli strings (Hartrees) = 1.983914462186769
+# eigenvalue lower bound from shifted one-norm (Hartrees) = -1.983914462186769
+# eigenvalue upper bound from shifted one-norm (Hartrees) = 1.7861865235158516
+# Hartree-Fock energy (Hartrees) = -1.1166843870853405
+# runtime for Hartree-Fock calculation (seconds) = 0.16678595542907715
+# runtime for active space calculation (seconds) = 0.00022792816162109375
+# runtime for fermion-to-qubit calculation (seconds) = 0.000308990478515625
+-9.88639693354587401e-02 IIII
+ 1.71197749034329993e-01 ZIII
+ 1.71197749034329993e-01 IZII
+-2.22785930404184263e-01 IIZI
+-2.22785930404184263e-01 IIIZ
+ 1.68622191589209380e-01 ZZII
+ 1.20544822053017919e-01 ZIZI
+ 1.65867024105891880e-01 ZIIZ
+ 1.65867024105891880e-01 IZZI
+ 1.20544822053017919e-01 IZIZ
+ 1.74348441855756570e-01 IIZZ
+-4.53222020528739680e-02 XXYY
+ 4.53222020528739680e-02 XYYX
+ 4.53222020528739680e-02 YXXY
+-4.53222020528739680e-02 YYXX

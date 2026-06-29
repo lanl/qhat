@@ -1,0 +1,74 @@
+{
+  "mapping": "bk",
+  "n_qubits": 4,
+  "n_electrons": 2,
+  "dt": 1.0,
+  "n_pauli_jobs": 14,
+  "pairwise_checks": 91,
+  "commuting_pairs": 75,
+  "noncommuting_pairs": 16,
+  "trace_classes": 6902,
+  "csv_path": "experiments/h2/trotter_error_scan_dt_sweep/h2_pauli_trotter_errors_bk_dt1p0.csv",
+  "operator_error": {
+    "min": 0.016238357493598435,
+    "median": 0.05989802459488761,
+    "mean": 0.06145614560203616,
+    "max": 0.13842150842452816
+  },
+  "state_error": {
+    "min": 3.1031676915590914e-17,
+    "median": 0.034783749962392696,
+    "mean": 0.03865567638302267,
+    "max": 0.1384215084245282
+  },
+  "best_order": {
+    "mapping": "bk",
+    "class_id": 3946,
+    "operator_error": 0.016238357493598435,
+    "state_error": 0.016238357493598383,
+    "tags": "",
+    "order_indices": "4 2 6 7 8 9 10 11 0 3 5 1 12 13",
+    "order_labels": "P0004 P0002 P0006 P0007 P0008 P0009 P0010 P0011 P0000 P0003 P0005 P0001 P0012 P0013",
+    "operator_error_rank": 1
+  },
+  "worst_order": {
+    "mapping": "bk",
+    "class_id": 5192,
+    "operator_error": 0.13842150842452816,
+    "state_error": 0.1384215084245282,
+    "tags": "",
+    "order_indices": "5 6 7 8 9 10 11 0 1 2 3 4 12 13",
+    "order_labels": "P0005 P0006 P0007 P0008 P0009 P0010 P0011 P0000 P0001 P0002 P0003 P0004 P0012 P0013",
+    "operator_error_rank": 6902
+  },
+  "heuristic_classes": {
+    "default": {
+      "class_id": 0,
+      "operator_error": 0.13277887785538636,
+      "state_error": 1.2432050435751766e-16,
+      "order_indices": "0 1 2 3 4 5 6 7 8 9 10 11 12 13",
+      "order_labels": "P0000 P0001 P0002 P0003 P0004 P0005 P0006 P0007 P0008 P0009 P0010 P0011 P0012 P0013"
+    },
+    "reverse": {
+      "class_id": 4256,
+      "operator_error": 0.1327788778553864,
+      "state_error": 1.1295700899707568e-16,
+      "order_indices": "4 5 6 7 8 9 10 11 12 13 0 1 2 3",
+      "order_labels": "P0004 P0005 P0006 P0007 P0008 P0009 P0010 P0011 P0012 P0013 P0000 P0001 P0002 P0003"
+    },
+    "coeff_desc": {
+      "class_id": 4256,
+      "operator_error": 0.1327788778553864,
+      "state_error": 1.1295700899707568e-16,
+      "order_indices": "4 5 6 7 8 9 10 11 12 13 0 1 2 3",
+      "order_labels": "P0004 P0005 P0006 P0007 P0008 P0009 P0010 P0011 P0012 P0013 P0000 P0001 P0002 P0003"
+    },
+    "coeff_asc": {
+      "class_id": 0,
+      "operator_error": 0.13277887785538636,
+      "state_error": 1.2432050435751766e-16,
+      "order_indices": "0 1 2 3 4 5 6 7 8 9 10 11 12 13",
+      "order_labels": "P0000 P0001 P0002 P0003 P0004 P0005 P0006 P0007 P0008 P0009 P0010 P0011 P0012 P0013"
+    }
+  }
+}

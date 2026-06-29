@@ -1,0 +1,150 @@
+[
+  {
+    "mapping": "jw",
+    "n_qubits": 4,
+    "n_electrons": 2,
+    "dt": 0.5,
+    "n_pauli_jobs": 14,
+    "pairwise_checks": 91,
+    "commuting_pairs": 75,
+    "noncommuting_pairs": 16,
+    "trace_classes": 6902,
+    "csv_path": "experiments/h2/trotter_error_scan_dt_sweep/h2_pauli_trotter_errors_jw_dt0p5.csv",
+    "operator_error": {
+      "min": 0.0030094010265522752,
+      "median": 0.015102780738006236,
+      "mean": 0.01579897449667818,
+      "max": 0.035433319884146046
+    },
+    "state_error": {
+      "min": 0.00018313001175864678,
+      "median": 0.007920611001914601,
+      "mean": 0.009145138816774213,
+      "max": 0.035068702605152845
+    },
+    "best_order": {
+      "mapping": "jw",
+      "class_id": 4539,
+      "operator_error": 0.0030094010265522752,
+      "state_error": 0.0023679537316325908,
+      "tags": "",
+      "order_indices": "5 6 7 8 0 1 4 9 10 11 2 3 12 13",
+      "order_labels": "P0005 P0006 P0007 P0008 P0000 P0001 P0004 P0009 P0010 P0011 P0002 P0003 P0012 P0013",
+      "operator_error_rank": 1
+    },
+    "worst_order": {
+      "mapping": "jw",
+      "class_id": 4272,
+      "operator_error": 0.035433319884146046,
+      "state_error": 0.002557568537646249,
+      "tags": "",
+      "order_indices": "4 5 6 7 9 10 11 0 1 2 3 8 12 13",
+      "order_labels": "P0004 P0005 P0006 P0007 P0009 P0010 P0011 P0000 P0001 P0002 P0003 P0008 P0012 P0013",
+      "operator_error_rank": 6902
+    },
+    "heuristic_classes": {
+      "default": {
+        "class_id": 0,
+        "operator_error": 0.035068702605152845,
+        "state_error": 0.035068702605152824,
+        "order_indices": "0 1 2 3 4 5 6 7 8 9 10 11 12 13",
+        "order_labels": "P0000 P0001 P0002 P0003 P0004 P0005 P0006 P0007 P0008 P0009 P0010 P0011 P0012 P0013"
+      },
+      "reverse": {
+        "class_id": 4256,
+        "operator_error": 0.035068702605152866,
+        "state_error": 0.035068702605152845,
+        "order_indices": "4 5 6 7 8 9 10 11 12 13 0 1 2 3",
+        "order_labels": "P0004 P0005 P0006 P0007 P0008 P0009 P0010 P0011 P0012 P0013 P0000 P0001 P0002 P0003"
+      },
+      "coeff_desc": {
+        "class_id": 4256,
+        "operator_error": 0.035068702605152866,
+        "state_error": 0.035068702605152845,
+        "order_indices": "4 5 6 7 8 9 10 11 12 13 0 1 2 3",
+        "order_labels": "P0004 P0005 P0006 P0007 P0008 P0009 P0010 P0011 P0012 P0013 P0000 P0001 P0002 P0003"
+      },
+      "coeff_asc": {
+        "class_id": 0,
+        "operator_error": 0.035068702605152845,
+        "state_error": 0.035068702605152824,
+        "order_indices": "0 1 2 3 4 5 6 7 8 9 10 11 12 13",
+        "order_labels": "P0000 P0001 P0002 P0003 P0004 P0005 P0006 P0007 P0008 P0009 P0010 P0011 P0012 P0013"
+      }
+    }
+  },
+  {
+    "mapping": "bk",
+    "n_qubits": 4,
+    "n_electrons": 2,
+    "dt": 0.5,
+    "n_pauli_jobs": 14,
+    "pairwise_checks": 91,
+    "commuting_pairs": 75,
+    "noncommuting_pairs": 16,
+    "trace_classes": 6902,
+    "csv_path": "experiments/h2/trotter_error_scan_dt_sweep/h2_pauli_trotter_errors_bk_dt0p5.csv",
+    "operator_error": {
+      "min": 0.0030094010265522804,
+      "median": 0.01510278073800621,
+      "mean": 0.015798974496678175,
+      "max": 0.03543331988414606
+    },
+    "state_error": {
+      "min": 0.0,
+      "median": 0.008869713035370033,
+      "mean": 0.009680972503525719,
+      "max": 0.03543331988414604
+    },
+    "best_order": {
+      "mapping": "bk",
+      "class_id": 3473,
+      "operator_error": 0.0030094010265522804,
+      "state_error": 0.0030094010265522626,
+      "tags": "",
+      "order_indices": "4 0 1 5 6 7 8 9 10 11 2 3 12 13",
+      "order_labels": "P0004 P0000 P0001 P0005 P0006 P0007 P0008 P0009 P0010 P0011 P0002 P0003 P0012 P0013",
+      "operator_error_rank": 1
+    },
+    "worst_order": {
+      "mapping": "bk",
+      "class_id": 4402,
+      "operator_error": 0.03543331988414606,
+      "state_error": 0.03543331988414603,
+      "tags": "",
+      "order_indices": "4 6 7 8 9 10 12 13 0 1 2 3 5 11",
+      "order_labels": "P0004 P0006 P0007 P0008 P0009 P0010 P0012 P0013 P0000 P0001 P0002 P0003 P0005 P0011",
+      "operator_error_rank": 6902
+    },
+    "heuristic_classes": {
+      "default": {
+        "class_id": 0,
+        "operator_error": 0.03506870260515284,
+        "state_error": 2.797157557069881e-17,
+        "order_indices": "0 1 2 3 4 5 6 7 8 9 10 11 12 13",
+        "order_labels": "P0000 P0001 P0002 P0003 P0004 P0005 P0006 P0007 P0008 P0009 P0010 P0011 P0012 P0013"
+      },
+      "reverse": {
+        "class_id": 4256,
+        "operator_error": 0.035068702605152845,
+        "state_error": 0.0,
+        "order_indices": "4 5 6 7 8 9 10 11 12 13 0 1 2 3",
+        "order_labels": "P0004 P0005 P0006 P0007 P0008 P0009 P0010 P0011 P0012 P0013 P0000 P0001 P0002 P0003"
+      },
+      "coeff_desc": {
+        "class_id": 4256,
+        "operator_error": 0.035068702605152845,
+        "state_error": 0.0,
+        "order_indices": "4 5 6 7 8 9 10 11 12 13 0 1 2 3",
+        "order_labels": "P0004 P0005 P0006 P0007 P0008 P0009 P0010 P0011 P0012 P0013 P0000 P0001 P0002 P0003"
+      },
+      "coeff_asc": {
+        "class_id": 0,
+        "operator_error": 0.03506870260515284,
+        "state_error": 2.797157557069881e-17,
+        "order_indices": "0 1 2 3 4 5 6 7 8 9 10 11 12 13",
+        "order_labels": "P0000 P0001 P0002 P0003 P0004 P0005 P0006 P0007 P0008 P0009 P0010 P0011 P0012 P0013"
+      }
+    }
+  }
+]

@@ -1,0 +1,41 @@
+# CONFIGURATION ===============================================================
+
+configuration_file = "energy_error = meV_to_Hartree(1e4)\n\ngeneral.print_verbose()\ngeneral.logfile = \"experiments/h2/analysis_none.log\"\n\nhamiltonian.load_second_quantization(\n    \"experiments/h2/h2_0.7414_sto3g_as-002-002.tensors.npz\",\n    fermion_to_qubit_transform=\"JW\",\n)\n\nunitary.encode_ramped_trotter(\n    energy_error=0.5 * energy_error,\n    trotter_implementation=\"flattened\",\n    trotter_combine_terms=False,\n    ordering_method=None,\n)\n\nunitary.error_coeff_mode = \"exact\"\n\nalgorithm.method = \"time evolution\"\n\nanalysis.resource_estimator = \"pyLIQTR\""
+
+[general]
+logfile = "experiments/h2/analysis_none.log"
+loglevel = "verbose"
+git_hash = "895752760fcafbaf40a01bc1a5bff07fd2287787"
+
+[hamiltonian]
+source = "numpy"
+filename = "experiments/h2/h2_0.7414_sto3g_as-002-002.tensors.npz"
+fermion_to_qubit_transform = "JW"
+boson_to_qubit_transform = "binary"
+lower_bound = -inf
+exact_energy_lower_bound = false
+upper_bound = -inf
+exact_energy_upper_bound = false
+
+[unitary]
+method = "ramped trotter"
+energy_error = 0.1837466108785
+error_scale = 1.0
+trotter_implementation = "flattened"
+trotter_combine_terms = false
+
+[algorithm]
+method = "time evolution"
+
+[analysis]
+resource_estimator = "pyLIQTR"
+matrix_memory_threshold_gb = 16.0
+num_eigenvalues = 0
+eigendecomposition_matrices = "approximate"
+which_eigenvalues = "smallest"
+
+# RESULTS =====================================================================
+
+[resource_estimates]
+Clifford_count = 6489
+T_count = 3090
