@@ -1,0 +1,123 @@
+{
+  "mapping": "jw",
+  "dt": 0.5,
+  "input_csv": "experiments/h2/trotter_error_scan_dt_sweep/h2_pauli_trotter_errors_jw_dt0p5.csv",
+  "enriched_csv": "experiments/h2/commutator_surrogate/h2_commutator_surrogate_jw_dt0p5.csv",
+  "n_trace_classes": 6902,
+  "n_pauli_jobs": 14,
+  "n_qubits": 4,
+  "nonzero_commutator_pairs": 16,
+  "spearman_correlation": {
+    "rho": 0.9957060556467339,
+    "pvalue": 0.0
+  },
+  "kendall_correlation": {
+    "tau": 0.9510044487613644,
+    "pvalue": 0.0
+  },
+  "operator_error": {
+    "min": 0.0030094010265522752,
+    "median": 0.015102780738006236,
+    "mean": 0.01579897449667818,
+    "max": 0.035433319884146046
+  },
+  "commutator_surrogate": {
+    "min": 0.01870471983667875,
+    "median": 0.12116578742779151,
+    "mean": 0.12756490137833915,
+    "max": 0.2856993268007532
+  },
+  "predicted_leading_error": {
+    "min": 0.0023380899795848436,
+    "median": 0.015145723428473938,
+    "mean": 0.015945612672292393,
+    "max": 0.03571241585009415
+  },
+  "global_best_actual": {
+    "class_id": 4539,
+    "operator_error": 0.0030094010265522752,
+    "operator_error_rank": 1,
+    "surrogate_rank": 1,
+    "commutator_surrogate": 0.01870471983667875,
+    "predicted_leading_error": 0.0023380899795848436,
+    "order_indices": "5 6 7 8 0 1 4 9 10 11 2 3 12 13",
+    "order_labels": "P0005 P0006 P0007 P0008 P0000 P0001 P0004 P0009 P0010 P0011 P0002 P0003 P0012 P0013"
+  },
+  "surrogate_best": {
+    "class_id": 4539,
+    "operator_error": 0.0030094010265522752,
+    "operator_error_rank": 1,
+    "surrogate_rank": 1,
+    "ratio_to_global_best": 1.0,
+    "commutator_surrogate": 0.01870471983667875,
+    "predicted_leading_error": 0.0023380899795848436,
+    "order_indices": "5 6 7 8 0 1 4 9 10 11 2 3 12 13",
+    "order_labels": "P0005 P0006 P0007 P0008 P0000 P0001 P0004 P0009 P0010 P0011 P0002 P0003 P0012 P0013"
+  },
+  "topk_summary": {
+    "top_1": {
+      "best_actual_error_in_topk": 0.0030094010265522752,
+      "ratio_to_global_best": 1.0,
+      "class_id": 4539,
+      "actual_rank": 1,
+      "surrogate_rank": 1,
+      "order_indices": "5 6 7 8 0 1 4 9 10 11 2 3 12 13"
+    },
+    "top_5": {
+      "best_actual_error_in_topk": 0.0030094010265522752,
+      "ratio_to_global_best": 1.0,
+      "class_id": 4539,
+      "actual_rank": 1,
+      "surrogate_rank": 1,
+      "order_indices": "5 6 7 8 0 1 4 9 10 11 2 3 12 13"
+    },
+    "top_10": {
+      "best_actual_error_in_topk": 0.0030094010265522752,
+      "ratio_to_global_best": 1.0,
+      "class_id": 4539,
+      "actual_rank": 1,
+      "surrogate_rank": 1,
+      "order_indices": "5 6 7 8 0 1 4 9 10 11 2 3 12 13"
+    },
+    "top_25": {
+      "best_actual_error_in_topk": 0.0030094010265522752,
+      "ratio_to_global_best": 1.0,
+      "class_id": 4539,
+      "actual_rank": 1,
+      "surrogate_rank": 1,
+      "order_indices": "5 6 7 8 0 1 4 9 10 11 2 3 12 13"
+    },
+    "top_50": {
+      "best_actual_error_in_topk": 0.0030094010265522752,
+      "ratio_to_global_best": 1.0,
+      "class_id": 4539,
+      "actual_rank": 1,
+      "surrogate_rank": 1,
+      "order_indices": "5 6 7 8 0 1 4 9 10 11 2 3 12 13"
+    },
+    "top_100": {
+      "best_actual_error_in_topk": 0.0030094010265522752,
+      "ratio_to_global_best": 1.0,
+      "class_id": 4539,
+      "actual_rank": 1,
+      "surrogate_rank": 1,
+      "order_indices": "5 6 7 8 0 1 4 9 10 11 2 3 12 13"
+    },
+    "top_250": {
+      "best_actual_error_in_topk": 0.0030094010265522752,
+      "ratio_to_global_best": 1.0,
+      "class_id": 4539,
+      "actual_rank": 1,
+      "surrogate_rank": 1,
+      "order_indices": "5 6 7 8 0 1 4 9 10 11 2 3 12 13"
+    },
+    "top_500": {
+      "best_actual_error_in_topk": 0.0030094010265522752,
+      "ratio_to_global_best": 1.0,
+      "class_id": 4539,
+      "actual_rank": 1,
+      "surrogate_rank": 1,
+      "order_indices": "5 6 7 8 0 1 4 9 10 11 2 3 12 13"
+    }
+  }
+}
