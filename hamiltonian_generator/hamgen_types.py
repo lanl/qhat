@@ -37,6 +37,9 @@ class HamiltonianConfiguration:
         # The number of active occupied and vacant spin (single-occupancy) orbitals in the molecule
         self.num_active_occupied = None
         self.num_active_vacant = None
+        # SymUCCSD symmetry reduction options
+        self.enable_symmetry = False  # Enable PySCF symmetry detection
+        self.apply_symmetry_reduction = False  # Filter Hamiltonian by point-group symmetry
     def add_atom(self, element, x, y, z):
         # TODO: Clarify the units involved.  Right now we just pass numbers along, so the user has
         #       to know the right units for the various choices they make.  It would be better to
@@ -77,6 +80,11 @@ class HamiltonianConfiguration:
             return "jw"
         elif self.fermion_to_qubit_name() == "bravyi-kitaev":
             return "bk"
+    def sym_tag(self, point_group: str = None):
+        """Return symmetry tag for filenames (e.g., '_symD2h')."""
+        if self.apply_symmetry_reduction and point_group:
+            return f"_sym{point_group}"
+        return ""
 
 # -------------------------------------------------------------------------------------------------
 # internal types and support functions
@@ -128,6 +136,9 @@ class State:
         self.config_general = GeneralConfiguration(general)
         self.config_hamiltonian = hamiltonian
         self.metadata = dict()
+        # Symmetry data (set during Stage 1: Hartree-Fock)
+        self.point_group = None  # Point group name (e.g., "D2h", "C2v")
+        self.mo_irreps = None  # Array of irrep IDs for each molecular orbital
     def log(self, *args, **kwargs):
         logger.info(*args, **kwargs)
     def log_verbose(self, *args, **kwargs):
@@ -137,13 +148,17 @@ class State:
     def filename_ham1(self):
         return "{stub}.pickle".format(stub=self.config_general.file_stub)
     def filename_ham2(self):
-        return "{stub}_{astag}.pickle".format(
-                stub=self.config_general.file_stub,
-                astag=self.config_hamiltonian.as_tag())
-    def filename_ham3(self):
-        return "{stub}_{astag}_{f2qtag}.{ext}".format(
+        symtag = self.config_hamiltonian.sym_tag(self.point_group)
+        return "{stub}_{astag}{symtag}.pickle".format(
                 stub=self.config_general.file_stub,
                 astag=self.config_hamiltonian.as_tag(),
+                symtag=symtag)
+    def filename_ham3(self):
+        symtag = self.config_hamiltonian.sym_tag(self.point_group)
+        return "{stub}_{astag}{symtag}_{f2qtag}.{ext}".format(
+                stub=self.config_general.file_stub,
+                astag=self.config_hamiltonian.as_tag(),
+                symtag=symtag,
                 f2qtag=self.config_hamiltonian.f2q_tag(),
                 ext=self.config_general.ham3_ext())
 

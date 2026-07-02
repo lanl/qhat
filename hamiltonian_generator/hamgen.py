@@ -20,6 +20,7 @@ from qhat.hamiltonian_generator.hamgen_types import (
     HamiltonianConfiguration,
     State,
 )
+from qhat.hamiltonian_generator.symmetry_reduction import filter_hamiltonian_tensors
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +151,13 @@ def define_active_orbitals(state, molecule: PyscfMolecularData) -> tuple[int,int
 def my_run_pyscf(state, molecule, verbose=False):
     # Prepare pyscf molecule.
     pyscf_molecule = prepare_pyscf_molecule(molecule)
+
+    # Enable symmetry if requested
+    if state.config_hamiltonian.enable_symmetry:
+        state.log("Enabling PySCF symmetry detection...")
+        pyscf_molecule.symmetry = True
+        pyscf_molecule.build()  # Rebuild with symmetry enabled
+
     molecule.n_orbitals = int(pyscf_molecule.nao_nr())
     molecule.n_qubits = 2 * molecule.n_orbitals
     molecule.nuclear_repulsion = float(pyscf_molecule.energy_nuc())
@@ -165,6 +173,20 @@ def my_run_pyscf(state, molecule, verbose=False):
     if verbose:
         print('Hartree-Fock energy for {} ({} electrons) is {}.'.format(
             molecule.name, molecule.n_electrons, molecule.hf_energy))
+
+    # Extract symmetry information if symmetry was enabled
+    if state.config_hamiltonian.enable_symmetry:
+        if hasattr(pyscf_molecule, 'groupname') and pyscf_molecule.groupname:
+            state.point_group = pyscf_molecule.groupname
+            state.log(f"Detected point group: {state.point_group}")
+        else:
+            state.log("Warning: Symmetry enabled but no point group detected")
+
+        if hasattr(pyscf_scf.mo_coeff, 'orbsym'):
+            state.mo_irreps = pyscf_scf.mo_coeff.orbsym
+            state.log(f"Extracted irreps for {len(state.mo_irreps)} molecular orbitals")
+        else:
+            state.log("Warning: Symmetry enabled but no orbital symmetries found")
 
     # Hold pyscf data in molecule. They are required to compute density
     # matrices and other quantities.
@@ -375,6 +397,43 @@ def get_ham2(state):
         # Recompute ham2_ActiveSpace from ham1_HartreeFock
         state.log("Apply active space.")
         ham2_ActiveSpace = apply_active_space(state, ham1_HartreeFock)
+
+        # Apply symmetry reduction if requested
+        if state.config_hamiltonian.apply_symmetry_reduction:
+            if state.point_group is None or state.mo_irreps is None:
+                state.log("Warning: symmetry reduction requested but no symmetry data available")
+                state.log("Skipping symmetry reduction (run with enable_symmetry=True)")
+            else:
+                state.log(f"Applying SymUCCSD symmetry reduction (point group: {state.point_group})")
+
+                # Get number of occupied spatial orbitals in active space
+                num_occupied_spatial = ham2_ActiveSpace.asmeta['n_act_occ_so'] // 2
+
+                # Filter the Hamiltonian tensors
+                f_const, f_one, f_two = filter_hamiltonian_tensors(
+                    ham2_ActiveSpace.constant,
+                    ham2_ActiveSpace.one_body_tensor,
+                    ham2_ActiveSpace.two_body_tensor,
+                    state.mo_irreps,
+                    state.point_group,
+                    num_occupied_spatial
+                )
+
+                # Create new InteractionOperator with filtered tensors
+                ham2_ActiveSpace = InteractionOperator(f_const, f_one, f_two)
+
+                # Restore metadata (InteractionOperator doesn't preserve custom attributes)
+                ham2_ActiveSpace.hf_energy = ham1_HartreeFock.hf_energy
+                ham2_ActiveSpace.asmeta = ham1_HartreeFock._pyscf_data['scf'].__dict__.get('asmeta', {})
+                # Get asmeta from the original ham2 before reconstruction
+                # We need to preserve this from apply_active_space
+                idx_act_occ, idx_frz_vac, asmeta = define_active_orbitals(state, ham1_HartreeFock)
+                ham2_ActiveSpace.asmeta = asmeta
+                ham2_ActiveSpace.basis = ham1_HartreeFock.basis
+                ham2_ActiveSpace.separation = ham1_HartreeFock.separation
+                ham2_ActiveSpace.hf_time = ham1_HartreeFock.hf_time
+                ham2_ActiveSpace.as_time = 0.0  # Will be updated
+
         state.log(f"Pickle to \"{ham2_filename}\" file.")
         # Save ham2_ActiveSpace for later re-use
         with open(ham2_filename, 'wb') as ham2_file:

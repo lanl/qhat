@@ -74,6 +74,55 @@ Currently allowed values are
 - for Bravyi-Kitaev: "Bravyi-Kitaev", "Bravyi Kitaev", "BK", "bravyi-kitaev", "bravyi\_kitaev",
   "bravyi kitaev", or "bk"
 
+### SymUCCSD: Symmetry Reduction (Optional)
+
+QHAT supports symmetry-reduced Hamiltonian generation using molecular point-group symmetry, based on the SymUCCSD method from Cao et al. (Physical Review A 105, 062452, 2022). This can significantly reduce the number of operators in the Hamiltonian for molecules with symmetry, enabling analysis of larger systems.
+
+**To enable symmetry reduction:**
+
+1. Enable PySCF symmetry detection:
+   ```python
+   hamiltonian.enable_symmetry = True
+   ```
+
+2. Enable symmetry-based filtering:
+   ```python
+   hamiltonian.apply_symmetry_reduction = True
+   ```
+
+**Example:**
+```python
+# BeH2 with D2h symmetry
+general.file_stub = "BeH2_sym"
+
+hamiltonian.add_atom("Be", 0.0, 0.0, 0.0)
+hamiltonian.add_atom("H", 0.0, 0.0, -1.3264)
+hamiltonian.add_atom("H", 0.0, 0.0, 1.3264)
+hamiltonian.basis = "sto-3g"
+hamiltonian.num_active_occupied = 6
+hamiltonian.num_active_vacant = 8
+
+# Enable symmetry reduction
+hamiltonian.enable_symmetry = True
+hamiltonian.apply_symmetry_reduction = True
+
+hamiltonian.f2q_mapping = "Jordan-Wigner"
+```
+
+**Supported Point Groups:**
+- **Abelian groups** (fully supported): C1, Cs, Ci, C2, C2v, C2h, D2, D2h
+- **Non-Abelian groups** (mapped to Abelian subgroups): D∞h/Dooh → D2h, C∞v/Coov → C2v, and others
+
+**Benefits:**
+- Reduces Hamiltonian tensor elements by filtering non-symmetry-preserving terms
+- Enables resource estimation for larger molecules
+- Files are tagged with point group (e.g., `BeH2_as-006-008_symD2h_jw.dat`)
+
+**Limitations:**
+- Works best with high-symmetry molecules
+- Currently supports only closed-shell (spin-restricted) systems
+- Reduction amount depends on molecular symmetry and active space
+
 ## Generated Files
 
 This script will generate various files for intermediate and final stages of the process.  These
@@ -88,14 +137,16 @@ Hartree-Fock calculation of the molecule.  The results of this step will be save
 The second stage is to apply the active space, freezing some electrons in low-lying orbital and
 locking some high-energy orbitals as being vacant.  The results of this step will be saved as
 "[filestub]\_[astag].pickle", where the "[astag]" is a shorthand notation indicating the number of
-active occupied orbitals and the number of active vacant orbitals.  The one-body and two-body
-tensors from this stage of the calculation will also be saved in a file called
+active occupied orbitals and the number of active vacant orbitals.  If symmetry reduction is enabled,
+the filename will include a symmetry tag: "[filestub]\_[astag]\_sym[PG].pickle" (e.g., "BeH2_as-006-008_symD2h.pickle").
+The one-body and two-body tensors from this stage of the calculation will also be saved in a file called
 "[filestub]\_[astag].tensors.npz", which can be loaded into the resource estimation software using
 the `load_numpy` function.
 
 The third stage is to transform the fermionic creation and annihilation operators to qubit
 operators, yielding some metadata and a set of Pauli strings.  This information will be written to
-a plaintext file called "[filestub]\_[astag]\_[f2q].dat", where "[f2q]" will be "jw" or "bk".
+a plaintext file called "[filestub]\_[astag]\_[f2q].dat", where "[f2q]" will be "jw" or "bk".  
+With symmetry reduction, the filename will be "[filestub]\_[astag]\_sym[PG]\_[f2q].dat".
 
 A logfile will also be written to, recording the progress of the calculation.  The name for this is
 set by the `general.logfile` option.
