@@ -1,5 +1,8 @@
+.gitignore
 __pycache__
 .ipynb_checkpoints
 qhat.egg-info
 .toml
 *.log
+*~
+.*.sw?
