@@ -200,5 +200,7 @@ def encode_as_unitary(
         raise NotImplementedError()
     elif config_unitary.method.lower() in ("ramped trotter"):
         return encode_ramped_trotter(config_unitary, hamiltonian, tevol_hbar)
+    elif config_unitary.method.lower() in ("none", "analytic"):
+        return hamiltonian
     else:
         raise ValueError(f"Invalid unitary encoding method \"{config_unitary.method}\".")
