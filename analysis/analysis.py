@@ -814,8 +814,19 @@ def numerical_simulation(
     # Log matrix properties
     logger.verbose(f"Matrix shape: {unitary_matrix.shape}")
 
-    # Note: numerical_simulation_inputs is normalized to list during validation
-    input_files = config_analysis.numerical_simulation_inputs
+    # Normalize inputs to list (in case this function is called directly without validation)
+    raw_inputs = config_analysis.numerical_simulation_inputs
+    if raw_inputs is None:
+        raise ValueError("numerical_simulation_inputs is None")
+
+    # Validate type before normalization
+    if not isinstance(raw_inputs, (str, list)):
+        raise ValueError(
+            f"numerical_simulation_inputs must be a string or list of strings, "
+            f"got {type(raw_inputs).__name__}"
+        )
+
+    input_files = _normalize_string_or_list_to_list(raw_inputs)
 
     logger.info(f"Running numerical simulation on {len(input_files)} input state(s)")
 
