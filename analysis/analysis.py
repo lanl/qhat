@@ -366,7 +366,7 @@ def _eigendecompose(matrix, matrix_type, num_eigenvalues, which_eigs):
 
 # -------------------------------------------------------------------------------------------------
 
-def _process_eigendecomposition(matrix, matrix_type, num_eigenvalues, which_eigs):
+def _process_eigendecomposition(matrix, matrix_type, num_eigenvalues, which_eigs, metadata=None):
     """
     Process eigendecomposition for a single matrix: compute, save, and return data.
 
@@ -375,9 +375,11 @@ def _process_eigendecomposition(matrix, matrix_type, num_eigenvalues, which_eigs
         matrix_type: String describing the matrix type ('exact' or 'approximate')
         num_eigenvalues: Number of eigenvalues to compute (int) or "all"
         which_eigs: Which eigenvalues to compute ('smallest', 'largest', or 'both')
+        metadata: Optional metadata dict with energy_shift, algorithm_type, time_parameter
 
     Returns:
-        Dictionary with file path, num_eigenvalues, eigenvalue_range, which, eigenvalues, eigenvectors
+        Dictionary with file path, num_eigenvalues, eigenvalue_range, which, eigenvalues,
+        eigenvalues_corrected, eigenvectors
 
     Raises:
         ValueError: If matrix is None
@@ -396,6 +398,17 @@ def _process_eigendecomposition(matrix, matrix_type, num_eigenvalues, which_eigs
         matrix, matrix_type, num_eigenvalues, which_eigs
     )
 
+    # Apply correction for comparison if metadata provided
+    if metadata:
+        eigs_corrected = _correct_eigenvalues_for_comparison(
+            eigs, matrix_type,
+            metadata.get('algorithm_type', ''),
+            metadata.get('time_parameter'),
+            metadata.get('energy_shift', 0.0)
+        )
+    else:
+        eigs_corrected = eigs
+
     # Save to file
     output_file = f'{matrix_type}_eigendecomposition.npz'
     save_eigendecomposition(
@@ -407,17 +420,75 @@ def _process_eigendecomposition(matrix, matrix_type, num_eigenvalues, which_eigs
         'file': output_file,
         'num_eigenvalues': num_computed,
         'eigenvalue_range': [float(eigs.min()), float(eigs.max())],
+        'eigenvalue_range_corrected': [float(eigs_corrected.min()), float(eigs_corrected.max())],
         'which': which_eigs,
-        'eigenvalues': eigs,
+        'eigenvalues': eigs,  # Original (phases for time evolution, shifted energies for Hamiltonian)
+        'eigenvalues_corrected': eigs_corrected,  # Corrected for comparison (unshifted energies)
         'eigenvectors': vecs
     }
+
+# -------------------------------------------------------------------------------------------------
+
+def _correct_eigenvalues_for_comparison(eigenvalues, matrix_type, algorithm_type, time_parameter, energy_shift):
+    """
+    Correct eigenvalues for meaningful comparison based on algorithm type.
+
+    The Hamiltonian may have an energy shift applied for efficiency in resource estimation.
+    Additionally, time evolution operators have phase eigenvalues exp(-iE*t) rather than
+    energy eigenvalues. This function corrects both issues to enable meaningful comparisons.
+
+    Parameters:
+        eigenvalues: Raw eigenvalues from eigendecomposition
+        matrix_type: 'exact' or 'approximate'
+        algorithm_type: Algorithm method (e.g., 'time evolution', 'qpe: ...')
+        time_parameter: Time parameter t for time evolution (required for time evolution)
+        energy_shift: Energy shift applied to Hamiltonian
+
+    Returns:
+        corrected_eigenvalues: Real energies in original (unshifted) Hamiltonian scale
+
+    For time evolution algorithms:
+        - U eigenvalues are exp(-i*E_shifted*t), extract phase and convert to energy
+        - Add back the energy shift to get original Hamiltonian energies
+
+    For Hamiltonian matrices:
+        - Eigenvalues are already shifted energies, add shift back to get original energies
+
+    For QPE algorithms:
+        - Eigenvalues should be energies (possibly shifted), add shift back
+    """
+    if matrix_type == 'approximate' and 'time evolution' in algorithm_type:
+        if time_parameter is None:
+            raise ValueError(
+                "Time parameter required to extract energies from time evolution operator eigenvalues"
+            )
+        # U eigenvalues are exp(-i*E_shifted*t), extract phase and convert to energy
+        phases = np.angle(eigenvalues)  # Extract phase from complex eigenvalue
+        energies_shifted = phases / time_parameter  # E_shifted = phase / t
+        energies_unshifted = energies_shifted + energy_shift  # Add back the shift
+        logger.verbose(f"Correcting {len(eigenvalues)} time evolution eigenvalues: phases -> energies + shift")
+        return energies_unshifted
+
+    elif matrix_type == 'exact':
+        # Hamiltonian eigenvalues are already shifted, add back to get original energies
+        energies_unshifted = eigenvalues + energy_shift
+        logger.verbose(f"Correcting {len(eigenvalues)} exact Hamiltonian eigenvalues: adding shift {energy_shift}")
+        return energies_unshifted
+
+    else:
+        # For other cases (QPE, etc.), eigenvalues may already be energies
+        # Apply shift correction
+        energies_unshifted = eigenvalues + energy_shift
+        logger.verbose(f"Correcting {len(eigenvalues)} {matrix_type} eigenvalues: adding shift {energy_shift}")
+        return energies_unshifted
 
 # -------------------------------------------------------------------------------------------------
 
 def eigendecomposition_analysis(
         config_analysis: AnalysisConfiguration,
         exact_matrix=None,
-        unitary_matrix=None) -> dict:
+        unitary_matrix=None,
+        metadata=None) -> dict:
     """
     Compute eigendecompositions of exact and/or approximate matrices.
 
@@ -458,13 +529,13 @@ def eigendecomposition_analysis(
     # Compute exact eigendecomposition if requested
     if need_exact:
         results['exact_eigendecomposition'] = _process_eigendecomposition(
-            exact_matrix, 'exact', num_eigenvalues, which_eigs
+            exact_matrix, 'exact', num_eigenvalues, which_eigs, metadata
         )
 
     # Compute approximate eigendecomposition if requested
     if need_approx:
         results['approximate_eigendecomposition'] = _process_eigendecomposition(
-            unitary_matrix, 'approximate', num_eigenvalues, which_eigs
+            unitary_matrix, 'approximate', num_eigenvalues, which_eigs, metadata
         )
 
     return results
@@ -478,7 +549,8 @@ def error_analysis(
         exact_matrix=None,
         unitary_matrix=None,
         exact_eigendecomp=None,
-        approx_eigendecomp=None) -> dict:
+        approx_eigendecomp=None,
+        metadata=None) -> dict:
     """
     Compute error metrics comparing exact and approximate representations.
 
@@ -520,9 +592,9 @@ def error_analysis(
                 "Ensure eigendecomposition_matrices is set to 'both' when enable_eigenvalue_errors is True."
             )
 
-        # Get all eigenvalues from the eigendecompositions
-        exact_eigs = exact_eigendecomp['eigenvalues']
-        approx_eigs = approx_eigendecomp['eigenvalues']
+        # Get corrected eigenvalues from the eigendecompositions (for meaningful comparison)
+        exact_eigs = exact_eigendecomp['eigenvalues_corrected']
+        approx_eigs = approx_eigendecomp['eigenvalues_corrected']
 
         # Verify that the same number of eigenvalues were computed
         if len(exact_eigs) != len(approx_eigs):
@@ -532,7 +604,7 @@ def error_analysis(
                 "the same number of eigenvalues."
             )
 
-        # Compare all eigenvalues
+        # Compare all eigenvalues (now both in the same energy scale)
         absolute_errors = exact_eigs - approx_eigs
         relative_errors = absolute_errors / np.abs(exact_eigs)
 
@@ -1204,9 +1276,17 @@ def exact_numerical_simulation(
 def analyze_algorithm(
         config_analysis: AnalysisConfiguration,
         algorithm,
-        hamiltonian=None) -> dict:
+        hamiltonian=None,
+        metadata=None) -> dict:
 
     logger.info("Beginning algorithm analysis.")
+
+    # Extract metadata with defaults
+    if metadata is None:
+        metadata = {}
+    energy_shift = metadata.get('energy_shift', 0.0)
+    algorithm_type = metadata.get('algorithm_type', '').lower()
+    time_parameter = metadata.get('time_parameter', None)
 
     # Note: Configuration validation happens in driver.py before Hamiltonian is loaded
 
@@ -1285,7 +1365,8 @@ def analyze_algorithm(
         eig_results = eigendecomposition_analysis(
             config_analysis,
             exact_matrix=exact_matrix,
-            unitary_matrix=unitary_matrix
+            unitary_matrix=unitary_matrix,
+            metadata=metadata
         )
         # Keep eigenvalue/eigenvector data for error analysis, but remove it before storing
         exact_eigendecomp = None
@@ -1298,7 +1379,7 @@ def analyze_algorithm(
         # Remove numpy arrays from results dict (they're already saved to files)
         eig_results_for_storage = {}
         for key, value in eig_results.items():
-            filtered_value = {k: v for k, v in value.items() if k not in ['eigenvalues', 'eigenvectors']}
+            filtered_value = {k: v for k, v in value.items() if k not in ['eigenvalues', 'eigenvectors', 'eigenvalues_corrected']}
             eig_results_for_storage[key] = filtered_value
         results["eigendecomposition"] = eig_results_for_storage
 
@@ -1313,7 +1394,8 @@ def analyze_algorithm(
             exact_matrix=exact_matrix,
             unitary_matrix=unitary_matrix,
             exact_eigendecomp=exact_eigendecomp,
-            approx_eigendecomp=approx_eigendecomp
+            approx_eigendecomp=approx_eigendecomp,
+            metadata=metadata
         )
 
     if config_analysis.exact_simulation_inputs is not None:

@@ -86,7 +86,19 @@ def run():
 
     # Analysis ____________________________________________________________________________________
 
-    state.store_results(analyze_algorithm(state.config_analysis, algorithm, hamiltonian=physical_hamiltonian))
+    # Extract metadata for analysis corrections (energy shift, algorithm type, time parameter)
+    energy_shift = physical_hamiltonian.get_energy_shift()
+    algorithm_metadata = {
+        'energy_shift': energy_shift,
+        'algorithm_type': state.config_algorithm.method,
+        'time_parameter': tevol_hbar if tevol_hbar is not None else None
+    }
+
+    state.store_results(analyze_algorithm(
+        state.config_analysis, algorithm,
+        hamiltonian=physical_hamiltonian,
+        metadata=algorithm_metadata
+    ))
 
     # Save Results ________________________________________________________________________________
 
