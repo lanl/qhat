@@ -348,11 +348,133 @@ analysis.error_state_inputs = "examples/initial_state.npy"  # Can be string or l
 # # Skip error_matrix_norms for large systems (too slow)
 
 # =================================================================================================
+# 5. EIGENDECOMPOSITION ANALYSIS (Branch 2: Now Available!)
+# =================================================================================================
+# Compute eigenvalues and eigenvectors of exact and/or approximate matrices
+
+analysis.num_eigenvalues = 5  # Compute 5 eigenvalues (use sparse methods)
+analysis.eigendecomposition_matrices = "both"  # Options: "exact", "approximate", "both"
+analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both"
+
+# This analysis computes eigendecompositions for validation and comparison:
+#   - Ground state energy (use num_eigenvalues=1, which_eigenvalues="smallest")
+#   - Low-lying excited states (use num_eigenvalues=5, which_eigenvalues="smallest")
+#   - High-energy states (use num_eigenvalues=5, which_eigenvalues="largest")
+#   - Both ends of spectrum (use which_eigenvalues="both")
+
+# Configuration options:
+#   num_eigenvalues:
+#     - 0 (default): Eigendecomposition disabled
+#     - Positive int (e.g., 5): Compute that many eigenvalues (recommended for large systems)
+#     - "all": Full eigendecomposition (only for systems ≤10 qubits)
+#
+#   eigendecomposition_matrices:
+#     - "approximate" (default): Only eigendecompose unitary matrix
+#     - "exact": Only eigendecompose exact Hamiltonian matrix
+#     - "both": Eigendecompose both (useful for comparison)
+#
+#   which_eigenvalues (ignored for "all"):
+#     - "smallest" (default): Algebraically smallest (most negative, ground state)
+#     - "largest": Algebraically largest (most positive)
+#     - "both": Compute smallest AND largest (returns 2k eigenvalues)
+#
+# System size guidance:
+#   - ≤10 qubits: "all" feasible
+#   - 10-12 qubits: "all" possible but expensive
+#   - ≥12 qubits: Use partial (specify k=5-10)
+#   - 20+ qubits: MUST use partial
+#   - 25-30 qubits: Partial still scales well
+
+# Output files:
+#   - exact_eigendecomposition.npz (if "exact" or "both")
+#   - approximate_eigendecomposition.npz (if "approximate" or "both")
+
+# Examples:
+
+# Ground state energy comparison (most common use case for large systems)
+# analysis.num_eigenvalues = 1
+# analysis.eigendecomposition_matrices = "both"
+# analysis.which_eigenvalues = "smallest"
+
+# Low-lying spectrum (5 lowest-energy states)
+# analysis.num_eigenvalues = 5
+# analysis.eigendecomposition_matrices = "exact"
+# analysis.which_eigenvalues = "smallest"
+
+# High and low energy states (3 smallest + 3 largest = 6 total)
+# analysis.num_eigenvalues = 3
+# analysis.eigendecomposition_matrices = "both"
+# analysis.which_eigenvalues = "both"
+
+# Full spectrum for small system
+# analysis.num_eigenvalues = "all"
+# analysis.eigendecomposition_matrices = "exact"
+
+# =================================================================================================
 # FUTURE ANALYSES (Coming in subsequent branches)
 # =================================================================================================
+# Apply the exact Hamiltonian matrix (no approximations) to input state(s)
+
+# Branch 3: Error Metrics
+analysis.error_num_eigenvalues = 1  # Compare ground state energy
+analysis.error_matrix_norms = ["frobenius", "spectral"]  # Matrix difference norms
+analysis.error_state_inputs = ["examples/ground_state.npy"]  # State-dependent errors
 
 # Branch 4: Exact Numerical Simulation
 # analysis.exact_simulation_inputs = "examples/initial_state.npy"
-# Simulate using exact Hamiltonian evolution (for comparison with approximate)
+
+# This applies the exact Hamiltonian H to the input state(s), producing exact time evolution.
+# Useful for:
+#   - Comparing exact evolution with approximate algorithm results
+#   - Validating algorithm correctness on small-scale problems
+#   - Understanding exact quantum dynamics
+
+# Configuration:
+#   exact_simulation_inputs:
+#     - None (default): Exact simulation disabled
+#     - String: Single input state file
+#     - List: Multiple input state files
+#
+#   Output files:
+#     - input.npy → input_exact_final.npy (note: _exact_final suffix)
+#     - Distinguishes from approximate simulation (_final suffix)
+
+# System size guidance:
+#   - ≤15 qubits: Fast (uses dense exact matrix)
+#   - 16-30 qubits: Uses matrix-free operator (scales well)
+#   - Limited by state vector size (16 GB at 30 qubits)
+
+# Examples:
+
+# Single state exact simulation
+# analysis.exact_simulation_inputs = "examples/initial_state.npy"
+
+# Multiple states
+# analysis.exact_simulation_inputs = [
+#     "examples/ground_state.npy",
+#     "examples/excited_state.npy",
+#     "examples/superposition_state.npy"
+# ]
+
+# Compare exact vs approximate evolution (run both!)
+# analysis.numerical_simulation_inputs = "examples/initial_state.npy"  # Approximate
+# analysis.exact_simulation_inputs = "examples/initial_state.npy"      # Exact
+# # Produces both:
+# #   initial_state_final.npy        (approximate result)
+# #   initial_state_exact_final.npy  (exact result)
+# # Then you can manually compare the output states
+
+# Full validation workflow (all analyses together)
+# This demonstrates using all available QHAT analysis capabilities:
+# analysis.resource_estimator = "pyLIQTR"                  # Gate counts
+# analysis.matrix_output_file = "unitary.npz"              # Approximate matrix
+# analysis.exact_matrix_output_file = "exact.npz"          # Exact matrix
+# analysis.num_eigenvalues = 5                              # Eigendecomposition
+# analysis.eigendecomposition_matrices = "both"             # Both exact and approximate
+# analysis.which_eigenvalues = "smallest"                   # Ground + excited states
+# analysis.error_num_eigenvalues = 1                        # Ground state error
+# analysis.error_state_inputs = "examples/ground.npy"       # State-dependent error
+# analysis.numerical_simulation_inputs = "examples/initial_state.npy"   # Approximate evolution
+# analysis.exact_simulation_inputs = "examples/initial_state.npy"       # Exact evolution
 
 # =================================================================================================

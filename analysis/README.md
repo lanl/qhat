@@ -356,7 +356,7 @@ There are many details of the algorithm that may be worth analyzing. The availab
   - **Matrix norm errors**: Use for physical bounds, but expensive for large systems
   - **State errors**: Use for specific physically relevant states, scales best
 
-#### Numerical Simulation
+#### Numerical Simulation (Approximate)
 
 - **Numerical Simulation**: Setting `analysis.numerical_simulation_inputs` to one or more state
   vector files will apply the algorithm to the input state(s) via numerical simulation, producing
@@ -393,7 +393,56 @@ There are many details of the algorithm that may be worth analyzing. The availab
   psi[0] = 1.0
   np.save("initial_state.npy", psi)
   ```
+
+#### Exact Numerical Simulation
+
+- **Exact Numerical Simulation**: Setting `analysis.exact_simulation_inputs` to one or more state
+  vector files will apply the **exact Hamiltonian matrix** (without Trotter or other approximations)
+  to the input state(s), producing output state(s).
+
+  **Purpose**: Compare exact time evolution with approximate algorithm results
+
+  **Input format**: Same as approximate simulation (NumPy `.npy` format). Input can be:
+  - Single filename (string): `"initial_state.npy"`
+  - Multiple filenames (list): `["state1.npy", "state2.npy", "state3.npy"]`
+
+  **Output naming**: Automatic suffix `_exact_final` is added to input filename:
+  - `initial_state.npy` → `initial_state_exact_final.npy`
+  - This distinguishes from approximate simulation output (`_final`)
+
+  **Scaling**: Can reach 25-30 qubits using matrix-free operators from Branch 1
+  - For large systems, uses `PauliStringOperator` (matrix-free)
+  - Memory: O(2^N) for state vectors, not O(2^(2N)) for matrices
+  - Computation time depends on number of Pauli terms in Hamiltonian
+
+  **Example**:
+  ```python
+  # Single state exact simulation
+  analysis.exact_simulation_inputs = "initial_state.npy"
+
+  # Multiple states
+  analysis.exact_simulation_inputs = [
+      "ground_state.npy",
+      "excited_state.npy",
+      "superposition.npy"
+  ]
+  ```
+
+  **Comparing exact vs approximate**:
+  You can run both simulations on the same input states:
+  ```python
+  # Run both approximate and exact simulations
+  analysis.numerical_simulation_inputs = "initial_state.npy"
+  analysis.exact_simulation_inputs = "initial_state.npy"
   
+  # Produces:
+  #   initial_state_final.npy       (approximate result)
+  #   initial_state_exact_final.npy (exact result)
+  # Then manually compare the output states
+  ```
+
+  **Note**: State vectors must be compatible with Hamiltonian dimension (2^N)
+
 ## Generated Files
 
 The script will print a log both to the screen and to a logfile. It also generates output files
@@ -404,8 +453,14 @@ depending on the analyses requested:
   results. Shows final results but not intermediate values.
 - **Matrix file** (if `matrix_output_file` specified): Unitary matrix in specified format (`.npz`,
   `.h5`, or `.txt`)
+- **Exact matrix file** (if `exact_matrix_output_file` specified): Exact Hamiltonian matrix
+- **Eigendecomposition files** (if `num_eigenvalues` > 0): `exact_eigendecomposition.npz` and/or
+  `approximate_eigendecomposition.npz`
+- **Error analysis file** (if any error analysis enabled): `error_analysis.npz`
 - **Final state files** (if `numerical_simulation_inputs` specified): Evolved quantum states with
   `_final` suffix (e.g., `initial_state.npy` → `initial_state_final.npy`)
+- **Exact final state files** (if `exact_simulation_inputs` specified): Exactly evolved states with
+  `_exact_final` suffix (e.g., `initial_state.npy` → `initial_state_exact_final.npy`)
 
 The logfile is typically most useful for understanding the analysis process and intermediate values.
 

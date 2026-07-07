@@ -173,6 +173,7 @@ class AnalysisConfiguration(ConfigurationBase):
         self.enable_eigenvalue_errors = False
         self.error_matrix_norms = None
         self.error_state_inputs = None
+        self.exact_simulation_inputs = None
 
     def _generate_TOML_table(self):
         table = tomlkit.table()
@@ -187,6 +188,7 @@ class AnalysisConfiguration(ConfigurationBase):
         self.save_if_present(table, "enable_eigenvalue_errors")
         self.save_if_present(table, "error_matrix_norms")
         self.save_if_present(table, "error_state_inputs")
+        self.save_if_present(table, "exact_simulation_inputs")
         return table
 
 # -------------------------------------------------------------------------------------------------

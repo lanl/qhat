@@ -1105,6 +1105,98 @@ def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfigura
 
 # -------------------------------------------------------------------------------------------------
 
+def exact_numerical_simulation(
+        config_analysis: AnalysisConfiguration,
+        hamiltonian,
+        exact_matrix) -> dict:
+    """
+    Perform exact numerical simulation by applying the exact Hamiltonian matrix to input state(s).
+
+    This is similar to numerical_simulation() but uses the exact Hamiltonian matrix
+    instead of the approximate unitary. Useful for comparing exact evolution with
+    approximate algorithm results.
+
+    Parameters:
+        config_analysis: Analysis configuration with exact_simulation_inputs
+        hamiltonian: Hamiltonian object (for metadata)
+        exact_matrix: The exact Hamiltonian matrix to apply (pre-computed, can be matrix-free)
+
+    Returns:
+        Dictionary with simulation metadata: list of {input_file, output_file, output_norm}
+    """
+
+    # Log operator properties
+    logger.verbose(f"Exact matrix shape: {exact_matrix.shape}")
+
+    # Normalize input to list
+    inputs = config_analysis.exact_simulation_inputs
+    if isinstance(inputs, str):
+        input_files = [inputs]
+    elif isinstance(inputs, list):
+        input_files = inputs
+    else:
+        raise ValueError(
+            f"exact_simulation_inputs must be a string or list of strings, "
+            f"got {type(inputs)}"
+        )
+
+    logger.info(f"Running exact numerical simulation on {len(input_files)} input state(s)")
+
+    results = []
+
+    for input_file in input_files:
+        logger.verbose(f"Processing {input_file}")
+
+        # Load initial state
+        try:
+            initial_state = load_state(input_file)
+        except Exception as e:
+            logger.info(f"ERROR: Failed to load state from {input_file}: {e}")
+            raise
+
+        # Validate dimensions
+        if initial_state.shape[0] != exact_matrix.shape[1]:
+            raise ValueError(
+                f"Dimension mismatch: state vector has dimension {initial_state.shape[0]} "
+                f"but exact matrix expects {exact_matrix.shape[1]}"
+            )
+
+        # Perform matrix-vector multiplication (or use matvec for matrix-free)
+        logger.verbose("Performing exact matrix-vector multiplication")
+        if hasattr(exact_matrix, 'matvec'):
+            # Matrix-free operator
+            final_state = exact_matrix.matvec(initial_state)
+        else:
+            # Dense matrix
+            final_state = exact_matrix @ initial_state
+
+        # Compute norm
+        final_norm = np.linalg.norm(final_state)
+        logger.verbose(f"Final state norm: {final_norm:.6e}")
+
+        # Generate output filename: input.npy -> input_exact_final.npy
+        input_path = Path(input_file)
+        output_file = str(input_path.parent / f"{input_path.stem}_exact_final{input_path.suffix}")
+
+        # Save final state
+        try:
+            save_state(output_file, final_state)
+        except Exception as e:
+            logger.info(f"ERROR: Failed to save state to {output_file}: {e}")
+            raise
+
+        logger.info(f"Exact simulation complete: {input_file} -> {output_file}")
+
+        results.append({
+            'input_file': input_file,
+            'output_file': output_file,
+            'output_norm': float(final_norm)
+        })
+
+    return {'exact_simulations': results}
+
+# -------------------------------------------------------------------------------------------------
+
 def analyze_algorithm(
         config_analysis: AnalysisConfiguration,
         algorithm,
@@ -1131,7 +1223,8 @@ def analyze_algorithm(
         config_analysis.numerical_simulation_inputs is None and
         config_analysis.exact_matrix_output_file is None and
         not eigendecomposition_requested and
-        not error_analysis_requested):
+        not error_analysis_requested and
+        config_analysis.exact_simulation_inputs is None):
         raise ValueError(
             "No analyses requested. Set at least one of:\n"
             "  - resource_estimator (e.g., 'pyliqtr', 'cirq')\n"
@@ -1141,7 +1234,8 @@ def analyze_algorithm(
             "  - num_eigenvalues (e.g., 5 or 'all')\n"
             "  - enable_eigenvalue_errors (True to compute errors for all eigenvalues)\n"
             "  - error_matrix_norms (e.g., 'frobenius' or ['frobenius', 'spectral'])\n"
-            "  - error_state_inputs (e.g., 'state.npy')"
+            "  - error_state_inputs (e.g., 'state.npy')\n"
+            "  - exact_simulation_inputs (e.g., 'state.npy')"
         )
 
     results = {}
@@ -1184,7 +1278,7 @@ def analyze_algorithm(
 
     if eigendecomposition_requested:
         logger.info("Performing eigendecomposition analysis.")
-        results["eigendecomposition"] = eigendecomposition_analysis(
+        eig_results = eigendecomposition_analysis(
             config_analysis,
             exact_matrix=exact_matrix,
             unitary_matrix=unitary_matrix
@@ -1206,6 +1300,12 @@ def analyze_algorithm(
             unitary_matrix=unitary_matrix,
             exact_eigendecomp=exact_eigendecomp,
             approx_eigendecomp=approx_eigendecomp
+        )
+
+    if config_analysis.exact_simulation_inputs is not None:
+        logger.info("Performing exact numerical simulation.")
+        results["exact_simulation"] = exact_numerical_simulation(
+            config_analysis, hamiltonian, exact_matrix
         )
 
     # TODO: Add gate parallelism / gate depth analysis
