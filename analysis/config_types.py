@@ -284,7 +284,7 @@ class State:
     def store_results(self, d):
         self.results.update(d)
     def show_results(self):
-        logger.info("results:\n" + pprint.pformat(self.results))
+        logger.warning("results:\n" + pprint.pformat(self.results))
     def save_summary(self):
         document = tomlkit.document()
         document.add(tomlkit.comment("CONFIGURATION " + 63 * "="))

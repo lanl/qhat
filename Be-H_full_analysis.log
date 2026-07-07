@@ -1,0 +1,117 @@
+2026-07-07 16:23:59,942 VERBOSE | qhat.analysis.hamiltonian           | -- number of Pauli strings = 62
+2026-07-07 16:23:59,942 VERBOSE | qhat.analysis.hamiltonian           | -- energy shift = -1.629465433169982
+2026-07-07 16:23:59,942 VERBOSE | qhat.analysis.hamiltonian           | -- computed bounds = [-3.8456172882071558, 0.5866864218671914)
+2026-07-07 16:23:59,942 VERBOSE | qhat.analysis.hamiltonian           | -- limited bounds = [-3.8456172882071558, 0.5866864218671914)
+2026-07-07 16:23:59,942 VERBOSE | qhat.analysis.hamiltonian           | -- initial bounds = [-3.8456172882071558, 0.5866864218671914)
+2026-07-07 16:23:59,942 VERBOSE | qhat.analysis.unitary               | Encoding with ramped-trotterization method from `common` (flattened QHAT).
+2026-07-07 16:24:00,164 VERBOSE | qhat.analysis.trotter_coefficients_fast | Preprocessing 62 Pauli terms...
+2026-07-07 16:24:00,164 VERBOSE | qhat.analysis.trotter_coefficients_fast |   Preprocessing done in 0.000s (6 qubits)
+2026-07-07 16:24:00,164 VERBOSE | qhat.analysis.trotter_coefficients_fast |   Using MONTE CARLO with tracking (N=62)
+2026-07-07 16:24:00,164 VERBOSE | qhat.analysis.trotter_coefficients_fast |   Exact computation is feasible for N=62 - enabling tracking
+2026-07-07 16:24:00,164 VERBOSE | qhat.analysis.trotter_coefficients_fast | Warming up Numba JIT compilation...
+2026-07-07 16:24:01,001 VERBOSE | qhat.analysis.trotter_coefficients_fast |   Warmup complete
+2026-07-07 16:24:01,001 VERBOSE | qhat.analysis.trotter_coefficients_fast | Estimating C1 with batch_size=10000...
+2026-07-07 16:24:01,008 VERBOSE | qhat.analysis.trotter_coefficients_fast |   C1 EXACT: All 1891 pairs sampled in 0.007s
+2026-07-07 16:24:01,008 VERBOSE | qhat.analysis.trotter_coefficients_fast |   C1 exact value: 0.643335
+2026-07-07 16:24:01,008 VERBOSE | qhat.analysis.trotter_coefficients_fast | Estimating C21 with batch_size=10000...
+2026-07-07 16:24:01,372 VERBOSE | qhat.analysis.trotter_coefficients_fast |   C21 EXACT: All 37820 triples sampled in 0.364s
+2026-07-07 16:24:01,372 VERBOSE | qhat.analysis.trotter_coefficients_fast |   C21 exact value: 0.391645
+2026-07-07 16:24:01,372 VERBOSE | qhat.analysis.trotter_coefficients_fast | Estimating C22 with batch_size=10000...
+2026-07-07 16:24:01,381 VERBOSE | qhat.analysis.trotter_coefficients_fast |   C22 EXACT: All 1891 pairs sampled in 0.009s
+2026-07-07 16:24:01,381 VERBOSE | qhat.analysis.trotter_coefficients_fast |   C22 exact value: 0.126194
+2026-07-07 16:24:01,381 VERBOSE | qhat.analysis.trotter_coefficients_fast | 
+======================================================================
+2026-07-07 16:24:01,381 VERBOSE | qhat.analysis.trotter_coefficients_fast | ✅ EXACT COMPUTATION ACHIEVED
+2026-07-07 16:24:01,381 VERBOSE | qhat.analysis.trotter_coefficients_fast |    All 1891 C1 pairs sampled
+2026-07-07 16:24:01,381 VERBOSE | qhat.analysis.trotter_coefficients_fast |    All 37820 C21 triples sampled
+2026-07-07 16:24:01,381 VERBOSE | qhat.analysis.trotter_coefficients_fast |    All 1891 C22 pairs sampled
+2026-07-07 16:24:01,381 VERBOSE | qhat.analysis.trotter_coefficients_fast | ======================================================================
+2026-07-07 16:24:01,387 VERBOSE | qhat.analysis.algorithm             | Build a time evolution algorithm.
+2026-07-07 16:24:01,387 VERBOSE | qhat.analysis.analysis              | Computing unitary matrix via tensor contraction...
+2026-07-07 16:24:01,679 VERBOSE | qhat.analysis.analysis              | Computing exact Hamiltonian matrix...
+2026-07-07 16:24:01,681 VERBOSE | qhat.analysis.hamiltonian           | Converting Hamiltonian to matrix for 6 qubits
+2026-07-07 16:24:01,681 VERBOSE | qhat.analysis.hamiltonian           | Hamiltonian has 62 Pauli terms
+2026-07-07 16:24:01,681 VERBOSE | qhat.analysis.matrix_operations     | Using dense matrix representation for 6 qubits (dim=64, memory=0.000 GB)
+2026-07-07 16:24:01,685 VERBOSE | qhat.analysis.analysis              | Estimating resources with pyLIQTR.
+2026-07-07 16:24:02,095 VERBOSE | qhat.analysis.analysis              | Matrix shape: (64, 64)
+2026-07-07 16:24:02,095 VERBOSE | qhat.analysis.analysis              | Matrix dtype: complex128
+2026-07-07 16:24:02,095 VERBOSE | qhat.analysis.analysis              | Matrix Frobenius norm: 8.000000e+00
+2026-07-07 16:24:02,095 VERBOSE | qhat.analysis.analysis              | Unitarity error ||U†U - I||_F: 8.209348e-15
+2026-07-07 16:24:02,097 VERBOSE | qhat.analysis.analysis              | Matrix shape: (64, 64)
+2026-07-07 16:24:02,097 VERBOSE | qhat.analysis.analysis              | Matrix dtype: complex128
+2026-07-07 16:24:02,097 VERBOSE | qhat.analysis.analysis              | Matrix Frobenius norm: 1.811225e+01
+2026-07-07 16:24:02,097 VERBOSE | qhat.analysis.analysis              | Hermiticity error ||H - H†||_F: 0.000000e+00
+2026-07-07 16:24:02,098 VERBOSE | qhat.analysis.analysis              | Matrix shape: (64, 64)
+2026-07-07 16:24:02,098 VERBOSE | qhat.analysis.analysis              | Processing analysis/examples/initial_state.npy
+2026-07-07 16:24:02,098 VERBOSE | qhat.analysis.file_io               | Loading state vector from analysis/examples/initial_state.npy
+2026-07-07 16:24:02,099 VERBOSE | qhat.analysis.file_io               | Loaded state vector with dimension 64 (n_qubits=6)
+2026-07-07 16:24:02,099 VERBOSE | qhat.analysis.analysis              | Performing matrix-vector multiplication
+2026-07-07 16:24:02,101 VERBOSE | qhat.analysis.analysis              | Final state norm: 1.000000e+00
+2026-07-07 16:24:02,101 VERBOSE | qhat.analysis.file_io               | Saving state vector to analysis/examples/initial_state_final.npy
+2026-07-07 16:24:02,101 VERBOSE | qhat.analysis.file_io               | State vector saved successfully
+2026-07-07 16:24:02,101 VERBOSE | qhat.analysis.analysis              |   num_eigenvalues: 5
+2026-07-07 16:24:02,101 VERBOSE | qhat.analysis.analysis              |   eigendecomposition_matrices: both
+2026-07-07 16:24:02,101 VERBOSE | qhat.analysis.analysis              |   which_eigenvalues: smallest
+2026-07-07 16:24:02,101 VERBOSE | qhat.analysis.analysis              | Computing 5 smallest eigenvalues for exact matrix
+2026-07-07 16:24:02,106 VERBOSE | qhat.analysis.analysis              |   Eigenvalue range: [1.527082e+00, 1.718091e+00]
+2026-07-07 16:24:02,109 VERBOSE | qhat.analysis.analysis              | Computing 5 smallest eigenvalues for approximate matrix
+2026-07-07 16:24:02,211 VERBOSE | qhat.analysis.analysis              |   Eigenvalue range: [-9.992840e-01, -9.958141e-01]
+2026-07-07 16:24:02,212 VERBOSE | qhat.analysis.analysis              | Using dense matrices for norm computation (dimension=64)
+2026-07-07 16:24:02,212 VERBOSE | qhat.analysis.analysis              | Processing analysis/examples/initial_state.npy
+2026-07-07 16:24:02,213 VERBOSE | qhat.analysis.file_io               | Loading state vector from analysis/examples/initial_state.npy
+2026-07-07 16:24:02,213 VERBOSE | qhat.analysis.file_io               | Loaded state vector with dimension 64 (n_qubits=6)
+2026-07-07 16:24:02,214 VERBOSE | qhat.analysis.analysis              | Exact matrix shape: (64, 64)
+2026-07-07 16:24:02,214 VERBOSE | qhat.analysis.analysis              | Processing analysis/examples/initial_state.npy
+2026-07-07 16:24:02,214 VERBOSE | qhat.analysis.file_io               | Loading state vector from analysis/examples/initial_state.npy
+2026-07-07 16:24:02,215 VERBOSE | qhat.analysis.file_io               | Loaded state vector with dimension 64 (n_qubits=6)
+2026-07-07 16:24:02,215 VERBOSE | qhat.analysis.analysis              | Performing exact matrix-vector multiplication
+2026-07-07 16:24:02,215 VERBOSE | qhat.analysis.analysis              | Final state norm: 3.845617e+00
+2026-07-07 16:24:02,215 VERBOSE | qhat.analysis.file_io               | Saving state vector to analysis/examples/initial_state_exact_final.npy
+2026-07-07 16:24:02,216 VERBOSE | qhat.analysis.file_io               | State vector saved successfully
+2026-07-07 16:24:02,217 WARNING | qhat.analysis.config_types          | results:
+{'eigendecomposition': {'approximate_eigendecomposition': {'eigenvalue_range': [-0.9992839624753797,
+                                                                                -0.9958140661127546],
+                                                           'file': 'approximate_eigendecomposition.npz',
+                                                           'num_eigenvalues': 5,
+                                                           'which': 'smallest'},
+                        'exact_eigendecomposition': {'eigenvalue_range': [1.527081759755074,
+                                                                          1.718090682000654],
+                                                     'file': 'exact_eigendecomposition.npz',
+                                                     'num_eigenvalues': 5,
+                                                     'which': 'smallest'}},
+ 'error_analysis': {'eigenvalue_errors': {'absolute_errors': [2.526365722230454,
+                                                              2.5259980467380343,
+                                                              2.713904748113409,
+                                                              2.640123087069139,
+                                                              2.6401232770467247],
+                                          'max_absolute_error': 2.713904748113409,
+                                          'max_relative_error': 1.654374892563482,
+                                          'num_eigenvalues': 5,
+                                          'relative_errors': [1.654374892563482,
+                                                              1.654134122552268,
+                                                              1.5796050677331919,
+                                                              1.6056264674020755,
+                                                              1.6056265829395215]},
+                    'matrix_frobenius_error': 24.771719668577862,
+                    'output_file': 'error_analysis.npz',
+                    'state_errors': [{'absolute_error': 3.256944636242268,
+                                      'input_file': 'analysis/examples/initial_state.npy',
+                                      'relative_error': 0.8469237555775269}]},
+ 'exact_matrix_output': {'hermiticity_error': 0.0,
+                         'matrix_file': 'Be-H_exact_hamiltonian.npz',
+                         'matrix_format': '.npz',
+                         'matrix_free': False,
+                         'matrix_norm': 18.112249349455944,
+                         'matrix_shape': (64, 64)},
+ 'exact_simulation': {'exact_simulations': [{'input_file': 'analysis/examples/initial_state.npy',
+                                             'output_file': 'analysis/examples/initial_state_exact_final.npy',
+                                             'output_norm': 3.845617288207155}]},
+ 'matrix_output': {'matrix_file': 'Be-H_unitary_matrix.npz',
+                   'matrix_format': '.npz',
+                   'matrix_norm': 7.999999999999998,
+                   'matrix_shape': (64, 64),
+                   'unitarity_error': 8.20934847664473e-15},
+ 'numerical_simulation': {'simulations': [{'input_file': 'analysis/examples/initial_state.npy',
+                                           'output_file': 'analysis/examples/initial_state_final.npy',
+                                           'output_norm': 0.9999999999999994}]},
+ 'resource_estimates': {'Clifford_count': 27333, 'T_count': 12669}}
