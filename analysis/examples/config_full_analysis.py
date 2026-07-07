@@ -235,13 +235,121 @@ analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both
 # analysis.eigendecomposition_matrices = "exact"
 
 # =================================================================================================
+# 5. EIGENDECOMPOSITION ANALYSIS
+# =================================================================================================
+# Compute eigenvalues and eigenvectors of exact and/or approximate matrices
+
+analysis.num_eigenvalues = 5  # Compute 5 eigenvalues (use sparse methods)
+analysis.eigendecomposition_matrices = "both"  # Options: "exact", "approximate", "both"
+analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both"
+
+# This analysis computes eigendecompositions for validation and comparison:
+#   - Ground state energy (use num_eigenvalues=1, which_eigenvalues="smallest")
+#   - Low-lying excited states (use num_eigenvalues=5, which_eigenvalues="smallest")
+#   - High-energy states (use num_eigenvalues=5, which_eigenvalues="largest")
+#   - Both ends of spectrum (use which_eigenvalues="both")
+
+# Configuration options:
+#   num_eigenvalues:
+#     - 0 (default): Eigendecomposition disabled
+#     - Positive int (e.g., 5): Compute that many eigenvalues (recommended for large systems)
+#     - "all": Full eigendecomposition (only for systems ≤10 qubits)
+#
+#   eigendecomposition_matrices:
+#     - "approximate" (default): Only eigendecompose unitary matrix
+#     - "exact": Only eigendecompose exact Hamiltonian matrix
+#     - "both": Eigendecompose both (useful for comparison)
+#
+#   which_eigenvalues (ignored for "all"):
+#     - "smallest" (default): Algebraically smallest (most negative, ground state)
+#     - "largest": Algebraically largest (most positive)
+#     - "both": Compute smallest AND largest (returns 2k eigenvalues)
+
+# Output files:
+#   - exact_eigendecomposition.npz (if "exact" or "both")
+#   - approximate_eigendecomposition.npz (if "approximate" or "both")
+
+# Examples:
+
+# Ground state energy comparison (most common use case for large systems)
+# analysis.num_eigenvalues = 1
+# analysis.eigendecomposition_matrices = "both"
+# analysis.which_eigenvalues = "smallest"
+
+# Low-lying spectrum (5 lowest-energy states)
+# analysis.num_eigenvalues = 5
+# analysis.eigendecomposition_matrices = "exact"
+# analysis.which_eigenvalues = "smallest"
+
+# High and low energy states (3 smallest + 3 largest = 6 total)
+# analysis.num_eigenvalues = 3
+# analysis.eigendecomposition_matrices = "both"
+# analysis.which_eigenvalues = "both"
+
+# Full spectrum for small system
+# analysis.num_eigenvalues = "all"
+# analysis.eigendecomposition_matrices = "exact"
+
+# =================================================================================================
+# 6. ERROR ANALYSIS
+# =================================================================================================
+# Compare exact and approximate representations using three types of error metrics
+
+analysis.enable_eigenvalue_errors = True  # Compare all eigenvalues from eigendecomposition
+analysis.error_matrix_norms = "frobenius"  # Options: "frobenius", "spectral", or ["frobenius", "spectral"]
+analysis.error_state_inputs = "examples/initial_state.npy"  # Can be string or list
+
+# This analysis computes three independent error types:
+#   1. Eigenvalue errors: Compare all eigenvalues computed in the eigendecomposition
+#   2. Matrix norm errors: Frobenius and/or spectral norms of difference matrix
+#   3. State-dependent errors: ||H_exact|ψ⟩ - H_approx|ψ⟩|| for specific states
+
+# Configuration options:
+#   enable_eigenvalue_errors:
+#     - False (default): Eigenvalue errors disabled
+#     - True: Compute errors for ALL eigenvalues from eigendecomposition
+#     - Requires eigendecompositions (set eigendecomposition_matrices = "both")
+#     - The number of eigenvalues compared is determined by num_eigenvalues
+#
+#   error_matrix_norms:
+#     - None (default): Matrix norm errors disabled
+#     - "frobenius": Fast element-wise difference norm
+#     - "spectral": Physically meaningful worst-case norm (slower)
+#     - ["frobenius", "spectral"]: Both norms
+#
+#   error_state_inputs:
+#     - None (default): State-dependent errors disabled
+#     - String or list of .npy files containing quantum states
+#     - Fast: just applies operators to states
+
+# Output: error_analysis.npz containing all computed errors
+
+# Examples:
+
+# Eigenvalue error comparison (compare all eigenvalues from eigendecomposition)
+# analysis.enable_eigenvalue_errors = True
+
+# Matrix norms (physical bounds, but expensive for large systems)
+# analysis.error_matrix_norms = "frobenius"  # Fast
+# analysis.error_matrix_norms = ["frobenius", "spectral"]  # Both (slower)
+
+# State-dependent errors (best scaling, physically relevant)
+# analysis.error_state_inputs = "examples/initial_state.npy"
+# analysis.error_state_inputs = ["examples/ground.npy", "examples/excited.npy"]
+
+# All three error types (comprehensive validation for small-medium systems)
+# analysis.enable_eigenvalue_errors = True
+# analysis.error_matrix_norms = "frobenius"
+# analysis.error_state_inputs = ["examples/ground.npy", "examples/excited.npy"]
+
+# Minimal setup for large systems
+# analysis.enable_eigenvalue_errors = True  # Compare eigenvalues
+# analysis.error_state_inputs = "examples/ground.npy"  # Scales well
+# # Skip error_matrix_norms for large systems (too slow)
+
+# =================================================================================================
 # FUTURE ANALYSES (Coming in subsequent branches)
 # =================================================================================================
-
-# Branch 3: Error Metrics
-# analysis.error_num_eigenvalues = 1  # Compare ground state energy
-# analysis.error_matrix_norms = ["frobenius", "spectral"]  # Matrix difference norms
-# analysis.error_state_inputs = ["examples/ground_state.npy"]  # State-dependent errors
 
 # Branch 4: Exact Numerical Simulation
 # analysis.exact_simulation_inputs = "examples/initial_state.npy"

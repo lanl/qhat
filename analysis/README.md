@@ -284,6 +284,78 @@ There are many details of the algorithm that may be worth analyzing. The availab
     - `"largest"` gives [10, 5, ...] (most positive)
     - This is NOT based on magnitude (which would give [0, 5, -5, ...])
 
+#### Error Analysis
+
+- **Error Analysis**: Enables three types of error metrics comparing exact and approximate representations. Each error type is independently enabled by setting its corresponding configuration parameter.
+
+  **Configuration parameters**:
+  
+  - **`enable_eigenvalue_errors`**: Enable eigenvalue error comparison (default: False, disabled)
+    - Set to `True` to compute errors for ALL eigenvalues from the eigendecomposition
+    - The number of eigenvalues compared is determined by `num_eigenvalues` setting
+    - Compares all eigenvalues computed in both exact and approximate eigendecompositions
+    - Requires `eigendecomposition_matrices = "both"` to ensure both decompositions are computed
+    - **Best for**: Validating eigenvalue accuracy across the spectrum
+
+  - **`error_matrix_norms`**: Which matrix norms to compute (default: None, disabled)
+    - Single string: `"frobenius"` or `"spectral"`
+    - List: `["frobenius", "spectral"]` for both
+    - **Frobenius norm**: Element-wise difference, fast to compute
+      - ||H_exact - H_approx||_F = sqrt(sum of squares of all elements)
+      - Good for quick comparisons
+    - **Spectral norm**: Worst-case effect on any quantum state, physically meaningful
+      - ||H_exact - H_approx||_2 = largest singular value
+      - More expensive to compute, especially for large systems
+    - **For large systems (>15 qubits)**: Uses matrix-free computation
+      - Frobenius: Requires 2^N matrix-vector products (minutes for 20 qubits)
+      - Spectral: Uses power iteration (can take longer)
+      - Progress warnings displayed during computation
+    - **Best for**: Physical bounds on algorithm error
+
+  - **`error_state_inputs`**: State files for state-dependent errors (default: None, disabled)
+    - Single filename (string): `"ground_state.npy"`
+    - Multiple filenames (list): `["state1.npy", "state2.npy"]`
+    - Compares: ||H_exact|ψ⟩ - H_approx|ψ⟩||
+    - **Best-scaling error metric** for large systems
+      - Only requires O(2^N) memory (state vectors), not O(2^(2N)) (matrices)
+      - Can reach 30 qubits
+      - Fast: just applies operators to states
+    - **Best for**: Error on specific physically relevant states
+
+  **System size guidance**:
+  - **≤15 qubits**: All error types fast (dense matrix operations)
+  - **16-20 qubits**: Matrix norms slow (matrix-free), state errors still fast
+  - **20-30 qubits**: Use eigenvalue + state errors; avoid matrix norms unless necessary
+  - **Production recommendation**: Eigenvalue errors (k=1-5) + state errors for best performance
+
+  **Output file**: `error_analysis.npz` containing all computed error metrics
+
+  **Examples**:
+  ```python
+  # Eigenvalue error comparison (compares all eigenvalues from eigendecomposition)
+  analysis.enable_eigenvalue_errors = True
+
+  # Matrix norm errors (physical bounds)
+  analysis.error_matrix_norms = "frobenius"  # Fast
+  # or
+  analysis.error_matrix_norms = ["frobenius", "spectral"]  # Both
+
+  # State-dependent errors (best scaling)
+  analysis.error_state_inputs = "ground_state.npy"
+  # or multiple states
+  analysis.error_state_inputs = ["ground.npy", "excited.npy"]
+
+  # All three error types together (comprehensive validation)
+  analysis.enable_eigenvalue_errors = True
+  analysis.error_matrix_norms = "frobenius"
+  analysis.error_state_inputs = ["ground.npy", "excited.npy"]
+  ```
+
+  **When to use each error type**:
+  - **Eigenvalue errors**: Use when you want to validate all eigenvalues computed in the eigendecomposition
+  - **Matrix norm errors**: Use for physical bounds, but expensive for large systems
+  - **State errors**: Use for specific physically relevant states, scales best
+
 #### Numerical Simulation
 
 - **Numerical Simulation**: Setting `analysis.numerical_simulation_inputs` to one or more state

@@ -1,6 +1,7 @@
 import numpy as np
 from datetime import datetime
 import logging
+import os
 from pathlib import Path
 
 from pyLIQTR.utils.resource_analysis import estimate_resources as estimate_pyliqtr
@@ -466,6 +467,334 @@ def eigendecomposition_analysis(
 
 # -------------------------------------------------------------------------------------------------
 
+def error_analysis(
+        config_analysis: AnalysisConfiguration,
+        hamiltonian,
+        algorithm,
+        exact_matrix=None,
+        unitary_matrix=None,
+        exact_eigendecomp=None,
+        approx_eigendecomp=None) -> dict:
+    """
+    Compute error metrics comparing exact and approximate representations.
+
+    Three independent error types:
+    1. Eigenvalue errors (if enable_eigenvalue_errors is True)
+    2. Matrix norm errors (if error_matrix_norms is not None)
+    3. State-dependent errors (if error_state_inputs is not None)
+
+    Parameters:
+        config_analysis: Analysis configuration with error analysis settings
+        hamiltonian: Hamiltonian object
+        algorithm: Algorithm bloq
+        exact_matrix: Pre-computed exact matrix (optional)
+        unitary_matrix: Pre-computed unitary matrix (optional)
+        exact_eigendecomp: Pre-computed exact eigendecomposition (optional)
+        approx_eigendecomp: Pre-computed approximate eigendecomposition (optional)
+
+    Returns:
+        Dictionary with error metrics
+    """
+    from qhat.analysis.matrix_operations import PauliStringOperator
+    from qhat.analysis.file_io import load_eigendecomposition, load_state
+    import scipy.linalg
+
+    logger.info("Starting error analysis")
+
+    results = {}
+
+    # =============================================================================================
+    # 1. EIGENVALUE ERROR
+    # =============================================================================================
+
+    if config_analysis.enable_eigenvalue_errors:
+        logger.info("Computing eigenvalue errors for all eigenvalues from eigendecomposition")
+
+        if exact_eigendecomp is None or approx_eigendecomp is None:
+            raise ValueError(
+                "Both eigendecompositions must be computed in order to compare eigenvalues. "
+                "Ensure eigendecomposition_matrices is set to 'both' when enable_eigenvalue_errors is True."
+            )
+
+        # Get all eigenvalues from the eigendecompositions
+        exact_eigs = exact_eigendecomp['eigenvalues']
+        approx_eigs = approx_eigendecomp['eigenvalues']
+
+        # Verify that the same number of eigenvalues were computed
+        if len(exact_eigs) != len(approx_eigs):
+            raise ValueError(
+                f"Mismatch in number of eigenvalues: exact has {len(exact_eigs)}, "
+                f"approximate has {len(approx_eigs)}. Both eigendecompositions must compute "
+                "the same number of eigenvalues."
+            )
+
+        # Compare all eigenvalues
+        absolute_errors = exact_eigs - approx_eigs
+        relative_errors = absolute_errors / np.abs(exact_eigs)
+
+        num_eigenvalues = len(exact_eigs)
+        logger.info(f"Computed errors for {num_eigenvalues} eigenvalues")
+        logger.info(f"Eigenvalue absolute error range: [{absolute_errors.min():.6e}, {absolute_errors.max():.6e}]")
+        logger.info(f"Eigenvalue relative error range: [{relative_errors.min():.6e}, {relative_errors.max():.6e}]")
+
+        results['eigenvalue_errors'] = {
+            'num_eigenvalues': num_eigenvalues,
+            'absolute_errors': absolute_errors.tolist(),
+            'relative_errors': relative_errors.tolist(),
+            'max_absolute_error': float(np.abs(absolute_errors).max()),
+            'max_relative_error': float(np.abs(relative_errors).max())
+        }
+
+    # =============================================================================================
+    # 2. MATRIX NORM ERRORS
+    # =============================================================================================
+
+    if config_analysis.error_matrix_norms is not None:
+        # Note: error_matrix_norms is normalized to list during validation
+        norms_to_compute = config_analysis.error_matrix_norms
+
+        logger.info(f"Computing matrix norm errors: {norms_to_compute}")
+
+        # Require matrices to be provided by caller
+        if exact_matrix is None:
+            raise ValueError(
+                "Matrix norm error analysis requires the exact Hamiltonian matrix, but it was not computed. "
+            )
+
+        if unitary_matrix is None:
+            raise ValueError(
+                "Matrix norm error analysis requires the approximate/unitary matrix, but it was not computed. "
+            )
+
+        # Check if matrices are dense or matrix-free
+        is_exact_dense = isinstance(exact_matrix, np.ndarray)
+        is_approx_dense = isinstance(unitary_matrix, np.ndarray)
+        is_dense = is_exact_dense and is_approx_dense
+
+        dimension = exact_matrix.shape[0]
+        num_qubits = int(np.log2(dimension))
+
+        if is_dense:
+            # Small systems: direct computation
+            logger.verbose(f"Using dense matrices for norm computation (dimension={dimension})")
+            diff_matrix = exact_matrix - unitary_matrix
+
+            for norm_type in norms_to_compute:
+                if norm_type == 'frobenius':
+                    error = np.linalg.norm(diff_matrix, 'fro')
+                    logger.info(f"Frobenius norm error: {error:.6e}")
+                    results['matrix_frobenius_error'] = float(error)
+
+                elif norm_type == 'spectral':
+                    error = np.linalg.norm(diff_matrix, 2)
+                    logger.info(f"Spectral norm error: {error:.6e}")
+                    results['matrix_spectral_error'] = float(error)
+
+                else:
+                    raise ValueError(f"Unknown matrix norm type: {norm_type}")
+
+        else:
+            # Large systems: matrix-free computation
+            logger.info(f"WARNING: Matrix-free norm computation for {num_qubits} qubits")
+            logger.info(f"  This requires 2^{num_qubits} = {dimension:,} matrix-vector products")
+            logger.info(f"  Estimated time: {'<1 minute' if dimension < 10000 else '1-10 minutes' if dimension < 100000 else '10+ minutes'}")
+
+            for norm_type in norms_to_compute:
+                if norm_type == 'frobenius':
+                    # Compute ||A||_F^2 = sum_i ||A e_i||^2
+                    logger.verbose("Computing Frobenius norm via matrix-vector products")
+                    frobenius_squared = 0.0
+                    for i in range(dimension):
+                        if i % max(1, dimension // 10) == 0:
+                            logger.verbose(f"  Progress: {i}/{dimension} ({100*i//dimension}%)")
+                        # Create basis vector e_i
+                        e_i = np.zeros(dimension, dtype=complex)
+                        e_i[i] = 1.0
+                        # Compute difference: (H - U) e_i
+                        if hasattr(exact_matrix, 'matvec'):
+                            exact_result = exact_matrix.matvec(e_i)
+                        else:
+                            exact_result = exact_matrix @ e_i
+                        if hasattr(unitary_matrix, 'matvec'):
+                            approx_result = unitary_matrix.matvec(e_i)
+                        else:
+                            approx_result = unitary_matrix @ e_i
+                        diff_i = exact_result - approx_result
+                        frobenius_squared += np.linalg.norm(diff_i) ** 2
+
+                    error = np.sqrt(frobenius_squared)
+                    logger.info(f"Frobenius norm error (matrix-free): {error:.6e}")
+                    results['matrix_frobenius_error'] = float(error)
+
+                elif norm_type == 'spectral':
+                    # Compute ||A||_2 = largest singular value via power iteration
+                    logger.verbose("Computing spectral norm via power iteration")
+
+                    # Random starting vector
+                    v = np.random.randn(dimension) + 1j * np.random.randn(dimension)
+                    v = v / np.linalg.norm(v)
+
+                    max_iterations = 100
+                    tolerance = 1e-6
+
+                    for iteration in range(max_iterations):
+                        # Apply (H - U)† (H - U) to v
+                        # First: (H - U) v
+                        if hasattr(exact_matrix, 'matvec'):
+                            exact_result = exact_matrix.matvec(v)
+                        else:
+                            exact_result = exact_matrix @ v
+                        if hasattr(unitary_matrix, 'matvec'):
+                            approx_result = unitary_matrix.matvec(v)
+                        else:
+                            approx_result = unitary_matrix @ v
+                        diff_v = exact_result - approx_result
+
+                        # Then: (H - U)† diff_v
+                        if hasattr(exact_matrix, 'rmatvec'):
+                            exact_adjoint = exact_matrix.rmatvec(diff_v)
+                        else:
+                            exact_adjoint = exact_matrix.conj().T @ diff_v
+                        if hasattr(unitary_matrix, 'rmatvec'):
+                            approx_adjoint = unitary_matrix.rmatvec(diff_v)
+                        else:
+                            approx_adjoint = unitary_matrix.conj().T @ diff_v
+                        result = exact_adjoint - approx_adjoint
+
+                        # Normalize
+                        v_new = result / np.linalg.norm(result)
+
+                        # Check convergence
+                        if np.linalg.norm(v_new - v) < tolerance:
+                            logger.verbose(f"  Converged after {iteration+1} iterations")
+                            break
+
+                        v = v_new
+
+                        if (iteration + 1) % 10 == 0:
+                            logger.verbose(f"  Iteration {iteration+1}/{max_iterations}")
+
+                    # Rayleigh quotient to get eigenvalue (= squared singular value)
+                    if hasattr(exact_matrix, 'matvec'):
+                        exact_result = exact_matrix.matvec(v)
+                    else:
+                        exact_result = exact_matrix @ v
+                    if hasattr(unitary_matrix, 'matvec'):
+                        approx_result = unitary_matrix.matvec(v)
+                    else:
+                        approx_result = unitary_matrix @ v
+                    diff_v = exact_result - approx_result
+
+                    if hasattr(exact_matrix, 'rmatvec'):
+                        exact_adjoint = exact_matrix.rmatvec(diff_v)
+                    else:
+                        exact_adjoint = exact_matrix.conj().T @ diff_v
+                    if hasattr(unitary_matrix, 'rmatvec'):
+                        approx_adjoint = unitary_matrix.rmatvec(diff_v)
+                    else:
+                        approx_adjoint = unitary_matrix.conj().T @ diff_v
+                    result = exact_adjoint - approx_adjoint
+
+                    eigenvalue = np.vdot(v, result)
+                    error = np.sqrt(np.abs(eigenvalue))
+
+                    logger.info(f"Spectral norm error (matrix-free, power iteration): {error:.6e}")
+                    results['matrix_spectral_error'] = float(error)
+
+                else:
+                    raise ValueError(f"Unknown matrix norm type: {norm_type}")
+
+    # =============================================================================================
+    # 3. STATE-DEPENDENT ERRORS
+    # =============================================================================================
+
+    if config_analysis.error_state_inputs is not None:
+        # Note: error_state_inputs is normalized to list during validation
+        state_files = config_analysis.error_state_inputs
+
+        logger.info(f"Computing state-dependent errors for {len(state_files)} state(s)")
+
+        # Require matrices to be provided by caller
+        if exact_matrix is None:
+            raise ValueError(
+                "State-dependent error analysis requires the exact Hamiltonian matrix, but it was not computed. "
+            )
+
+        if unitary_matrix is None:
+            raise ValueError(
+                "State-dependent error analysis requires the approximate/unitary matrix, but it was not computed. "
+            )
+
+        state_errors = []
+
+        for state_file in state_files:
+            logger.verbose(f"Processing {state_file}")
+
+            # Load state
+            try:
+                initial_state = load_state(state_file)
+            except Exception as e:
+                logger.info(f"ERROR: Failed to load state from {state_file}: {e}")
+                raise
+
+            # Apply exact operator
+            if hasattr(exact_matrix, 'matvec'):
+                exact_final = exact_matrix.matvec(initial_state)
+            else:
+                exact_final = exact_matrix @ initial_state
+
+            # Apply approximate operator
+            if hasattr(unitary_matrix, 'matvec'):
+                approx_final = unitary_matrix.matvec(initial_state)
+            else:
+                approx_final = unitary_matrix @ initial_state
+
+            # Compute error
+            diff = exact_final - approx_final
+            absolute_error = np.linalg.norm(diff)
+            relative_error = absolute_error / np.linalg.norm(exact_final)
+
+            logger.info(f"  {state_file}: absolute error = {absolute_error:.6e}, relative error = {relative_error:.6e}")
+
+            state_errors.append({
+                'input_file': state_file,
+                'absolute_error': float(absolute_error),
+                'relative_error': float(relative_error)
+            })
+
+        results['state_errors'] = state_errors
+
+    # Save results to file
+    output_file = 'error_analysis.npz'
+    save_dict = {}
+
+    if 'eigenvalue_errors' in results:
+        save_dict['eigenvalue_absolute_errors'] = np.array(results['eigenvalue_errors']['absolute_errors'])
+        save_dict['eigenvalue_relative_errors'] = np.array(results['eigenvalue_errors']['relative_errors'])
+        save_dict['eigenvalue_num'] = results['eigenvalue_errors']['num_eigenvalues']
+
+    if 'matrix_frobenius_error' in results:
+        save_dict['matrix_frobenius_error'] = results['matrix_frobenius_error']
+
+    if 'matrix_spectral_error' in results:
+        save_dict['matrix_spectral_error'] = results['matrix_spectral_error']
+
+    if 'state_errors' in results:
+        state_absolute = [s['absolute_error'] for s in results['state_errors']]
+        state_relative = [s['relative_error'] for s in results['state_errors']]
+        save_dict['state_absolute_errors'] = np.array(state_absolute)
+        save_dict['state_relative_errors'] = np.array(state_relative)
+        # Note: filenames are in results dict, not saved to npz
+
+    if save_dict:
+        np.savez(output_file, **save_dict)
+        logger.info(f"Error analysis results saved to {output_file}")
+        results['output_file'] = output_file
+
+    return results
+
+# -------------------------------------------------------------------------------------------------
+
 def numerical_simulation(
         config_analysis: AnalysisConfiguration,
         algorithm,
@@ -485,17 +814,19 @@ def numerical_simulation(
     # Log matrix properties
     logger.verbose(f"Matrix shape: {unitary_matrix.shape}")
 
-    # Normalize input to list
-    inputs = config_analysis.numerical_simulation_inputs
-    if isinstance(inputs, str):
-        input_files = [inputs]
-    elif isinstance(inputs, list):
-        input_files = inputs
-    else:
+    # Normalize inputs to list (in case this function is called directly without validation)
+    raw_inputs = config_analysis.numerical_simulation_inputs
+    if raw_inputs is None:
+        raise ValueError("numerical_simulation_inputs is None")
+
+    # Validate type before normalization
+    if not isinstance(raw_inputs, (str, list)):
         raise ValueError(
             f"numerical_simulation_inputs must be a string or list of strings, "
-            f"got {type(inputs)}"
+            f"got {type(raw_inputs).__name__}"
         )
+
+    input_files = _normalize_string_or_list_to_list(raw_inputs)
 
     logger.info(f"Running numerical simulation on {len(input_files)} input state(s)")
 
@@ -548,6 +879,231 @@ def numerical_simulation(
     return {'simulations': results}
 
 # -------------------------------------------------------------------------------------------------
+# Helper functions
+# -------------------------------------------------------------------------------------------------
+
+def _normalize_string_or_list_to_list(value):
+    """
+    Normalize a configuration value that can be either a string or list into a list.
+
+    This is a common pattern for config options that accept either a single item (string)
+    or multiple items (list).
+
+    Parameters:
+        value: Either a string or a list of strings (or None)
+
+    Returns:
+        A list (or None if input was None)
+
+    Examples:
+        _normalize_string_or_list_to_list("item") -> ["item"]
+        _normalize_string_or_list_to_list(["a", "b"]) -> ["a", "b"]
+        _normalize_string_or_list_to_list(None) -> None
+    """
+    if value is None:
+        return None
+    elif isinstance(value, str):
+        return [value]
+    else:
+        # Already a list (or list-like)
+        return value
+
+# -------------------------------------------------------------------------------------------------
+# Functions to determine what expensive computations are required
+# -------------------------------------------------------------------------------------------------
+
+def requires_exact_eigendecomposition(config_analysis: AnalysisConfiguration) -> bool:
+    """
+    Determine if exact eigendecomposition needs to be computed.
+
+    Exact eigendecomposition is required for:
+    - Eigendecomposition analysis with eigendecomposition_matrices = 'exact' or 'both'
+    - Eigenvalue error analysis (always needs both eigendecompositions)
+
+    Parameters:
+        config_analysis: Analysis configuration
+
+    Returns:
+        True if exact eigendecomposition computation is needed, False otherwise
+    """
+    # Check if eigendecomposition is requested at all
+    num_eigenvalues = config_analysis.num_eigenvalues
+    eigendecomposition_requested = (
+        isinstance(num_eigenvalues, int) and num_eigenvalues > 0
+    ) or (
+        isinstance(num_eigenvalues, str) and num_eigenvalues.lower() == "all"
+    )
+
+    # Need exact eigendecomposition if:
+    # 1. Eigendecomposition requested and matrices setting includes 'exact' or 'both'
+    # 2. Eigenvalue error analysis is enabled (always needs both)
+    return (
+        (eigendecomposition_requested and
+         config_analysis.eigendecomposition_matrices in ['exact', 'both']) or
+        config_analysis.enable_eigenvalue_errors
+    )
+
+
+def requires_approximate_eigendecomposition(config_analysis: AnalysisConfiguration) -> bool:
+    """
+    Determine if approximate eigendecomposition needs to be computed.
+
+    Approximate eigendecomposition is required for:
+    - Eigendecomposition analysis with eigendecomposition_matrices = 'approximate' or 'both'
+    - Eigenvalue error analysis (always needs both eigendecompositions)
+
+    Parameters:
+        config_analysis: Analysis configuration
+
+    Returns:
+        True if approximate eigendecomposition computation is needed, False otherwise
+    """
+    # Check if eigendecomposition is requested at all
+    num_eigenvalues = config_analysis.num_eigenvalues
+    eigendecomposition_requested = (
+        isinstance(num_eigenvalues, int) and num_eigenvalues > 0
+    ) or (
+        isinstance(num_eigenvalues, str) and num_eigenvalues.lower() == "all"
+    )
+
+    # Need approximate eigendecomposition if:
+    # 1. Eigendecomposition requested and matrices setting includes 'approximate' or 'both'
+    # 2. Eigenvalue error analysis is enabled (always needs both)
+    return (
+        (eigendecomposition_requested and
+         config_analysis.eigendecomposition_matrices in ['approximate', 'both']) or
+        config_analysis.enable_eigenvalue_errors
+    )
+
+
+def requires_exact_matrix(config_analysis: AnalysisConfiguration) -> bool:
+    """
+    Determine if the exact Hamiltonian matrix needs to be computed.
+
+    The exact matrix is required for:
+    - Exact matrix output to file
+    - Exact eigendecomposition (which depends on the matrix)
+    - Matrix norm error analysis
+    - State-dependent error analysis
+
+    Parameters:
+        config_analysis: Analysis configuration
+
+    Returns:
+        True if exact matrix computation is needed, False otherwise
+    """
+    return (
+        config_analysis.exact_matrix_output_file is not None or
+        requires_exact_eigendecomposition(config_analysis) or
+        config_analysis.error_matrix_norms is not None or
+        config_analysis.error_state_inputs is not None
+    )
+
+
+def requires_approximate_matrix(config_analysis: AnalysisConfiguration) -> bool:
+    """
+    Determine if the approximate/unitary matrix needs to be computed.
+
+    The approximate matrix is required for:
+    - Matrix output to file
+    - Numerical simulation
+    - Approximate eigendecomposition (which depends on the matrix)
+    - Matrix norm error analysis
+    - State-dependent error analysis
+
+    Parameters:
+        config_analysis: Analysis configuration
+
+    Returns:
+        True if approximate matrix computation is needed, False otherwise
+    """
+    return (
+        config_analysis.matrix_output_file is not None or
+        config_analysis.numerical_simulation_inputs is not None or
+        requires_approximate_eigendecomposition(config_analysis) or
+        config_analysis.error_matrix_norms is not None or
+        config_analysis.error_state_inputs is not None
+    )
+
+# -------------------------------------------------------------------------------------------------
+
+def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfiguration) -> None:
+    """
+    Validate configuration consistency and auto-enable dependent analyses where appropriate.
+
+    This function is called early in driver.py, after loading configuration but before
+    loading the Hamiltonian. This allows for fail-fast behavior if configuration is invalid.
+
+    This function checks for:
+    1. Missing dependencies (raises errors if configuration is needed)
+    2. Opportunities to auto-enable analyses (logs when enabling)
+
+    Parameters:
+        config_analysis: Analysis configuration to validate and potentially modify
+
+    Raises:
+        ValueError: If configuration is inconsistent and cannot be auto-corrected
+
+    Note:
+        This function modifies the config_analysis object in-place when auto-enabling analyses.
+    """
+
+    # Check eigenvalue error analysis dependencies
+    if config_analysis.enable_eigenvalue_errors:
+        # Check if num_eigenvalues is configured
+        num_eigenvalues = config_analysis.num_eigenvalues
+        eigendecomposition_configured = (
+            isinstance(num_eigenvalues, int) and num_eigenvalues > 0
+        ) or (
+            isinstance(num_eigenvalues, str) and num_eigenvalues.lower() == "all"
+        )
+
+        if not eigendecomposition_configured:
+            raise ValueError(
+                "enable_eigenvalue_errors requires eigendecomposition. "
+                "Set num_eigenvalues to a positive integer or 'all'."
+            )
+
+        # Must compute both eigendecompositions to compare
+        if config_analysis.eigendecomposition_matrices != 'both':
+            logger.info(
+                "INFO: enable_eigenvalue_errors requires both exact and approximate eigendecompositions. "
+                f"Auto-setting eigendecomposition_matrices from '{config_analysis.eigendecomposition_matrices}' to 'both'."
+            )
+            config_analysis.eigendecomposition_matrices = 'both'
+
+    # Normalize string-or-list config values to always be lists
+    # This allows downstream code to always assume list type
+    config_analysis.error_matrix_norms = _normalize_string_or_list_to_list(
+        config_analysis.error_matrix_norms
+    )
+    config_analysis.error_state_inputs = _normalize_string_or_list_to_list(
+        config_analysis.error_state_inputs
+    )
+    config_analysis.numerical_simulation_inputs = _normalize_string_or_list_to_list(
+        config_analysis.numerical_simulation_inputs
+    )
+
+    # Check if matrices will be computed and auto-enable output if not already set
+    if requires_approximate_matrix(config_analysis):
+        if config_analysis.matrix_output_file is None:
+            default_filename = "unitary_matrix.npz"
+            logger.info(
+                f"INFO: Approximate/unitary matrix will be computed for requested analyses. "
+                f"Auto-enabling matrix output to '{default_filename}' (essentially free)."
+            )
+            config_analysis.matrix_output_file = default_filename
+
+    if requires_exact_matrix(config_analysis):
+        if config_analysis.exact_matrix_output_file is None:
+            default_filename = "exact_hamiltonian.npz"
+            logger.info(
+                f"INFO: Exact Hamiltonian matrix will be computed for requested analyses. "
+                f"Auto-enabling exact matrix output to '{default_filename}' (essentially free)."
+            )
+            config_analysis.exact_matrix_output_file = default_filename
+
+# -------------------------------------------------------------------------------------------------
 
 def analyze_algorithm(
         config_analysis: AnalysisConfiguration,
@@ -556,46 +1112,46 @@ def analyze_algorithm(
 
     logger.info("Beginning algorithm analysis.")
 
-    # Validate at least one analysis requested
-    num_eigenvalues = config_analysis.num_eigenvalues
+    # Note: Configuration validation happens in driver.py before Hamiltonian is loaded
+
+    # Check what analyses are requested
     eigendecomposition_requested = (
-        isinstance(num_eigenvalues, int) and num_eigenvalues > 0
-    ) or (
-        isinstance(num_eigenvalues, str) and num_eigenvalues.lower() == "all"
+        requires_exact_eigendecomposition(config_analysis) or
+        requires_approximate_eigendecomposition(config_analysis)
+    )
+    error_analysis_requested = (
+        config_analysis.enable_eigenvalue_errors or
+        config_analysis.error_matrix_norms is not None or
+        config_analysis.error_state_inputs is not None
     )
 
+    # Validate at least one analysis requested
     if (config_analysis.resource_estimator is None and
         config_analysis.matrix_output_file is None and
         config_analysis.numerical_simulation_inputs is None and
         config_analysis.exact_matrix_output_file is None and
-        not eigendecomposition_requested):
+        not eigendecomposition_requested and
+        not error_analysis_requested):
         raise ValueError(
             "No analyses requested. Set at least one of:\n"
             "  - resource_estimator (e.g., 'pyliqtr', 'cirq')\n"
             "  - matrix_output_file (e.g., 'matrix.npz', 'matrix.h5', 'matrix.txt')\n"
             "  - numerical_simulation_inputs (e.g., 'state.npy' or ['state1.npy', 'state2.npy'])\n"
             "  - exact_matrix_output_file (e.g., 'exact_hamiltonian.npz')\n"
-            "  - num_eigenvalues (e.g., 5 or 'all')"
+            "  - num_eigenvalues (e.g., 5 or 'all')\n"
+            "  - enable_eigenvalue_errors (True to compute errors for all eigenvalues)\n"
+            "  - error_matrix_norms (e.g., 'frobenius' or ['frobenius', 'spectral'])\n"
+            "  - error_state_inputs (e.g., 'state.npy')"
         )
 
     results = {}
 
-    # Check if any analysis needs the unitary matrix
-    needs_matrix = (
-        config_analysis.matrix_output_file is not None or
-        config_analysis.numerical_simulation_inputs is not None or
-        (eigendecomposition_requested and
-         config_analysis.eigendecomposition_matrices in ['approximate', 'both'])
-    )
-
-    # Check if any analysis needs the exact Hamiltonian matrix
-    needs_exact_matrix = (
-        config_analysis.exact_matrix_output_file is not None or
-        (eigendecomposition_requested and
-         config_analysis.eigendecomposition_matrices in ['exact', 'both'])
-    )
+    # Determine what expensive computations are needed using shared functions
+    needs_matrix = requires_approximate_matrix(config_analysis)
+    needs_exact_matrix = requires_exact_matrix(config_analysis)
 
     # Compute matrices once if needed
+    # Note: Opportunistic matrix output enabling happens during validation in driver.py
     unitary_matrix = None
     if needs_matrix:
         unitary_matrix = _compute_unitary_matrix(algorithm)
@@ -633,11 +1189,25 @@ def analyze_algorithm(
             exact_matrix=exact_matrix,
             unitary_matrix=unitary_matrix
         )
+        results["eigendecomposition"] = eig_results
 
-    # TODO: Add error estimation
-    # TODO: Add an option for detailed error analysis (explicitly compute the eigenvalues of the
-    #       original Hamiltonian and the final unitary, compute ground state energy from both,
-    #       compare the results; will only work for small systems)
+    if error_analysis_requested:
+        logger.info("Performing error analysis.")
+        # Pass eigendecomposition results if available
+        exact_eigendecomp = None
+        approx_eigendecomp = None
+        if eigendecomposition_requested and 'eig_results' in locals():
+            # Eigendecompositions were computed, but we need to load them from files
+            # The error_analysis function will handle loading if needed
+            pass
+        results["error_analysis"] = error_analysis(
+            config_analysis, hamiltonian, algorithm,
+            exact_matrix=exact_matrix,
+            unitary_matrix=unitary_matrix,
+            exact_eigendecomp=exact_eigendecomp,
+            approx_eigendecomp=approx_eigendecomp
+        )
+
     # TODO: Add gate parallelism / gate depth analysis
     # TODO: Would it be useful to analyze in terms of a different basis (e.g., Toffoli gates)?
 
