@@ -1,17 +1,89 @@
 import logging
 import math
+import cirq
+import numpy as np
 
-from openfermion import InteractionOperator, jordan_wigner
+from qualtran.bloqs.block_encoding import LCUBlockEncoding
+from qualtran.bloqs.multiplexers.select_pauli_lcu import SelectPauliLCU
+from qualtran.bloqs.state_preparation import StatePreparationAliasSampling, StatePreparationViaRotations
 
 from pyLIQTR.BlockEncodings.DoubleFactorized import DoubleFactorized
 from pyLIQTR.BlockEncodings.LinearT import Fermionic_LinearT
-from pyLIQTR.BlockEncodings.PauliStringLCU import PauliStringLCU
+from pyLIQTR.BlockEncodings.PauliStringLCU import PauliStringLCU as PyLIQTRPauliStringLCU
 from pyLIQTR.ProblemInstances.ChemicalHamiltonian import ChemicalHamiltonian
 
 from qhat.analysis.config_types import GeneralConfiguration, UnitaryConfiguration, value
 from qhat.analysis.ordering import reorder_paulis
 
 logger = logging.getLogger(__name__)
+
+# -------------------------------------------------------------------------------------------------
+
+class PauliStringLCU(LCUBlockEncoding):
+
+    def __init__(self, hamiltonian, prepare_type=None, probability_eps=0.002, **kwargs):
+
+        pauli_terms = [cirq.DensePauliString(term[0],coefficient=term[1])
+                          for term in hamiltonian.get_all_pauli_strings(return_as='strings').items()
+                      ]
+        # hack to skip identity term
+        # TODO:  fix
+        del pauli_terms[0]
+
+        ##  n_terms   :   Number of problem terms
+        ##  n_pad     :   Number of padding terms
+        ##  n_tot     :   Total number of terms
+        ##
+        n_terms  =  len(pauli_terms)
+        n_tot    =  2**(int(np.ceil(np.log2(n_terms))))
+        n_pad    =  n_tot - n_terms
+#        print(f"-- n_terms={n_terms}")
+#        print(f"-- n_tot={n_tot}")
+#        for i in range(n_terms):
+#            print(f"-- getTerms[{i}]={pauli_terms[i]}")
+
+        alphas = [np.sqrt(np.abs(t.coefficient)) for t in pauli_terms]
+        alpha = np.sum([a**2 for a in alphas])
+#        print(f"-- alpha={alpha}")
+        alphas_scaled = [a/np.sqrt(alpha) for a in alphas]
+        alphas_scaled.extend([0.0 for i in range(n_pad)])
+#        print(f"-- alphas_scaled={alphas_scaled}")
+
+        selection_bitsize = int(np.ceil(np.log2(n_tot)))
+
+        select = SelectPauliLCU(
+                     selection_bitsize=selection_bitsize,
+                     target_bitsize=hamiltonian.num_qubits(),
+                     select_unitaries=pauli_terms,
+                 )
+
+        if prepare_type is None:
+            # The following ought to work, but doesn't -
+            # see https://github.com/quantumlib/Qualtran/issues/1045
+            #prepare = StatePreparationViaRotations(
+            #              phase_bitsize = 4,
+            #              state_coefficients = alphas_scaled,
+            #          )
+            raise NotImplementedError("PauliStringLCU")
+
+        elif prepare_type=='AS':
+            for t in pauli_terms:
+                coeff = np.real(t.coefficient)
+                if coeff < 0:
+                    logger.warning("Alias sampling preparation with negative coefficients is not supported yet. Circuits and estimates will assume positive coefficients.")
+                    break
+
+            prepare = StatePreparationAliasSampling.from_lcu_probs(
+                          lcu_probabilities=[
+                              np.abs(np.real(t.coefficient)) for t in pauli_terms
+                          ],
+                          probability_epsilon=probability_eps,
+                      )
+
+        super().__init__(
+            alpha=alpha, epsilon=probability_eps,
+            select=select, prepare=prepare
+        )
 
 # -------------------------------------------------------------------------------------------------
 
@@ -39,6 +111,19 @@ def encode_pauli_lcu(
         config_unitary: UnitaryConfiguration,
         hamiltonian):
 
+    if config_unitary.use_library.lower() == "pyliqtr":
+        return encode_pauli_lcu_pyliqtr(config_unitary, hamiltonian)
+    elif config_unitary.use_library.lower() == "qualtran":
+        return encode_pauli_lcu_qualtran(config_unitary, hamiltonian)
+    else:
+        raise ValueError(f"Invalid unitary method \"{unitary.method}\".")
+
+# -------------------------------------------------------------------------------------------------
+
+def encode_pauli_lcu_pyliqtr(
+        config_unitary: UnitaryConfiguration,
+        hamiltonian):
+
     logger.verbose(
             "Encoding with Pauli linear-combination-of-unitaries block encoding from pyLIQTR.")
 
@@ -53,9 +138,24 @@ def encode_pauli_lcu(
             mol_ham=hamiltonian.get_core_operator(),
             mol_name="molecular hamiltonian")
     # TODO: Do we want to exercise any of the other options to PauliStringLCU?
-    return PauliStringLCU(
+    return PyLIQTRPauliStringLCU(
             ProblemInstance=problem_instance,
             # TODO: Setting `prepare_type='AS'` might give the alias sampling Obenland mentioned?
+            prepare_type='AS',
+            # TODO: What to do with energy_error?
+            )
+
+# -------------------------------------------------------------------------------------------------
+
+def encode_pauli_lcu_qualtran(
+        config_unitary: UnitaryConfiguration,
+        hamiltonian):
+
+    logger.verbose(
+            "Encoding with Pauli linear-combination-of-unitaries block encoding from Qualtran.")
+
+    return PauliStringLCU(
+            hamiltonian=hamiltonian,
             prepare_type='AS',
             # TODO: What to do with energy_error?
             )

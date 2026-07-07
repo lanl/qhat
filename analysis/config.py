@@ -29,6 +29,8 @@ if my_method == "Trotter":
             ordering_method = "lexicographical"
             )
 elif my_method == "pauli-lcu":
+    unitary.use_library = "pyLIQTR"
+#    unitary.use_library = "qualtran"
     unitary.encode_pauli_lcu(energy_error=1.0e-4)
 elif my_method == "double-factorization":
     unitary.encode_double_factorization(energy_error=1.0e-4)
