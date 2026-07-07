@@ -30,13 +30,36 @@
 import logging
 import math
 
+from qualtran import CtrlSpec
+from qualtran.bloqs.phase_estimation import TextbookQPE, QubitizationQPE
+from qualtran.bloqs.qubitization.qubitization_walk_operator import QubitizationWalkOperator
+
 from pyLIQTR.PhaseEstimation.pe import PhaseEstimation
 from pyLIQTR.qubitization.phase_estimation import QubitizedPhaseEstimation
-from qualtran.bloqs.phase_estimation import TextbookQPE
 
 from qhat.analysis.config_types import AlgorithmConfiguration, GeneralConfiguration
 
 logger = logging.getLogger(__name__)
+
+# -------------------------------------------------------------------------------------------------
+
+# We define our own version of QubitizationQPE, in order to fix a bug
+# in the qualtran 0.4.0 version
+class NewQubitizationQPE(QubitizationQPE):
+    def build_call_graph(self, ssa: 'SympySymbolAllocator'):
+        # Assumes self.unitary is not fast forwardable.
+        M = 2**self.m_bits
+        return {
+            (self.ctrl_state_prep, 1),
+            #(self.walk.controlled(control_values=[1]), 1),
+            #(self.walk.reflect.controlled(control_values=[0]), 2 * (self.m_bits - 1)),
+            # === bugfix, backported from 0.5.0 ===
+            (self.walk.controlled(), 1),
+            (self.walk.reflect.controlled(ctrl_spec=CtrlSpec(cvs=0)), 2 * (self.m_bits - 1)),
+            # === end bugfix ===
+            (self.walk, M - 2),
+            (self.qft_inv, 1),
+        }
 
 # -------------------------------------------------------------------------------------------------
 
@@ -107,6 +130,20 @@ def build_qpe_qualtran_textbook(
 
 # -------------------------------------------------------------------------------------------------
 
+def build_qpe_qualtran_qubitized(
+        config_algorithm: AlgorithmConfiguration,
+        unitary):
+
+    logger.verbose(
+            "Build a QPE algorithm with Qualtran's \"QubitizationQPE\" method.")
+
+#    return NewQubitizationQPE(QubitizationWalkOperator(unitary.select, unitary.prepare),
+    return NewQubitizationQPE(QubitizationWalkOperator(unitary._select_gate,
+                                                       unitary._prepare_gate),
+                              config_algorithm.num_phase_qubits)
+
+# -------------------------------------------------------------------------------------------------
+
 def build_qpe_pyliqtr_qubitized(
         config_algorithm: AlgorithmConfiguration,
         unitary):
@@ -151,7 +188,7 @@ def build_algorithm(
         return build_qpe_qualtran_textbook(config_algorithm, unitary, P0)
     elif config_algorithm.method.lower() in ("qpe: qualtran qubitization",):
         # TODO: This may be more specialized (for LCU only?), but I'm not yet sure of the details.
-        raise NotImplementedError()
+        return build_qpe_qualtran_qubitized(config_algorithm, unitary)
     elif config_algorithm.method.lower() in ("qpe: pyliqtr qubitized",):
         return build_qpe_pyliqtr_qubitized(config_algorithm, unitary)
     elif config_algorithm.method.lower() in ("time evolution",):

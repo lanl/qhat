@@ -44,6 +44,7 @@ if my_method == "Trotter":
     algorithm.probability_of_failure = 0.01
 elif my_method == "pauli-lcu":
     algorithm.method = "QPE: pyLIQTR qubitized"
+#    algorithm.method = "QPE: qualtran qubitization"
     algorithm.num_phase_qubits = 12
 elif my_method == "double-factorization":
     algorithm.method = "QPE: pyLIQTR qubitized"
@@ -55,4 +56,5 @@ else:
 # analysis
 
 analysis.resource_estimator = "pyLIQTR"
+#analysis.resource_estimator = "qualtran"
 

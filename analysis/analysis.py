@@ -5,6 +5,7 @@ from pathlib import Path
 
 from pyLIQTR.utils.resource_analysis import estimate_resources as estimate_pyliqtr
 from qualtran.resource_counting import get_cost_value, QubitCount
+from qualtran.cirq_interop.t_complexity_protocol import t_complexity
 
 from qhat.analysis.config_types import AnalysisConfiguration, GeneralConfiguration
 from qhat.analysis.file_io import save_matrix, load_state, save_state
@@ -47,6 +48,25 @@ def resource_estimation_pyliqtr(
 
 # -------------------------------------------------------------------------------------------------
 
+def resource_estimation_qualtran(
+        config_analysis: AnalysisConfiguration,
+        algorithm) -> dict:
+
+    logger.verbose("Estimating resources with Qualtran.")
+
+    t_cliff_resources = t_complexity(algorithm)
+    qubits = get_cost_value(algorithm, QubitCount())
+
+    # TODO:  add rotation count to this?
+    resource_dict = {
+        "Clifford_count" : t_cliff_resources.clifford,
+        "T_count"        : t_cliff_resources.t,
+        "qubit_count"    : qubits
+        }
+    return resource_dict
+
+# -------------------------------------------------------------------------------------------------
+
 def estimate_resources(
         config_analysis: AnalysisConfiguration,
         algorithm) -> dict:
@@ -55,6 +75,8 @@ def estimate_resources(
         return resource_estimation_pyliqtr(config_analysis, algorithm)
     elif config_analysis.resource_estimator.lower() == "cirq":
         return resource_estimation_cirq(config_analysis, algorithm)
+    elif config_analysis.resource_estimator.lower() == "qualtran":
+        return resource_estimation_qualtran(config_analysis, algorithm)
     else:
         raise ValueError(
                 f"Invalid resource estimator method \"{config_analysis.resource_estimator}\".")
