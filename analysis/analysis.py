@@ -259,9 +259,11 @@ def exact_matrix_output(
 
     # Save matrix to file (format auto-detected from extension)
     output_file = config_analysis.exact_matrix_output_file
+    # Note: save_matrix expects 'unitarity_error' parameter, but for Hamiltonians
+    # we use hermiticity_error. Pass it as unitarity_error for storage.
     save_matrix(
         output_file, exact_matrix,
-        hermiticity_error=hermiticity_error,
+        unitarity_error=hermiticity_error,
         matrix_norm=matrix_norm
     )
 
@@ -366,7 +368,7 @@ def _eigendecompose(matrix, matrix_type, num_eigenvalues, which_eigs):
 
 def _process_eigendecomposition(matrix, matrix_type, num_eigenvalues, which_eigs):
     """
-    Process eigendecomposition for a single matrix: compute, save, and return metadata.
+    Process eigendecomposition for a single matrix: compute, save, and return data.
 
     Parameters:
         matrix: Matrix to decompose (dense array or matrix-free operator)
@@ -375,7 +377,7 @@ def _process_eigendecomposition(matrix, matrix_type, num_eigenvalues, which_eigs
         which_eigs: Which eigenvalues to compute ('smallest', 'largest', or 'both')
 
     Returns:
-        Dictionary with file path, num_eigenvalues, eigenvalue_range, and which
+        Dictionary with file path, num_eigenvalues, eigenvalue_range, which, eigenvalues, eigenvectors
 
     Raises:
         ValueError: If matrix is None
@@ -405,7 +407,9 @@ def _process_eigendecomposition(matrix, matrix_type, num_eigenvalues, which_eigs
         'file': output_file,
         'num_eigenvalues': num_computed,
         'eigenvalue_range': [float(eigs.min()), float(eigs.max())],
-        'which': which_eigs
+        'which': which_eigs,
+        'eigenvalues': eigs,
+        'eigenvectors': vecs
     }
 
 # -------------------------------------------------------------------------------------------------
@@ -1283,17 +1287,27 @@ def analyze_algorithm(
             exact_matrix=exact_matrix,
             unitary_matrix=unitary_matrix
         )
-        results["eigendecomposition"] = eig_results
+        # Keep eigenvalue/eigenvector data for error analysis, but remove it before storing
+        exact_eigendecomp = None
+        approx_eigendecomp = None
+        if 'exact_eigendecomposition' in eig_results:
+            exact_eigendecomp = eig_results['exact_eigendecomposition']
+        if 'approximate_eigendecomposition' in eig_results:
+            approx_eigendecomp = eig_results['approximate_eigendecomposition']
+
+        # Remove numpy arrays from results dict (they're already saved to files)
+        eig_results_for_storage = {}
+        for key, value in eig_results.items():
+            filtered_value = {k: v for k, v in value.items() if k not in ['eigenvalues', 'eigenvectors']}
+            eig_results_for_storage[key] = filtered_value
+        results["eigendecomposition"] = eig_results_for_storage
 
     if error_analysis_requested:
         logger.info("Performing error analysis.")
-        # Pass eigendecomposition results if available
-        exact_eigendecomp = None
-        approx_eigendecomp = None
-        if eigendecomposition_requested and 'eig_results' in locals():
-            # Eigendecompositions were computed, but we need to load them from files
-            # The error_analysis function will handle loading if needed
-            pass
+        # Use eigendecomposition data if available (from above)
+        if not eigendecomposition_requested:
+            exact_eigendecomp = None
+            approx_eigendecomp = None
         results["error_analysis"] = error_analysis(
             config_analysis, hamiltonian, algorithm,
             exact_matrix=exact_matrix,

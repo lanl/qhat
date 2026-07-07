@@ -83,6 +83,12 @@ jobs:
             config_file: config-df.py
             config_setup: 'sed -e ''s/^my_method = "Trotter"/my_method = "double-factorization"/'' config.py > config-df.py'
 
+          - name: analysis-full-config
+            directory: .
+            script: python -m qhat.analysis.driver
+            config_file: analysis/examples/config_full_analysis.py
+            config_setup: ''
+
           - name: common-unit-tests
             directory: common
             script: pytest
