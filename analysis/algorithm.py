@@ -137,7 +137,6 @@ def build_qpe_qualtran_qubitized(
     logger.verbose(
             "Build a QPE algorithm with Qualtran's \"QubitizationQPE\" method.")
 
-#    return NewQubitizationQPE(QubitizationWalkOperator(unitary.select, unitary.prepare),
     return NewQubitizationQPE(QubitizationWalkOperator(unitary._select_gate,
                                                        unitary._prepare_gate),
                               config_algorithm.num_phase_qubits)
