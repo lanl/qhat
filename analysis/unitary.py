@@ -85,6 +85,15 @@ class PauliStringLCU(LCUBlockEncoding):
             select=select, prepare=prepare
         )
 
+    # Add aliases for 'select' and 'prepare' to match PyLIQTR
+    @property
+    def _select_gate(self):
+        return self.select
+
+    @property
+    def _prepare_gate(self):
+        return self.prepare
+
 # -------------------------------------------------------------------------------------------------
 
 def encode_linear_t(

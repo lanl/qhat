@@ -137,15 +137,9 @@ def build_qpe_qualtran_qubitized(
     logger.verbose(
             "Build a QPE algorithm with Qualtran's \"QubitizationQPE\" method.")
 
-    try:
-        # qualtran gate names
-        return NewQubitizationQPE(QubitizationWalkOperator(unitary.select, unitary.prepare),
-                                  config_algorithm.num_phase_qubits)
-    except:
-        # pyliqtr gate names
-        return NewQubitizationQPE(QubitizationWalkOperator(unitary._select_gate,
-                                                           unitary._prepare_gate),
-                                  config_algorithm.num_phase_qubits)
+    return NewQubitizationQPE(QubitizationWalkOperator(unitary._select_gate,
+                                                       unitary._prepare_gate),
+                              config_algorithm.num_phase_qubits)
 
 # -------------------------------------------------------------------------------------------------
 
