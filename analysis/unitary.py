@@ -125,7 +125,7 @@ def encode_pauli_lcu(
     elif config_unitary.use_library.lower() == "qualtran":
         return encode_pauli_lcu_qualtran(config_unitary, hamiltonian)
     else:
-        raise ValueError(f"Invalid unitary method \"{unitary.method}\".")
+        raise ValueError(f"Invalid unitary library \"{config_unitary.use_library}\".")
 
 # -------------------------------------------------------------------------------------------------
 
