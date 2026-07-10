@@ -317,7 +317,10 @@ def exact_matrix_output(
 
 def _eigendecompose_full(matrix, matrix_type):
     """
-    Perform full eigendecomposition of a Hermitian matrix.
+    Perform full eigendecomposition of a matrix.
+
+    For exact (Hermitian) matrices: Uses eigh for efficiency (real eigenvalues).
+    For approximate (unitary) matrices: Uses eig to get complex eigenvalues on unit circle.
 
     Args:
         matrix: Matrix to decompose (dense numpy array)
@@ -344,9 +347,18 @@ def _eigendecompose_full(matrix, matrix_type):
         )
 
     logger.info(f"Computing full eigendecomposition for {matrix_type} matrix (dimension {dimension})")
-    eigenvalues, eigenvectors = scipy.linalg.eigh(matrix)
 
-    logger.verbose(f"  Eigenvalue range (unsorted): [{eigenvalues.min():.6e}, {eigenvalues.max():.6e}]")
+    # Use appropriate eigendecomposition based on matrix type
+    if matrix_type == 'exact':
+        # Exact Hamiltonian is Hermitian: use eigh for real eigenvalues
+        eigenvalues, eigenvectors = scipy.linalg.eigh(matrix)
+        logger.verbose(f"  Eigenvalue range (unsorted): [{eigenvalues.min():.6e}, {eigenvalues.max():.6e}]")
+    else:  # matrix_type == 'approximate'
+        # Approximate unitary is not Hermitian: use eig for complex eigenvalues
+        eigenvalues, eigenvectors = scipy.linalg.eig(matrix)
+        # For unitary matrices, all eigenvalues should have magnitude 1
+        magnitudes = np.abs(eigenvalues)
+        logger.verbose(f"  Eigenvalue magnitude range: [{magnitudes.min():.6e}, {magnitudes.max():.6e}]")
 
     return eigenvalues, eigenvectors
 
