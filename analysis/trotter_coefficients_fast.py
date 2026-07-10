@@ -679,7 +679,7 @@ def _compute_exact_path(x_bits, z_bits, coeffs, N, batch_size):
     C22_exact = compute_C22_exact(x_bits, z_bits, coeffs, N, batch_size)
 
     # Report
-    logger.verbose("\n" + "="*70)
+    logger.verbose("="*70)
     logger.verbose("✅ EXACT COMPUTATION COMPLETED")
     logger.verbose(f"   All combinations enumerated deterministically")
     logger.verbose("="*70)
@@ -899,7 +899,7 @@ def _compute_monte_carlo_path(x_bits, z_bits, coeffs, N, time_limit, batch_size,
     # ---------------------------
     # Check if we achieved exact computation
     if use_tracking and len(seen_c1) == total_c1 and len(seen_c21) == total_c21 and len(seen_c22) == total_c22:
-        logger.verbose("\n" + "="*70)
+        logger.verbose("="*70)
         logger.verbose("✅ EXACT COMPUTATION ACHIEVED")
         logger.verbose(f"   All {total_c1} C1 pairs sampled")
         logger.verbose(f"   All {total_c21} C21 triples sampled")

@@ -20,19 +20,22 @@ logger = logging.getLogger(__name__)
 # Matrix I/O Functions
 # =================================================================================================
 
-def _save_matrix_numpy(output_path, unitary_matrix, unitarity_error, matrix_norm):
+def _save_matrix_numpy(output_path, unitary_matrix, unitarity_error, matrix_norm, hermiticity_error):
     """Save matrix in NumPy .npz format with metadata."""
-    np.savez(
-        output_path,
-        matrix=unitary_matrix,
-        shape=unitary_matrix.shape,
-        timestamp=datetime.now().isoformat(),
-        unitarity_error=unitarity_error,
-        matrix_norm=matrix_norm
-    )
+    metadata = {
+        'matrix': unitary_matrix,
+        'shape': unitary_matrix.shape,
+        'timestamp': datetime.now().isoformat(),
+        'matrix_norm': matrix_norm
+    }
+    if unitarity_error is not None:
+        metadata['unitarity_error'] = unitarity_error
+    if hermiticity_error is not None:
+        metadata['hermiticity_error'] = hermiticity_error
+    np.savez(output_path, **metadata)
 
 
-def _save_matrix_hdf5(output_path, unitary_matrix, unitarity_error, matrix_norm):
+def _save_matrix_hdf5(output_path, unitary_matrix, unitarity_error, matrix_norm, hermiticity_error):
     """Save matrix in HDF5 format with metadata as attributes."""
     try:
         import h5py
@@ -45,11 +48,13 @@ def _save_matrix_hdf5(output_path, unitary_matrix, unitarity_error, matrix_norm)
         dset.attrs['timestamp'] = datetime.now().isoformat()
         if unitarity_error is not None:
             dset.attrs['unitarity_error'] = float(unitarity_error)
+        if hermiticity_error is not None:
+            dset.attrs['hermiticity_error'] = float(hermiticity_error)
         if matrix_norm is not None:
             dset.attrs['matrix_norm'] = float(matrix_norm)
 
 
-def _save_matrix_text(output_path, unitary_matrix, unitarity_error, matrix_norm):
+def _save_matrix_text(output_path, unitary_matrix, unitarity_error, matrix_norm, hermiticity_error):
     """Save matrix in human-readable sparse text format (coordinate format).
 
     Only non-zero entries are written to save space. This is especially beneficial
@@ -114,14 +119,15 @@ def _get_matrix_format_from_extension(filename):
     return extension_map[ext]
 
 
-def save_matrix(output_path, unitary_matrix, unitarity_error=None, matrix_norm=None):
+def save_matrix(output_path, unitary_matrix, unitarity_error=None, matrix_norm=None, hermiticity_error=None):
     """
-    Save unitary matrix to file with automatic format detection.
+    Save matrix to file with automatic format detection.
 
     Parameters:
         output_path: Output file path (format inferred from extension)
         unitary_matrix: The matrix to save (numpy array)
-        unitarity_error: Optional unitarity error for metadata
+        unitarity_error: Optional unitarity error for unitary matrices
+        hermiticity_error: Optional hermiticity error for Hermitian matrices
         matrix_norm: Optional matrix norm for metadata
 
     Supported formats:
@@ -149,7 +155,7 @@ def save_matrix(output_path, unitary_matrix, unitarity_error=None, matrix_norm=N
             f"Valid options are: {', '.join(repr(k) for k in format_handlers.keys())}"
         )
 
-    handler(output_path, unitary_matrix, unitarity_error, matrix_norm)
+    handler(output_path, unitary_matrix, unitarity_error, matrix_norm, hermiticity_error)
     logger.info(f"Matrix saved to {output_path}")
 
 

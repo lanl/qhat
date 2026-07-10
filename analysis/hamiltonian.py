@@ -95,6 +95,7 @@ class LinearCombinationOfPauliStrings:
 class Hamiltonian:
     def __init__(self, hamiltonian):
         self._H = hamiltonian
+        self._energy_shift_total = 0.0  # Track cumulative energy shift for analysis corrections
     def get_core_operator(self):
         # TODO: This should probably be replaced by a function that generates an appropriate
         #       pyLIQTR problem instance.
@@ -226,6 +227,9 @@ class Hamiltonian:
             force_sparse=force_sparse
         )
     def energy_shift(self, dE):
+        # Track the cumulative shift for analysis corrections
+        self._energy_shift_total += dE
+
         if isinstance(self._H, InteractionOperator):
             t0 = self._H.constant + dE
             t1 = self._H.one_body_tensor
@@ -238,6 +242,18 @@ class Hamiltonian:
         else:
             raise TypeError(
                     f"Unable to shift a fermionic Hamiltonian of type \"{type(self._H)}\".")
+
+    def get_energy_shift(self) -> float:
+        """
+        Get the cumulative energy shift applied to this Hamiltonian.
+
+        This is used by analysis functions to correct eigenvalues and errors
+        for meaningful comparisons between exact and approximate representations.
+
+        Returns:
+            The total energy shift applied via energy_shift() calls
+        """
+        return self._energy_shift_total
     def compute_initial_energy_bounds(
             self,
             config_hamiltonian: HamiltonianConfiguration):

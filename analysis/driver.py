@@ -87,13 +87,18 @@ def run():
     # Analysis ____________________________________________________________________________________
 
     # Extract timestep for eigendecomposition analysis (if available)
-    timestep = getattr(state.config_unitary, 'timestep', None)
+    # For ramped trotter, use tevol_hbar; otherwise check config_unitary.timestep
+    timestep = tevol_hbar if tevol_hbar is not None else getattr(state.config_unitary, 'timestep', None)
+
+    # Extract energy shift for correcting eigenvalue comparisons
+    energy_shift = physical_hamiltonian.get_energy_shift()
 
     state.store_results(analyze_algorithm(
         state.config_analysis,
         algorithm,
         hamiltonian=physical_hamiltonian,
-        timestep=timestep
+        timestep=timestep,
+        energy_shift=energy_shift
     ))
 
     # Save Results ________________________________________________________________________________

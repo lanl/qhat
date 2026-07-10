@@ -230,6 +230,7 @@ def test_eigendecomposition_orthonormality():
     """Test that eigenvectors are orthonormal."""
     from qhat.analysis.analysis import eigendecomposition_analysis
     from qhat.analysis.config_types import AnalysisConfiguration
+    from qhat.analysis.file_io import load_eigendecomposition
 
     # Create a simple Hermitian matrix
     matrix = np.array([[2, 1], [1, 2]], dtype=complex)
@@ -247,7 +248,10 @@ def test_eigendecomposition_orthonormality():
                 unitary_matrix=None
             )
 
-            eigenvectors = results['exact_eigendecomposition']['eigenvectors']
+            # Load eigenvectors from the saved file
+            output_file = results['exact_eigendecomposition']['file']
+            data = load_eigendecomposition(output_file)
+            eigenvectors = data['eigenvectors']
 
             # Check orthonormality: V† V should be identity
             gram = eigenvectors.conj().T @ eigenvectors

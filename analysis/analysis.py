@@ -317,7 +317,10 @@ def exact_matrix_output(
 
 def _eigendecompose_full(matrix, matrix_type):
     """
-    Perform full eigendecomposition of a Hermitian matrix.
+    Perform full eigendecomposition of a matrix.
+
+    For exact (Hermitian) matrices: Uses eigh for efficiency (real eigenvalues).
+    For approximate (unitary) matrices: Uses eig to get complex eigenvalues on unit circle.
 
     Args:
         matrix: Matrix to decompose (dense numpy array)
@@ -344,15 +347,24 @@ def _eigendecompose_full(matrix, matrix_type):
         )
 
     logger.info(f"Computing full eigendecomposition for {matrix_type} matrix (dimension {dimension})")
-    eigenvalues, eigenvectors = scipy.linalg.eigh(matrix)
 
-    logger.verbose(f"  Eigenvalue range (unsorted): [{eigenvalues.min():.6e}, {eigenvalues.max():.6e}]")
+    # Use appropriate eigendecomposition based on matrix type
+    if matrix_type == 'exact':
+        # Exact Hamiltonian is Hermitian: use eigh for real eigenvalues
+        eigenvalues, eigenvectors = scipy.linalg.eigh(matrix)
+        logger.verbose(f"  Eigenvalue range (unsorted): [{eigenvalues.min():.6e}, {eigenvalues.max():.6e}]")
+    else:  # matrix_type == 'approximate'
+        # Approximate unitary is not Hermitian: use eig for complex eigenvalues
+        eigenvalues, eigenvectors = scipy.linalg.eig(matrix)
+        # For unitary matrices, all eigenvalues should have magnitude 1
+        magnitudes = np.abs(eigenvalues)
+        logger.verbose(f"  Eigenvalue magnitude range: [{magnitudes.min():.6e}, {magnitudes.max():.6e}]")
 
     return eigenvalues, eigenvectors
 
 # -------------------------------------------------------------------------------------------------
 
-def _process_eigendecomposition(matrix, matrix_type, timestep=None):
+def _process_eigendecomposition(matrix, matrix_type, timestep=None, energy_shift=0.0):
     """
     Process full eigendecomposition: compute, convert (if unitary), sort, save, and return data.
 
@@ -360,6 +372,7 @@ def _process_eigendecomposition(matrix, matrix_type, timestep=None):
         matrix: Matrix to decompose (dense array, matrix-free not supported)
         matrix_type: String describing the matrix type ('exact' or 'approximate')
         timestep: Required for matrix_type='approximate' to convert phases to eigenenergies
+        energy_shift: Energy shift to add back to eigenenergies (for comparison on same scale)
 
     Returns:
         Dictionary with eigenenergies, eigenvectors, file path, and metadata
@@ -390,12 +403,17 @@ def _process_eigendecomposition(matrix, matrix_type, timestep=None):
             eigenvalues_raw, timestep
         )
 
+        # Apply energy shift correction to restore original energy scale
+        eigenenergies_corrected = eigenenergies + energy_shift
+
         # Sort by eigenenergy
-        sort_indices = np.argsort(eigenenergies)
-        eigenenergies_sorted = eigenenergies[sort_indices]
+        sort_indices = np.argsort(eigenenergies_corrected)
+        eigenenergies_sorted = eigenenergies_corrected[sort_indices]
         eigenvectors_sorted = eigenvectors_raw[:, sort_indices]
 
         logger.info(f"Converted {len(eigenphases)} unitary eigenvalues to eigenenergies")
+        if abs(energy_shift) > 1e-10:
+            logger.info(f"  Applied energy shift correction: {energy_shift:.6e}")
         logger.info(f"  Eigenenergy range (sorted): [{eigenenergies_sorted[0]:.6e}, {eigenenergies_sorted[-1]:.6e}]")
 
         # Save sorted results with optional debugging data
@@ -411,12 +429,18 @@ def _process_eigendecomposition(matrix, matrix_type, timestep=None):
         )
 
     else:  # matrix_type == 'exact'
-        # Eigenvalues are already eigenenergies, just sort
+        # Eigenvalues are already eigenenergies, apply energy shift correction and sort
         eigenenergies_raw = np.real(eigenvalues_raw)  # Should be real for Hermitian
-        sort_indices = np.argsort(eigenenergies_raw)
-        eigenenergies_sorted = eigenenergies_raw[sort_indices]
+
+        # Apply energy shift correction to restore original energy scale
+        eigenenergies_corrected = eigenenergies_raw + energy_shift
+
+        sort_indices = np.argsort(eigenenergies_corrected)
+        eigenenergies_sorted = eigenenergies_corrected[sort_indices]
         eigenvectors_sorted = eigenvectors_raw[:, sort_indices]
 
+        if abs(energy_shift) > 1e-10:
+            logger.info(f"Applied energy shift correction: {energy_shift:.6e}")
         logger.info(f"Eigenenergy range (sorted): [{eigenenergies_sorted[0]:.6e}, {eigenenergies_sorted[-1]:.6e}]")
 
         # Save sorted results
@@ -431,7 +455,6 @@ def _process_eigendecomposition(matrix, matrix_type, timestep=None):
     return {
         'file': output_file,
         'eigenenergies': eigenenergies_sorted,
-        'eigenvectors': eigenvectors_sorted,
         'num_eigenstates': len(eigenenergies_sorted),
         'eigenenergy_range': [float(eigenenergies_sorted[0]), float(eigenenergies_sorted[-1])]
     }
@@ -441,6 +464,7 @@ def _process_eigendecomposition(matrix, matrix_type, timestep=None):
 def eigendecomposition_analysis(
         config_analysis: AnalysisConfiguration,
         timestep=None,
+        energy_shift=0.0,
         exact_matrix=None,
         unitary_matrix=None) -> dict:
     """
@@ -452,6 +476,7 @@ def eigendecomposition_analysis(
     Parameters:
         config_analysis: Analysis configuration with eigendecomposition settings
         timestep: Time evolution parameter (required for approximate eigendecomposition)
+        energy_shift: Energy shift applied to Hamiltonian (added back to eigenenergies for comparison)
         exact_matrix: Pre-computed exact matrix (required if eigendecomposition_matrices is 'exact' or 'both')
         unitary_matrix: Pre-computed unitary matrix (required if eigendecomposition_matrices is 'approximate' or 'both')
 
@@ -479,13 +504,13 @@ def eigendecomposition_analysis(
     # Compute exact eigendecomposition if requested
     if need_exact:
         results['exact_eigendecomposition'] = _process_eigendecomposition(
-            exact_matrix, 'exact', timestep=None
+            exact_matrix, 'exact', timestep=None, energy_shift=energy_shift
         )
 
     # Compute approximate eigendecomposition if requested
     if need_approx:
         results['approximate_eigendecomposition'] = _process_eigendecomposition(
-            unitary_matrix, 'approximate', timestep=timestep
+            unitary_matrix, 'approximate', timestep=timestep, energy_shift=energy_shift
         )
 
     return results
@@ -1212,7 +1237,8 @@ def analyze_algorithm(
         config_analysis: AnalysisConfiguration,
         algorithm,
         hamiltonian=None,
-        timestep=None) -> dict:
+        timestep=None,
+        energy_shift=0.0) -> dict:
     """
     Analyze a quantum algorithm.
 
@@ -1222,6 +1248,7 @@ def analyze_algorithm(
         hamiltonian: Hamiltonian object (required for exact matrix/simulation)
         timestep: Time evolution parameter (required for approximate eigendecomposition)
                  If not provided, approximate eigendecomposition will fail.
+        energy_shift: Energy shift applied to Hamiltonian (for correcting eigenvalue comparisons)
 
     Returns:
         Dictionary with analysis results
@@ -1309,6 +1336,7 @@ def analyze_algorithm(
         eig_results = eigendecomposition_analysis(
             config_analysis,
             timestep=timestep,
+            energy_shift=energy_shift,
             exact_matrix=exact_matrix,
             unitary_matrix=unitary_matrix
         )

@@ -279,8 +279,111 @@ class State:
         self.results[key] = value
     def store_results(self, d):
         self.results.update(d)
+
+    def _format_results(self, obj, indent=0, max_line_length=100):
+        """
+        Custom formatter for nested dictionaries with readable output.
+
+        Rules:
+        - Dictionaries: Each key on own line with nested content indented (4 spaces)
+        - Lists/sets that fit on one line: Keep inline
+        - Long lists: One element per line, indented
+        - Scalar values: Same line as key
+        """
+        import numpy as np
+
+        indent_str = "    " * indent  # Changed from 3 to 4 spaces
+
+        if isinstance(obj, dict):
+            if not obj:
+                return "{}"
+            lines = []
+            for key, value in obj.items():
+                # Check if value is a numpy array (treat as list/tuple)
+                if isinstance(value, np.ndarray):
+                    lines.append(f"{indent_str}{key}:")
+                    lines.append(self._format_results(value, indent + 1, max_line_length))
+                elif isinstance(value, (dict, list, tuple, set)) and value:
+                    # Container types get their own indented section
+                    lines.append(f"{indent_str}{key}:")
+                    lines.append(self._format_results(value, indent + 1, max_line_length))
+                else:
+                    # Scalars and empty containers stay on same line
+                    lines.append(f"{indent_str}{key}: {value}")
+            return "\n".join(lines)
+
+        elif isinstance(obj, (list, tuple)) or isinstance(obj, np.ndarray):
+            # Convert numpy arrays to list for consistent handling
+            if isinstance(obj, np.ndarray):
+                obj_list = obj.tolist()
+            else:
+                obj_list = obj
+
+            if not obj_list:
+                return f"{indent_str}[]"
+
+            # Try formatting on one line first (use list representation, not numpy string)
+            one_line = str(obj_list)
+            if len(one_line) <= max_line_length:
+                return f"{indent_str}{one_line}"
+
+            # Too long - one element per line
+            lines = []
+            for item in obj_list:
+                if isinstance(item, (dict, list, tuple, set)) and item:
+                    lines.append(self._format_results(item, indent, max_line_length))
+                else:
+                    lines.append(f"{indent_str}{item}")
+            return "\n".join(lines)
+
+        elif isinstance(obj, set):
+            if not obj:
+                return f"{indent_str}set()"
+
+            # Try formatting on one line first
+            one_line = str(obj)
+            if len(one_line) <= max_line_length:
+                return f"{indent_str}{one_line}"
+
+            # Too long - one element per line
+            lines = []
+            for item in sorted(obj):  # Sort for consistency
+                lines.append(f"{indent_str}{item}")
+            return "\n".join(lines)
+
+        else:
+            # Scalar value
+            return f"{indent_str}{obj}"
+
     def show_results(self):
-        logger.info("results:\n" + pprint.pformat(self.results))
+        formatted = self._format_results(self.results, indent=0)
+        logger.warning(f"results:\n{formatted}")
+
+    def _filter_for_toml(self, obj):
+        """Recursively filter out numpy arrays and other non-serializable objects from results."""
+        import numpy as np
+
+        if isinstance(obj, np.ndarray):
+            # Skip numpy arrays - they're saved separately in .npz files
+            return None
+        elif isinstance(obj, dict):
+            # Recursively filter dictionary values
+            filtered = {}
+            for k, v in obj.items():
+                filtered_v = self._filter_for_toml(v)
+                # Only include if not None (unless original was actually None)
+                if filtered_v is not None or (v is None):
+                    filtered[k] = filtered_v
+            return filtered
+        elif isinstance(obj, (list, tuple)):
+            # Recursively filter list/tuple elements
+            filtered = [self._filter_for_toml(item) for item in obj]
+            # Remove None values that came from filtered numpy arrays
+            return [item for item in filtered if item is not None]
+        else:
+            # Return as-is for serializable types
+            return obj
+
     def save_summary(self):
         document = tomlkit.document()
         document.add(tomlkit.comment("CONFIGURATION " + 63 * "="))
@@ -294,7 +397,9 @@ class State:
         document.add(tomlkit.nl())
         document.add(tomlkit.comment("RESULTS " + 69 * "="))
         for key in self.results:
-            document.add(key, self.results[key])
+            # Filter out numpy arrays and other non-serializable objects
+            filtered_value = self._filter_for_toml(self.results[key])
+            document.add(key, filtered_value)
         filename = ".".join((str(self.overall_hash), "toml"))
         tomlfile = TOMLFile(filename)
         tomlfile.write(document)
