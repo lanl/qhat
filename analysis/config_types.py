@@ -279,8 +279,73 @@ class State:
         self.results[key] = value
     def store_results(self, d):
         self.results.update(d)
+
+    def _format_results(self, obj, indent=0, max_line_length=100):
+        """
+        Custom formatter for nested dictionaries with readable output.
+
+        Rules:
+        - Dictionaries: Each key on own line with nested content indented
+        - Lists/sets that fit on one line: Keep inline
+        - Long lists: One element per line, indented
+        - Scalar values: Same line as key
+        """
+        indent_str = "   " * indent
+
+        if isinstance(obj, dict):
+            if not obj:
+                return "{}"
+            lines = []
+            for key, value in obj.items():
+                if isinstance(value, (dict, list, tuple, set)) and value:
+                    # Container types get their own indented section
+                    lines.append(f"{indent_str}{key}:")
+                    lines.append(self._format_results(value, indent + 1, max_line_length))
+                else:
+                    # Scalars and empty containers stay on same line
+                    lines.append(f"{indent_str}{key}: {value}")
+            return "\n".join(lines)
+
+        elif isinstance(obj, (list, tuple)):
+            if not obj:
+                return f"{indent_str}[]"
+
+            # Try formatting on one line first
+            one_line = str(obj)
+            if len(one_line) <= max_line_length:
+                return f"{indent_str}{one_line}"
+
+            # Too long - one element per line
+            lines = []
+            for item in obj:
+                if isinstance(item, (dict, list, tuple, set)) and item:
+                    lines.append(self._format_results(item, indent, max_line_length))
+                else:
+                    lines.append(f"{indent_str}{item}")
+            return "\n".join(lines)
+
+        elif isinstance(obj, set):
+            if not obj:
+                return f"{indent_str}set()"
+
+            # Try formatting on one line first
+            one_line = str(obj)
+            if len(one_line) <= max_line_length:
+                return f"{indent_str}{one_line}"
+
+            # Too long - one element per line
+            lines = []
+            for item in sorted(obj):  # Sort for consistency
+                lines.append(f"{indent_str}{item}")
+            return "\n".join(lines)
+
+        else:
+            # Scalar value
+            return f"{indent_str}{obj}"
+
     def show_results(self):
-        logger.warning("results:\n" + pprint.pformat(self.results))
+        formatted = self._format_results(self.results, indent=0)
+        logger.warning(f"results:\n{formatted}")
 
     def _filter_for_toml(self, obj):
         """Recursively filter out numpy arrays and other non-serializable objects from results."""
