@@ -15,6 +15,44 @@ logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------------------------------
 
+def convert_unitary_eigenvalues_to_eigenenergies(unitary_eigenvalues, timestep, hbar=1.0):
+    """
+    Convert unitary eigenvalues e^(-iφ) to Hamiltonian eigenenergies E.
+
+    The time evolution operator is U = exp(-iHt/ℏ), so if H has eigenenergy E,
+    then U has eigenvalue exp(-iEt/ℏ) = exp(-iφ) where φ = Et/ℏ is the eigenphase.
+
+    Assumption: The Hamiltonian has been shifted and scaled (by existing code) such that
+    all eigenenergies produce eigenphases in the range [0, 2π), preventing aliasing.
+
+    Args:
+        unitary_eigenvalues: Complex eigenvalues of unitary U = exp(-iHt/ℏ) (on unit circle)
+        timestep: Time evolution parameter t (units: ℏ/energy, e.g., ℏ/Hartree)
+        hbar: Value of ℏ (default: 1.0 for atomic units)
+
+    Returns:
+        tuple: (eigenenergies, eigenphases)
+            eigenenergies: Real eigenvalues of Hamiltonian (shifted/scaled, units: energy)
+            eigenphases: Phases φ ∈ [0, 2π) where φ = Et/ℏ
+    """
+    # Extract phases using np.angle, which returns [-π, π]
+    # Since U = exp(-iφ), we have arg(U) = -φ (mod 2π)
+    phases_neg_pi_to_pi = np.angle(unitary_eigenvalues)
+
+    # Eigenphase φ = -arg(U), then map to [0, 2π) convention
+    eigenphases_raw = -phases_neg_pi_to_pi
+    eigenphases = np.where(eigenphases_raw < 0,
+                           eigenphases_raw + 2*np.pi,
+                           eigenphases_raw)
+
+    # Convert to eigenenergies: E = φ * ℏ / t
+    # These are shifted/scaled eigenenergies that correspond to the phases in [0, 2π)
+    eigenenergies = eigenphases * hbar / timestep
+
+    return eigenenergies, eigenphases
+
+# -------------------------------------------------------------------------------------------------
+
 def resource_estimation_cirq(
         config_analysis: AnalysisConfiguration,
         algorithm) -> dict:
@@ -277,112 +315,61 @@ def exact_matrix_output(
 
 # -------------------------------------------------------------------------------------------------
 
-def _eigendecompose(matrix, matrix_type, num_eigenvalues, which_eigs):
+def _eigendecompose_full(matrix, matrix_type):
     """
-    Perform eigendecomposition of a matrix (full or partial).
+    Perform full eigendecomposition of a Hermitian matrix.
 
-    Parameters:
-        matrix: Matrix to decompose (dense array or matrix-free operator)
-        matrix_type: String describing the matrix type (for logging)
-        num_eigenvalues: Number of eigenvalues to compute (int) or "all" for full decomposition
-        which_eigs: Which eigenvalues to compute ('smallest', 'largest', or 'both')
+    Args:
+        matrix: Matrix to decompose (dense numpy array)
+        matrix_type: String describing the matrix type ('exact' or 'approximate', for logging)
 
     Returns:
-        tuple: (eigenvalues, eigenvectors, num_computed)
+        tuple: (eigenvalues, eigenvectors)
+            eigenvalues: All eigenvalues (unsorted, as returned by scipy)
+            eigenvectors: All eigenvectors (columns correspond to eigenvalues)
 
     Raises:
-        ValueError: If parameters are invalid or operation not supported
+        ValueError: If matrix is too large (matrix-free operators not supported for full decomposition)
     """
     import scipy.linalg
-    import scipy.sparse.linalg
     from qhat.analysis.matrix_operations import PauliStringOperator
 
     dimension = matrix.shape[0]
     is_matrix_free = isinstance(matrix, PauliStringOperator) or hasattr(matrix, 'matvec')
 
-    # Determine if full or partial eigendecomposition
-    is_full = isinstance(num_eigenvalues, str) and num_eigenvalues.lower() == "all"
+    if is_matrix_free:
+        raise ValueError(
+            f"Full eigendecomposition not supported for matrix-free operators. "
+            f"Matrix dimension {dimension} is too large for dense eigendecomposition."
+        )
 
-    if is_full:
-        # Full eigendecomposition
-        if is_matrix_free:
-            raise ValueError(
-                f"Full eigendecomposition not supported for matrix-free operators. "
-                f"Use num_eigenvalues=k for partial decomposition."
-            )
-        logger.verbose(f"Computing full eigendecomposition for {matrix_type} matrix")
-        eigenvalues, eigenvectors = scipy.linalg.eigh(matrix)
-        num_computed = len(eigenvalues)
+    logger.info(f"Computing full eigendecomposition for {matrix_type} matrix (dimension {dimension})")
+    eigenvalues, eigenvectors = scipy.linalg.eigh(matrix)
 
-    else:
-        # Partial eigendecomposition using sparse methods
-        k = int(num_eigenvalues)
-        if k <= 0:
-            raise ValueError(f"num_eigenvalues must be positive, got {k}")
-        if k > dimension:
-            raise ValueError(
-                f"num_eigenvalues ({k}) must be less than or equal to dimension ({dimension})."
-            )
+    logger.verbose(f"  Eigenvalue range (unsorted): [{eigenvalues.min():.6e}, {eigenvalues.max():.6e}]")
 
-        # Map user-friendly values to scipy's 'which' parameter
-        which_map = {
-            'smallest': 'SA',  # Smallest Algebraic (most negative)
-            'largest': 'LA',   # Largest Algebraic (most positive)
-        }
-
-        if which_eigs == 'both':
-            # Compute both smallest and largest
-            logger.verbose(f"Computing {k} smallest and {k} largest eigenvalues for {matrix_type} matrix")
-            eigs_small, vecs_small = scipy.sparse.linalg.eigsh(
-                matrix, k=k, which='SA', return_eigenvectors=True
-            )
-            eigs_large, vecs_large = scipy.sparse.linalg.eigsh(
-                matrix, k=k, which='LA', return_eigenvectors=True
-            )
-            # Concatenate results
-            eigenvalues = np.concatenate([eigs_small, eigs_large])
-            eigenvectors = np.concatenate([vecs_small, vecs_large], axis=1)
-            num_computed = len(eigenvalues)
-        else:
-            # Compute only one set
-            which_scipy = which_map.get(which_eigs)
-            if which_scipy is None:
-                raise ValueError(
-                    f"which_eigenvalues must be 'smallest', 'largest', or 'both', "
-                    f"got '{which_eigs}'"
-                )
-            logger.verbose(f"Computing {k} {which_eigs} eigenvalues for {matrix_type} matrix")
-            eigenvalues, eigenvectors = scipy.sparse.linalg.eigsh(
-                matrix, k=k, which=which_scipy, return_eigenvectors=True
-            )
-            num_computed = len(eigenvalues)
-
-    logger.info(f"Computed {num_computed} eigenvalues for {matrix_type} matrix")
-    logger.verbose(f"  Eigenvalue range: [{eigenvalues.min():.6e}, {eigenvalues.max():.6e}]")
-
-    return eigenvalues, eigenvectors, num_computed
+    return eigenvalues, eigenvectors
 
 # -------------------------------------------------------------------------------------------------
 
-def _process_eigendecomposition(matrix, matrix_type, num_eigenvalues, which_eigs):
+def _process_eigendecomposition(matrix, matrix_type, timestep=None):
     """
-    Process eigendecomposition for a single matrix: compute, save, and return metadata.
+    Process full eigendecomposition: compute, convert (if unitary), sort, save, and return data.
 
-    Parameters:
-        matrix: Matrix to decompose (dense array or matrix-free operator)
+    Args:
+        matrix: Matrix to decompose (dense array, matrix-free not supported)
         matrix_type: String describing the matrix type ('exact' or 'approximate')
-        num_eigenvalues: Number of eigenvalues to compute (int) or "all"
-        which_eigs: Which eigenvalues to compute ('smallest', 'largest', or 'both')
+        timestep: Required for matrix_type='approximate' to convert phases to eigenenergies
 
     Returns:
-        Dictionary with file path, num_eigenvalues, eigenvalue_range, and which
+        Dictionary with eigenenergies, eigenvectors, file path, and metadata
 
     Raises:
-        ValueError: If matrix is None
+        ValueError: If matrix is None or if timestep not provided for approximate
     """
     from qhat.analysis.file_io import save_eigendecomposition
 
-    logger.info(f"Computing {matrix_type} matrix eigendecomposition")
+    logger.info(f"Computing {matrix_type} matrix eigendecomposition (full spectrum)")
 
     if matrix is None:
         raise ValueError(
@@ -390,60 +377,98 @@ def _process_eigendecomposition(matrix, matrix_type, num_eigenvalues, which_eigs
             "Compute the matrix before calling eigendecomposition_analysis()."
         )
 
-    eigs, vecs, num_computed = _eigendecompose(
-        matrix, matrix_type, num_eigenvalues, which_eigs
-    )
+    # Compute full eigendecomposition
+    eigenvalues_raw, eigenvectors_raw = _eigendecompose_full(matrix, matrix_type)
 
-    # Save to file
-    output_file = f'{matrix_type}_eigendecomposition.npz'
-    save_eigendecomposition(
-        output_file, eigs, vecs, matrix_type,
-        num_eigenvalues, which_eigs
-    )
+    # Convert to eigenenergies and sort
+    if matrix_type == 'approximate':
+        if timestep is None:
+            raise ValueError("timestep is required for approximate eigendecomposition to convert phases to eigenenergies")
+
+        # Convert unitary eigenvalues to eigenenergies
+        eigenenergies, eigenphases = convert_unitary_eigenvalues_to_eigenenergies(
+            eigenvalues_raw, timestep
+        )
+
+        # Sort by eigenenergy
+        sort_indices = np.argsort(eigenenergies)
+        eigenenergies_sorted = eigenenergies[sort_indices]
+        eigenvectors_sorted = eigenvectors_raw[:, sort_indices]
+
+        logger.info(f"Converted {len(eigenphases)} unitary eigenvalues to eigenenergies")
+        logger.info(f"  Eigenenergy range (sorted): [{eigenenergies_sorted[0]:.6e}, {eigenenergies_sorted[-1]:.6e}]")
+
+        # Save sorted results with optional debugging data
+        output_file = f'{matrix_type}_eigendecomposition.npz'
+        save_eigendecomposition(
+            output_file,
+            eigenenergies=eigenenergies_sorted,
+            eigenvectors=eigenvectors_sorted,
+            matrix_type=matrix_type,
+            timestep=timestep,
+            unitary_eigenvalues=eigenvalues_raw,
+            eigenphases=eigenphases
+        )
+
+    else:  # matrix_type == 'exact'
+        # Eigenvalues are already eigenenergies, just sort
+        eigenenergies_raw = np.real(eigenvalues_raw)  # Should be real for Hermitian
+        sort_indices = np.argsort(eigenenergies_raw)
+        eigenenergies_sorted = eigenenergies_raw[sort_indices]
+        eigenvectors_sorted = eigenvectors_raw[:, sort_indices]
+
+        logger.info(f"Eigenenergy range (sorted): [{eigenenergies_sorted[0]:.6e}, {eigenenergies_sorted[-1]:.6e}]")
+
+        # Save sorted results
+        output_file = f'{matrix_type}_eigendecomposition.npz'
+        save_eigendecomposition(
+            output_file,
+            eigenenergies=eigenenergies_sorted,
+            eigenvectors=eigenvectors_sorted,
+            matrix_type=matrix_type
+        )
 
     return {
         'file': output_file,
-        'num_eigenvalues': num_computed,
-        'eigenvalue_range': [float(eigs.min()), float(eigs.max())],
-        'which': which_eigs
+        'eigenenergies': eigenenergies_sorted,
+        'eigenvectors': eigenvectors_sorted,
+        'num_eigenstates': len(eigenenergies_sorted),
+        'eigenenergy_range': [float(eigenenergies_sorted[0]), float(eigenenergies_sorted[-1])]
     }
 
 # -------------------------------------------------------------------------------------------------
 
 def eigendecomposition_analysis(
         config_analysis: AnalysisConfiguration,
+        timestep=None,
         exact_matrix=None,
         unitary_matrix=None) -> dict:
     """
-    Compute eigendecompositions of exact and/or approximate matrices.
+    Compute full eigendecompositions of exact and/or approximate matrices.
+
+    This is the single decision point for computing eigendecompositions.
+    Always computes full spectrum (all eigenstates), sorted by eigenenergy.
 
     Parameters:
         config_analysis: Analysis configuration with eigendecomposition settings
+        timestep: Time evolution parameter (required for approximate eigendecomposition)
         exact_matrix: Pre-computed exact matrix (required if eigendecomposition_matrices is 'exact' or 'both')
         unitary_matrix: Pre-computed unitary matrix (required if eigendecomposition_matrices is 'approximate' or 'both')
 
     Returns:
-        Dictionary with eigendecomposition results and file paths
+        Dictionary with eigendecomposition data (eigenenergies, eigenvectors) and metadata
 
     Raises:
-        ValueError: If required matrices are not provided
+        ValueError: If required matrices or timestep are not provided
     """
-    from qhat.analysis.file_io import save_eigendecomposition
-    from qhat.analysis.matrix_operations import PauliStringOperator
-    import scipy.linalg
-    import scipy.sparse.linalg
-
-    num_eigenvalues = config_analysis.num_eigenvalues
     which_matrices = config_analysis.eigendecomposition_matrices
-    which_eigs = config_analysis.which_eigenvalues
+
+    if which_matrices is None:
+        logger.info("Eigendecomposition analysis not requested (eigendecomposition_matrices is None)")
+        return {}
 
     logger.info(f"Starting eigendecomposition analysis")
-    logger.verbose(f"  num_eigenvalues: {num_eigenvalues}")
     logger.verbose(f"  eigendecomposition_matrices: {which_matrices}")
-    logger.verbose(f"  which_eigenvalues: {which_eigs}")
-
-    # Determine if full or partial eigendecomposition
-    is_full = isinstance(num_eigenvalues, str) and num_eigenvalues.lower() == "all"
 
     # Determine which matrices we need
     need_exact = which_matrices in ['exact', 'both']
@@ -454,13 +479,13 @@ def eigendecomposition_analysis(
     # Compute exact eigendecomposition if requested
     if need_exact:
         results['exact_eigendecomposition'] = _process_eigendecomposition(
-            exact_matrix, 'exact', num_eigenvalues, which_eigs
+            exact_matrix, 'exact', timestep=None
         )
 
     # Compute approximate eigendecomposition if requested
     if need_approx:
         results['approximate_eigendecomposition'] = _process_eigendecomposition(
-            unitary_matrix, 'approximate', num_eigenvalues, which_eigs
+            unitary_matrix, 'approximate', timestep=timestep
         )
 
     return results
@@ -504,41 +529,42 @@ def error_analysis(
     results = {}
 
     # =============================================================================================
-    # 1. EIGENVALUE ERROR
+    # 1. EIGENENERGY ERROR
     # =============================================================================================
 
     if config_analysis.enable_eigenvalue_errors:
-        logger.info("Computing eigenvalue errors for all eigenvalues from eigendecomposition")
+        logger.info("Computing eigenenergy errors for all eigenstates")
 
         if exact_eigendecomp is None or approx_eigendecomp is None:
             raise ValueError(
-                "Both eigendecompositions must be computed in order to compare eigenvalues. "
+                "Both eigendecompositions must be computed in order to compare eigenenergies. "
                 "Ensure eigendecomposition_matrices is set to 'both' when enable_eigenvalue_errors is True."
             )
 
-        # Get all eigenvalues from the eigendecompositions
-        exact_eigs = exact_eigendecomp['eigenvalues']
-        approx_eigs = approx_eigendecomp['eigenvalues']
+        # Get eigenenergies from both decompositions (both already sorted by energy)
+        exact_eigenenergies = exact_eigendecomp['eigenenergies']
+        approx_eigenenergies = approx_eigendecomp['eigenenergies']
 
-        # Verify that the same number of eigenvalues were computed
-        if len(exact_eigs) != len(approx_eigs):
+        # Verify same dimension (should have all eigenvalues since full decomposition)
+        if len(exact_eigenenergies) != len(approx_eigenenergies):
             raise ValueError(
-                f"Mismatch in number of eigenvalues: exact has {len(exact_eigs)}, "
-                f"approximate has {len(approx_eigs)}. Both eigendecompositions must compute "
-                "the same number of eigenvalues."
+                f"Dimension mismatch: exact has {len(exact_eigenenergies)} eigenstates, "
+                f"approximate has {len(approx_eigenenergies)} eigenstates."
             )
 
-        # Compare all eigenvalues
-        absolute_errors = exact_eigs - approx_eigs
-        relative_errors = absolute_errors / np.abs(exact_eigs)
+        # Element-wise comparison (both already sorted by energy)
+        absolute_errors = exact_eigenenergies - approx_eigenenergies
+        relative_errors = absolute_errors / np.abs(exact_eigenenergies)
 
-        num_eigenvalues = len(exact_eigs)
-        logger.info(f"Computed errors for {num_eigenvalues} eigenvalues")
-        logger.info(f"Eigenvalue absolute error range: [{absolute_errors.min():.6e}, {absolute_errors.max():.6e}]")
-        logger.info(f"Eigenvalue relative error range: [{relative_errors.min():.6e}, {relative_errors.max():.6e}]")
+        num_eigenstates = len(exact_eigenenergies)
+        logger.info(f"Computed errors for {num_eigenstates} eigenstates (sorted by energy)")
+        logger.info(f"  Ground state: exact={exact_eigenenergies[0]:.6e}, approx={approx_eigenenergies[0]:.6e}, error={absolute_errors[0]:.6e}")
+        logger.info(f"  Highest state: exact={exact_eigenenergies[-1]:.6e}, approx={approx_eigenenergies[-1]:.6e}, error={absolute_errors[-1]:.6e}")
+        logger.info(f"  Max absolute error: {np.abs(absolute_errors).max():.6e}")
+        logger.info(f"  Max relative error: {np.abs(relative_errors).max():.6e}")
 
-        results['eigenvalue_errors'] = {
-            'num_eigenvalues': num_eigenvalues,
+        results['eigenenergy_errors'] = {
+            'num_eigenstates': num_eigenstates,
             'absolute_errors': absolute_errors.tolist(),
             'relative_errors': relative_errors.tolist(),
             'max_absolute_error': float(np.abs(absolute_errors).max()),
@@ -768,10 +794,10 @@ def error_analysis(
     output_file = 'error_analysis.npz'
     save_dict = {}
 
-    if 'eigenvalue_errors' in results:
-        save_dict['eigenvalue_absolute_errors'] = np.array(results['eigenvalue_errors']['absolute_errors'])
-        save_dict['eigenvalue_relative_errors'] = np.array(results['eigenvalue_errors']['relative_errors'])
-        save_dict['eigenvalue_num'] = results['eigenvalue_errors']['num_eigenvalues']
+    if 'eigenenergy_errors' in results:
+        save_dict['eigenenergy_absolute_errors'] = np.array(results['eigenenergy_errors']['absolute_errors'])
+        save_dict['eigenenergy_relative_errors'] = np.array(results['eigenenergy_errors']['relative_errors'])
+        save_dict['eigenenergy_num'] = results['eigenenergy_errors']['num_eigenstates']
 
     if 'matrix_frobenius_error' in results:
         save_dict['matrix_frobenius_error'] = results['matrix_frobenius_error']
@@ -926,13 +952,8 @@ def requires_exact_eigendecomposition(config_analysis: AnalysisConfiguration) ->
     Returns:
         True if exact eigendecomposition computation is needed, False otherwise
     """
-    # Check if eigendecomposition is requested at all
-    num_eigenvalues = config_analysis.num_eigenvalues
-    eigendecomposition_requested = (
-        isinstance(num_eigenvalues, int) and num_eigenvalues > 0
-    ) or (
-        isinstance(num_eigenvalues, str) and num_eigenvalues.lower() == "all"
-    )
+    # Eigendecomposition requested if eigendecomposition_matrices is not None
+    eigendecomposition_requested = config_analysis.eigendecomposition_matrices is not None
 
     # Need exact eigendecomposition if:
     # 1. Eigendecomposition requested and matrices setting includes 'exact' or 'both'
@@ -958,13 +979,8 @@ def requires_approximate_eigendecomposition(config_analysis: AnalysisConfigurati
     Returns:
         True if approximate eigendecomposition computation is needed, False otherwise
     """
-    # Check if eigendecomposition is requested at all
-    num_eigenvalues = config_analysis.num_eigenvalues
-    eigendecomposition_requested = (
-        isinstance(num_eigenvalues, int) and num_eigenvalues > 0
-    ) or (
-        isinstance(num_eigenvalues, str) and num_eigenvalues.lower() == "all"
-    )
+    # Eigendecomposition requested if eigendecomposition_matrices is not None
+    eigendecomposition_requested = config_analysis.eigendecomposition_matrices is not None
 
     # Need approximate eigendecomposition if:
     # 1. Eigendecomposition requested and matrices setting includes 'approximate' or 'both'
@@ -1050,18 +1066,13 @@ def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfigura
 
     # Check eigenvalue error analysis dependencies
     if config_analysis.enable_eigenvalue_errors:
-        # Check if num_eigenvalues is configured
-        num_eigenvalues = config_analysis.num_eigenvalues
-        eigendecomposition_configured = (
-            isinstance(num_eigenvalues, int) and num_eigenvalues > 0
-        ) or (
-            isinstance(num_eigenvalues, str) and num_eigenvalues.lower() == "all"
-        )
+        # Check if eigendecomposition is configured
+        eigendecomposition_configured = config_analysis.eigendecomposition_matrices is not None
 
         if not eigendecomposition_configured:
             raise ValueError(
                 "enable_eigenvalue_errors requires eigendecomposition. "
-                "Set num_eigenvalues to a positive integer or 'all'."
+                "Set eigendecomposition_matrices to 'both' to enable eigenvalue error analysis."
             )
 
         # Must compute both eigendecompositions to compare
@@ -1200,7 +1211,21 @@ def exact_numerical_simulation(
 def analyze_algorithm(
         config_analysis: AnalysisConfiguration,
         algorithm,
-        hamiltonian=None) -> dict:
+        hamiltonian=None,
+        timestep=None) -> dict:
+    """
+    Analyze a quantum algorithm.
+
+    Parameters:
+        config_analysis: Analysis configuration
+        algorithm: Algorithm bloq to analyze
+        hamiltonian: Hamiltonian object (required for exact matrix/simulation)
+        timestep: Time evolution parameter (required for approximate eigendecomposition)
+                 If not provided, approximate eigendecomposition will fail.
+
+    Returns:
+        Dictionary with analysis results
+    """
 
     logger.info("Beginning algorithm analysis.")
 
@@ -1231,7 +1256,7 @@ def analyze_algorithm(
             "  - matrix_output_file (e.g., 'matrix.npz', 'matrix.h5', 'matrix.txt')\n"
             "  - numerical_simulation_inputs (e.g., 'state.npy' or ['state1.npy', 'state2.npy'])\n"
             "  - exact_matrix_output_file (e.g., 'exact_hamiltonian.npz')\n"
-            "  - num_eigenvalues (e.g., 5 or 'all')\n"
+            "  - eigendecomposition_matrices (e.g., 'exact', 'approximate', or 'both')\n"
             "  - enable_eigenvalue_errors (True to compute errors for all eigenvalues)\n"
             "  - error_matrix_norms (e.g., 'frobenius' or ['frobenius', 'spectral'])\n"
             "  - error_state_inputs (e.g., 'state.npy')\n"
@@ -1276,24 +1301,28 @@ def analyze_algorithm(
         logger.info("Performing numerical simulation.")
         results["numerical_simulation"] = numerical_simulation(config_analysis, algorithm, unitary_matrix)
 
+    # Eigendecomposition: single decision point for computing eigendecompositions
+    exact_eigendecomp = None
+    approx_eigendecomp = None
     if eigendecomposition_requested:
         logger.info("Performing eigendecomposition analysis.")
         eig_results = eigendecomposition_analysis(
             config_analysis,
+            timestep=timestep,
             exact_matrix=exact_matrix,
             unitary_matrix=unitary_matrix
         )
         results["eigendecomposition"] = eig_results
 
+        # Extract eigendecomposition data for use by error_analysis
+        if 'exact_eigendecomposition' in eig_results:
+            exact_eigendecomp = eig_results['exact_eigendecomposition']
+        if 'approximate_eigendecomposition' in eig_results:
+            approx_eigendecomp = eig_results['approximate_eigendecomposition']
+
+    # Error analysis: receives eigendecomposition data, does not recompute
     if error_analysis_requested:
         logger.info("Performing error analysis.")
-        # Pass eigendecomposition results if available
-        exact_eigendecomp = None
-        approx_eigendecomp = None
-        if eigendecomposition_requested and 'eig_results' in locals():
-            # Eigendecompositions were computed, but we need to load them from files
-            # The error_analysis function will handle loading if needed
-            pass
         results["error_analysis"] = error_analysis(
             config_analysis, hamiltonian, algorithm,
             exact_matrix=exact_matrix,

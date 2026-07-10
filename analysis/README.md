@@ -232,57 +232,56 @@ There are many details of the algorithm that may be worth analyzing. The availab
 
 #### Eigendecomposition Analysis
 
-- **Eigendecomposition Analysis**: Setting `analysis.num_eigenvalues` to a positive integer or `"all"` enables eigenvalue/eigenvector computation for exact and/or approximate matrices.
+- **Eigendecomposition Analysis**: Setting `analysis.eigendecomposition_matrices` enables full-spectrum eigendecomposition for exact and/or approximate matrices.
 
-  **Configuration parameters**:
+  **Key features**:
+  - **Always computes full spectrum** (all eigenstates)
+  - **Sorted by eigenenergy** (ascending order: ground state first)
+  - **Converts phases to energies** for approximate case
+  - **Only feasible for small systems**
+
+  **Configuration parameter**:
   
-  - **`num_eigenvalues`**: Controls how many eigenvalues to compute
-    - `0` (default): Eigendecomposition disabled
-    - Positive integer (e.g., `5`): Compute that many eigenvalues using sparse methods (recommended for large systems)
-    - `"all"` (case-insensitive): Compute full eigendecomposition (all eigenvalues and eigenvectors)
-      - **Only feasible for small systems**
-
   - **`eigendecomposition_matrices`**: Which matrices to eigendecompose
-    - `"approximate"` (default): Only eigendecompose the algorithm's unitary matrix
+    - `None` (default): Eigendecomposition disabled
     - `"exact"`: Only eigendecompose the exact Hamiltonian matrix
-    - `"both"`: Eigendecompose both matrices (useful for comparison)
+    - `"approximate"`: Only eigendecompose the algorithm's unitary matrix
+    - `"both"`: Eigendecompose both matrices (required for eigenvalue error analysis)
 
-  - **`which_eigenvalues`**: Which eigenvalues to compute (ignored for full decomposition)
-    - `"smallest"` (default): Algebraically smallest (most negative, ground state for Hamiltonians)
-    - `"largest"`: Algebraically largest (most positive)
-    - `"both"`: Compute k smallest AND k largest (returns 2k eigenvalues total)
-    - **Important**: "smallest" means most negative (closest to -∞), NOT smallest magnitude
+  **Terminology** (used consistently in code, file names, and documentation):
+  - **eigenenergy**: Eigenvalue of Hamiltonian H (units: energy, e.g., Hartrees)
+  - **unitary_eigenvalue**: Eigenvalue of time evolution unitary U = exp(-iHt/ℏ) (complex, on unit circle)
+  - **eigenphase**: Phase φ = (E·t/ℏ) ∈ [0, 2π) extracted from unitary eigenvalue
+
+  **Phase-to-energy conversion** (approximate case only):
+  - Unitary eigenvalues: λ_U = exp(-iφ) where φ = E·t/ℏ
+  - Eigenphases: φ ∈ [0, 2π) (include 0, exclude 2π)
+  - Eigenenergies: E = φ·ℏ/t
+  - **Assumption**: Hamiltonian is shifted/scaled by existing code to ensure phases fall in [0, 2π)
 
   **Output files**:
-  - `exact_eigendecomposition.npz`: Results for exact matrix (if requested)
-  - `approximate_eigendecomposition.npz`: Results for approximate matrix (if requested)
-  - Each file contains: eigenvalues, eigenvectors, metadata
+  - `exact_eigendecomposition.npz`: Exact Hamiltonian eigenstates (if requested)
+  - `approximate_eigendecomposition.npz`: Approximate eigenstates from unitary (if requested)
+  - Each file contains: `eigenenergies` (sorted), `eigenvectors` (reordered to match), metadata
+  - Approximate files also include `timestep`, and optionally `unitary_eigenvalues`, `eigenphases`
+  - **Sorted order**: Index 0 = ground state, 1 = first excited state, etc.
 
   **Examples**:
   ```python
-  # Ground state energy (1 smallest eigenvalue) for large system
-  analysis.num_eigenvalues = 1
-  analysis.which_eigenvalues = "smallest"
-  analysis.eigendecomposition_matrices = "both"  # Compare exact vs approximate
-
-  # Low-lying excited states (5 smallest eigenvalues)
-  analysis.num_eigenvalues = 5
-  analysis.which_eigenvalues = "smallest"
-
-  # High and low energy states
-  analysis.num_eigenvalues = 3
-  analysis.which_eigenvalues = "both"  # Returns 6 eigenvalues (3 smallest + 3 largest)
-
-  # Full spectrum for small system
-  analysis.num_eigenvalues = "all"
+  # Full spectrum for small system (exact Hamiltonian)
   analysis.eigendecomposition_matrices = "exact"
+
+  # Full spectrum for approximate algorithm
+  analysis.eigendecomposition_matrices = "approximate"
+
+  # Both (required for eigenvalue error comparison)
+  analysis.eigendecomposition_matrices = "both"
   ```
 
-  **Eigenvalue terminology**:
-  - For a Hamiltonian with eigenvalues [-10, -5, 0, 5, 10]:
-    - `"smallest"` gives [-10, -5, ...] (most negative, ground state)
-    - `"largest"` gives [10, 5, ...] (most positive)
-    - This is NOT based on magnitude (which would give [0, 5, -5, ...])
+  **Size limitations**:
+  - Only practical for small systems
+  - For larger systems, eigendecomposition will fail with clear error message
+  - Matrix must fit in memory (no matrix-free operator support)
 
 #### Error Analysis
 
@@ -290,12 +289,13 @@ There are many details of the algorithm that may be worth analyzing. The availab
 
   **Configuration parameters**:
   
-  - **`enable_eigenvalue_errors`**: Enable eigenvalue error comparison (default: False, disabled)
-    - Set to `True` to compute errors for ALL eigenvalues from the eigendecomposition
-    - The number of eigenvalues compared is determined by `num_eigenvalues` setting
-    - Compares all eigenvalues computed in both exact and approximate eigendecompositions
-    - Requires `eigendecomposition_matrices = "both"` to ensure both decompositions are computed
-    - **Best for**: Validating eigenvalue accuracy across the spectrum
+  - **`enable_eigenvalue_errors`**: Enable eigenenergy error comparison (default: False, disabled)
+    - **Note**: Parameter name uses "eigenvalue" for historical reasons, but compares **eigenenergies** (H eigenvalues, not U eigenvalues)
+    - Set to `True` to compute errors for ALL eigenstates (full spectrum)
+    - Compares eigenenergies element-wise after both are sorted by energy
+    - Ground state (exact) compared with ground state (approximate), etc.
+    - Requires `eigendecomposition_matrices = "both"` (auto-set if not already "both")
+    - **Best for**: Validating eigenenergy accuracy across the full spectrum
 
   - **`error_matrix_norms`**: Which matrix norms to compute (default: None, disabled)
     - Single string: `"frobenius"` or `"spectral"`

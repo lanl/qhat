@@ -194,33 +194,43 @@ def _get_state_format_from_extension(filename):
 # Eigendecomposition I/O Functions
 # =================================================================================================
 
-def save_eigendecomposition(output_path, eigenvalues, eigenvectors, matrix_type,
-                            num_eigenvalues, which_eigenvalues):
+def save_eigendecomposition(output_path, eigenenergies, eigenvectors, matrix_type,
+                            timestep=None, unitary_eigenvalues=None, eigenphases=None):
     """
     Save eigendecomposition results to NumPy .npz format.
 
+    All eigendecompositions include the full spectrum (all eigenstates) sorted by eigenenergy.
+
     Parameters:
         output_path: Path to output file (must end in .npz)
-        eigenvalues: 1D array of eigenvalues
-        eigenvectors: 2D array where column i is the eigenvector for eigenvalue i
+        eigenenergies: 1D array of eigenenergies (sorted in ascending order)
+        eigenvectors: 2D array where column i is the eigenvector for eigenenergy i (sorted)
         matrix_type: 'exact' or 'approximate'
-        num_eigenvalues: Number of eigenvalues computed (int or "all")
-        which_eigenvalues: 'smallest', 'largest', or 'both'
+        timestep: Time evolution parameter (required for approximate, None for exact)
+        unitary_eigenvalues: Optional, original complex unitary eigenvalues (for approximate only, debugging)
+        eigenphases: Optional, eigenphases in [0, 2π) (for approximate only, debugging)
     """
     if not output_path.endswith('.npz'):
         raise ValueError(f"Output path must end with .npz, got: {output_path}")
 
     metadata = {
-        'eigenvalues': eigenvalues,
+        'eigenenergies': eigenenergies,
         'eigenvectors': eigenvectors,
         'matrix_type': matrix_type,
-        'num_eigenvalues': num_eigenvalues if isinstance(num_eigenvalues, int) else str(num_eigenvalues),
-        'which_eigenvalues': which_eigenvalues,
+        'num_eigenstates': len(eigenenergies),
         'timestamp': datetime.now().isoformat(),
     }
 
+    # Add optional fields for approximate case
+    if timestep is not None:
+        metadata['timestep'] = timestep
+    if unitary_eigenvalues is not None:
+        metadata['unitary_eigenvalues'] = unitary_eigenvalues
+    if eigenphases is not None:
+        metadata['eigenphases'] = eigenphases
+
     np.savez(output_path, **metadata)
-    logger.info(f"Eigendecomposition saved to {output_path}")
+    logger.info(f"Eigendecomposition saved to {output_path} ({len(eigenenergies)} eigenstates, sorted by energy)")
 
 
 def load_eigendecomposition(path):
@@ -231,23 +241,31 @@ def load_eigendecomposition(path):
         path: Path to .npz file
 
     Returns:
-        Dictionary with keys: eigenvalues, eigenvectors, matrix_type,
-        num_eigenvalues, which_eigenvalues, and timestamp
+        Dictionary with keys: eigenenergies, eigenvectors, matrix_type,
+        num_eigenstates, timestep (if approximate), and timestamp.
+        For approximate case may also include unitary_eigenvalues and eigenphases.
     """
     if not path.endswith('.npz'):
         raise ValueError(f"Path must end with .npz, got: {path}")
 
     data = np.load(path, allow_pickle=False)
     result = {
-        'eigenvalues': data['eigenvalues'],
+        'eigenenergies': data['eigenenergies'],
         'eigenvectors': data['eigenvectors'],
         'matrix_type': str(data['matrix_type']),
-        'num_eigenvalues': data['num_eigenvalues'],
-        'which_eigenvalues': str(data['which_eigenvalues']),
+        'num_eigenstates': int(data['num_eigenstates']),
         'timestamp': str(data['timestamp']),
     }
 
-    logger.info(f"Eigendecomposition loaded from {path}")
+    # Load optional fields if present
+    if 'timestep' in data:
+        result['timestep'] = float(data['timestep'])
+    if 'unitary_eigenvalues' in data:
+        result['unitary_eigenvalues'] = data['unitary_eigenvalues']
+    if 'eigenphases' in data:
+        result['eigenphases'] = data['eigenphases']
+
+    logger.info(f"Eigendecomposition loaded from {path} ({result['num_eigenstates']} eigenstates)")
     return result
 
 

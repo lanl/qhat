@@ -167,9 +167,7 @@ class AnalysisConfiguration(ConfigurationBase):
         self.numerical_simulation_inputs = None
         self.exact_matrix_output_file = None
         self.matrix_memory_threshold_gb = 16.0
-        self.num_eigenvalues = 0
-        self.eigendecomposition_matrices = 'approximate'
-        self.which_eigenvalues = 'smallest'
+        self.eigendecomposition_matrices = None
         self.enable_eigenvalue_errors = False
         self.error_matrix_norms = None
         self.error_state_inputs = None
@@ -182,9 +180,7 @@ class AnalysisConfiguration(ConfigurationBase):
         self.save_if_present(table, "numerical_simulation_inputs")
         self.save_if_present(table, "exact_matrix_output_file")
         self.save_if_present(table, "matrix_memory_threshold_gb")
-        self.save_if_present(table, "num_eigenvalues")
         self.save_if_present(table, "eigendecomposition_matrices")
-        self.save_if_present(table, "which_eigenvalues")
         self.save_if_present(table, "enable_eigenvalue_errors")
         self.save_if_present(table, "error_matrix_norms")
         self.save_if_present(table, "error_state_inputs")

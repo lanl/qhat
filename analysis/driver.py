@@ -86,7 +86,15 @@ def run():
 
     # Analysis ____________________________________________________________________________________
 
-    state.store_results(analyze_algorithm(state.config_analysis, algorithm, hamiltonian=physical_hamiltonian))
+    # Extract timestep for eigendecomposition analysis (if available)
+    timestep = getattr(state.config_unitary, 'timestep', None)
+
+    state.store_results(analyze_algorithm(
+        state.config_analysis,
+        algorithm,
+        hamiltonian=physical_hamiltonian,
+        timestep=timestep
+    ))
 
     # Save Results ________________________________________________________________________________
 
