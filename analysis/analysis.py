@@ -443,7 +443,6 @@ def _process_eigendecomposition(matrix, matrix_type, timestep=None, energy_shift
     return {
         'file': output_file,
         'eigenenergies': eigenenergies_sorted,
-        'eigenvectors': eigenvectors_sorted,
         'num_eigenstates': len(eigenenergies_sorted),
         'eigenenergy_range': [float(eigenenergies_sorted[0]), float(eigenenergies_sorted[-1])]
     }

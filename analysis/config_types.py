@@ -280,7 +280,7 @@ class State:
     def store_results(self, d):
         self.results.update(d)
     def show_results(self):
-        logger.info("results:\n" + pprint.pformat(self.results))
+        logger.warning("results:\n" + pprint.pformat(self.results))
 
     def _filter_for_toml(self, obj):
         """Recursively filter out numpy arrays and other non-serializable objects from results."""
