@@ -113,7 +113,7 @@ analysis.matrix_output_file = "Be-H_unitary_matrix.npz"
 # Useful for testing algorithm behavior on specific initial states
 
 # Single input state:
-analysis.numerical_simulation_inputs = "examples/initial_state.npy"
+analysis.numerical_simulation_inputs = "examples/Be-H_1.30_sto-6g_as-003-003_jw.npy"
 
 # Multiple input states (processes each independently):
 # analysis.numerical_simulation_inputs = [
@@ -272,7 +272,7 @@ analysis.eigendecomposition_matrices = "both"  # Options: None (disabled), "exac
 
 analysis.enable_eigenvalue_errors = True  # Compare all eigenvalues from eigendecomposition
 analysis.error_matrix_norms = "frobenius"  # Options: "frobenius", "spectral", or ["frobenius", "spectral"]
-analysis.error_state_inputs = "examples/initial_state.npy"  # Can be string or list
+analysis.error_state_inputs = "examples/Be-H_1.30_sto-6g_as-003-003_jw.npy"  # Can be string or list
 
 # This analysis computes three independent error types:
 #   1. Eigenvalue errors: Compare all eigenvalues computed in the eigendecomposition
@@ -391,7 +391,7 @@ analysis.eigendecomposition_matrices = "both"  # Options: None (disabled), "exac
 # Branch 3: Error Metrics
 # Eigenvalue errors: compares all eigenstates (full spectrum, sorted by energy)
 analysis.error_matrix_norms = ["frobenius", "spectral"]  # Matrix difference norms
-analysis.error_state_inputs = ["examples/ground_state.npy"]  # State-dependent errors
+analysis.error_state_inputs = ["examples/Be-H_1.30_sto-6g_as-003-003_jw.npy"]  # State-dependent errors
 
 # Branch 4: Exact Numerical Simulation
 # analysis.exact_simulation_inputs = "examples/initial_state.npy"
