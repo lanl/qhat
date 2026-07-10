@@ -285,19 +285,25 @@ class State:
         Custom formatter for nested dictionaries with readable output.
 
         Rules:
-        - Dictionaries: Each key on own line with nested content indented
+        - Dictionaries: Each key on own line with nested content indented (4 spaces)
         - Lists/sets that fit on one line: Keep inline
         - Long lists: One element per line, indented
         - Scalar values: Same line as key
         """
-        indent_str = "   " * indent
+        import numpy as np
+
+        indent_str = "    " * indent  # Changed from 3 to 4 spaces
 
         if isinstance(obj, dict):
             if not obj:
                 return "{}"
             lines = []
             for key, value in obj.items():
-                if isinstance(value, (dict, list, tuple, set)) and value:
+                # Check if value is a numpy array (treat as list/tuple)
+                if isinstance(value, np.ndarray):
+                    lines.append(f"{indent_str}{key}:")
+                    lines.append(self._format_results(value, indent + 1, max_line_length))
+                elif isinstance(value, (dict, list, tuple, set)) and value:
                     # Container types get their own indented section
                     lines.append(f"{indent_str}{key}:")
                     lines.append(self._format_results(value, indent + 1, max_line_length))
@@ -306,18 +312,24 @@ class State:
                     lines.append(f"{indent_str}{key}: {value}")
             return "\n".join(lines)
 
-        elif isinstance(obj, (list, tuple)):
-            if not obj:
+        elif isinstance(obj, (list, tuple)) or isinstance(obj, np.ndarray):
+            # Convert numpy arrays to list for consistent handling
+            if isinstance(obj, np.ndarray):
+                obj_list = obj.tolist()
+            else:
+                obj_list = obj
+
+            if not obj_list:
                 return f"{indent_str}[]"
 
-            # Try formatting on one line first
-            one_line = str(obj)
+            # Try formatting on one line first (use list representation, not numpy string)
+            one_line = str(obj_list)
             if len(one_line) <= max_line_length:
                 return f"{indent_str}{one_line}"
 
             # Too long - one element per line
             lines = []
-            for item in obj:
+            for item in obj_list:
                 if isinstance(item, (dict, list, tuple, set)) and item:
                     lines.append(self._format_results(item, indent, max_line_length))
                 else:
