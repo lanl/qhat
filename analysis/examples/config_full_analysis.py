@@ -181,33 +181,20 @@ analysis.exact_matrix_output_file = "Be-H_exact_hamiltonian.npz"
 # Compute eigenvalues and eigenvectors of exact and/or approximate matrices.  May not be practical
 # or even possible for large systems.
 
-analysis.num_eigenvalues = 5  # Compute 5 eigenvalues (use sparse methods)
-analysis.eigendecomposition_matrices = "both"  # Options: "exact", "approximate", "both"
-analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both"
+# Eigendecomposition: always computes full spectrum, sorted by eigenenergy
+analysis.eigendecomposition_matrices = "both"  # Options: None (disabled), "exact", "approximate", "both"
 
-# This analysis computes eigendecompositions for validation and comparison:
-#   - Ground state energy (use num_eigenvalues=1, which_eigenvalues="smallest")
-#   - Low-lying excited states (use num_eigenvalues=5, which_eigenvalues="smallest")
-#   - High-energy states (use num_eigenvalues=5, which_eigenvalues="largest")
-#   - Both ends of spectrum (use which_eigenvalues="both")
+# This analysis computes full-spectrum eigendecompositions (all eigenstates, sorted by energy):
+#   - Always computes ALL eigenvalues and eigenvectors
+#   - Results are automatically sorted by eigenenergy (ground state = index 0)
+#   - Only feasible for small systems
 
-# Configuration options:
-#   num_eigenvalues:
-#     - 0 (default): Eigendecomposition disabled
-#     - Positive int (e.g., 5): Compute that many eigenvalues
-#     - "all": Full eigendecomposition (only for small systems)
-#
+# Configuration option:
 #   eigendecomposition_matrices:
-#     - "approximate" (default): Only eigendecompose unitary matrix
+#     - None (default): Eigendecomposition disabled
 #     - "exact": Only eigendecompose exact Hamiltonian matrix
-#     - "both": Eigendecompose both (useful for comparison)
-#
-#   which_eigenvalues (ignored for "all"):
-#     - "smallest" (default): Algebraically smallest (most negative, ground state)
-#     - "largest": Algebraically largest (most positive)
-#     - "both": Compute smallest AND largest (returns num_eigenvalues smallest AND num_eigenvalues
-#       largest)
-#
+#     - "approximate": Only eigendecompose approximate unitary matrix
+#     - "both": Eigendecompose both (required for eigenvalue error analysis)
 
 # Output files:
 #   - exact_eigendecomposition.npz (if "exact" or "both")
@@ -215,39 +202,27 @@ analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both
 
 # Examples:
 
-# Ground state energy comparison
-# analysis.num_eigenvalues = 1
-# analysis.eigendecomposition_matrices = "both"
-# analysis.which_eigenvalues = "smallest"
-
-# Low-lying spectrum (5 lowest-energy states)
-# analysis.num_eigenvalues = 5
+# Full spectrum for exact Hamiltonian only
 # analysis.eigendecomposition_matrices = "exact"
-# analysis.which_eigenvalues = "smallest"
 
-# High and low energy states (3 smallest + 3 largest = 6 total)
-# analysis.num_eigenvalues = 3
+# Full spectrum for approximate unitary only
+# analysis.eigendecomposition_matrices = "approximate"
+
+# Both (required for comparing exact vs approximate eigenenergies)
 # analysis.eigendecomposition_matrices = "both"
-# analysis.which_eigenvalues = "both"
-
-# Full spectrum for small system
-# analysis.num_eigenvalues = "all"
-# analysis.eigendecomposition_matrices = "exact"
 
 # =================================================================================================
 # 5. EIGENDECOMPOSITION ANALYSIS
 # =================================================================================================
 # Compute eigenvalues and eigenvectors of exact and/or approximate matrices
 
-analysis.num_eigenvalues = 5  # Compute 5 eigenvalues (use sparse methods)
-analysis.eigendecomposition_matrices = "both"  # Options: "exact", "approximate", "both"
-analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both"
+# Eigendecomposition: always computes full spectrum, sorted by eigenenergy
+analysis.eigendecomposition_matrices = "both"  # Options: None (disabled), "exact", "approximate", "both"
 
-# This analysis computes eigendecompositions for validation and comparison:
-#   - Ground state energy (use num_eigenvalues=1, which_eigenvalues="smallest")
-#   - Low-lying excited states (use num_eigenvalues=5, which_eigenvalues="smallest")
-#   - High-energy states (use num_eigenvalues=5, which_eigenvalues="largest")
-#   - Both ends of spectrum (use which_eigenvalues="both")
+# This analysis computes full-spectrum eigendecompositions (all eigenstates, sorted by energy):
+#   - Always computes ALL eigenvalues and eigenvectors
+#   - Results are automatically sorted by eigenenergy (ground state = index 0)
+#   - Only feasible for small systems
 
 # Configuration options:
 #   num_eigenvalues:
@@ -309,7 +284,7 @@ analysis.error_state_inputs = "examples/initial_state.npy"  # Can be string or l
 #     - False (default): Eigenvalue errors disabled
 #     - True: Compute errors for ALL eigenvalues from eigendecomposition
 #     - Requires eigendecompositions (set eigendecomposition_matrices = "both")
-#     - The number of eigenvalues compared is determined by num_eigenvalues
+#     - Compares ALL eigenvalues (full spectrum) element-wise after sorting
 #
 #   error_matrix_norms:
 #     - None (default): Matrix norm errors disabled
@@ -352,15 +327,13 @@ analysis.error_state_inputs = "examples/initial_state.npy"  # Can be string or l
 # =================================================================================================
 # Compute eigenvalues and eigenvectors of exact and/or approximate matrices
 
-analysis.num_eigenvalues = 5  # Compute 5 eigenvalues (use sparse methods)
-analysis.eigendecomposition_matrices = "both"  # Options: "exact", "approximate", "both"
-analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both"
+# Eigendecomposition: always computes full spectrum, sorted by eigenenergy
+analysis.eigendecomposition_matrices = "both"  # Options: None (disabled), "exact", "approximate", "both"
 
-# This analysis computes eigendecompositions for validation and comparison:
-#   - Ground state energy (use num_eigenvalues=1, which_eigenvalues="smallest")
-#   - Low-lying excited states (use num_eigenvalues=5, which_eigenvalues="smallest")
-#   - High-energy states (use num_eigenvalues=5, which_eigenvalues="largest")
-#   - Both ends of spectrum (use which_eigenvalues="both")
+# This analysis computes full-spectrum eigendecompositions (all eigenstates, sorted by energy):
+#   - Always computes ALL eigenvalues and eigenvectors
+#   - Results are automatically sorted by eigenenergy (ground state = index 0)
+#   - Only feasible for small systems (~15-18 qubits, dimension ≤256k)
 
 # Configuration options:
 #   num_eigenvalues:
@@ -416,7 +389,7 @@ analysis.which_eigenvalues = "smallest"  # Options: "smallest", "largest", "both
 # Apply the exact Hamiltonian matrix (no approximations) to input state(s)
 
 # Branch 3: Error Metrics
-analysis.error_num_eigenvalues = 1  # Compare ground state energy
+# Eigenvalue errors: compares all eigenstates (full spectrum, sorted by energy)
 analysis.error_matrix_norms = ["frobenius", "spectral"]  # Matrix difference norms
 analysis.error_state_inputs = ["examples/ground_state.npy"]  # State-dependent errors
 

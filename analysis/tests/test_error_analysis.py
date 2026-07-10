@@ -24,8 +24,8 @@ from qhat.analysis.file_io import save_state
 # Unit Tests: Eigenvalue Errors
 # =================================================================================================
 
-def test_eigenvalue_error_zero_when_identical():
-    """Test that eigenvalue error is zero when matrices are identical."""
+def test_eigenenergy_error_zero_when_identical():
+    """Test that eigenenergy error is zero when matrices are identical."""
     from qhat.analysis.file_io import save_eigendecomposition, load_eigendecomposition
 
     # Create identical eigendecompositions
@@ -42,11 +42,11 @@ def test_eigenvalue_error_zero_when_identical():
             # Save both decompositions
             save_eigendecomposition(
                 'exact_eigendecomposition.npz', eigenvalues, eigenvectors,
-                matrix_type='exact', num_eigenvalues=3, which_eigenvalues='smallest'
+                matrix_type='exact'
             )
             save_eigendecomposition(
                 'approximate_eigendecomposition.npz', eigenvalues, eigenvectors,
-                matrix_type='approximate', num_eigenvalues=3, which_eigenvalues='smallest'
+                matrix_type='approximate', timestep=1.0
             )
 
             # Load eigendecompositions
@@ -65,9 +65,9 @@ def test_eigenvalue_error_zero_when_identical():
             )
 
             # Verify zero errors
-            assert 'eigenvalue_errors' in results
+            assert 'eigenenergy_errors' in results
             np.testing.assert_array_almost_equal(
-                results['eigenvalue_errors']['absolute_errors'],
+                results['eigenenergy_errors']['absolute_errors'],
                 [0.0, 0.0, 0.0]
             )
 
@@ -75,8 +75,8 @@ def test_eigenvalue_error_zero_when_identical():
             os.chdir(original_dir)
 
 
-def test_eigenvalue_error_nonzero_when_different():
-    """Test that eigenvalue error is nonzero when matrices differ."""
+def test_eigenenergy_error_nonzero_when_different():
+    """Test that eigenenergy error is nonzero when matrices differ."""
     from qhat.analysis.file_io import save_eigendecomposition, load_eigendecomposition
 
     # Create different eigendecompositions
@@ -94,11 +94,11 @@ def test_eigenvalue_error_nonzero_when_different():
             # Save both decompositions
             save_eigendecomposition(
                 'exact_eigendecomposition.npz', exact_eigenvalues, eigenvectors,
-                matrix_type='exact', num_eigenvalues=3, which_eigenvalues='smallest'
+                matrix_type='exact'
             )
             save_eigendecomposition(
                 'approximate_eigendecomposition.npz', approx_eigenvalues, eigenvectors,
-                matrix_type='approximate', num_eigenvalues=3, which_eigenvalues='smallest'
+                matrix_type='approximate', timestep=1.0
             )
 
             # Load eigendecompositions
@@ -117,10 +117,10 @@ def test_eigenvalue_error_nonzero_when_different():
             )
 
             # Verify nonzero errors
-            assert 'eigenvalue_errors' in results
+            assert 'eigenenergy_errors' in results
             expected_errors = exact_eigenvalues - approx_eigenvalues
             np.testing.assert_array_almost_equal(
-                results['eigenvalue_errors']['absolute_errors'],
+                results['eigenenergy_errors']['absolute_errors'],
                 expected_errors.tolist()
             )
 
@@ -425,11 +425,11 @@ def test_all_error_types_together():
             # Save eigendecompositions
             save_eigendecomposition(
                 'exact_eigendecomposition.npz', eigenvalues_exact, eigenvectors,
-                matrix_type='exact', num_eigenvalues=2, which_eigenvalues='smallest'
+                matrix_type='exact'
             )
             save_eigendecomposition(
                 'approximate_eigendecomposition.npz', eigenvalues_approx, eigenvectors,
-                matrix_type='approximate', num_eigenvalues=2, which_eigenvalues='smallest'
+                matrix_type='approximate', timestep=1.0
             )
 
             # Load eigendecompositions
@@ -451,7 +451,7 @@ def test_all_error_types_together():
             )
 
             # Verify all three types present
-            assert 'eigenvalue_errors' in results
+            assert 'eigenenergy_errors' in results
             assert 'matrix_frobenius_error' in results
             assert 'matrix_spectral_error' in results
             assert 'state_errors' in results
@@ -477,11 +477,11 @@ def test_error_output_file_created():
             # Save eigendecompositions
             save_eigendecomposition(
                 'exact_eigendecomposition.npz', eigenvalues, eigenvectors,
-                matrix_type='exact', num_eigenvalues=2, which_eigenvalues='smallest'
+                matrix_type='exact'
             )
             save_eigendecomposition(
                 'approximate_eigendecomposition.npz', eigenvalues, eigenvectors,
-                matrix_type='approximate', num_eigenvalues=2, which_eigenvalues='smallest'
+                matrix_type='approximate', timestep=1.0
             )
 
             # Load eigendecompositions
@@ -505,8 +505,8 @@ def test_error_output_file_created():
 
             # Verify can load
             data = np.load('error_analysis.npz')
-            assert 'eigenvalue_absolute_errors' in data
-            assert 'eigenvalue_relative_errors' in data
+            assert 'eigenenergy_absolute_errors' in data
+            assert 'eigenenergy_relative_errors' in data
 
         finally:
             os.chdir(original_dir)
@@ -662,11 +662,11 @@ def test_eigenvalue_relative_error():
         try:
             save_eigendecomposition(
                 'exact_eigendecomposition.npz', exact_eigenvalues, eigenvectors,
-                matrix_type='exact', num_eigenvalues=2, which_eigenvalues='smallest'
+                matrix_type='exact'
             )
             save_eigendecomposition(
                 'approximate_eigendecomposition.npz', approx_eigenvalues, eigenvectors,
-                matrix_type='approximate', num_eigenvalues=2, which_eigenvalues='smallest'
+                matrix_type='approximate', timestep=1.0
             )
 
             # Load eigendecompositions
@@ -687,7 +687,7 @@ def test_eigenvalue_relative_error():
             # (10 - 11) / |10| = -0.1, (20 - 18) / |20| = 0.1
             expected_relative = np.array([-0.1, 0.1])
             np.testing.assert_array_almost_equal(
-                results['eigenvalue_errors']['relative_errors'],
+                results['eigenenergy_errors']['relative_errors'],
                 expected_relative.tolist()
             )
 
