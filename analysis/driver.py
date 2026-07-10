@@ -89,11 +89,15 @@ def run():
     # Extract timestep for eigendecomposition analysis (if available)
     timestep = getattr(state.config_unitary, 'timestep', None)
 
+    # Extract energy shift for correcting eigenvalue comparisons
+    energy_shift = physical_hamiltonian.get_energy_shift()
+
     state.store_results(analyze_algorithm(
         state.config_analysis,
         algorithm,
         hamiltonian=physical_hamiltonian,
-        timestep=timestep
+        timestep=timestep,
+        energy_shift=energy_shift
     ))
 
     # Save Results ________________________________________________________________________________
