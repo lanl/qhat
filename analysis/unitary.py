@@ -26,9 +26,6 @@ class PauliStringLCU(LCUBlockEncoding):
         pauli_terms = [cirq.DensePauliString(term[0],coefficient=term[1])
                           for term in hamiltonian.get_all_pauli_strings(return_as='strings').items()
                       ]
-        # hack to skip identity term
-        # TODO:  fix
-        del pauli_terms[0]
 
         ##  n_terms   :   Number of problem terms
         ##  n_pad     :   Number of padding terms
