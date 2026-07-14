@@ -183,7 +183,11 @@ computed by the script by setting
 
 ### Analyzing an Algorithm
 
-There are many details of the algorithm that may be worth analyzing. The available analyses include:
+There are many details of the algorithm that may be worth analyzing. The available analyses are
+discussed below.
+
+The matrix output, eigendecomposition, error, and numerical simulation analyses are still under
+development are may not be reliable yet.
 
 #### Resource Estimation
 
