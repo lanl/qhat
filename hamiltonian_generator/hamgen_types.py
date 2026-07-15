@@ -6,6 +6,11 @@ import pprint
 import subprocess
 import sys
 
+from qhat.hamiltonian_generator.thresholding import (
+    DEFAULT_COEFFICIENT_THRESHOLD,
+    validate_coefficient_threshold,
+)
+
 logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------------------------------
@@ -34,9 +39,16 @@ class HamiltonianConfiguration:
         self._geometry = ()
         self.basis = "sto-3g"
         self.f2q_mapping = "Jordan-Wigner"
+        self._coefficient_threshold = DEFAULT_COEFFICIENT_THRESHOLD
         # The number of active occupied and vacant spin (single-occupancy) orbitals in the molecule
         self.num_active_occupied = None
         self.num_active_vacant = None
+    @property
+    def coefficient_threshold(self):
+        return self._coefficient_threshold
+    @coefficient_threshold.setter
+    def coefficient_threshold(self, value):
+        self._coefficient_threshold = validate_coefficient_threshold(value)
     def add_atom(self, element, x, y, z):
         # TODO: Clarify the units involved.  Right now we just pass numbers along, so the user has
         #       to know the right units for the various choices they make.  It would be better to
@@ -148,4 +160,3 @@ class State:
                 ext=self.config_general.ham3_ext())
 
 # -------------------------------------------------------------------------------------------------
-

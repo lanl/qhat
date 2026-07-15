@@ -74,6 +74,21 @@ Currently allowed values are
 - for Bravyi-Kitaev: "Bravyi-Kitaev", "Bravyi Kitaev", "BK", "bravyi-kitaev", "bravyi\_kitaev",
   "bravyi kitaev", or "bk"
 
+The absolute coefficient cutoff is set with **`hamiltonian.coefficient_threshold`**.  Its default
+is `1e-8`, preserving the historical QHAT/OpenFermion scale.  QHAT applies this cutoff when it
+builds the active-space spin-orbital tensors and again after all contributions to each final Pauli
+coefficient have been summed.  Set it to `0.0` to disable magnitude-based pruning:
+
+```python
+hamiltonian.coefficient_threshold = 0.0
+```
+
+The value must be finite and non-negative.  The comparison is strict, so a coefficient exactly
+equal to the threshold is retained.  Literal zero also retains floating-point symmetry noise, so
+it does not guarantee identical term counts for molecular geometries that differ only in bond
+length.  See [THRESHOLDING_HOTFIX.md](THRESHOLDING_HOTFIX.md) for the Issue #31 diagnosis,
+Li2 results, cache behavior, and verification instructions.
+
 ## Generated Files
 
 This script will generate various files for intermediate and final stages of the process.  These
@@ -91,7 +106,9 @@ locking some high-energy orbitals as being vacant.  The results of this step wil
 active occupied orbitals and the number of active vacant orbitals.  The one-body and two-body
 tensors from this stage of the calculation will also be saved in a file called
 "[filestub]\_[astag].tensors.npz", which can be loaded into the resource estimation software using
-the `load_numpy` function.
+the `load_numpy` function.  Both files record the effective coefficient threshold.  If a cached
+pickle was generated with a different threshold, QHAT rebuilds this stage from the Hartree-Fock
+pickle instead of silently reusing incompatible tensors.
 
 The third stage is to transform the fermionic creation and annihilation operators to qubit
 operators, yielding some metadata and a set of Pauli strings.  This information will be written to

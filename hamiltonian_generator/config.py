@@ -14,6 +14,9 @@ for i in range(2):
 
 hamiltonian.basis = "sto-3g"                    # Select the atomic basis functions
 
+# Absolute cutoff applied to spin-orbital and final Pauli coefficients.  The default is 1e-8;
+# set this to 0.0 to retain every nonzero floating-point coefficient.
+hamiltonian.coefficient_threshold = 1e-8
+
 hamiltonian.num_active_occupied = 4             # Specify the active space
 hamiltonian.num_active_vacant = 6
-

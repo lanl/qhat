@@ -8,7 +8,7 @@ import time
 import mendeleev
 import numpy as np
 
-from openfermion import InteractionOperator, MolecularData, bravyi_kitaev, jordan_wigner
+from openfermion import MolecularData
 from openfermion.transforms.opconversions.binary_codes import _encoder_bk
 from openfermionpyscf import PyscfMolecularData
 from openfermionpyscf._run_pyscf import compute_integrals, compute_scf, prepare_pyscf_molecule
@@ -19,6 +19,11 @@ from qhat.hamiltonian_generator.hamgen_types import (
     GeneralConfigurationUser,
     HamiltonianConfiguration,
     State,
+)
+from qhat.hamiltonian_generator.thresholding import (
+    DEFAULT_COEFFICIENT_THRESHOLD,
+    get_molecular_hamiltonian,
+    map_interaction_operator,
 )
 
 logger = logging.getLogger(__name__)
@@ -245,10 +250,18 @@ def apply_active_space(state, ham1_HartreeFock):
 
     # Build an InteractionOperator (from openfermion) with one- and two-body integrals computed
     state.log_verbose("Build instance of InteractionOperator.")
-    ham2_ActiveSpace = ham1_HartreeFock.get_molecular_hamiltonian(
+    ham2_ActiveSpace = get_molecular_hamiltonian(
+        ham1_HartreeFock,
         occupied_indices=range(idx_act_occ),
         active_indices=range(idx_act_occ, idx_frz_vac),
+        coefficient_threshold=state.config_hamiltonian.coefficient_threshold,
     )
+    stats = ham2_ActiveSpace.threshold_stats
+    state.log(" ".join([
+        f"Coefficient threshold {ham2_ActiveSpace.coefficient_threshold:.6g} retained",
+        f"{stats['one_body_after']}/{stats['one_body_before']} one-body and",
+        f"{stats['two_body_after']}/{stats['two_body_before']} two-body tensor entries.",
+    ]))
     tstop = time.time()
     # Pass along metadata that needs to be preserved
     ham2_ActiveSpace.hf_energy = ham1_HartreeFock.hf_energy
@@ -266,13 +279,11 @@ def map_fermions_to_qubits(state, ham2_ActiveSpace):
     tstart = time.time()
     ham3_Fermion2Qubit = None
     mapping_name = state.config_hamiltonian.fermion_to_qubit_name()
-    if mapping_name == "jordan-wigner":
-        ham3_Fermion2Qubit = jordan_wigner(ham2_ActiveSpace)
-    elif mapping_name == "bravyi-kitaev":
-        ham3_Fermion2Qubit = bravyi_kitaev(ham2_ActiveSpace)
-    else:
-        mapping = state.config_hamiltonian.f2q_mapping()
-        raise NotImplementedError(f"invalid fermion-to-qubit mapping \"{mapping}\"")
+    ham3_Fermion2Qubit = map_interaction_operator(
+        ham2_ActiveSpace,
+        mapping_name,
+        state.config_hamiltonian.coefficient_threshold,
+    )
     tstop = time.time()
     # Propagate previously-computed metadata that we need to preserve across all run modes
     ham3_Fermion2Qubit.hf_energy = ham2_ActiveSpace.hf_energy
@@ -280,6 +291,8 @@ def map_fermions_to_qubits(state, ham2_ActiveSpace):
     ham3_Fermion2Qubit.basis = ham2_ActiveSpace.basis
     ham3_Fermion2Qubit.separation = ham2_ActiveSpace.separation
     ham3_Fermion2Qubit.f2q_mapping = mapping_name
+    ham3_Fermion2Qubit.coefficient_threshold = ham2_ActiveSpace.coefficient_threshold
+    ham3_Fermion2Qubit.threshold_stats = ham2_ActiveSpace.threshold_stats
     ham3_Fermion2Qubit.hf_time = ham2_ActiveSpace.hf_time
     ham3_Fermion2Qubit.as_time = ham2_ActiveSpace.as_time
     ham3_Fermion2Qubit.f2q_time = tstop - tstart
@@ -366,32 +379,67 @@ def get_ham2(state):
     # TODO: Python errors get a little weird if you have an exception inside an exception.  So
     #       instead the exception clause should _only_ flag that we're going to recompute versus
     #       load, and the actual recomputing should be outside of the except clause.
-    except FileNotFoundError as err:
+    except FileNotFoundError:
+        ham2_ActiveSpace = None
+
+    requested_threshold = state.config_hamiltonian.coefficient_threshold
+    if ham2_ActiveSpace is not None:
+        # Pickles created before threshold configurability necessarily used
+        # OpenFermion's historical 1e-8 default.
+        cached_threshold = getattr(
+            ham2_ActiveSpace,
+            "coefficient_threshold",
+            DEFAULT_COEFFICIENT_THRESHOLD,
+        )
+        if cached_threshold == requested_threshold:
+            ham2_ActiveSpace.coefficient_threshold = cached_threshold
+            if not hasattr(ham2_ActiveSpace, "threshold_stats"):
+                one_after = int(np.count_nonzero(ham2_ActiveSpace.one_body_tensor))
+                two_after = int(np.count_nonzero(ham2_ActiveSpace.two_body_tensor))
+                ham2_ActiveSpace.threshold_stats = {
+                    "one_body_before": None,
+                    "one_body_after": one_after,
+                    "one_body_removed": None,
+                    "two_body_before": None,
+                    "two_body_after": two_after,
+                    "two_body_removed": None,
+                }
+            state.log(' '.join([
+                f"Loaded \"{ham2_filename}\" with coefficient threshold",
+                f"{cached_threshold:.6g}.",
+                "Continuing from after the active space is applied."]))
+            return ham2_ActiveSpace
+
         state.log(' '.join([
-            f"Could not load \"{ham2_filename}\".",
-            f"Trying to load \"{state.filename_ham1()}\"."]))
-        # Get ham1_HartreeFock (by loading or by recomputing, depending on data availability)
-        ham1_HartreeFock = get_ham1(state)
-        # Recompute ham2_ActiveSpace from ham1_HartreeFock
-        state.log("Apply active space.")
-        ham2_ActiveSpace = apply_active_space(state, ham1_HartreeFock)
-        state.log(f"Pickle to \"{ham2_filename}\" file.")
-        # Save ham2_ActiveSpace for later re-use
-        with open(ham2_filename, 'wb') as ham2_file:
-            pickle.dump(ham2_ActiveSpace, ham2_file)
-        # Save the one-body and two-body tensors using numpy's `save` function.  These files can be
-        # loaded using numpy's `load` function.
-        t_filename = ham2_filename[:ham2_filename.rfind('.')] + ".tensors.npz"
-        np.savez_compressed(t_filename,
-                            constant=ham2_ActiveSpace.constant,
-                            one_body=ham2_ActiveSpace.one_body_tensor,
-                            two_body=ham2_ActiveSpace.two_body_tensor)
-        return ham2_ActiveSpace
+            f"Cached \"{ham2_filename}\" used coefficient threshold",
+            f"{cached_threshold:.6g}, but {requested_threshold:.6g} was requested.",
+            "Recomputing the active-space tensors."]))
     else:
-        state.log(' '.join([
-            f"Loaded \"{ham2_filename}\".",
-            "Continuing from after the active space is applied."]))
-        return ham2_ActiveSpace
+        state.log(f"Could not load \"{ham2_filename}\".")
+
+    state.log(f"Trying to load \"{state.filename_ham1()}\".")
+    ham1_HartreeFock = get_ham1(state)
+    state.log("Apply active space.")
+    ham2_ActiveSpace = apply_active_space(state, ham1_HartreeFock)
+    state.log(f"Pickle to \"{ham2_filename}\" file.")
+    with open(ham2_filename, 'wb') as ham2_file:
+        pickle.dump(ham2_ActiveSpace, ham2_file)
+
+    # Store threshold provenance alongside the tensors.
+    stats = ham2_ActiveSpace.threshold_stats
+    t_filename = ham2_filename[:ham2_filename.rfind('.')] + ".tensors.npz"
+    np.savez_compressed(
+        t_filename,
+        constant=ham2_ActiveSpace.constant,
+        one_body=ham2_ActiveSpace.one_body_tensor,
+        two_body=ham2_ActiveSpace.two_body_tensor,
+        coefficient_threshold=ham2_ActiveSpace.coefficient_threshold,
+        one_body_entries_before_threshold=stats["one_body_before"],
+        one_body_entries_after_threshold=stats["one_body_after"],
+        two_body_entries_before_threshold=stats["two_body_before"],
+        two_body_entries_after_threshold=stats["two_body_after"],
+    )
+    return ham2_ActiveSpace
 
 # -------------------------------------------------------------------------------------------------
 
@@ -449,13 +497,27 @@ def compute_metadata(state, ham3_Fermion2Qubit):
     state.metadata["interatomic separation (angstroms)"] = ham3_Fermion2Qubit.separation
     # fermion-to-qubit transformation
     state.metadata["fermion-to-qubit operator mapping"] = ham3_Fermion2Qubit.f2q_mapping
+    state.metadata["coefficient threshold (Hartrees)"] = (
+        ham3_Fermion2Qubit.coefficient_threshold
+    )
+    threshold_stats = ham3_Fermion2Qubit.threshold_stats
+    for tensor_name in ("one_body", "two_body"):
+        before = threshold_stats[f"{tensor_name}_before"]
+        after = threshold_stats[f"{tensor_name}_after"]
+        if before is not None:
+            state.metadata[
+                f"{tensor_name.replace('_', '-')} tensor entries before thresholding"
+            ] = before
+        state.metadata[
+            f"{tensor_name.replace('_', '-')} tensor entries after thresholding"
+        ] = after
     # number of terms in sum of Pauli strings
     state.metadata["number of terms in sum of Pauli strings"] = len(ham3_Fermion2Qubit.terms)
     # one-norm of sum of Pauli strings
     one_norm = sum(abs(coefficient) for coefficient in ham3_Fermion2Qubit.terms.values())
     state.metadata["one-norm of sum of Pauli strings (Hartrees)"] = one_norm
     # eigenvalue bounds (see Trotter Workflow document for where this comes from)
-    E0 = ham3_Fermion2Qubit.terms[tuple()]
+    E0 = ham3_Fermion2Qubit.terms.get(tuple(), 0.0)
     dE = one_norm - abs(E0)
     state.metadata["eigenvalue lower bound from shifted one-norm (Hartrees)"] = E0 - dE
     state.metadata["eigenvalue upper bound from shifted one-norm (Hartrees)"] = E0 + dE
