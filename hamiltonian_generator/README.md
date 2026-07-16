@@ -85,7 +85,7 @@ hamiltonian.coefficient_threshold = 0.0
 The value must be finite and non-negative.  This does not change OpenFermion's standard JW/BK
 mapping, which can still discard small coefficients.  Changing the value also does not invalidate
 an existing active-space pickle; remove that pickle or use a different `general.file_stub` when
-comparing thresholds.  See [THRESHOLDING_HOTFIX.md](THRESHOLDING_HOTFIX.md) for details.
+comparing thresholds.
 
 ## Generated Files
 
