@@ -1,3 +1,3 @@
 representation,number_of_vertices,number_of_possible_pairs,number_of_noncommuting_edges,graph_density,average_degree,maximum_degree,largest_first_greedy_colors,color_group_sizes,pair_analysis_runtime_seconds,coloring_runtime_seconds,total_graph_runtime_seconds
 Hermitian fermionic terms,12,66,12,0.18181818181818182,2.0,,2,"[4, 8]",,,
-JW Pauli strings,14,91,16,0.17582417582417584,2.2857142857142856,4.0,2,"[10, 4]",7.15409998974792e-05,0.00018124999996871338,0.00036145800004305784
+JW Pauli strings,14,91,16,0.17582417582417584,2.2857142857142856,4.0,2,"[10, 4]",0.0001420419976057019,0.00015204100054688752,0.0005224999986239709
