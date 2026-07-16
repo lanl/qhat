@@ -1,3 +1,5 @@
-molecule,n_qubits,mapping,ordering,time_t,trotter_steps,number_of_exponentials,state_based_error,state_infidelity,state_overlap_abs,operator_compilation_seconds,trotter_runtime_seconds
-H4_sto-3g_singlet_H4_0.7414,8,JW,fermionic-term order,1.0,1,111,0.2978799780532097,0.08607533199702655,0.9559940732049407,0.002191625000705244,0.12082220899901586
-H4_sto-3g_singlet_H4_0.7414,8,JW,color-block order,1.0,1,15,0.2978799780532098,0.08607533199702677,0.9559940732049406,0.0011057080009777565,0.06399020800017752
+molecule,n_qubits,mapping,decomposition,ordering,time_t,trotter_steps,suzuki_order,number_of_exponentials,state_based_error,state_infidelity,state_overlap_abs,operator_compilation_seconds,trotter_runtime_seconds
+H4_sto-3g_singlet_H4_0.7414,8,JW,fermionic terms,raw fermionic order,1.0,1,1,111,0.5509420693774129,0.27359625092718565,0.8522932295124809,0.0024425420015177224,0.13068220800050767
+H4_sto-3g_singlet_H4_0.7414,8,JW,fermionic terms,fermionic-color order,1.0,1,1,111,0.2978799780532097,0.08607533199702677,0.9559940732049406,0.002131916997313965,0.11822920899794553
+H4_sto-3g_singlet_H4_0.7414,8,JW,unique JW Pauli strings,OpenFermion order,1.0,1,1,185,0.30010457047693007,0.08803258768770728,0.954969848902201,0.0007572909998998512,0.06227708399819676
+H4_sto-3g_singlet_H4_0.7414,8,JW,unique JW Pauli strings,JW-color order,1.0,1,1,185,0.32131335569408787,0.0951760151406521,0.951222363519355,0.0007710840000072494,0.06089566700029536
