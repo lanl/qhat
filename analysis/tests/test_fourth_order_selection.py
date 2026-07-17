@@ -3,26 +3,27 @@
 Simple test to verify fourth-order Trotter selection works in analysis/unitary.py
 """
 
-import sys
-import logging
+import pytest
 from qhat.analysis.unitary import encode_ramped_trotter
 from qhat.analysis.config_types import UnitaryConfiguration
 from qhat.analysis.hamiltonian import LinearCombinationOfPauliStrings, Hamiltonian
-from qhat.common.logging_utils import configure_logging
 
-# Set up logging to see the selection messages
-configure_logging()
 
-def test_order_selection(energy_error, expected_order, explicit_order=None):
-    """Test that the given error tolerance selects the expected order."""
-    print(f"\n{'='*70}")
-    print(f"Testing with energy_error = {energy_error}")
-    if explicit_order:
-        print(f"Explicitly requesting: {explicit_order}")
-    print(f"Expected order: {expected_order}")
-    print('='*70)
+@pytest.fixture
+def simple_hamiltonian():
+    """Create a simple test Hamiltonian."""
+    pauli_dict = {
+        ((0, 'X'), (1, 'Y')): 0.5,
+        ((1, 'Y'), (2, 'Z')): 0.3,
+        ((0, 'Z'), (2, 'X')): 0.2,
+        ((0, 'X'),): 0.1,
+    }
+    lcps = LinearCombinationOfPauliStrings(sparse=pauli_dict, num_qubits=3)
+    return Hamiltonian(lcps)
 
-    # Create configuration
+
+def create_config(energy_error, explicit_order=None):
+    """Helper to create UnitaryConfiguration."""
     config = UnitaryConfiguration()
     config.method = 'ramped trotter'
     config.trotter_implementation = 'flattened'
@@ -35,61 +36,32 @@ def test_order_selection(energy_error, expected_order, explicit_order=None):
     config.error_coeff_auto_exact = False
     config.error_coeff_time_limit = 5
     config.trotter_order = explicit_order  # Explicitly request order (or None for auto-select)
+    return config
 
-    # Create a simple Hamiltonian
-    # LinearCombinationOfPauliStrings expects either dense or sparse format
-    # sparse format: key is tuple of (qubit, operator) tuples
-    pauli_dict = {
-        ((0, 'X'), (1, 'Y')): 0.5,
-        ((1, 'Y'), (2, 'Z')): 0.3,
-        ((0, 'Z'), (2, 'X')): 0.2,
-        ((0, 'X'),): 0.1,
-    }
-    lcps = LinearCombinationOfPauliStrings(sparse=pauli_dict, num_qubits=3)
-    ham = Hamiltonian(lcps)
 
-    # Encode - this should print log messages showing the order selection
-    try:
-        result = encode_ramped_trotter(config, ham, tevol_hbar=1.0)
-        print(f"✓ Successfully created {expected_order} Trotterization")
-        return True
-    except Exception as e:
-        print(f"✗ Failed: {e}")
-        return False
+def test_large_error_tolerance_prefers_first_order(simple_hamiltonian):
+    """Test that large error tolerance auto-selects first-order."""
+    config = create_config(energy_error=1e-2)
+    result = encode_ramped_trotter(config, simple_hamiltonian, tevol_hbar=1.0)
+    assert result is not None
 
-if __name__ == "__main__":
-    success = True
 
-    # Test 1: Large error tolerance should prefer first-order (lowest cost)
-    print("\n" + "="*70)
-    print("TEST 1: Large error tolerance (auto-select, should prefer first-order)")
-    print("="*70)
-    success &= test_order_selection(energy_error=1e-2, expected_order="first order")
+def test_medium_error_tolerance_prefers_second_order(simple_hamiltonian):
+    """Test that medium error tolerance auto-selects second-order."""
+    config = create_config(energy_error=1e-4)
+    result = encode_ramped_trotter(config, simple_hamiltonian, tevol_hbar=1.0)
+    assert result is not None
 
-    # Test 2: Medium error tolerance should prefer second-order
-    print("\n" + "="*70)
-    print("TEST 2: Medium error tolerance (auto-select, should prefer second-order)")
-    print("="*70)
-    success &= test_order_selection(energy_error=1e-4, expected_order="second order")
 
-    # Test 3: Fourth-order NOT auto-selected, even with very small error tolerance
-    print("\n" + "="*70)
-    print("TEST 3: Very small error tolerance (auto-select, should still prefer second-order)")
-    print("="*70)
-    success &= test_order_selection(energy_error=1e-10, expected_order="second order")
+def test_small_error_tolerance_still_prefers_second_order(simple_hamiltonian):
+    """Test that very small error tolerance still auto-selects second-order (not fourth)."""
+    config = create_config(energy_error=1e-10)
+    result = encode_ramped_trotter(config, simple_hamiltonian, tevol_hbar=1.0)
+    assert result is not None
 
-    # Test 4: Explicitly request fourth-order
-    print("\n" + "="*70)
-    print("TEST 4: Explicitly request fourth-order")
-    print("="*70)
-    success &= test_order_selection(energy_error=1e-10, expected_order="fourth order", explicit_order="fourth order")
 
-    print("\n" + "="*70)
-    if success:
-        print("✓ All tests passed!")
-        print("="*70)
-        sys.exit(0)
-    else:
-        print("✗ Some tests failed")
-        print("="*70)
-        sys.exit(1)
+def test_explicit_fourth_order_request(simple_hamiltonian):
+    """Test that explicitly requesting fourth-order works."""
+    config = create_config(energy_error=1e-10, explicit_order="fourth order")
+    result = encode_ramped_trotter(config, simple_hamiltonian, tevol_hbar=1.0)
+    assert result is not None
