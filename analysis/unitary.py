@@ -245,17 +245,32 @@ def encode_ramped_trotter(
     # derived in terms of the absolute energy error rather than the fractional energy error
     s1 = timestep * config_unitary.error_scale * c1 / config_unitary.energy_error
     s2 = timestep * math.sqrt(config_unitary.error_scale * c2 / config_unitary.energy_error)
-    logger.info(f"-- Trotter step count: s1 = {s1}, s2 = {s2}")
 
+    # Fourth-order step count using C2-based heuristic
+    # NOTE: This is an approximation since we don't compute the exact C4 coefficient
+    s4 = timestep * (config_unitary.error_scale * c2 / config_unitary.energy_error) ** (1.0/3.0)
+    logger.warning(
+        "Fourth-order step count (s4) uses an APPROXIMATION based on C2, not an exact C4 "
+        "coefficient. Unlike first-order (C1) and second-order (C2), this is a heuristic "
+        "estimate and may be less accurate."
+    )
+    logger.info(f"-- Trotter step count: s1 = {s1}, s2 = {s2}, s4 = {s4}")
+
+    # Cost factors: r1=1 (single ramp), r2=2 (forward+backward), r4=10 (5 S2 applications × 2 ramps)
     r1 = 1
     r2 = 2
     r4 = 10
+
+    # Select the method with the lowest cost
     method = "second order"
     Nsteps0 = s2
     if r1 * s1 < r2 * s2:
         method = "first order"
         Nsteps0 = s1
-    # TODO: Add fourth-order (possibly only computed if second order is better than first order)
+    if r4 * s4 < min(r1 * s1, r2 * s2):
+        method = "fourth order"
+        Nsteps0 = s4
+
     Nsteps = max(1, math.ceil(Nsteps0))
     logger.info(f"-- using {method} Trotter formula with {Nsteps} steps ({Nsteps0})")
 
