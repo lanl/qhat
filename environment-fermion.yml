@@ -1,0 +1,19 @@
+name: fermion
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12.13
+  - pip
+  - pip:
+      - ipykernel==7.2.0
+      - jupyterlab==4.5.8
+      - matplotlib==3.10.9
+      - nbclient==0.10.2
+      - nbformat==5.10.4
+      - networkx==3.6.1
+      - numpy==2.4.6
+      - openfermion==1.7.1
+      - openfermionpyscf==0.5
+      - pandas==2.3.3
+      - pyscf==2.13.1
+      - scipy==1.17.1
