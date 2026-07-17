@@ -7,6 +7,7 @@
 # basis set = sto-3g
 # interatomic separation (angstroms) = 2.0
 # fermion-to-qubit operator mapping = jordan-wigner
+# spin-orbital coefficient threshold (Hartrees) = 1e-08
 # number of terms in sum of Pauli strings = 156
 # one-norm of sum of Pauli strings (Hartrees) = 18.125380876421513
 # eigenvalue lower bound from shifted one-norm (Hartrees) = -18.125380876421513

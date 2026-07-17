@@ -12,7 +12,12 @@ DEFAULT_COEFFICIENT_THRESHOLD = 1.0e-8
 def validate_coefficient_threshold(value) -> float:
     if isinstance(value, bool) or not isinstance(value, numbers.Real):
         raise TypeError("coefficient threshold must be a real number")
-    threshold = float(value)
+    try:
+        threshold = float(value)
+    except OverflowError as error:
+        raise ValueError(
+            "coefficient threshold must be finite and non-negative"
+        ) from error
     if not math.isfinite(threshold) or threshold < 0.0:
         raise ValueError("coefficient threshold must be finite and non-negative")
     return threshold

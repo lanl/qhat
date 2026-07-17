@@ -1,0 +1,285 @@
+"""Regression tests for QHAT's configurable coefficient threshold."""
+
+import pickle
+from pathlib import Path
+
+import numpy as np
+import pytest
+from openfermion import InteractionOperator
+from openfermion.chem.molecular_data import (
+    spinorb_from_spatial as openfermion_spinorb_from_spatial,
+)
+
+from qhat.hamiltonian_generator import hamgen
+from qhat.hamiltonian_generator.hamgen_types import HamiltonianConfiguration
+from qhat.hamiltonian_generator.thresholding import (
+    DEFAULT_COEFFICIENT_THRESHOLD,
+    spinorb_from_spatial,
+)
+
+
+HAMGEN_DIRECTORY = Path(__file__).resolve().parents[1]
+
+
+class _ActiveSpaceState:
+    def __init__(self, threshold=DEFAULT_COEFFICIENT_THRESHOLD):
+        self.config_hamiltonian = HamiltonianConfiguration()
+        self.config_hamiltonian.num_active_occupied = 4
+        self.config_hamiltonian.num_active_vacant = 6
+        self.config_hamiltonian.coefficient_threshold = threshold
+
+    def log(self, *args, **kwargs):
+        pass
+
+    def log_verbose(self, *args, **kwargs):
+        pass
+
+
+class _CacheState:
+    def __init__(self, cache_path, threshold):
+        self.cache_path = cache_path
+        self.config_hamiltonian = HamiltonianConfiguration()
+        self.config_hamiltonian.coefficient_threshold = threshold
+
+    def filename_ham1(self):
+        return str(self.cache_path.with_name("hartree-fock.pickle"))
+
+    def filename_ham2(self):
+        return str(self.cache_path)
+
+    def log(self, *args, **kwargs):
+        pass
+
+
+def _interaction_operator(constant, threshold=None):
+    operator = InteractionOperator(
+        constant,
+        np.diag([constant, 0.0]),
+        np.zeros((2, 2, 2, 2)),
+    )
+    operator.hf_energy = -1.0
+    operator.asmeta = {
+        "n_frz_occ_so": 0,
+        "n_act_occ_so": 1,
+        "n_act_vac_so": 1,
+        "n_frz_vac_so": 0,
+    }
+    operator.basis = "test-basis"
+    operator.separation = 1.0
+    operator.hf_time = 0.0
+    operator.as_time = 0.0
+    if threshold is not None:
+        operator.coefficient_threshold = threshold
+    return operator
+
+
+def test_configuration_uses_openfermion_default_threshold():
+    config = HamiltonianConfiguration()
+    assert config.coefficient_threshold == DEFAULT_COEFFICIENT_THRESHOLD == 1.0e-8
+
+
+@pytest.mark.parametrize("value", [0, 1.0e-12, np.float64(1.0e-8)])
+def test_configuration_accepts_non_negative_real_thresholds(value):
+    config = HamiltonianConfiguration()
+    config.coefficient_threshold = value
+    assert config.coefficient_threshold == float(value)
+
+
+@pytest.mark.parametrize(
+    ("value", "exception"),
+    [
+        (-1.0e-8, ValueError),
+        (float("nan"), ValueError),
+        (float("inf"), ValueError),
+        (-float("inf"), ValueError),
+        pytest.param(10**10000, ValueError, id="overflowing-real"),
+        (True, TypeError),
+        ("1e-8", TypeError),
+        (None, TypeError),
+    ],
+)
+def test_configuration_rejects_invalid_thresholds(value, exception):
+    config = HamiltonianConfiguration()
+    with pytest.raises(exception):
+        config.coefficient_threshold = value
+
+
+def test_spinorb_default_parity_strict_boundary_and_zero_threshold():
+    threshold = DEFAULT_COEFFICIENT_THRESHOLD
+    below_threshold = threshold / 2.0
+    one_body = np.array(
+        [
+            [below_threshold, threshold],
+            [-2.0 * threshold, 0.0],
+        ]
+    )
+    two_body = np.zeros((2, 2, 2, 2))
+    two_body[0, 0, 0, 0] = below_threshold
+    two_body[0, 0, 0, 1] = threshold
+    two_body[1, 0, 0, 1] = -2.0 * threshold
+
+    expected_one, expected_two = openfermion_spinorb_from_spatial(one_body, two_body)
+    default_one, default_two = spinorb_from_spatial(one_body, two_body)
+    zero_one, zero_two = spinorb_from_spatial(one_body, two_body, 0.0)
+
+    np.testing.assert_array_equal(default_one, expected_one)
+    np.testing.assert_array_equal(default_two, expected_two)
+
+    assert default_one[0, 0] == 0.0
+    assert default_one[0, 2] == threshold
+    assert default_two[0, 1, 1, 0] == 0.0
+    assert default_two[0, 1, 1, 2] == threshold
+
+    assert zero_one[0, 0] == below_threshold
+    assert zero_two[0, 1, 1, 0] == below_threshold
+
+
+def test_active_space_matches_openfermion_and_respects_zero_threshold():
+    with open(HAMGEN_DIRECTORY / "diatomic_lithium.pickle", "rb") as file:
+        molecule = pickle.load(file)
+
+    default_operator = hamgen.apply_active_space(_ActiveSpaceState(), molecule)
+    expected_operator = molecule.get_molecular_hamiltonian(
+        occupied_indices=range(1),
+        active_indices=range(1, 6),
+    )
+
+    assert default_operator.constant == expected_operator.constant
+    np.testing.assert_array_equal(
+        default_operator.one_body_tensor,
+        expected_operator.one_body_tensor,
+    )
+    np.testing.assert_array_equal(
+        default_operator.two_body_tensor,
+        expected_operator.two_body_tensor,
+    )
+    assert default_operator.coefficient_threshold == DEFAULT_COEFFICIENT_THRESHOLD
+
+    zero_operator = hamgen.apply_active_space(_ActiveSpaceState(0.0), molecule)
+    assert zero_operator.coefficient_threshold == 0.0
+    assert np.count_nonzero(zero_operator.one_body_tensor) > np.count_nonzero(
+        default_operator.one_body_tensor
+    )
+    assert np.count_nonzero(zero_operator.two_body_tensor) > np.count_nonzero(
+        default_operator.two_body_tensor
+    )
+
+
+def test_mapping_and_metadata_use_effective_operator_threshold():
+    state = _ActiveSpaceState(0.0)
+    state.metadata = {}
+    active_operator = _interaction_operator(
+        1.0,
+        threshold=DEFAULT_COEFFICIENT_THRESHOLD,
+    )
+
+    mapped_operator = hamgen.map_fermions_to_qubits(state, active_operator)
+    hamgen.compute_metadata(state, mapped_operator)
+
+    assert mapped_operator.coefficient_threshold == DEFAULT_COEFFICIENT_THRESHOLD
+    assert mapped_operator.coefficient_threshold != state.config_hamiltonian.coefficient_threshold
+    assert state.metadata["spin-orbital coefficient threshold (Hartrees)"] == (
+        DEFAULT_COEFFICIENT_THRESHOLD
+    )
+
+
+def test_active_space_cache_tracks_threshold_and_recomputes_on_mismatch(
+    tmp_path,
+    monkeypatch,
+):
+    cache_path = tmp_path / "active-space.pickle"
+    legacy_operator = _interaction_operator(1.0)
+    with open(cache_path, "wb") as file:
+        pickle.dump(legacy_operator, file)
+
+    calls = []
+    recomputed_operator = _interaction_operator(2.0, threshold=0.0)
+
+    def fake_get_ham1(state):
+        calls.append("get_ham1")
+        return object()
+
+    def fake_apply_active_space(state, molecule):
+        calls.append("apply_active_space")
+        return recomputed_operator
+
+    monkeypatch.setattr(hamgen, "get_ham1", fake_get_ham1)
+    monkeypatch.setattr(hamgen, "apply_active_space", fake_apply_active_space)
+
+    default_state = _CacheState(cache_path, DEFAULT_COEFFICIENT_THRESHOLD)
+    loaded_legacy = hamgen.get_ham2(default_state)
+    assert loaded_legacy.constant == legacy_operator.constant
+    assert loaded_legacy.coefficient_threshold == DEFAULT_COEFFICIENT_THRESHOLD
+    assert calls == []
+
+    zero_state = _CacheState(cache_path, 0.0)
+    rebuilt = hamgen.get_ham2(zero_state)
+    assert rebuilt is recomputed_operator
+    assert calls == ["get_ham1", "apply_active_space"]
+
+    with open(cache_path, "rb") as file:
+        persisted = pickle.load(file)
+    assert persisted.coefficient_threshold == 0.0
+    assert persisted.constant == recomputed_operator.constant
+    with np.load(tmp_path / "active-space.tensors.npz") as tensors:
+        assert set(tensors.files) == {"constant", "one_body", "two_body"}
+        assert tensors["constant"] == recomputed_operator.constant
+        np.testing.assert_array_equal(
+            tensors["one_body"],
+            recomputed_operator.one_body_tensor,
+        )
+        np.testing.assert_array_equal(
+            tensors["two_body"],
+            recomputed_operator.two_body_tensor,
+        )
+
+    loaded_match = hamgen.get_ham2(zero_state)
+    assert loaded_match.constant == recomputed_operator.constant
+    assert loaded_match.coefficient_threshold == 0.0
+    assert calls == ["get_ham1", "apply_active_space"]
+
+
+@pytest.mark.parametrize(
+    "invalid_threshold",
+    [
+        False,
+        float("nan"),
+        np.array([0.0]),
+        pytest.param(10**10000, id="overflowing-real"),
+    ],
+)
+def test_active_space_cache_recomputes_invalid_threshold_provenance(
+    tmp_path,
+    monkeypatch,
+    invalid_threshold,
+):
+    cache_path = tmp_path / "active-space.pickle"
+    cached_operator = _interaction_operator(1.0, threshold=invalid_threshold)
+    with open(cache_path, "wb") as file:
+        pickle.dump(cached_operator, file)
+
+    recomputed_operator = _interaction_operator(
+        2.0,
+        threshold=DEFAULT_COEFFICIENT_THRESHOLD,
+    )
+    calls = []
+
+    def fake_get_ham1(state):
+        calls.append("get_ham1")
+        return object()
+
+    def fake_apply_active_space(state, molecule):
+        calls.append("apply_active_space")
+        return recomputed_operator
+
+    monkeypatch.setattr(hamgen, "get_ham1", fake_get_ham1)
+    monkeypatch.setattr(hamgen, "apply_active_space", fake_apply_active_space)
+
+    state = _CacheState(cache_path, DEFAULT_COEFFICIENT_THRESHOLD)
+    rebuilt = hamgen.get_ham2(state)
+
+    assert rebuilt is recomputed_operator
+    assert calls == ["get_ham1", "apply_active_space"]
+    with open(cache_path, "rb") as file:
+        persisted = pickle.load(file)
+    assert persisted.coefficient_threshold == DEFAULT_COEFFICIENT_THRESHOLD
