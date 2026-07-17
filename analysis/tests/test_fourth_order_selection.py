@@ -13,10 +13,12 @@ from qhat.common.logging_utils import configure_logging
 # Set up logging to see the selection messages
 configure_logging()
 
-def test_order_selection(energy_error, expected_order):
+def test_order_selection(energy_error, expected_order, explicit_order=None):
     """Test that the given error tolerance selects the expected order."""
     print(f"\n{'='*70}")
     print(f"Testing with energy_error = {energy_error}")
+    if explicit_order:
+        print(f"Explicitly requesting: {explicit_order}")
     print(f"Expected order: {expected_order}")
     print('='*70)
 
@@ -32,6 +34,7 @@ def test_order_selection(energy_error, expected_order):
     config.error_coeff_mode = 'monte_carlo'
     config.error_coeff_auto_exact = False
     config.error_coeff_time_limit = 5
+    config.trotter_order = explicit_order  # Explicitly request order (or None for auto-select)
 
     # Create a simple Hamiltonian
     # LinearCombinationOfPauliStrings expects either dense or sparse format
@@ -59,21 +62,27 @@ if __name__ == "__main__":
 
     # Test 1: Large error tolerance should prefer first-order (lowest cost)
     print("\n" + "="*70)
-    print("TEST 1: Large error tolerance (should prefer first-order)")
+    print("TEST 1: Large error tolerance (auto-select, should prefer first-order)")
     print("="*70)
     success &= test_order_selection(energy_error=1e-2, expected_order="first order")
 
     # Test 2: Medium error tolerance should prefer second-order
     print("\n" + "="*70)
-    print("TEST 2: Medium error tolerance (should prefer second-order)")
+    print("TEST 2: Medium error tolerance (auto-select, should prefer second-order)")
     print("="*70)
     success &= test_order_selection(energy_error=1e-4, expected_order="second order")
 
-    # Test 3: Very small error tolerance should prefer fourth-order
+    # Test 3: Fourth-order NOT auto-selected, even with very small error tolerance
     print("\n" + "="*70)
-    print("TEST 3: Very small error tolerance (should prefer fourth-order)")
+    print("TEST 3: Very small error tolerance (auto-select, should still prefer second-order)")
     print("="*70)
-    success &= test_order_selection(energy_error=1e-10, expected_order="fourth order")
+    success &= test_order_selection(energy_error=1e-10, expected_order="second order")
+
+    # Test 4: Explicitly request fourth-order
+    print("\n" + "="*70)
+    print("TEST 4: Explicitly request fourth-order")
+    print("="*70)
+    success &= test_order_selection(energy_error=1e-10, expected_order="fourth order", explicit_order="fourth order")
 
     print("\n" + "="*70)
     if success:
