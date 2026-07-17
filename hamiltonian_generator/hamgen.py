@@ -23,7 +23,6 @@ from qhat.hamiltonian_generator.hamgen_types import (
 from qhat.hamiltonian_generator.thresholding import (
     DEFAULT_COEFFICIENT_THRESHOLD,
     spinorb_from_spatial,
-    validate_coefficient_threshold,
 )
 
 logger = logging.getLogger(__name__)
@@ -301,7 +300,6 @@ def map_fermions_to_qubits(state, ham2_ActiveSpace):
     ham3_Fermion2Qubit.hf_time = ham2_ActiveSpace.hf_time
     ham3_Fermion2Qubit.as_time = ham2_ActiveSpace.as_time
     ham3_Fermion2Qubit.f2q_time = tstop - tstart
-    ham3_Fermion2Qubit.coefficient_threshold = ham2_ActiveSpace.coefficient_threshold
     # Return result
     return ham3_Fermion2Qubit
 
@@ -385,57 +383,44 @@ def get_ham2(state):
     # TODO: Python errors get a little weird if you have an exception inside an exception.  So
     #       instead the exception clause should _only_ flag that we're going to recompute versus
     #       load, and the actual recomputing should be outside of the except clause.
-    except FileNotFoundError:
+    except FileNotFoundError as err:
         state.log(' '.join([
             f"Could not load \"{ham2_filename}\".",
             f"Trying to load \"{state.filename_ham1()}\"."]))
+        # Get ham1_HartreeFock (by loading or by recomputing, depending on data availability)
+        ham1_HartreeFock = get_ham1(state)
+        # Recompute ham2_ActiveSpace from ham1_HartreeFock
+        state.log("Apply active space.")
+        ham2_ActiveSpace = apply_active_space(state, ham1_HartreeFock)
+        state.log(f"Pickle to \"{ham2_filename}\" file.")
+        # Save ham2_ActiveSpace for later re-use
+        with open(ham2_filename, 'wb') as ham2_file:
+            pickle.dump(ham2_ActiveSpace, ham2_file)
+        # Save the one-body and two-body tensors using numpy's `save` function.  These files can be
+        # loaded using numpy's `load` function.
+        t_filename = ham2_filename[:ham2_filename.rfind('.')] + ".tensors.npz"
+        np.savez_compressed(t_filename,
+                            constant=ham2_ActiveSpace.constant,
+                            one_body=ham2_ActiveSpace.one_body_tensor,
+                            two_body=ham2_ActiveSpace.two_body_tensor)
+        return ham2_ActiveSpace
     else:
-        cached_threshold_value = getattr(
+        cached_threshold = getattr(
             ham2_ActiveSpace,
             "coefficient_threshold",
             DEFAULT_COEFFICIENT_THRESHOLD,
         )
         configured_threshold = state.config_hamiltonian.coefficient_threshold
-        try:
-            cached_threshold = validate_coefficient_threshold(cached_threshold_value)
-        except (TypeError, ValueError):
-            state.log(' '.join([
-                f"Loaded \"{ham2_filename}\" with invalid coefficient threshold",
-                f"provenance of type {type(cached_threshold_value).__name__}.",
-                "Recomputing the active space."]))
-            state.log(f"Trying to load \"{state.filename_ham1()}\".")
-        else:
-            if cached_threshold == configured_threshold:
-                # Active-space pickles created before the threshold was configurable used
-                # OpenFermion's historical 1e-8 cutoff and have no explicit provenance field.
-                ham2_ActiveSpace.coefficient_threshold = cached_threshold
-                state.log(' '.join([
-                    f"Loaded \"{ham2_filename}\".",
-                    "Continuing from after the active space is applied."]))
-                return ham2_ActiveSpace
-            state.log(' '.join([
-                f"Loaded \"{ham2_filename}\" with coefficient threshold {cached_threshold},",
-                f"but the configured threshold is {configured_threshold}.",
-                "Recomputing the active space."]))
-            state.log(f"Trying to load \"{state.filename_ham1()}\".")
-
-    # Get ham1_HartreeFock (by loading or by recomputing, depending on data availability)
-    ham1_HartreeFock = get_ham1(state)
-    # Recompute ham2_ActiveSpace from ham1_HartreeFock
-    state.log("Apply active space.")
-    ham2_ActiveSpace = apply_active_space(state, ham1_HartreeFock)
-    state.log(f"Pickle to \"{ham2_filename}\" file.")
-    # Save ham2_ActiveSpace for later re-use
-    with open(ham2_filename, 'wb') as ham2_file:
-        pickle.dump(ham2_ActiveSpace, ham2_file)
-    # Save the one-body and two-body tensors using numpy's `save` function.  These files can be
-    # loaded using numpy's `load` function.
-    t_filename = ham2_filename[:ham2_filename.rfind('.')] + ".tensors.npz"
-    np.savez_compressed(t_filename,
-                        constant=ham2_ActiveSpace.constant,
-                        one_body=ham2_ActiveSpace.one_body_tensor,
-                        two_body=ham2_ActiveSpace.two_body_tensor)
-    return ham2_ActiveSpace
+        if cached_threshold != configured_threshold:
+            raise ValueError(
+                f"Active-space cache \"{ham2_filename}\" was built with coefficient threshold "
+                f"{cached_threshold}, but the configuration requests {configured_threshold}; "
+                "remove the cache and rerun."
+            )
+        state.log(' '.join([
+            f"Loaded \"{ham2_filename}\".",
+            "Continuing from after the active space is applied."]))
+        return ham2_ActiveSpace
 
 # -------------------------------------------------------------------------------------------------
 
@@ -494,7 +479,7 @@ def compute_metadata(state, ham3_Fermion2Qubit):
     # fermion-to-qubit transformation
     state.metadata["fermion-to-qubit operator mapping"] = ham3_Fermion2Qubit.f2q_mapping
     state.metadata["spin-orbital coefficient threshold (Hartrees)"] = (
-        ham3_Fermion2Qubit.coefficient_threshold
+        state.config_hamiltonian.coefficient_threshold
     )
     # number of terms in sum of Pauli strings
     state.metadata["number of terms in sum of Pauli strings"] = len(ham3_Fermion2Qubit.terms)

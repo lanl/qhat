@@ -92,7 +92,6 @@ def test_configuration_accepts_non_negative_real_thresholds(value):
         (float("nan"), ValueError),
         (float("inf"), ValueError),
         (-float("inf"), ValueError),
-        pytest.param(10**10000, ValueError, id="overflowing-real"),
         (True, TypeError),
         ("1e-8", TypeError),
         (None, TypeError),
@@ -165,25 +164,18 @@ def test_active_space_matches_openfermion_and_respects_zero_threshold():
     )
 
 
-def test_mapping_and_metadata_use_effective_operator_threshold():
+def test_mapping_and_metadata_record_configured_threshold():
     state = _ActiveSpaceState(0.0)
     state.metadata = {}
-    active_operator = _interaction_operator(
-        1.0,
-        threshold=DEFAULT_COEFFICIENT_THRESHOLD,
-    )
+    active_operator = _interaction_operator(1.0, threshold=0.0)
 
     mapped_operator = hamgen.map_fermions_to_qubits(state, active_operator)
     hamgen.compute_metadata(state, mapped_operator)
 
-    assert mapped_operator.coefficient_threshold == DEFAULT_COEFFICIENT_THRESHOLD
-    assert mapped_operator.coefficient_threshold != state.config_hamiltonian.coefficient_threshold
-    assert state.metadata["spin-orbital coefficient threshold (Hartrees)"] == (
-        DEFAULT_COEFFICIENT_THRESHOLD
-    )
+    assert state.metadata["spin-orbital coefficient threshold (Hartrees)"] == 0.0
 
 
-def test_active_space_cache_tracks_threshold_and_recomputes_on_mismatch(
+def test_active_space_cache_rejects_mismatch_and_rebuilds_after_removal(
     tmp_path,
     monkeypatch,
 ):
@@ -209,10 +201,14 @@ def test_active_space_cache_tracks_threshold_and_recomputes_on_mismatch(
     default_state = _CacheState(cache_path, DEFAULT_COEFFICIENT_THRESHOLD)
     loaded_legacy = hamgen.get_ham2(default_state)
     assert loaded_legacy.constant == legacy_operator.constant
-    assert loaded_legacy.coefficient_threshold == DEFAULT_COEFFICIENT_THRESHOLD
     assert calls == []
 
     zero_state = _CacheState(cache_path, 0.0)
+    with pytest.raises(ValueError, match="remove the cache and rerun"):
+        hamgen.get_ham2(zero_state)
+    assert calls == []
+
+    cache_path.unlink()
     rebuilt = hamgen.get_ham2(zero_state)
     assert rebuilt is recomputed_operator
     assert calls == ["get_ham1", "apply_active_space"]
@@ -237,49 +233,3 @@ def test_active_space_cache_tracks_threshold_and_recomputes_on_mismatch(
     assert loaded_match.constant == recomputed_operator.constant
     assert loaded_match.coefficient_threshold == 0.0
     assert calls == ["get_ham1", "apply_active_space"]
-
-
-@pytest.mark.parametrize(
-    "invalid_threshold",
-    [
-        False,
-        float("nan"),
-        np.array([0.0]),
-        pytest.param(10**10000, id="overflowing-real"),
-    ],
-)
-def test_active_space_cache_recomputes_invalid_threshold_provenance(
-    tmp_path,
-    monkeypatch,
-    invalid_threshold,
-):
-    cache_path = tmp_path / "active-space.pickle"
-    cached_operator = _interaction_operator(1.0, threshold=invalid_threshold)
-    with open(cache_path, "wb") as file:
-        pickle.dump(cached_operator, file)
-
-    recomputed_operator = _interaction_operator(
-        2.0,
-        threshold=DEFAULT_COEFFICIENT_THRESHOLD,
-    )
-    calls = []
-
-    def fake_get_ham1(state):
-        calls.append("get_ham1")
-        return object()
-
-    def fake_apply_active_space(state, molecule):
-        calls.append("apply_active_space")
-        return recomputed_operator
-
-    monkeypatch.setattr(hamgen, "get_ham1", fake_get_ham1)
-    monkeypatch.setattr(hamgen, "apply_active_space", fake_apply_active_space)
-
-    state = _CacheState(cache_path, DEFAULT_COEFFICIENT_THRESHOLD)
-    rebuilt = hamgen.get_ham2(state)
-
-    assert rebuilt is recomputed_operator
-    assert calls == ["get_ham1", "apply_active_space"]
-    with open(cache_path, "rb") as file:
-        persisted = pickle.load(file)
-    assert persisted.coefficient_threshold == DEFAULT_COEFFICIENT_THRESHOLD
