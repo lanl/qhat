@@ -139,6 +139,12 @@ supports
       in operation count varies depending on the Hamiltonian structure.
     - `False`: Keep all terms separate. Useful for comparing results with the original
       implementation. When disabled, produces the same gate counts as the original implementation.
+  - `trotter_order`: (Optional) Explicitly specify which Trotter order to use:
+    - `None` (default): Automatically select between first-order and second-order based on cost-effectiveness
+    - `"first order"`: Force use of first-order Trotter
+    - `"second order"`: Force use of second-order Trotter
+    - `"fourth order"`: Force use of fourth-order Trotter using five-term Suzuki recursion (step
+      count is estimates from second-order method, hence being excluded from automatic selection).
 - Double-Factorization: The function **`unitary.encode_double_factorization()`** uses a
   double-factorized block-encoding of the Hamiltonian.  This model is preliminary: it has not been
   verified and is known to fail unexpectedly for some Hamiltonians.  It takes the following

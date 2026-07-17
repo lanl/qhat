@@ -123,6 +123,7 @@ class UnitaryConfiguration(ConfigurationBase):
         self.trotter_implementation = kwargs.get("trotter_implementation", "flattened")
         self.trotter_combine_terms = kwargs.get("trotter_combine_terms", True)
         self.ordering_method = kwargs.get("ordering_method", None)
+        self.trotter_order = kwargs.get("trotter_order", None)
     def encode_pauli_lcu(self, **kwargs):
         self._only_once()
         self.method = "pauli lcu"
@@ -140,6 +141,7 @@ class UnitaryConfiguration(ConfigurationBase):
         self.save_if_present(table, "trotter_implementation")
         self.save_if_present(table, "trotter_combine_terms")
         self.save_if_present(table, "ordering_method")
+        self.save_if_present(table, "trotter_order")
         return table
 
 # -------------------------------------------------------------------------------------------------
