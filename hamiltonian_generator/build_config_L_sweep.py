@@ -165,7 +165,7 @@ def do_the_thing(elements, element1, basis, configuration, element2, L,
 def mapping_loop(elements, element1, basis, configuration, element2, L,
                  total_orbitals, n_act_occ, n_act_vac, count, indent,
                  library_root, config_files):
-    for mapping in ["JW", "BK"]:
+    for mapping in ["JW",]: # "BK"]:
         do_the_thing(elements, element1, basis, configuration, element2, L,
                      total_orbitals, n_act_occ, n_act_vac, mapping, count, indent,
                      library_root, config_files)
