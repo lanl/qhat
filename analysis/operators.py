@@ -254,11 +254,13 @@ class OperatorRepresentation:
             return data
 
         # Need to compute eigendecomposition from dense matrix
-        if operator_type == 'hamiltonian' and not energy_shifted:
-            # Unshifted Hamiltonian - should be Hermitian, use eigh for efficiency
+        if operator_type == 'hamiltonian':
+            # Hamiltonians (shifted or unshifted) are Hermitian, use eigh
+            # IMPORTANT: Must use eigh (not eig) for Hermitian matrices to get
+            # properly orthonormal eigenvectors. Using eig() causes reconstruction errors.
             eigenvalues, eigenvectors = scipy.linalg.eigh(data)
         else:
-            # Everything else - use general eig
+            # Time-evolution operators - use general eig
             eigenvalues, eigenvectors = scipy.linalg.eig(data)
 
         result = {
