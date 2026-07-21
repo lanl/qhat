@@ -99,8 +99,9 @@ Created `test_operator_conversions.py` - comprehensive test that:
 - Checks unitarity and eigenvalue consistency
 - **Helped identify the eigenvector reconstruction bug**
 
-### Commit
+### Commits
 `7f0e92c` - "Fix eigenvector reconstruction bug in OperatorRepresentation"
+`cb42777` - "Fix matrix reconstruction to use proper inverse for time-evolution operators"
 
 ---
 
@@ -208,7 +209,9 @@ For U' → U_physical:
 ### Commits
 1. `2320ae7` - Initial (incorrect) fix attempt
 2. `ff76979` - Fix sign convention mismatch ✅
-3. `7f0e92c` - Fix eigenvector reconstruction bug ✅
+3. `7f0e92c` - Fix eigenvector reconstruction bug (eigh vs eig) ✅
+4. `cb42777` - Fix matrix reconstruction (V† vs V^(-1)) ✅
+5. `95e9927` - Add documentation and diagnostic test ✅
 
 ---
 
