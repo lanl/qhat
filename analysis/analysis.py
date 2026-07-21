@@ -1148,23 +1148,9 @@ def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfigura
     """
 
     # Check eigenvalue error analysis dependencies
-    if config_analysis.enable_eigenvalue_errors:
-        # Check if eigendecomposition is configured
-        eigendecomposition_configured = config_analysis.eigendecomposition_matrices is not None
-
-        if not eigendecomposition_configured:
-            raise ValueError(
-                "enable_eigenvalue_errors requires eigendecomposition. "
-                "Set eigendecomposition_matrices to 'both' to enable eigenvalue error analysis."
-            )
-
-        # Must compute both eigendecompositions to compare
-        if config_analysis.eigendecomposition_matrices != 'both':
-            logger.info(
-                "INFO: enable_eigenvalue_errors requires both exact and approximate eigendecompositions. "
-                f"Auto-setting eigendecomposition_matrices from '{config_analysis.eigendecomposition_matrices}' to 'both'."
-            )
-            config_analysis.eigendecomposition_matrices = 'both'
+    # Note: If enable_eigenvalue_errors is True, the requires_*_eigendecomposition() functions
+    # will return True, ensuring eigendecompositions are computed even if not explicitly requested
+    # for output. No validation error needed - the system auto-enables what's required.
 
     # Normalize string-or-list config values to always be lists
     # This allows downstream code to always assume list type
