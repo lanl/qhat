@@ -779,8 +779,10 @@ def error_analysis(
             )
 
     # =============================================================================================
-    # 3. STATE-DEPENDENT ERRORS
+    # 3. STATE-DEPENDENT ERRORS: ||U_exact|ψ⟩ - U_approx|ψ⟩||
     # =============================================================================================
+    # Compares time evolution applied to specific quantum states.
+    # Uses the same unshifted operators (U_exact, U_approx) as matrix norm errors.
 
     if config_analysis.error_state_inputs is not None:
         # Note: error_state_inputs is normalized to list during validation
@@ -811,24 +813,26 @@ def error_analysis(
                 logger.info(f"ERROR: Failed to load state from {state_file}: {e}")
                 raise
 
-            # Apply exact operator
-            if hasattr(exact_matrix, 'matvec'):
-                exact_final = exact_matrix.matvec(initial_state)
-            else:
-                exact_final = exact_matrix @ initial_state
+            # Use the converted unitary operators (computed in conversion section above)
+            if exact_unitary_matrix is None or approx_unitary_matrix is None:
+                raise RuntimeError(
+                    "Unitary matrices should have been computed but are None. "
+                    "This is an internal error in the operator conversion logic."
+                )
 
-            # Apply approximate operator
-            if hasattr(unitary_matrix, 'matvec'):
-                approx_final = unitary_matrix.matvec(initial_state)
-            else:
-                approx_final = unitary_matrix @ initial_state
+            # Apply exact time evolution operator: U_exact |ψ⟩
+            # Note: For Phase 1 dense case, these are always numpy arrays (not matrix-free)
+            exact_final = exact_unitary_matrix @ initial_state
 
-            # Compute error
+            # Apply approximate time evolution operator: U_approx |ψ⟩
+            approx_final = approx_unitary_matrix @ initial_state
+
+            # Compute error: ||U_exact|ψ⟩ - U_approx|ψ⟩||
             diff = exact_final - approx_final
             absolute_error = np.linalg.norm(diff)
             relative_error = absolute_error / np.linalg.norm(exact_final)
 
-            logger.info(f"  {state_file}: absolute error = {absolute_error:.6e}, relative error = {relative_error:.6e}")
+            logger.info(f"  {state_file}: ||U_exact|ψ⟩ - U_approx|ψ⟩|| = {absolute_error:.6e} (relative: {relative_error:.6e})")
 
             state_errors.append({
                 'input_file': state_file,
