@@ -200,13 +200,13 @@ class TestEnergyShift:
             representation='dense_matrix'
         )
 
-        # Expected: H_shifted = H - E*I
-        expected = np.diag([1.0 - 0.5, 2.0 - 0.5])
+        # Expected: H_shifted = H + E*I (NEW CONVENTION, matches driver.py)
+        expected = np.diag([1.0 + 0.5, 2.0 + 0.5])
         np.testing.assert_allclose(H_shifted, expected, rtol=1e-14)
 
     def test_remove_shift_from_hamiltonian(self):
         """Test removing energy shift from Hamiltonian eigenvalues."""
-        H_shifted = np.diag([0.5, 1.5])  # This is H - 0.5*I where H = diag([1, 2])
+        H_shifted = np.diag([1.5, 2.5])  # This is H + 0.5*I where H = diag([1, 2]) (NEW CONVENTION)
         energy_shift = 0.5
         timestep = 1.0
 
@@ -226,7 +226,7 @@ class TestEnergyShift:
             representation='dense_matrix'
         )
 
-        # Expected: H = H_shifted + E*I
+        # Expected: H = H_shifted - E*I (NEW CONVENTION)
         expected = np.diag([1.0, 2.0])
         np.testing.assert_allclose(H_unshifted, expected, rtol=1e-14)
 
@@ -254,8 +254,9 @@ class TestEnergyShift:
             representation='dense_matrix'
         )
 
-        # Expected: U_shifted = exp(i*E*t)*U_unshifted
-        phase_factor = np.exp(1j * energy_shift * timestep)
+        # Expected: U_shifted = exp(-i*E*t)*U_unshifted (NEW CONVENTION, matches driver.py)
+        # H_shifted = H + E*I, so U_shifted = exp(-i*(H+E*I)*t) = exp(-i*E*t)*exp(-i*H*t)
+        phase_factor = np.exp(-1j * energy_shift * timestep)
         expected = phase_factor * U_unshifted
         np.testing.assert_allclose(U_shifted, expected, rtol=1e-14)
 
@@ -352,11 +353,11 @@ class TestComplexConversions:
             representation='dense_matrix'
         )
 
-        # Compute expected manually:
+        # Compute expected manually (NEW CONVENTION):
         # 1. H → U: U = exp(-i*H*t)
-        # 2. Apply shift: U_shifted = exp(i*E*t)*U
+        # 2. Apply shift: U_shifted = exp(-i*E*t)*U (H_shifted = H + E*I)
         U = scipy.linalg.expm(-1j * H * timestep)
-        phase_factor = np.exp(1j * energy_shift * timestep)
+        phase_factor = np.exp(-1j * energy_shift * timestep)  # FIXED: was +1j
         expected = phase_factor * U
 
         np.testing.assert_allclose(U_shifted, expected, rtol=1e-14)
@@ -410,17 +411,17 @@ class TestComplexConversions:
         U_unshifted = op.get(operator_type='time_evolution', energy_shifted=False)
         U_shifted = op.get(operator_type='time_evolution', energy_shifted=True)
 
-        # Check relationships:
-        # 1. H_shifted = H_unshifted - E*I
-        expected_H_shifted = H_unshifted - energy_shift * np.eye(2)
+        # Check relationships (NEW CONVENTION):
+        # 1. H_shifted = H_unshifted + E*I (FIXED: was -)
+        expected_H_shifted = H_unshifted + energy_shift * np.eye(2)
         np.testing.assert_allclose(H_shifted, expected_H_shifted, rtol=1e-14)
 
         # 2. U_unshifted = exp(-i*H_unshifted*t)
         expected_U_unshifted = scipy.linalg.expm(-1j * H_unshifted * timestep)
         np.testing.assert_allclose(U_unshifted, expected_U_unshifted, rtol=1e-14)
 
-        # 3. U_shifted = exp(i*E*t)*U_unshifted
-        phase_factor = np.exp(1j * energy_shift * timestep)
+        # 3. U_shifted = exp(-i*E*t)*U_unshifted (FIXED: was +i)
+        phase_factor = np.exp(-1j * energy_shift * timestep)
         expected_U_shifted = phase_factor * U_unshifted
         np.testing.assert_allclose(U_shifted, expected_U_shifted, rtol=1e-14)
 
@@ -526,9 +527,9 @@ class TestEdgeCases:
             energy_shift=energy_shift
         )
 
-        # Should still work correctly
+        # Should still work correctly (NEW CONVENTION)
         H_shifted = op.get(operator_type='hamiltonian', energy_shifted=True)
-        expected = np.diag([1.0 - 100.0, 2.0 - 100.0])
+        expected = np.diag([1.0 + 100.0, 2.0 + 100.0])  # FIXED: was - (sign error)
         np.testing.assert_allclose(H_shifted, expected, rtol=1e-14)
 
     def test_very_small_timestep(self):
