@@ -175,6 +175,154 @@ class AnalysisConfiguration(ConfigurationBase):
         self.error_state_inputs = None
         self.exact_simulation_inputs = None
 
+        # New flexible output API
+        self._matrix_output_requests = []
+        self._eigendecomposition_output_requests = []
+
+    def save_matrix_to_file(self, filename, operator, form, shift):
+        """
+        Request saving a matrix to file.
+
+        All parameters are required to ensure explicit specification.
+
+        Parameters
+        ----------
+        filename : str
+            Output filename (e.g., 'H_exact.npz')
+            Supported extensions: .npz, .h5, .hdf5, .txt
+        operator : {'exact', 'approximate'}
+            Which operator to save
+            'exact' = true Hamiltonian (no approximations)
+            'approximate' = algorithm output (Trotter, LCU, etc.)
+        form : {'hamiltonian', 'time_evolution'}
+            Which representation to save
+            'hamiltonian' = Hamiltonian matrix H
+            'time_evolution' = Time-evolution operator U = exp(-i*H*t)
+        shift : {'unshifted', 'shifted'}
+            Whether to include energy shift
+            'unshifted' = physical energy scale (can have negative eigenvalues)
+            'shifted' = QPE energy scale (all eigenvalues positive)
+
+        Examples
+        --------
+        >>> # Save physical Hamiltonian
+        >>> analysis.save_matrix_to_file(
+        ...     filename='H_exact.npz',
+        ...     operator='exact',
+        ...     form='hamiltonian',
+        ...     shift='unshifted'
+        ... )
+
+        >>> # Save approximate time-evolution operator (shifted for QPE)
+        >>> analysis.save_matrix_to_file(
+        ...     filename='U_approx_shifted.npz',
+        ...     operator='approximate',
+        ...     form='time_evolution',
+        ...     shift='shifted'
+        ... )
+        """
+        # Validate inputs
+        self._validate_output_request(filename, operator, form, shift)
+
+        # Store request
+        self._matrix_output_requests.append({
+            'filename': filename,
+            'operator': operator,
+            'form': form,
+            'shift': shift
+        })
+
+    def save_eigendecomposition_to_file(self, filename, operator, form, shift):
+        """
+        Request saving an eigendecomposition to file.
+
+        All parameters are required to ensure explicit specification.
+
+        Parameters
+        ----------
+        filename : str
+            Output filename (e.g., 'H_exact_eig.npz')
+            Supported extensions: .npz, .h5, .hdf5
+        operator : {'exact', 'approximate'}
+            Which operator to eigendecompose
+            'exact' = true Hamiltonian (no approximations)
+            'approximate' = algorithm output (Trotter, LCU, etc.)
+        form : {'hamiltonian', 'time_evolution'}
+            Which representation to eigendecompose
+            'hamiltonian' = diagonalize H to get eigenenergies
+            'time_evolution' = diagonalize U and convert phases to energies
+        shift : {'unshifted', 'shifted'}
+            Whether eigenvalues include energy shift
+            'unshifted' = physical energy scale
+            'shifted' = QPE energy scale (shifted eigenvalues)
+
+        Output file contains:
+            eigenenergies : ndarray
+                Eigenvalues (sorted ascending)
+            eigenvectors : ndarray
+                Eigenvectors (columns correspond to eigenvalues)
+            metadata : dict
+                operator, form, shift, timestamp, dimension
+
+        Examples
+        --------
+        >>> # Save eigendecomposition of physical Hamiltonian
+        >>> analysis.save_eigendecomposition_to_file(
+        ...     filename='H_exact_eig.npz',
+        ...     operator='exact',
+        ...     form='hamiltonian',
+        ...     shift='unshifted'
+        ... )
+
+        >>> # Save eigendecomposition of approximate unitary
+        >>> analysis.save_eigendecomposition_to_file(
+        ...     filename='U_approx_eig.npz',
+        ...     operator='approximate',
+        ...     form='time_evolution',
+        ...     shift='unshifted'
+        ... )
+        """
+        # Validate inputs
+        self._validate_output_request(filename, operator, form, shift)
+
+        # Store request
+        self._eigendecomposition_output_requests.append({
+            'filename': filename,
+            'operator': operator,
+            'form': form,
+            'shift': shift
+        })
+
+    def _validate_output_request(self, filename, operator, form, shift):
+        """Validate output request parameters."""
+        valid_operators = ['exact', 'approximate']
+        valid_forms = ['hamiltonian', 'time_evolution']
+        valid_shifts = ['unshifted', 'shifted']
+
+        if operator not in valid_operators:
+            raise ValueError(
+                f"operator must be one of {valid_operators}, got '{operator}'"
+            )
+        if form not in valid_forms:
+            raise ValueError(
+                f"form must be one of {valid_forms}, got '{form}'"
+            )
+        if shift not in valid_shifts:
+            raise ValueError(
+                f"shift must be one of {valid_shifts}, got '{shift}'"
+            )
+
+        # Validate filename
+        if not isinstance(filename, str):
+            raise TypeError(f"filename must be a string, got {type(filename)}")
+
+        supported_exts = ('.npz', '.h5', '.hdf5', '.txt')
+        if not filename.endswith(supported_exts):
+            logger.warning(
+                f"Filename '{filename}' has unusual extension. "
+                f"Supported: {', '.join(supported_exts)}"
+            )
+
     def _generate_TOML_table(self):
         table = tomlkit.table()
         self.save_if_present(table, "resource_estimator")
@@ -187,6 +335,13 @@ class AnalysisConfiguration(ConfigurationBase):
         self.save_if_present(table, "error_matrix_norms")
         self.save_if_present(table, "error_state_inputs")
         self.save_if_present(table, "exact_simulation_inputs")
+
+        # Save new output requests
+        if self._matrix_output_requests:
+            table['matrix_output_requests'] = self._matrix_output_requests
+        if self._eigendecomposition_output_requests:
+            table['eigendecomposition_output_requests'] = self._eigendecomposition_output_requests
+
         return table
 
 # -------------------------------------------------------------------------------------------------
