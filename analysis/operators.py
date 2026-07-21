@@ -356,24 +356,30 @@ class OperatorRepresentation:
         """
         Apply energy shift to eigenvalues.
 
-        For Hamiltonians: H_shifted = H - E*I, so λ_shifted = λ - E
-        For time-evolution: U_shifted = exp(i*E*t/ℏ)*U, so λ_U_shifted = exp(i*E*t/ℏ)*λ_U
+        CONVENTION CHANGE (2026-07-21): Now matches hamiltonian.py driver convention.
+        For Hamiltonians: H_shifted = H + E*I, so λ_shifted = λ + E
+        For time-evolution: U_shifted = exp(-i*E*t/ℏ)*U, so λ_U_shifted = exp(-i*E*t/ℏ)*λ_U
+
+        This matches the driver.py convention where energy_shift(+E) adds E to eigenvalues.
         """
         if operator_type == 'hamiltonian':
-            return eigenvalues - self.energy_shift
+            return eigenvalues + self.energy_shift  # FIXED: was - (sign error)
         else:  # time_evolution
-            phase_factor = np.exp(1j * self.energy_shift * self.timestep / self.hbar)
+            phase_factor = np.exp(-1j * self.energy_shift * self.timestep / self.hbar)  # FIXED: was +1j
             return phase_factor * eigenvalues
 
     def _remove_energy_shift(self, eigenvalues: np.ndarray, operator_type: str) -> np.ndarray:
         """
         Remove energy shift from eigenvalues (inverse of _apply_energy_shift).
 
-        For Hamiltonians: H = H_shifted + E*I, so λ = λ_shifted + E
-        For time-evolution: U = exp(-i*E*t/ℏ)*U_shifted, so λ_U = exp(-i*E*t/ℏ)*λ_U_shifted
+        CONVENTION CHANGE (2026-07-21): Now matches hamiltonian.py driver convention.
+        For Hamiltonians: H = H_shifted - E*I, so λ = λ_shifted - E
+        For time-evolution: U = exp(+i*E*t/ℏ)*U_shifted, so λ_U = exp(+i*E*t/ℏ)*λ_U_shifted
+
+        This matches the driver.py convention where energy_shift(+E) adds E to eigenvalues.
         """
         if operator_type == 'hamiltonian':
-            return eigenvalues + self.energy_shift
+            return eigenvalues - self.energy_shift  # FIXED: was + (sign error)
         else:  # time_evolution
-            phase_factor = np.exp(-1j * self.energy_shift * self.timestep / self.hbar)
+            phase_factor = np.exp(1j * self.energy_shift * self.timestep / self.hbar)  # FIXED: was -1j
             return phase_factor * eigenvalues
