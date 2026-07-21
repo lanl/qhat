@@ -4,3 +4,7 @@ __pycache__
 qhat.egg-info
 .toml
 *.log
+
+# Generated L-sweep Hamiltonian intermediates can contain thousands of files.
+# Benchmark summaries live in trotter_benchmark_results instead.
+demo_L_sweep_library/

@@ -1,0 +1,54 @@
+{
+  "cases": [
+    {
+      "case_id": "similar_4q",
+      "molecule": "Be-Be",
+      "bond_length": 2.244,
+      "basis": "sto-6g",
+      "active_occupied": 2,
+      "active_vacant": 2,
+      "dat_path": "demo_L_sweep_library/Be-Be/2.24/sto-6g/Be-Be_2.24_sto-6g_as-002-002_jw.dat",
+      "tensor_path": "demo_L_sweep_library/Be-Be/2.24/sto-6g/Be-Be_2.24_sto-6g_as-002-002.tensors.npz",
+      "initial_state_path": "demo_L_sweep_library/Be-Be/2.24/sto-6g/Be-Be_2.24_sto-6g_as-002-002_jw.npy",
+      "selection_reason": "4-qubit case where both colored methods have similar error"
+    },
+    {
+      "case_id": "fermionic_first_order_6q",
+      "molecule": "B-B",
+      "bond_length": 2.38,
+      "basis": "sto-6g",
+      "active_occupied": 2,
+      "active_vacant": 4,
+      "dat_path": "demo_L_sweep_library/B-B/2.38/sto-6g/B-B_2.38_sto-6g_as-002-004_jw.dat",
+      "tensor_path": "demo_L_sweep_library/B-B/2.38/sto-6g/B-B_2.38_sto-6g_as-002-004.tensors.npz",
+      "initial_state_path": "demo_L_sweep_library/B-B/2.38/sto-6g/B-B_2.38_sto-6g_as-002-004_jw.npy",
+      "selection_reason": "6-qubit case where fermionic coloring is better at first order"
+    },
+    {
+      "case_id": "jw_second_order_6q",
+      "molecule": "B-B",
+      "bond_length": 2.38,
+      "basis": "hgbs-5",
+      "active_occupied": 2,
+      "active_vacant": 4,
+      "dat_path": "demo_L_sweep_library/B-B/2.38/hgbs-5/B-B_2.38_hgbs-5_as-002-004_jw.dat",
+      "tensor_path": "demo_L_sweep_library/B-B/2.38/hgbs-5/B-B_2.38_hgbs-5_as-002-004.tensors.npz",
+      "initial_state_path": "demo_L_sweep_library/B-B/2.38/hgbs-5/B-B_2.38_hgbs-5_as-002-004_jw.npy",
+      "selection_reason": "6-qubit case where direct JW coloring is much better at second order"
+    }
+  ],
+  "random_orderings": 100,
+  "seed": 20260721,
+  "total_time": 1.0,
+  "steps": [
+    1,
+    2,
+    5,
+    10
+  ],
+  "implemented_orders": [
+    1,
+    2
+  ],
+  "randomization_unit": "individual nonidentity decomposition vertices"
+}

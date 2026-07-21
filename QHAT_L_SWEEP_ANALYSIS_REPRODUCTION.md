@@ -172,6 +172,13 @@ and
 h_{pqrs}a_p^\dagger a_q^\dagger a_r a_s.
 \]
 
+Before graph construction, tensor permutations are canonicalized into the same
+descending-index normal-order convention used by OpenFermion in
+`h2_fermionic.ipynb`. Fermionic antisymmetry signs are applied, repeated
+equal-action operators are discarded, and equivalent monomials are combined.
+The implementation performs this limited tensor canonicalization directly and
+does not import OpenFermion.
+
 A monomial and its Hermitian conjugate are grouped into one Hermitian vertex:
 
 \[
@@ -347,7 +354,43 @@ The 108 exact-evolution cases consist of all successful JW cases at two, four, a
 - spectral error; and
 - tensor-to-JW reconstruction error.
 
-## 10. Disk usage and Git guidance
+## 10. Run the focused three-case robustness benchmark
+
+After generating the L-sweep library, run the representative benchmark from the
+repository root:
+
+```bash
+python run_trotter_benchmark.py --random-orderings 100
+python summarize_trotter_results.py
+```
+
+The default selection contains one four-qubit near-tie, one six-qubit case where
+fermionic coloring is better at first order, and one six-qubit case where direct
+JW coloring is much better at second order. The runner evaluates first and
+second order at 1, 2, 5, and 10 steps. It saves the graph/color schedule,
+color-block and nested-commutator diagnostics, 100 seeded random vertex orders,
+state error, infidelity, and particle-number leakage.
+
+The portable outputs are written to `trotter_benchmark_results/`:
+
+- `ordering_trials.csv`: colored and random-order measurements;
+- `graph_diagnostics.csv`: vertices, edges, colors, color membership/order, and
+  coefficient-weighted commutator summaries;
+- `block_commutators.csv`: pairwise color-block diagnostics;
+- `robustness_summary.csv`: best, median, percentile, and relative-error metrics;
+- `benchmark_summary.md`: the compact numeric report; and
+- `benchmark_config.json`: exact cases, seed, time, and step settings.
+
+The notebook's **Focused benchmark** section reads these outputs and plots the
+colored schedule against the random median and 10th–90th percentile band.
+
+The generated `demo_L_sweep_library/` directory is intentionally ignored by
+Git. Consequently, a clean clone must generate the L-sweep inputs before
+rerunning the benchmark. The regression tests run the data-independent checks
+everywhere and automatically add the three numeric case checks when those local
+inputs are present.
+
+## 11. Disk usage and Git guidance
 
 The complete generated library can require several gigabytes because of the Hartree–Fock HDF5 and pickle intermediates. In the reference run, the molecular library occupied approximately 6.3 GB, while the final CSV, notebook, and Markdown reports were small enough to review and publish normally.
 
@@ -356,6 +399,8 @@ Do not commit the full generated library unless the repository explicitly uses a
 - `qhat_L_sweep_trotter_demo.ipynb`;
 - `qhat_full_library_coloring_trotter_errors.csv`;
 - `QHAT_FERMIONIC_VS_PAULI_NONCOMMUTATION_INSIGHTS.md`; and
+- `trotter_benchmark_results/*.csv` and `benchmark_summary.md`;
+- `run_trotter_benchmark.py` and `summarize_trotter_results.py`; and
 - this reproduction guide.
 
 ## Troubleshooting
