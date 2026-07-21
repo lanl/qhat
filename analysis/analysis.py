@@ -614,8 +614,6 @@ def error_analysis(
     #   - H ↔ U (Hamiltonian ↔ time-evolution operator)
     #   - Shifted ↔ unshifted (energy shift application/removal)
     #   - Dense matrix ↔ eigendecomposition
-    #
-    # Phase 2: Dense matrices only; matrix-free support deferred to Phase 3
 
     # Wrap operators in OperatorRepresentation instances
     exact_op = None
@@ -654,11 +652,9 @@ def error_analysis(
         is_approx_dense = isinstance(unitary_matrix, np.ndarray)
 
         if not (is_exact_dense and is_approx_dense):
-            # Matrix-free case: not implemented in Phase 2
+            # Matrix-free case: not implemented yet
             raise NotImplementedError(
-                "Matrix/state error analysis not yet implemented for matrix-free operators. "
-                "Phase 2 supports only dense matrices (systems with n ≤ 15 qubits). "
-                "Reduce system size to enable dense matrix computation, or disable these error types."
+                "Matrix/state error analysis not yet implemented for matrix-free operators."
             )
 
         logger.verbose(f"Creating OperatorRepresentation instances")
@@ -787,13 +783,11 @@ def error_analysis(
                     raise ValueError(f"Unknown matrix norm type: {norm_type}")
 
         else:
-            # Matrix-free case: not implemented in Phase 2
+            # Matrix-free case: not implemented yet
             raise NotImplementedError(
                 "Matrix-free matrix norm error analysis not yet implemented. "
-                "Phase 2 supports only dense matrices (systems with n ≤ 15 qubits). "
-                "This feature is planned for Phase 3 to support larger systems. "
-                "Note: Matrix norm errors require O(N²) matrix-vector products in matrix-free mode, "
-                "which may be impractical for very large systems anyway."
+                "Note: Matrix norm errors require O(N²) matrix-vector products in matrix-free "
+                "mode, which may be impractical for very large systems anyway."
             )
 
     # =============================================================================================
@@ -852,7 +846,7 @@ def error_analysis(
                 raise
 
             # Apply exact time evolution operator: U_exact |ψ⟩
-            # Note: For Phase 2 dense case, these are always numpy arrays (not matrix-free)
+            # Note: For dense case, these are always numpy arrays (not matrix-free)
             exact_final = exact_unitary_matrix @ initial_state
 
             # Apply approximate time evolution operator: U_approx |ψ⟩
@@ -1582,7 +1576,7 @@ def analyze_algorithm(
             config_analysis, hamiltonian, exact_matrix
         )
 
-    # Flexible operator outputs (new API)
+    # Flexible operator outputs
     if config_analysis._matrix_output_requests or config_analysis._eigendecomposition_output_requests:
         logger.info("Saving requested operator outputs.")
         # Need both exact_matrix and unitary_matrix
