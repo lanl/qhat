@@ -486,18 +486,21 @@ def eigendecomposition_analysis(
     Raises:
         ValueError: If required matrices or timestep are not provided
     """
-    which_matrices = config_analysis.eigendecomposition_matrices
+    # Determine which eigendecompositions need to be computed
+    # Use requires_* functions to check if eigendecompositions are needed
+    # (handles both explicit requests and implicit needs like eigenvalue error analysis)
+    need_exact = requires_exact_eigendecomposition(config_analysis)
+    need_approx = requires_approximate_eigendecomposition(config_analysis)
 
-    if which_matrices is None:
-        logger.info("Eigendecomposition analysis not requested (eigendecomposition_matrices is None)")
+    if not need_exact and not need_approx:
+        logger.info("Eigendecomposition analysis not requested")
         return {}
 
     logger.info(f"Starting eigendecomposition analysis")
-    logger.verbose(f"  eigendecomposition_matrices: {which_matrices}")
-
-    # Determine which matrices we need
-    need_exact = which_matrices in ['exact', 'both']
-    need_approx = which_matrices in ['approximate', 'both']
+    if config_analysis.eigendecomposition_matrices is not None:
+        logger.verbose(f"  eigendecomposition_matrices: {config_analysis.eigendecomposition_matrices}")
+    if config_analysis.enable_eigenvalue_errors:
+        logger.verbose(f"  enable_eigenvalue_errors: True (requires both eigendecompositions)")
 
     results = {}
 
@@ -1370,7 +1373,7 @@ def save_requested_operator_outputs(
             'shape': matrix.shape
         }
 
-        save_matrix(request['filename'], matrix, metadata=metadata)
+        save_matrix(request['filename'], matrix)
 
         results['matrix_outputs'].append({
             'filename': request['filename'],
@@ -1417,7 +1420,7 @@ def save_requested_operator_outputs(
             eigenenergies=eigenvalues_sorted,
             eigenvectors=eigenvectors_sorted,
             matrix_type=f"{request['operator']}_{request['form']}_{request['shift']}",
-            **metadata
+            timestep=timestep
         )
 
         results['eigendecomposition_outputs'].append({
