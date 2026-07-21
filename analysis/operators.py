@@ -226,8 +226,15 @@ class OperatorRepresentation:
                 'eigenvectors': eigenvectors
             }
         else:  # dense_matrix
-            # Reconstruct matrix: M = V @ diag(λ) @ V†
-            result = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.conj().T
+            # Reconstruct matrix: M = V @ diag(λ) @ V^(-1)
+            # Note: For Hermitian matrices (from eigh), V is unitary so V† = V^(-1)
+            # For general matrices (from eig), V is not necessarily unitary, so we must use V^(-1)
+            if operator_type == 'hamiltonian':
+                # Eigenvectors from eigh are orthonormal, use V† (faster)
+                result = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.conj().T
+            else:
+                # Eigenvectors from eig are not necessarily orthonormal, use V^(-1)
+                result = eigenvectors @ np.diag(eigenvalues) @ np.linalg.inv(eigenvectors)
 
         # Cache and return
         self._cache[cache_key] = result
