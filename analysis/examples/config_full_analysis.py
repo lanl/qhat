@@ -3,13 +3,16 @@ Comprehensive Configuration Example for QHAT Analysis
 
 This configuration demonstrates ALL currently available analysis capabilities:
 1. Resource estimation (quantum gate counts, qubit requirements)
-2. Flexible operator output (NEW: save any combination of operator forms)
+2. Flexible operator output (save any combination of operator forms)
 3. Numerical simulation (apply unitary to input state vectors)
 4. Error analysis (eigenvalue errors, matrix norms, state-dependent errors)
 
 Usage:
     python3.11 -m qhat.analysis.driver examples/config_full_analysis.py
 """
+
+# Energy error budget: split between Trotterization and phase estimation
+energy_error = meV_to_Hartree(1e4)  # 0.01 keV
 
 # =================================================================================================
 # GENERAL CONFIGURATION
@@ -35,9 +38,6 @@ hamiltonian.load_second_quantization("examples/Be-H_1.30_sto-6g_as-003-003.tenso
 # =================================================================================================
 # How to encode the Hamiltonian as a quantum circuit
 # Currently supports: ramped_trotter, pauli_lcu, double_factorization
-
-# Define energy error budget (used for both Trotter and phase estimation)
-energy_error = 0.001  # 1 meV in natural units
 
 unitary.encode_ramped_trotter(
     energy_error=0.5 * energy_error,  # Split error budget between Trotter and phase estimation
@@ -71,6 +71,7 @@ algorithm.method = "time evolution"
 # 1. RESOURCE ESTIMATION
 # -------------------------------------------------------------------------------------------------
 # Estimate quantum computing resources required (gate counts, qubit counts, circuit depth)
+# Options: "pyLIQTR", "cirq"
 
 analysis.resource_estimator = "pyLIQTR"
 
@@ -81,7 +82,7 @@ analysis.resource_estimator = "pyLIQTR"
 #   - circuit_depth: Depth of the quantum circuit
 
 # -------------------------------------------------------------------------------------------------
-# 2. FLEXIBLE OPERATOR OUTPUT (NEW API)
+# 2. FLEXIBLE OPERATOR OUTPUT
 # -------------------------------------------------------------------------------------------------
 # Save any combination of operator forms using the new flexible API
 #
