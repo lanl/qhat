@@ -3,18 +3,13 @@ Comprehensive Configuration Example for QHAT Analysis
 
 This configuration demonstrates ALL currently available analysis capabilities:
 1. Resource estimation (quantum gate counts, qubit requirements)
-2. Matrix output (save unitary matrix representation)
+2. Flexible operator output (NEW: save any combination of operator forms)
 3. Numerical simulation (apply unitary to input state vectors)
-4. Exact Hamiltonian matrix computation
-5. Eigendecomposition analysis (exact and/or approximate)
-6. Error analysis (eigenvalue errors, matrix norms, state-dependent errors)
+4. Error analysis (eigenvalue errors, matrix norms, state-dependent errors)
 
 Usage:
-    python3.11 -m qhat.analysis.driver config_full_analysis.py
+    python3.11 -m qhat.analysis.driver examples/config_full_analysis.py
 """
-
-# Energy error budget: split between Trotterization and phase estimation
-energy_error = meV_to_Hartree(1e4)  # 0.01 keV
 
 # =================================================================================================
 # GENERAL CONFIGURATION
@@ -40,6 +35,9 @@ hamiltonian.load_second_quantization("examples/Be-H_1.30_sto-6g_as-003-003.tenso
 # =================================================================================================
 # How to encode the Hamiltonian as a quantum circuit
 # Currently supports: ramped_trotter, pauli_lcu, double_factorization
+
+# Define energy error budget (used for both Trotter and phase estimation)
+energy_error = 0.001  # 1 meV in natural units
 
 unitary.encode_ramped_trotter(
     energy_error=0.5 * energy_error,  # Split error budget between Trotter and phase estimation
@@ -73,7 +71,6 @@ algorithm.method = "time evolution"
 # 1. RESOURCE ESTIMATION
 # -------------------------------------------------------------------------------------------------
 # Estimate quantum computing resources required (gate counts, qubit counts, circuit depth)
-# Options: "pyLIQTR", "cirq"
 
 analysis.resource_estimator = "pyLIQTR"
 
@@ -84,65 +81,265 @@ analysis.resource_estimator = "pyLIQTR"
 #   - circuit_depth: Depth of the quantum circuit
 
 # -------------------------------------------------------------------------------------------------
-# 2. UNITARY MATRIX OUTPUT
+# 2. FLEXIBLE OPERATOR OUTPUT (NEW API)
 # -------------------------------------------------------------------------------------------------
-# Generate and save the unitary matrix representation of the approximate algorithm
-# This materializes the full 2^N × 2^N unitary matrix
-# Practical for small systems (≤15 qubits, dimension ≤ 32768)
+# Save any combination of operator forms using the new flexible API
+#
+# Each operator has 4 independent choices:
+#   operator: 'exact' or 'approximate'
+#   form: 'hamiltonian' or 'time_evolution'
+#   shift: 'unshifted' or 'shifted'
+#   representation: matrix or eigendecomposition
+#
+# This gives 2 × 2 × 2 × 2 = 16 possible output files per operator type (matrix vs eigendecomp)
 
-analysis.matrix_output_file = "Be-H_unitary_matrix.npz"
+# ALL PARAMETERS ARE REQUIRED - be explicit about what you want!
 
-# Supported formats (auto-detected from file extension):
-#   - .npz: NumPy compressed format (recommended, includes metadata)
-#   - .h5 / .hdf5: HDF5 format (for compatibility with other tools)
-#   - .txt: Human-readable text (only for very small matrices)
+# =================================================================================================
+# 2A. MATRIX OUTPUTS
+# =================================================================================================
+# Call save_matrix_to_file() for each matrix you want to save
 
-# The saved file includes:
-#   - Unitary matrix U
-#   - Metadata: timestamp, matrix shape, matrix norm
-#   - Unitarity error: ||U†U - I||_F (should be ~1e-15 for correct implementations)
+# --- EXACT OPERATOR: All 4 matrix forms ---
+
+# 1. Exact Hamiltonian, unshifted (physical energy scale)
+analysis.save_matrix_to_file(
+    filename='H_exact_physical.npz',
+    operator='exact',
+    form='hamiltonian',
+    shift='unshifted'
+)
+
+# 2. Exact Hamiltonian, shifted (QPE energy scale)
+analysis.save_matrix_to_file(
+    filename='H_exact_QPE.npz',
+    operator='exact',
+    form='hamiltonian',
+    shift='shifted'
+)
+
+# 3. Exact time-evolution, unshifted (from physical H)
+analysis.save_matrix_to_file(
+    filename='U_exact_physical.npz',
+    operator='exact',
+    form='time_evolution',
+    shift='unshifted'
+)
+
+# 4. Exact time-evolution, shifted (from QPE H)
+analysis.save_matrix_to_file(
+    filename='U_exact_QPE.npz',
+    operator='exact',
+    form='time_evolution',
+    shift='shifted'
+)
+
+# --- APPROXIMATE OPERATOR: All 4 matrix forms ---
+
+# 5. Approximate Hamiltonian, unshifted (physical scale, extracted from Trotter/LCU)
+analysis.save_matrix_to_file(
+    filename='H_approx_physical.npz',
+    operator='approximate',
+    form='hamiltonian',
+    shift='unshifted'
+)
+
+# 6. Approximate Hamiltonian, shifted (QPE scale, extracted from Trotter/LCU)
+analysis.save_matrix_to_file(
+    filename='H_approx_QPE.npz',
+    operator='approximate',
+    form='hamiltonian',
+    shift='shifted'
+)
+
+# 7. Approximate time-evolution, unshifted (Trotter/LCU on physical scale)
+analysis.save_matrix_to_file(
+    filename='U_approx_physical.npz',
+    operator='approximate',
+    form='time_evolution',
+    shift='unshifted'
+)
+
+# 8. Approximate time-evolution, shifted (Trotter/LCU as computed)
+analysis.save_matrix_to_file(
+    filename='U_approx_QPE.npz',
+    operator='approximate',
+    form='time_evolution',
+    shift='shifted'
+)
+
+# =================================================================================================
+# 2B. EIGENDECOMPOSITION OUTPUTS
+# =================================================================================================
+# Call save_eigendecomposition_to_file() for each eigendecomposition you want to save
+
+# --- EXACT OPERATOR: All 4 eigendecomposition forms ---
+
+# 1. Exact Hamiltonian eigendecomp, unshifted (physical eigenenergies)
+analysis.save_eigendecomposition_to_file(
+    filename='H_exact_physical_eig.npz',
+    operator='exact',
+    form='hamiltonian',
+    shift='unshifted'
+)
+
+# 2. Exact Hamiltonian eigendecomp, shifted (QPE eigenenergies)
+analysis.save_eigendecomposition_to_file(
+    filename='H_exact_QPE_eig.npz',
+    operator='exact',
+    form='hamiltonian',
+    shift='shifted'
+)
+
+# 3. Exact time-evolution eigendecomp, unshifted (phases from physical H)
+analysis.save_eigendecomposition_to_file(
+    filename='U_exact_physical_eig.npz',
+    operator='exact',
+    form='time_evolution',
+    shift='unshifted'
+)
+
+# 4. Exact time-evolution eigendecomp, shifted (phases from QPE H)
+analysis.save_eigendecomposition_to_file(
+    filename='U_exact_QPE_eig.npz',
+    operator='exact',
+    form='time_evolution',
+    shift='shifted'
+)
+
+# --- APPROXIMATE OPERATOR: All 4 eigendecomposition forms ---
+
+# 5. Approximate Hamiltonian eigendecomp, unshifted (physical scale)
+analysis.save_eigendecomposition_to_file(
+    filename='H_approx_physical_eig.npz',
+    operator='approximate',
+    form='hamiltonian',
+    shift='unshifted'
+)
+
+# 6. Approximate Hamiltonian eigendecomp, shifted (QPE scale)
+analysis.save_eigendecomposition_to_file(
+    filename='H_approx_QPE_eig.npz',
+    operator='approximate',
+    form='hamiltonian',
+    shift='shifted'
+)
+
+# 7. Approximate time-evolution eigendecomp, unshifted (phases, physical scale)
+analysis.save_eigendecomposition_to_file(
+    filename='U_approx_physical_eig.npz',
+    operator='approximate',
+    form='time_evolution',
+    shift='unshifted'
+)
+
+# 8. Approximate time-evolution eigendecomp, shifted (phases, QPE scale)
+analysis.save_eigendecomposition_to_file(
+    filename='U_approx_QPE_eig.npz',
+    operator='approximate',
+    form='time_evolution',
+    shift='shifted'
+)
+
+# =================================================================================================
+# FLEXIBLE OUTPUT API: Understanding the Parameters
+# =================================================================================================
+#
+# operator: Which quantum operator?
+#   'exact' = true Hamiltonian from Pauli strings (no approximations)
+#   'approximate' = algorithm output (Trotter, LCU, double-factorization, etc.)
+#
+# form: How to represent the operator?
+#   'hamiltonian' = Hamiltonian matrix H (eigenvectors are energy eigenstates)
+#   'time_evolution' = Time-evolution operator U = exp(-i*H*t) (eigenvectors same, eigenvalues on unit circle)
+#
+# shift: Which energy scale?
+#   'unshifted' = physical energy scale (eigenvalues can be negative)
+#   'shifted' = QPE energy scale (H' = H + E*I, all eigenvalues positive)
+#     - The energy shift E = |min(eigenvalues)| is applied automatically
+#     - QPE requires positive eigenvalues to extract phases correctly
+#     - For error analysis, usually compare on unshifted (physical) scale
+#
+# representation: (determined by method called)
+#   save_matrix_to_file() = dense matrix (2^n × 2^n array)
+#   save_eigendecomposition_to_file() = eigenvalues + eigenvectors
+#
+# Key insights:
+#   - All 16 forms are mathematically equivalent (just different views)
+#   - OperatorRepresentation handles all conversions automatically
+#   - Most common for error analysis: 'unshifted' (physical scale) comparisons
+#   - QPE algorithm works on 'shifted' scale but we typically report physical energies
+
+# =================================================================================================
+# COMMON USE CASES (comment out the above and use these instead)
+# =================================================================================================
+
+# --- Use Case 1: Basic error analysis (most common) ---
+# Compare exact vs approximate on physical scale
+#
+# analysis.save_matrix_to_file(
+#     filename='U_exact.npz',
+#     operator='exact',
+#     form='time_evolution',
+#     shift='unshifted'
+# )
+# analysis.save_matrix_to_file(
+#     filename='U_approx.npz',
+#     operator='approximate',
+#     form='time_evolution',
+#     shift='unshifted'
+# )
+# analysis.save_eigendecomposition_to_file(
+#     filename='H_exact_eig.npz',
+#     operator='exact',
+#     form='hamiltonian',
+#     shift='unshifted'
+# )
+# analysis.save_eigendecomposition_to_file(
+#     filename='H_approx_eig.npz',
+#     operator='approximate',
+#     form='hamiltonian',
+#     shift='unshifted'
+# )
+
+# --- Use Case 2: Debug energy shift corrections ---
+# Verify shift/unshift operations are working correctly
+#
+# analysis.save_eigendecomposition_to_file(
+#     filename='H_exact_physical_eig.npz',
+#     operator='exact',
+#     form='hamiltonian',
+#     shift='unshifted'
+# )
+# analysis.save_eigendecomposition_to_file(
+#     filename='H_exact_QPE_eig.npz',
+#     operator='exact',
+#     form='hamiltonian',
+#     shift='shifted'
+# )
+# # Eigenvalues should differ by exactly E (the energy shift)
+
+# --- Use Case 3: Verify H ↔ U conversion ---
+# Same operator in both representations should have matching eigenvalues
+#
+# analysis.save_eigendecomposition_to_file(
+#     filename='exact_as_H_eig.npz',
+#     operator='exact',
+#     form='hamiltonian',
+#     shift='unshifted'
+# )
+# analysis.save_eigendecomposition_to_file(
+#     filename='exact_as_U_eig.npz',
+#     operator='exact',
+#     form='time_evolution',
+#     shift='unshifted'
+# )
+# # After converting U eigenvalues (phases) to energies, should match H eigenvalues
 
 # -------------------------------------------------------------------------------------------------
-# 3. EXACT HAMILTONIAN MATRIX OUTPUT
-# -------------------------------------------------------------------------------------------------
-# Compute and save the exact matrix representation of the Hamiltonian (no approximations)
-
-analysis.exact_matrix_output_file = "Be-H_exact_hamiltonian.npz"
-
-# This computes the true Hamiltonian matrix H directly from the Pauli string representation.
-# Useful for:
-#   - Validating approximate algorithms (compare exact vs approximate eigenvalues)
-#   - Small-scale testing and verification
-#   - Computing exact ground state energies
-
-# Implementation notes:
-#   - Uses memory threshold to choose between dense and sparse representations
-#   - Default threshold: 16 GB (allows dense matrices up to ~15 qubits)
-#   - Dense matrices: Full materialization, can be saved to file
-#   - Sparse matrices (above threshold): Matrix-free operator, enables analysis but no file output
-
-# Optional: Configure memory threshold for dense/sparse selection
-# analysis.matrix_memory_threshold_gb = 16.0  # Default: 16 GB
-# Examples:
-#   - 1.0 GB allows dense up to ~13 qubits
-#   - 16.0 GB allows dense up to ~15 qubits
-#   - 64.0 GB allows dense up to ~16 qubits
-
-# Supported formats (same as unitary matrix output):
-#   - .npz: NumPy compressed format (recommended)
-#   - .h5 / .hdf5: HDF5 format
-#   - .txt: Human-readable text (only for very small matrices)
-
-# The saved file includes:
-#   - Hamiltonian matrix H
-#   - Metadata: timestamp, matrix shape, matrix norm
-#   - Hermiticity error: ||H - H†||_F (should be ~1e-15 for Hermitian matrices)
-
-# -------------------------------------------------------------------------------------------------
-# 4. NUMERICAL SIMULATION (APPROXIMATE)
+# 3. NUMERICAL SIMULATION (APPROXIMATE UNITARY)
 # -------------------------------------------------------------------------------------------------
 # Apply the approximate unitary matrix to one or more input quantum states
-# Useful for testing algorithm behavior on specific initial states
 
 # Single input state:
 analysis.numerical_simulation_inputs = "examples/Be-H_1.30_sto-6g_as-003-003_jw.npy"
@@ -159,120 +356,67 @@ analysis.numerical_simulation_inputs = "examples/Be-H_1.30_sto-6g_as-003-003_jw.
 #   - Dimension 2^N (matching system size)
 #   - Saved as NumPy .npy files
 #   - Normalized (||ψ|| = 1) for physical quantum states
-
+#
 # Output:
 #   - For each input "state.npy", creates "state_final.npy"
 #   - Reports final state norm (should be 1.0 for unitary evolution)
-#   - Can be used to verify algorithm correctness or study state evolution
+
+# Optional: Apply exact Hamiltonian evolution to states (for comparison)
+# analysis.exact_simulation_inputs = "examples/Be-H_1.30_sto-6g_as-003-003_jw.npy"
+# Output: For each input "state.npy", creates "state_exact_final.npy"
 
 # -------------------------------------------------------------------------------------------------
-# 5. EIGENDECOMPOSITION ANALYSIS
-# -------------------------------------------------------------------------------------------------
-# Compute eigenvalues and eigenvectors of exact Hamiltonian and/or approximate unitary
-
-analysis.eigendecomposition_matrices = "both"  # Options: None, "exact", "approximate", "both"
-
-# This analysis performs full eigendecomposition (all eigenvalues and eigenvectors):
-#   - Exact matrix: Diagonalizes Hamiltonian H to find eigenenergies and eigenstates
-#   - Approximate matrix: Diagonalizes unitary U and converts phases to energies
-#   - Results are sorted by eigenenergy (ground state = index 0)
-#   - Only feasible for small-medium systems (~15-18 qubits, dimension ≤ 256k)
-
-# Configuration options:
-#   - None (default): Eigendecomposition disabled
-#   - "exact": Only eigendecompose exact Hamiltonian matrix
-#   - "approximate": Only eigendecompose approximate unitary matrix
-#   - "both": Eigendecompose both (required for eigenvalue error analysis)
-
-# Output files:
-#   - exact_eigendecomposition.npz (if "exact" or "both")
-#       Contains: eigenenergies, eigenvectors, energy_shift applied
-#   - approximate_eigendecomposition.npz (if "approximate" or "both")
-#       Contains: eigenenergies (corrected for energy shift), eigenvectors, timestep used
-
-# Important notes:
-#   - Energy shift correction: The approximate time evolution uses a shifted Hamiltonian
-#     H̃ = H - E_min·I to reduce phase qubit requirements. The eigendecomposition analysis
-#     automatically corrects approximate eigenenergies to the same scale as exact eigenenergies
-#     for proper comparison.
-#   - Requires timestep for approximate case (automatically extracted from unitary config)
-
-# -------------------------------------------------------------------------------------------------
-# 6. ERROR ANALYSIS
+# 4. ERROR ANALYSIS (OLD API - still supported)
 # -------------------------------------------------------------------------------------------------
 # Compare exact and approximate representations using multiple error metrics
 
-analysis.enable_eigenvalue_errors = True  # Compare all eigenvalues from eigendecomposition
-analysis.error_matrix_norms = ["frobenius", "spectral"]  # Options: "frobenius", "spectral", ["frobenius", "spectral"]
-analysis.error_state_inputs = "examples/Be-H_1.30_sto-6g_as-003-003_jw.npy"  # String or list of state files
+# Note: With the new flexible output API, you might not need the old error analysis API
+# since you can directly save and compare any operator forms you want. However, the
+# error analysis API still provides convenient aggregate error metrics.
 
-# This analysis computes three independent error types:
+analysis.enable_eigenvalue_errors = True  # Compare all eigenvalues
+analysis.error_matrix_norms = ["frobenius", "spectral"]  # Norm-based errors
+analysis.error_state_inputs = "examples/Be-H_1.30_sto-6g_as-003-003_jw.npy"  # State-dependent errors
+
+# This computes three independent error types:
 #
 # 1. EIGENVALUE ERRORS:
 #    - Compares eigenenergies: λ(H_exact) vs λ(H_approx)
-#    - Requires eigendecomposition_matrices = "both"
 #    - Reports absolute errors, relative errors, max error, RMS error
-#    - Accounts for energy shift correction automatically
 #
 # 2. MATRIX NORM ERRORS:
 #    - Compares time-evolution operators: ||U_exact - U_approx||
-#      where U_exact = exp(-i*H_exact*t) and U_approx is from the algorithm
-#    - Options:
-#      * Frobenius norm: Fast, measures total element-wise difference
-#      * Spectral norm: Slower, measures worst-case error (physically meaningful)
+#    - Frobenius norm (fast) and/or spectral norm (physically meaningful)
 #
 # 3. STATE-DEPENDENT ERRORS:
 #    - Compares time-evolved states: ||U_exact|ψ⟩ - U_approx|ψ⟩||
-#      where U operators are the same as in matrix norm errors
-#    - Fast: Just applies operators to states
-#    - Most relevant for practical applications (how accurate for states you care about?)
-
-# Configuration options:
-#   enable_eigenvalue_errors:
-#     - False (default): Eigenvalue errors disabled
-#     - True: Compute errors for ALL eigenvalues from eigendecomposition
-#
-#   error_matrix_norms:
-#     - None (default): Matrix norm errors disabled
-#     - "frobenius": Fast element-wise difference norm
-#     - "spectral": Physically meaningful worst-case norm (slower)
-#     - ["frobenius", "spectral"]: Both norms
-#
-#   error_state_inputs:
-#     - None (default): State-dependent errors disabled
-#     - String or list of .npy files containing quantum states
-#     - Same format as numerical_simulation_inputs
+#    - Most relevant for practical applications
 
 # Output: error_analysis.npz containing all computed errors with metadata
 
-# Examples for different use cases:
-#
-# Comprehensive validation (small systems):
-# analysis.enable_eigenvalue_errors = True
-# analysis.error_matrix_norms = ["frobenius", "spectral"]
-# analysis.error_state_inputs = ["examples/ground.npy", "examples/excited.npy"]
-#
-# Standard validation (medium systems):
-# analysis.enable_eigenvalue_errors = True
-# analysis.error_matrix_norms = "frobenius"
-# analysis.error_state_inputs = "examples/ground.npy"
-#
-# Minimal validation (large systems):
-# analysis.enable_eigenvalue_errors = False  # Too expensive
-# analysis.error_matrix_norms = None  # Too expensive
-# analysis.error_state_inputs = "examples/ground.npy"  # Scales well
-
 # =================================================================================================
-# SUMMARY OF ALL ANALYSES ENABLED IN THIS CONFIG
+# SUMMARY OF ALL OPTIONS IN THIS CONFIG
 # =================================================================================================
-# This configuration enables every available analysis feature:
-#   ✓ Resource estimation (pyLIQTR)
-#   ✓ Unitary matrix output (Be-H_unitary_matrix.npz)
-#   ✓ Exact Hamiltonian matrix output (Be-H_exact_hamiltonian.npz)
-#   ✓ Numerical simulation with approximate unitary
-#   ✓ Eigendecomposition of both exact and approximate matrices
-#   ✓ Error analysis: eigenvalue errors, Frobenius norm, state-dependent errors
+# This configuration demonstrates EVERY available analysis feature:
 #
-# This serves as a complete example of QHAT's analysis capabilities.
-# For production runs, you may want to disable some analyses to improve performance.
+# ✓ Resource estimation (pyLIQTR)
+#
+# ✓ Flexible operator outputs (NEW API):
+#     8 matrix files covering all exact operator forms
+#     8 matrix files covering all approximate operator forms
+#     8 eigendecomposition files covering all exact operator forms
+#     8 eigendecomposition files covering all approximate operator forms
+#     = 32 output files total (all 16 possible combinations × 2 representations)
+#
+# ✓ Numerical simulation with approximate unitary
+#
+# ✓ Error analysis (eigenvalue, matrix norm, state-dependent)
+#
+# For production runs, you would typically use only a small subset:
+#   - Basic validation: 2-4 files (U_exact, U_approx, maybe eigendecompositions)
+#   - Debugging: 4-8 files (compare shifted vs unshifted, H vs U forms)
+#   - Comprehensive: This full config (all 32 files for complete analysis)
+#
+# The flexible API gives you complete control over exactly what gets saved,
+# ensuring you get the precise operator forms needed for your analysis workflow.
 # =================================================================================================

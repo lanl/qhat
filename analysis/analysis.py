@@ -1291,6 +1291,168 @@ def exact_numerical_simulation(
 
 # -------------------------------------------------------------------------------------------------
 
+def save_requested_operator_outputs(
+        config_analysis: AnalysisConfiguration,
+        exact_matrix,
+        unitary_matrix,
+        timestep,
+        energy_shift) -> dict:
+    """
+    Save all requested operator forms using OperatorRepresentation.
+
+    Parameters
+    ----------
+    config_analysis : AnalysisConfiguration
+        Configuration with output requests
+    exact_matrix : ndarray
+        Exact Hamiltonian matrix (shifted, H' = H + E*I)
+    unitary_matrix : ndarray
+        Approximate time-evolution operator (from shifted Hamiltonian)
+    timestep : float
+        Time evolution parameter
+    energy_shift : float
+        Energy shift value
+
+    Returns
+    -------
+    dict
+        Information about saved files
+    """
+    from qhat.analysis.operators import OperatorRepresentation
+    from qhat.analysis.file_io import save_matrix, save_eigendecomposition
+    import datetime
+
+    results = {
+        'matrix_outputs': [],
+        'eigendecomposition_outputs': []
+    }
+
+    # Check if any requests exist
+    if not config_analysis._matrix_output_requests and not config_analysis._eigendecomposition_output_requests:
+        return results
+
+    # Create OperatorRepresentation wrappers
+    logger.verbose("Creating OperatorRepresentation instances for flexible output")
+    logger.verbose(f"  Timestep: t = {timestep}")
+    logger.verbose(f"  Energy shift: E = {energy_shift}")
+
+    # Exact operator (from shifted Hamiltonian)
+    exact_op = OperatorRepresentation(
+        data=exact_matrix,
+        operator_type='hamiltonian',
+        energy_shifted=True,  # Input is H' = H + E*I
+        representation='dense_matrix',
+        timestep=timestep,
+        energy_shift=energy_shift
+    )
+    logger.verbose("  Created exact operator representation (H', shifted)")
+
+    # Approximate operator (from shifted Hamiltonian via Trotter/etc)
+    approx_op = OperatorRepresentation(
+        data=unitary_matrix,
+        operator_type='time_evolution',
+        energy_shifted=True,  # Input is U' from H'
+        representation='dense_matrix',
+        timestep=timestep,
+        energy_shift=energy_shift
+    )
+    logger.verbose("  Created approximate operator representation (U', shifted)")
+
+    operators = {
+        'exact': exact_op,
+        'approximate': approx_op
+    }
+
+    # Process matrix output requests
+    for request in config_analysis._matrix_output_requests:
+        op = operators[request['operator']]
+        energy_shifted = (request['shift'] == 'shifted')
+
+        logger.info(
+            f"Saving {request['operator']} {request['form']} "
+            f"({request['shift']}) matrix to {request['filename']}"
+        )
+
+        matrix = op.get(
+            operator_type=request['form'],
+            energy_shifted=energy_shifted,
+            representation='dense_matrix'
+        )
+
+        # Save with metadata
+        metadata = {
+            'operator': request['operator'],
+            'form': request['form'],
+            'shift': request['shift'],
+            'timestep': timestep,
+            'energy_shift': energy_shift,
+            'timestamp': datetime.datetime.now().isoformat(),
+            'shape': matrix.shape
+        }
+
+        save_matrix(request['filename'], matrix, metadata=metadata)
+
+        results['matrix_outputs'].append({
+            'filename': request['filename'],
+            'operator': request['operator'],
+            'form': request['form'],
+            'shift': request['shift'],
+            'shape': matrix.shape
+        })
+
+    # Process eigendecomposition output requests
+    for request in config_analysis._eigendecomposition_output_requests:
+        op = operators[request['operator']]
+        energy_shifted = (request['shift'] == 'shifted')
+
+        logger.info(
+            f"Saving {request['operator']} {request['form']} "
+            f"({request['shift']}) eigendecomposition to {request['filename']}"
+        )
+
+        eigendata = op.get(
+            operator_type=request['form'],
+            energy_shifted=energy_shifted,
+            representation='eigendecomposition'
+        )
+
+        # Sort by eigenvalues (ascending)
+        sort_indices = np.argsort(eigendata['eigenvalues'].real)
+        eigenvalues_sorted = eigendata['eigenvalues'][sort_indices]
+        eigenvectors_sorted = eigendata['eigenvectors'][:, sort_indices]
+
+        # Save with metadata
+        metadata = {
+            'operator': request['operator'],
+            'form': request['form'],
+            'shift': request['shift'],
+            'timestep': timestep,
+            'energy_shift': energy_shift,
+            'timestamp': datetime.datetime.now().isoformat(),
+            'dimension': len(eigenvalues_sorted)
+        }
+
+        save_eigendecomposition(
+            request['filename'],
+            eigenenergies=eigenvalues_sorted,
+            eigenvectors=eigenvectors_sorted,
+            matrix_type=f"{request['operator']}_{request['form']}_{request['shift']}",
+            **metadata
+        )
+
+        results['eigendecomposition_outputs'].append({
+            'filename': request['filename'],
+            'operator': request['operator'],
+            'form': request['form'],
+            'shift': request['shift'],
+            'num_eigenvalues': len(eigenvalues_sorted),
+            'eigenvalue_range': [float(eigenvalues_sorted[0].real), float(eigenvalues_sorted[-1].real)]
+        })
+
+    return results
+
+# -------------------------------------------------------------------------------------------------
+
 def analyze_algorithm(
         config_analysis: AnalysisConfiguration,
         algorithm,
@@ -1327,6 +1489,12 @@ def analyze_algorithm(
         config_analysis.error_state_inputs is not None
     )
 
+    # Check if flexible output API is used
+    flexible_outputs_requested = (
+        config_analysis._matrix_output_requests or
+        config_analysis._eigendecomposition_output_requests
+    )
+
     # Validate at least one analysis requested
     if (config_analysis.resource_estimator is None and
         config_analysis.matrix_output_file is None and
@@ -1334,7 +1502,8 @@ def analyze_algorithm(
         config_analysis.exact_matrix_output_file is None and
         not eigendecomposition_requested and
         not error_analysis_requested and
-        config_analysis.exact_simulation_inputs is None):
+        config_analysis.exact_simulation_inputs is None and
+        not flexible_outputs_requested):
         raise ValueError(
             "No analyses requested. Set at least one of:\n"
             "  - resource_estimator (e.g., 'pyliqtr', 'cirq')\n"
@@ -1345,7 +1514,9 @@ def analyze_algorithm(
             "  - enable_eigenvalue_errors (True to compute errors for all eigenvalues)\n"
             "  - error_matrix_norms (e.g., 'frobenius' or ['frobenius', 'spectral'])\n"
             "  - error_state_inputs (e.g., 'state.npy')\n"
-            "  - exact_simulation_inputs (e.g., 'state.npy')"
+            "  - exact_simulation_inputs (e.g., 'state.npy')\n"
+            "  - analysis.save_matrix_to_file(...) (flexible matrix output API)\n"
+            "  - analysis.save_eigendecomposition_to_file(...) (flexible eigendecomposition output API)"
         )
 
     results = {}
@@ -1423,6 +1594,34 @@ def analyze_algorithm(
         logger.info("Performing exact numerical simulation.")
         results["exact_simulation"] = exact_numerical_simulation(
             config_analysis, hamiltonian, exact_matrix
+        )
+
+    # Flexible operator outputs (new API)
+    if config_analysis._matrix_output_requests or config_analysis._eigendecomposition_output_requests:
+        logger.info("Saving requested operator outputs.")
+        # Need both exact_matrix and unitary_matrix
+        if exact_matrix is None:
+            raise ValueError(
+                "Flexible operator output requires exact_matrix. "
+                "This should have been caught during validation."
+            )
+        if unitary_matrix is None:
+            raise ValueError(
+                "Flexible operator output requires unitary_matrix. "
+                "This should have been caught during validation."
+            )
+        if timestep is None:
+            raise ValueError(
+                "Flexible operator output requires timestep parameter. "
+                "Pass timestep to analyze_algorithm()."
+            )
+
+        results["flexible_operator_outputs"] = save_requested_operator_outputs(
+            config_analysis,
+            exact_matrix,
+            unitary_matrix,
+            timestep,
+            energy_shift
         )
 
     # TODO: Add gate parallelism / gate depth analysis
