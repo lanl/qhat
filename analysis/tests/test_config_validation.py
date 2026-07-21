@@ -12,39 +12,46 @@ from qhat.analysis.analysis import validate_and_autocomplete_analysis_config
 
 
 def test_eigenvalue_error_requires_eigendecomposition():
-    """Test that eigenvalue errors require eigendecomposition to be configured."""
+    """Test that eigenvalue errors auto-enable eigendecomposition computation."""
     config = AnalysisConfiguration()
     config.enable_eigenvalue_errors = True
-    # num_eigenvalues is 0 by default
 
-    with pytest.raises(ValueError, match="enable_eigenvalue_errors requires eigendecomposition"):
-        validate_and_autocomplete_analysis_config(config)
+    # Should NOT raise an error - eigendecompositions will be computed automatically
+    validate_and_autocomplete_analysis_config(config)
+
+    # Verify that eigendecompositions will be computed (checked by requires_* functions)
+    from qhat.analysis.analysis import requires_exact_eigendecomposition, requires_approximate_eigendecomposition
+    assert requires_exact_eigendecomposition(config), "Exact eigendecomposition should be required"
+    assert requires_approximate_eigendecomposition(config), "Approximate eigendecomposition should be required"
 
 
 def test_eigenvalue_error_autocorrects_eigendecomposition_matrices():
-    """Test that eigenvalue errors auto-set eigendecomposition_matrices to 'both'."""
+    """Test that eigenvalue errors work even without eigendecomposition_matrices set."""
     config = AnalysisConfiguration()
     config.enable_eigenvalue_errors = True
-    config.num_eigenvalues = 5
-    config.eigendecomposition_matrices = 'approximate'
 
-    # Should auto-correct to 'both'
+    # Should work without setting eigendecomposition_matrices
     validate_and_autocomplete_analysis_config(config)
 
-    assert config.eigendecomposition_matrices == 'both'
+    # Eigendecompositions will be computed automatically via requires_* functions
+    from qhat.analysis.analysis import requires_exact_eigendecomposition, requires_approximate_eigendecomposition
+    assert requires_exact_eigendecomposition(config)
+    assert requires_approximate_eigendecomposition(config)
 
 
 def test_eigenvalue_error_with_exact_eigendecomposition():
-    """Test that eigenvalue errors auto-set eigendecomposition_matrices from 'exact' to 'both'."""
+    """Test that eigenvalue errors work with any eigendecomposition setting."""
     config = AnalysisConfiguration()
     config.enable_eigenvalue_errors = True
-    config.num_eigenvalues = 5
     config.eigendecomposition_matrices = 'exact'
 
-    # Should auto-correct to 'both'
+    # Should work - eigendecompositions will be computed as needed
     validate_and_autocomplete_analysis_config(config)
 
-    assert config.eigendecomposition_matrices == 'both'
+    # Both eigendecompositions will be computed because enable_eigenvalue_errors is True
+    from qhat.analysis.analysis import requires_exact_eigendecomposition, requires_approximate_eigendecomposition
+    assert requires_exact_eigendecomposition(config)
+    assert requires_approximate_eigendecomposition(config)
 
 
 def test_eigenvalue_error_already_set_to_both():
@@ -61,16 +68,19 @@ def test_eigenvalue_error_already_set_to_both():
 
 
 def test_eigenvalue_error_with_all_eigenvalues():
-    """Test that eigenvalue errors work with num_eigenvalues='all'."""
+    """Test that eigenvalue errors work regardless of eigendecomposition_matrices setting."""
     config = AnalysisConfiguration()
     config.enable_eigenvalue_errors = True
     config.num_eigenvalues = 'all'
     config.eigendecomposition_matrices = 'approximate'
 
-    # Should auto-correct to 'both'
+    # Should work - eigendecompositions computed automatically via requires_* functions
     validate_and_autocomplete_analysis_config(config)
 
-    assert config.eigendecomposition_matrices == 'both'
+    # Both eigendecompositions will be computed because enable_eigenvalue_errors is True
+    from qhat.analysis.analysis import requires_exact_eigendecomposition, requires_approximate_eigendecomposition
+    assert requires_exact_eigendecomposition(config)
+    assert requires_approximate_eigendecomposition(config)
 
 
 def test_matrix_norm_errors_pass_validation():
@@ -100,10 +110,13 @@ def test_multiple_error_types_with_eigenvalue():
     config.error_matrix_norms = 'frobenius'
     config.error_state_inputs = 'state.npy'
 
-    # Should auto-correct eigendecomposition_matrices to 'both'
+    # Should work - eigendecompositions computed automatically
     validate_and_autocomplete_analysis_config(config)
 
-    assert config.eigendecomposition_matrices == 'both'
+    # Both eigendecompositions will be computed because enable_eigenvalue_errors is True
+    from qhat.analysis.analysis import requires_exact_eigendecomposition, requires_approximate_eigendecomposition
+    assert requires_exact_eigendecomposition(config)
+    assert requires_approximate_eigendecomposition(config)
 
 
 def test_no_analyses_configured():

@@ -93,8 +93,6 @@ analysis.resource_estimator = "pyLIQTR"
 #
 # This gives 2 × 2 × 2 × 2 = 16 possible output files per operator type (matrix vs eigendecomp)
 
-# ALL PARAMETERS ARE REQUIRED - be explicit about what you want!
-
 # =================================================================================================
 # 2A. MATRIX OUTPUTS
 # =================================================================================================
@@ -263,81 +261,9 @@ analysis.save_eigendecomposition_to_file(
 # representation: (determined by method called)
 #   save_matrix_to_file() = dense matrix (2^n × 2^n array)
 #   save_eigendecomposition_to_file() = eigenvalues + eigenvectors
-#
-# Key insights:
-#   - All 16 forms are mathematically equivalent (just different views)
-#   - OperatorRepresentation handles all conversions automatically
-#   - Most common for error analysis: 'unshifted' (physical scale) comparisons
-#   - QPE algorithm works on 'shifted' scale but we typically report physical energies
-
-# =================================================================================================
-# COMMON USE CASES (comment out the above and use these instead)
-# =================================================================================================
-
-# --- Use Case 1: Basic error analysis (most common) ---
-# Compare exact vs approximate on physical scale
-#
-# analysis.save_matrix_to_file(
-#     filename='U_exact.npz',
-#     operator='exact',
-#     form='time_evolution',
-#     shift='unshifted'
-# )
-# analysis.save_matrix_to_file(
-#     filename='U_approx.npz',
-#     operator='approximate',
-#     form='time_evolution',
-#     shift='unshifted'
-# )
-# analysis.save_eigendecomposition_to_file(
-#     filename='H_exact_eig.npz',
-#     operator='exact',
-#     form='hamiltonian',
-#     shift='unshifted'
-# )
-# analysis.save_eigendecomposition_to_file(
-#     filename='H_approx_eig.npz',
-#     operator='approximate',
-#     form='hamiltonian',
-#     shift='unshifted'
-# )
-
-# --- Use Case 2: Debug energy shift corrections ---
-# Verify shift/unshift operations are working correctly
-#
-# analysis.save_eigendecomposition_to_file(
-#     filename='H_exact_physical_eig.npz',
-#     operator='exact',
-#     form='hamiltonian',
-#     shift='unshifted'
-# )
-# analysis.save_eigendecomposition_to_file(
-#     filename='H_exact_QPE_eig.npz',
-#     operator='exact',
-#     form='hamiltonian',
-#     shift='shifted'
-# )
-# # Eigenvalues should differ by exactly E (the energy shift)
-
-# --- Use Case 3: Verify H ↔ U conversion ---
-# Same operator in both representations should have matching eigenvalues
-#
-# analysis.save_eigendecomposition_to_file(
-#     filename='exact_as_H_eig.npz',
-#     operator='exact',
-#     form='hamiltonian',
-#     shift='unshifted'
-# )
-# analysis.save_eigendecomposition_to_file(
-#     filename='exact_as_U_eig.npz',
-#     operator='exact',
-#     form='time_evolution',
-#     shift='unshifted'
-# )
-# # After converting U eigenvalues (phases) to energies, should match H eigenvalues
 
 # -------------------------------------------------------------------------------------------------
-# 3. NUMERICAL SIMULATION (APPROXIMATE UNITARY)
+# 3. NUMERICAL SIMULATION
 # -------------------------------------------------------------------------------------------------
 # Apply the approximate unitary matrix to one or more input quantum states
 
@@ -366,13 +292,9 @@ analysis.numerical_simulation_inputs = "examples/Be-H_1.30_sto-6g_as-003-003_jw.
 # Output: For each input "state.npy", creates "state_exact_final.npy"
 
 # -------------------------------------------------------------------------------------------------
-# 4. ERROR ANALYSIS (OLD API - still supported)
+# 4. ERROR ANALYSIS
 # -------------------------------------------------------------------------------------------------
 # Compare exact and approximate representations using multiple error metrics
-
-# Note: With the new flexible output API, you might not need the old error analysis API
-# since you can directly save and compare any operator forms you want. However, the
-# error analysis API still provides convenient aggregate error metrics.
 
 analysis.enable_eigenvalue_errors = True  # Compare all eigenvalues
 analysis.error_matrix_norms = ["frobenius", "spectral"]  # Norm-based errors
@@ -386,11 +308,10 @@ analysis.error_state_inputs = "examples/Be-H_1.30_sto-6g_as-003-003_jw.npy"  # S
 #
 # 2. MATRIX NORM ERRORS:
 #    - Compares time-evolution operators: ||U_exact - U_approx||
-#    - Frobenius norm (fast) and/or spectral norm (physically meaningful)
+#    - Frobenius norm and/or spectral norm
 #
 # 3. STATE-DEPENDENT ERRORS:
 #    - Compares time-evolved states: ||U_exact|ψ⟩ - U_approx|ψ⟩||
-#    - Most relevant for practical applications
 
 # Output: error_analysis.npz containing all computed errors with metadata
 
@@ -401,22 +322,16 @@ analysis.error_state_inputs = "examples/Be-H_1.30_sto-6g_as-003-003_jw.npy"  # S
 #
 # ✓ Resource estimation (pyLIQTR)
 #
-# ✓ Flexible operator outputs (NEW API):
-#     8 matrix files covering all exact operator forms
-#     8 matrix files covering all approximate operator forms
-#     8 eigendecomposition files covering all exact operator forms
-#     8 eigendecomposition files covering all approximate operator forms
-#     = 32 output files total (all 16 possible combinations × 2 representations)
+# ✓ Flexible operator outputs:
+#     4 matrix files covering all exact operator forms
+#     4 matrix files covering all approximate operator forms
+#     4 eigendecomposition files covering all exact operator forms
+#     4 eigendecomposition files covering all approximate operator forms
+#     = 16 output files total (all 8 possible combinations × 2 representations)
 #
 # ✓ Numerical simulation with approximate unitary
 #
 # ✓ Error analysis (eigenvalue, matrix norm, state-dependent)
 #
-# For production runs, you would typically use only a small subset:
-#   - Basic validation: 2-4 files (U_exact, U_approx, maybe eigendecompositions)
-#   - Debugging: 4-8 files (compare shifted vs unshifted, H vs U forms)
-#   - Comprehensive: This full config (all 32 files for complete analysis)
-#
-# The flexible API gives you complete control over exactly what gets saved,
-# ensuring you get the precise operator forms needed for your analysis workflow.
+# For production runs, you would typically use only a small subset.
 # =================================================================================================
