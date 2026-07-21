@@ -666,26 +666,29 @@ def error_analysis(
         logger.verbose(f"  Energy shift: E = {energy_shift}")
 
         # Wrap exact Hamiltonian in OperatorRepresentation
+        # Note: exact_matrix is H' = H + E*I (shifted), and unitary_matrix is U' = exp(-i*H'*t)
+        # Both are already derived from the SAME shifted Hamiltonian, so they're on the same scale.
+        # We treat them as "unshifted" here (with shift=0) because they don't need relative adjustment.
         exact_op = OperatorRepresentation(
             data=exact_matrix,
             operator_type='hamiltonian',
-            energy_shifted=False,
+            energy_shifted=False,  # Treat as baseline (no relative shift to apply)
             representation='dense_matrix',
             timestep=timestep,
-            energy_shift=energy_shift
+            energy_shift=0.0  # Both already on same scale
         )
-        logger.verbose(f"  Created exact operator representation (H_exact, unshifted)")
+        logger.verbose(f"  Created exact operator representation (H')")
 
         # Wrap approximate time-evolution operator in OperatorRepresentation
         approx_op = OperatorRepresentation(
             data=unitary_matrix,
             operator_type='time_evolution',
-            energy_shifted=True,  # Input is energy-shifted
+            energy_shifted=False,  # Treat as baseline (no relative shift to apply)
             representation='dense_matrix',
             timestep=timestep,
-            energy_shift=energy_shift
+            energy_shift=0.0  # Both already on same scale
         )
-        logger.verbose(f"  Created approx operator representation (U_s,approx, shifted)")
+        logger.verbose(f"  Created approx operator representation (U')")
 
         logger.info(f"Operator representations ready for conversion on demand")
 
