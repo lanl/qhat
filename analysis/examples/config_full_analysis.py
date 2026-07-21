@@ -9,12 +9,6 @@ This configuration demonstrates ALL currently available analysis capabilities:
 5. Eigendecomposition analysis (exact and/or approximate)
 6. Error analysis (eigenvalue errors, matrix norms, state-dependent errors)
 
-PHASE 2 IMPROVEMENTS (2026-07):
-  Error analysis now correctly compares time-evolution operators U_exact vs U_approx
-  (not H_exact vs U_approx as in Phase 0). This produces physically meaningful error
-  values. The implementation uses the OperatorRepresentation framework internally for
-  clean, automatic operator conversions. No config changes required - it just works better!
-
 Usage:
     python3.11 -m qhat.analysis.driver config_full_analysis.py
 """
@@ -207,20 +201,9 @@ analysis.eigendecomposition_matrices = "both"  # Options: None, "exact", "approx
 # 6. ERROR ANALYSIS
 # -------------------------------------------------------------------------------------------------
 # Compare exact and approximate representations using multiple error metrics
-#
-# PHASE 2 IMPROVEMENTS (2026-07):
-#   Error analysis now uses the OperatorRepresentation framework internally, which provides:
-#   - Automatic operator conversion: H → U, energy shift handling, etc.
-#   - Correct comparison of time-evolution operators: U_exact vs U_approx (not H vs U!)
-#   - Lazy evaluation and caching for efficiency
-#   - Clean, maintainable code for future extensions
-#
-#   This fixes the Phase 1 bug where H_exact was incorrectly compared to U_approx, producing
-#   nonsensical error values (Frobenius norm ~25, state error ~147%). Error values are now
-#   physically meaningful (typically 0.01-0.1 for good approximations).
 
 analysis.enable_eigenvalue_errors = True  # Compare all eigenvalues from eigendecomposition
-analysis.error_matrix_norms = "frobenius"  # Options: "frobenius", "spectral", ["frobenius", "spectral"]
+analysis.error_matrix_norms = ["frobenius", "spectral"]  # Options: "frobenius", "spectral", ["frobenius", "spectral"]
 analysis.error_state_inputs = "examples/Be-H_1.30_sto-6g_as-003-003_jw.npy"  # String or list of state files
 
 # This analysis computes three independent error types:
@@ -237,15 +220,12 @@ analysis.error_state_inputs = "examples/Be-H_1.30_sto-6g_as-003-003_jw.npy"  # S
 #    - Options:
 #      * Frobenius norm: Fast, measures total element-wise difference
 #      * Spectral norm: Slower, measures worst-case error (physically meaningful)
-#    - Phase 2: Automatic conversion ensures correct comparison
-#    - Typical values for good approximations: 0.01-0.1 (down from ~25 in buggy Phase 0)
 #
 # 3. STATE-DEPENDENT ERRORS:
 #    - Compares time-evolved states: ||U_exact|ψ⟩ - U_approx|ψ⟩||
 #      where U operators are the same as in matrix norm errors
 #    - Fast: Just applies operators to states
 #    - Most relevant for practical applications (how accurate for states you care about?)
-#    - Typical relative errors for good approximations: 0.1-1% (down from ~147% in buggy Phase 0)
 
 # Configuration options:
 #   enable_eigenvalue_errors:
@@ -264,20 +244,6 @@ analysis.error_state_inputs = "examples/Be-H_1.30_sto-6g_as-003-003_jw.npy"  # S
 #     - Same format as numerical_simulation_inputs
 
 # Output: error_analysis.npz containing all computed errors with metadata
-#
-# IMPLEMENTATION NOTES (Phase 2):
-#   Error analysis internally uses OperatorRepresentation to convert operators:
-#   1. Wraps H_exact (from exact_matrix_output) as Hamiltonian, unshifted
-#   2. Wraps U_s,approx (from algorithm) as time-evolution, energy-shifted
-#   3. Converts both to U_exact and U_approx (unshifted) for comparison
-#   4. Caches conversions for efficiency (matrix norms and state errors share operators)
-#   This ensures we compare compatible operators: U vs U (not H vs U as in Phase 0)
-
-# System size guidance:
-#   - ≤15 qubits: All error types feasible (dense matrices)
-#   - 16-20 qubits: eigenvalue_errors + error_state_inputs recommended
-#   - 20+ qubits: error_state_inputs only (best scaling)
-#   - Phase 3 (future): Matrix-free support for n > 15 qubits via scipy.sparse.linalg
 
 # Examples for different use cases:
 #
