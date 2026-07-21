@@ -620,10 +620,6 @@ def error_analysis(
     #   - Shifted ↔ unshifted (energy shift application/removal)
     #   - Dense matrix ↔ eigendecomposition
 
-    # Wrap operators in OperatorRepresentation instances
-    exact_op = None
-    approx_op = None
-
     # Check if matrix/state errors are requested (these need unitary operators)
     needs_unitaries = (
         config_analysis.error_matrix_norms is not None or
