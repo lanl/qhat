@@ -137,9 +137,15 @@ class OperatorRepresentation:
         cache_key = (operator_type, energy_shifted, representation)
         self._cache[cache_key] = data
 
-        logger.debug(
-            f"Created OperatorRepresentation: type={operator_type}, "
-            f"shifted={energy_shifted}, repr={representation}, "
+        # Get matrix dimension for logging
+        if representation == 'dense_matrix':
+            dim = data.shape[0]
+        else:
+            dim = len(data['eigenvalues'])
+
+        logger.info(
+            f"OperatorRepresentation created: type={operator_type}, "
+            f"shifted={energy_shifted}, repr={representation}, dim={dim}, "
             f"timestep={timestep}, E_shift={energy_shift}"
         )
 
@@ -188,10 +194,17 @@ class OperatorRepresentation:
         # Check cache
         cache_key = (operator_type, energy_shifted, representation)
         if cache_key in self._cache:
-            logger.debug(f"Cache hit: {cache_key}")
+            logger.debug(
+                f"OperatorRepresentation.get() cache hit: "
+                f"type={operator_type}, shifted={energy_shifted}, repr={representation}"
+            )
             return self._cache[cache_key]
 
-        logger.debug(f"Cache miss: {cache_key}, computing conversion")
+        logger.info(
+            f"OperatorRepresentation.get() cache miss - converting: "
+            f"from (type={self._original_type}, shifted={self._original_shifted}, repr={self._original_repr}) "
+            f"to (type={operator_type}, shifted={energy_shifted}, repr={representation})"
+        )
 
         # Need to convert - strategy: convert through eigendecomposition (universal intermediate)
         # Path: current form -> eigendecomp -> target form
@@ -211,6 +224,16 @@ class OperatorRepresentation:
         eigenvectors = eigendata['eigenvectors']
 
         # Step 2: Convert eigenvalues to desired operator_type and energy_shifted state
+        needs_conversion = (
+            self._original_type != operator_type or
+            self._original_shifted != energy_shifted
+        )
+        if needs_conversion:
+            logger.debug(
+                f"Converting eigenvalues: "
+                f"from (type={self._original_type}, shifted={self._original_shifted}) "
+                f"to (type={operator_type}, shifted={energy_shifted})"
+            )
         eigenvalues = self._convert_eigenvalues(
             eigenvalues,
             from_type=self._original_type,
@@ -229,6 +252,10 @@ class OperatorRepresentation:
             # Reconstruct matrix: M = V @ diag(λ) @ V^(-1)
             # Note: For Hermitian matrices (from eigh), V is unitary so V† = V^(-1)
             # For general matrices (from eig), V is not necessarily unitary, so we must use V^(-1)
+            logger.debug(
+                f"Reconstructing dense matrix from eigendecomposition: "
+                f"type={operator_type}, shifted={energy_shifted}, dim={len(eigenvalues)}"
+            )
             if operator_type == 'hamiltonian':
                 # Eigenvectors from eigh are orthonormal, use V† (faster)
                 result = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.conj().T
@@ -238,6 +265,10 @@ class OperatorRepresentation:
 
         # Cache and return
         self._cache[cache_key] = result
+        logger.info(
+            f"Conversion complete and cached: "
+            f"type={operator_type}, shifted={energy_shifted}, repr={representation}"
+        )
         return result
 
     def _get_eigendecomposition(
@@ -254,20 +285,35 @@ class OperatorRepresentation:
         """
         cache_key = (operator_type, energy_shifted, 'eigendecomposition')
         if cache_key in self._cache:
+            logger.debug(
+                f"Eigendecomposition cache hit: type={operator_type}, shifted={energy_shifted}"
+            )
             return self._cache[cache_key]
 
         if representation == 'eigendecomposition':
             # Already have it
+            logger.debug(
+                f"Eigendecomposition already available: type={operator_type}, shifted={energy_shifted}"
+            )
             return data
 
         # Need to compute eigendecomposition from dense matrix
+        dim = data.shape[0]
         if operator_type == 'hamiltonian':
             # Hamiltonians (shifted or unshifted) are Hermitian, use eigh
             # IMPORTANT: Must use eigh (not eig) for Hermitian matrices to get
             # properly orthonormal eigenvectors. Using eig() causes reconstruction errors.
+            logger.info(
+                f"Computing eigendecomposition (eigh): type={operator_type}, "
+                f"shifted={energy_shifted}, dim={dim} [O(N³) operation]"
+            )
             eigenvalues, eigenvectors = scipy.linalg.eigh(data)
         else:
             # Time-evolution operators - use general eig
+            logger.info(
+                f"Computing eigendecomposition (eig): type={operator_type}, "
+                f"shifted={energy_shifted}, dim={dim} [O(N³) operation]"
+            )
             eigenvalues, eigenvectors = scipy.linalg.eig(data)
 
         result = {
@@ -276,6 +322,9 @@ class OperatorRepresentation:
         }
 
         self._cache[cache_key] = result
+        logger.info(
+            f"Eigendecomposition computed and cached: type={operator_type}, shifted={energy_shifted}"
+        )
         return result
 
     def _convert_eigenvalues(
