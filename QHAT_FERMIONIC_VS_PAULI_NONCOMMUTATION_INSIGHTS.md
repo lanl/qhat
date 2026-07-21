@@ -1,5 +1,16 @@
 # QHAT Fermionic vs. Pauli Noncommutation Graph Insights
 
+> **Canonicalization correction (2026-07-21):** The full-library structural
+> counts in this legacy report were calculated from raw QHAT tensor slots.
+> Algebraically equivalent antisymmetric permutations were therefore counted as
+> separate fermionic vertices, unlike the normal-ordered convention in
+> `h2_fermionic.ipynb`. Do not use the fermionic vertex/edge statistics below as
+> canonical graph measurements. The corrected three-case workflow and results
+> are in `trotter_benchmark_results/benchmark_summary.md`; a future full-library
+> rerun is required before revising the aggregate structural claims. The focused
+> colored errors survive canonical aggregation, but its random-order statistics
+> must use canonical terms and have been regenerated there.
+
 ## Purpose
 
 This report summarizes what the generated QHAT bond-length sweep reveals about:
