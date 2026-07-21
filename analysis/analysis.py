@@ -529,7 +529,9 @@ def error_analysis(
         exact_eigendecomp=None,
         approx_eigendecomp=None,
         timestep=None,
-        energy_shift=0.0) -> dict:
+        energy_shift=0.0,
+        exact_op=None,
+        approx_op=None) -> dict:
     """
     Compute error metrics comparing exact and approximate representations.
 
@@ -660,36 +662,42 @@ def error_analysis(
                 "Matrix/state error analysis not yet implemented for matrix-free operators."
             )
 
-        logger.verbose(f"Creating OperatorRepresentation instances")
-        logger.verbose(f"  Timestep: t = {timestep}")
-        logger.verbose(f"  Energy shift: E = {energy_shift}")
+        # Create OperatorRepresentation instances if not provided
+        if exact_op is None or approx_op is None:
+            from qhat.analysis.operators import OperatorRepresentation
 
-        # Wrap exact Hamiltonian in OperatorRepresentation
-        # Note: exact_matrix is H' = H + E*I (shifted up by E to make eigenvalues positive)
-        # unitary_matrix is U' = exp(-i*H'*t) (also uses the shifted Hamiltonian)
-        # Both are on the shifted scale, and we want to unshift to the physical H for comparison.
-        exact_op = OperatorRepresentation(
-            data=exact_matrix,
-            operator_type='hamiltonian',
-            energy_shifted=True,  # Input IS shifted (H' = H + E*I)
-            representation='dense_matrix',
-            timestep=timestep,
-            energy_shift=energy_shift  # Will unshift by subtracting E
-        )
-        logger.verbose(f"  Created exact operator representation (H', shifted)")
+            logger.verbose(f"Creating OperatorRepresentation instances")
+            logger.verbose(f"  Timestep: t = {timestep}")
+            logger.verbose(f"  Energy shift: E = {energy_shift}")
 
-        # Wrap approximate time-evolution operator in OperatorRepresentation
-        approx_op = OperatorRepresentation(
-            data=unitary_matrix,
-            operator_type='time_evolution',
-            energy_shifted=True,  # Input IS shifted (U' from H')
-            representation='dense_matrix',
-            timestep=timestep,
-            energy_shift=energy_shift  # Will unshift with phase factor
-        )
-        logger.verbose(f"  Created approx operator representation (U', shifted)")
+            # Wrap exact Hamiltonian in OperatorRepresentation
+            # Note: exact_matrix is H' = H + E*I (shifted up by E to make eigenvalues positive)
+            # unitary_matrix is U' = exp(-i*H'*t) (also uses the shifted Hamiltonian)
+            # Both are on the shifted scale, and we want to unshift to the physical H for comparison.
+            exact_op = OperatorRepresentation(
+                data=exact_matrix,
+                operator_type='hamiltonian',
+                energy_shifted=True,  # Input IS shifted (H' = H + E*I)
+                representation='dense_matrix',
+                timestep=timestep,
+                energy_shift=energy_shift  # Will unshift by subtracting E
+            )
+            logger.verbose(f"  Created exact operator representation (H', shifted)")
 
-        logger.info(f"Operator representations ready for conversion on demand")
+            # Wrap approximate time-evolution operator in OperatorRepresentation
+            approx_op = OperatorRepresentation(
+                data=unitary_matrix,
+                operator_type='time_evolution',
+                energy_shifted=True,  # Input IS shifted (U' from H')
+                representation='dense_matrix',
+                timestep=timestep,
+                energy_shift=energy_shift  # Will unshift with phase factor
+            )
+            logger.verbose(f"  Created approx operator representation (U', shifted)")
+
+            logger.info(f"Operator representations ready for conversion on demand")
+        else:
+            logger.verbose("Using pre-created OperatorRepresentation instances (shared with other analyses)")
 
     # =============================================================================================
     # 2. MATRIX NORM ERRORS: ||U_exact - U_approx||
@@ -1279,7 +1287,9 @@ def save_requested_operator_outputs(
         exact_matrix,
         unitary_matrix,
         timestep,
-        energy_shift) -> dict:
+        energy_shift,
+        exact_op=None,
+        approx_op=None) -> dict:
     """
     Save all requested operator forms using OperatorRepresentation.
 
@@ -1314,32 +1324,37 @@ def save_requested_operator_outputs(
     if not config_analysis._matrix_output_requests and not config_analysis._eigendecomposition_output_requests:
         return results
 
-    # Create OperatorRepresentation wrappers
-    logger.verbose("Creating OperatorRepresentation instances for flexible output")
-    logger.verbose(f"  Timestep: t = {timestep}")
-    logger.verbose(f"  Energy shift: E = {energy_shift}")
+    # Create OperatorRepresentation wrappers if not provided
+    if exact_op is None or approx_op is None:
+        from qhat.analysis.operators import OperatorRepresentation
 
-    # Exact operator (from shifted Hamiltonian)
-    exact_op = OperatorRepresentation(
-        data=exact_matrix,
-        operator_type='hamiltonian',
-        energy_shifted=True,  # Input is H' = H + E*I
-        representation='dense_matrix',
-        timestep=timestep,
-        energy_shift=energy_shift
-    )
-    logger.verbose("  Created exact operator representation (H', shifted)")
+        logger.verbose("Creating OperatorRepresentation instances for flexible output")
+        logger.verbose(f"  Timestep: t = {timestep}")
+        logger.verbose(f"  Energy shift: E = {energy_shift}")
 
-    # Approximate operator (from shifted Hamiltonian via Trotter/etc)
-    approx_op = OperatorRepresentation(
-        data=unitary_matrix,
-        operator_type='time_evolution',
-        energy_shifted=True,  # Input is U' from H'
-        representation='dense_matrix',
-        timestep=timestep,
-        energy_shift=energy_shift
-    )
-    logger.verbose("  Created approximate operator representation (U', shifted)")
+        # Exact operator (from shifted Hamiltonian)
+        exact_op = OperatorRepresentation(
+            data=exact_matrix,
+            operator_type='hamiltonian',
+            energy_shifted=True,  # Input is H' = H + E*I
+            representation='dense_matrix',
+            timestep=timestep,
+            energy_shift=energy_shift
+        )
+        logger.verbose("  Created exact operator representation (H', shifted)")
+
+        # Approximate operator (from shifted Hamiltonian via Trotter/etc)
+        approx_op = OperatorRepresentation(
+            data=unitary_matrix,
+            operator_type='time_evolution',
+            energy_shifted=True,  # Input is U' from H'
+            representation='dense_matrix',
+            timestep=timestep,
+            energy_shift=energy_shift
+        )
+        logger.verbose("  Created approximate operator representation (U', shifted)")
+    else:
+        logger.verbose("Using pre-created OperatorRepresentation instances (shared with error analysis)")
 
     operators = {
         'exact': exact_op,
@@ -1560,6 +1575,44 @@ def analyze_algorithm(
         if 'approximate_eigendecomposition' in eig_results:
             approx_eigendecomp = eig_results['approximate_eigendecomposition']
 
+    # Create OperatorRepresentation instances once for reuse across analyses
+    # This avoids redundant eigendecompositions when both error analysis and flexible outputs are requested
+    exact_op = None
+    approx_op = None
+    needs_operators = (
+        error_analysis_requested or
+        len(config_analysis._matrix_output_requests) > 0 or
+        len(config_analysis._eigendecomposition_output_requests) > 0
+    )
+    if needs_operators:
+        from qhat.analysis.operators import OperatorRepresentation
+
+        logger.info("Creating shared OperatorRepresentation instances")
+        logger.verbose(f"  Timestep: t = {timestep}")
+        logger.verbose(f"  Energy shift: E = {energy_shift}")
+
+        # Exact operator (from shifted Hamiltonian H' = H + E*I)
+        exact_op = OperatorRepresentation(
+            data=exact_matrix,
+            operator_type='hamiltonian',
+            energy_shifted=True,
+            representation='dense_matrix',
+            timestep=timestep,
+            energy_shift=energy_shift
+        )
+        logger.verbose("  Created exact operator representation (H', shifted)")
+
+        # Approximate operator (from shifted time-evolution U' = exp(-i*H'*t))
+        approx_op = OperatorRepresentation(
+            data=unitary_matrix,
+            operator_type='time_evolution',
+            energy_shifted=True,
+            representation='dense_matrix',
+            timestep=timestep,
+            energy_shift=energy_shift
+        )
+        logger.verbose("  Created approximate operator representation (U', shifted)")
+
     # Error analysis: receives eigendecomposition data, does not recompute
     if error_analysis_requested:
         logger.info("Performing error analysis.")
@@ -1570,7 +1623,9 @@ def analyze_algorithm(
             exact_eigendecomp=exact_eigendecomp,
             approx_eigendecomp=approx_eigendecomp,
             timestep=timestep,
-            energy_shift=energy_shift
+            energy_shift=energy_shift,
+            exact_op=exact_op,
+            approx_op=approx_op
         )
 
     if config_analysis.exact_simulation_inputs is not None:
@@ -1604,7 +1659,9 @@ def analyze_algorithm(
             exact_matrix,
             unitary_matrix,
             timestep,
-            energy_shift
+            energy_shift,
+            exact_op=exact_op,
+            approx_op=approx_op
         )
 
     # TODO: Add gate parallelism / gate depth analysis
