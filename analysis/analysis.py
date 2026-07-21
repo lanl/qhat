@@ -742,134 +742,41 @@ def error_analysis(
         num_qubits = int(np.log2(dimension))
 
         if is_dense:
-            # Small systems: direct computation
+            # Small systems: direct computation of ||U_exact - U_approx||
             logger.verbose(f"Using dense matrices for norm computation (dimension={dimension})")
-            diff_matrix = exact_matrix - unitary_matrix
+
+            # Use the converted unitary operators (computed in conversion section above)
+            if exact_unitary_matrix is None or approx_unitary_matrix is None:
+                raise RuntimeError(
+                    "Unitary matrices should have been computed but are None. "
+                    "This is an internal error in the operator conversion logic."
+                )
+
+            diff_matrix = exact_unitary_matrix - approx_unitary_matrix
 
             for norm_type in norms_to_compute:
                 if norm_type == 'frobenius':
                     error = np.linalg.norm(diff_matrix, 'fro')
-                    logger.info(f"Frobenius norm error: {error:.6e}")
+                    logger.info(f"Frobenius norm ||U_exact - U_approx||_F: {error:.6e}")
                     results['matrix_frobenius_error'] = float(error)
 
                 elif norm_type == 'spectral':
                     error = np.linalg.norm(diff_matrix, 2)
-                    logger.info(f"Spectral norm error: {error:.6e}")
+                    logger.info(f"Spectral norm ||U_exact - U_approx||_2: {error:.6e}")
                     results['matrix_spectral_error'] = float(error)
 
                 else:
                     raise ValueError(f"Unknown matrix norm type: {norm_type}")
 
         else:
-            # Large systems: matrix-free computation
-            logger.info(f"WARNING: Matrix-free norm computation for {num_qubits} qubits")
-            logger.info(f"  This requires 2^{num_qubits} = {dimension:,} matrix-vector products")
-            logger.info(f"  Estimated time: {'<1 minute' if dimension < 10000 else '1-10 minutes' if dimension < 100000 else '10+ minutes'}")
-
-            for norm_type in norms_to_compute:
-                if norm_type == 'frobenius':
-                    # Compute ||A||_F^2 = sum_i ||A e_i||^2
-                    logger.verbose("Computing Frobenius norm via matrix-vector products")
-                    frobenius_squared = 0.0
-                    for i in range(dimension):
-                        if i % max(1, dimension // 10) == 0:
-                            logger.verbose(f"  Progress: {i}/{dimension} ({100*i//dimension}%)")
-                        # Create basis vector e_i
-                        e_i = np.zeros(dimension, dtype=complex)
-                        e_i[i] = 1.0
-                        # Compute difference: (H - U) e_i
-                        if hasattr(exact_matrix, 'matvec'):
-                            exact_result = exact_matrix.matvec(e_i)
-                        else:
-                            exact_result = exact_matrix @ e_i
-                        if hasattr(unitary_matrix, 'matvec'):
-                            approx_result = unitary_matrix.matvec(e_i)
-                        else:
-                            approx_result = unitary_matrix @ e_i
-                        diff_i = exact_result - approx_result
-                        frobenius_squared += np.linalg.norm(diff_i) ** 2
-
-                    error = np.sqrt(frobenius_squared)
-                    logger.info(f"Frobenius norm error (matrix-free): {error:.6e}")
-                    results['matrix_frobenius_error'] = float(error)
-
-                elif norm_type == 'spectral':
-                    # Compute ||A||_2 = largest singular value via power iteration
-                    logger.verbose("Computing spectral norm via power iteration")
-
-                    # Random starting vector
-                    v = np.random.randn(dimension) + 1j * np.random.randn(dimension)
-                    v = v / np.linalg.norm(v)
-
-                    max_iterations = 100
-                    tolerance = 1e-6
-
-                    for iteration in range(max_iterations):
-                        # Apply (H - U)† (H - U) to v
-                        # First: (H - U) v
-                        if hasattr(exact_matrix, 'matvec'):
-                            exact_result = exact_matrix.matvec(v)
-                        else:
-                            exact_result = exact_matrix @ v
-                        if hasattr(unitary_matrix, 'matvec'):
-                            approx_result = unitary_matrix.matvec(v)
-                        else:
-                            approx_result = unitary_matrix @ v
-                        diff_v = exact_result - approx_result
-
-                        # Then: (H - U)† diff_v
-                        if hasattr(exact_matrix, 'rmatvec'):
-                            exact_adjoint = exact_matrix.rmatvec(diff_v)
-                        else:
-                            exact_adjoint = exact_matrix.conj().T @ diff_v
-                        if hasattr(unitary_matrix, 'rmatvec'):
-                            approx_adjoint = unitary_matrix.rmatvec(diff_v)
-                        else:
-                            approx_adjoint = unitary_matrix.conj().T @ diff_v
-                        result = exact_adjoint - approx_adjoint
-
-                        # Normalize
-                        v_new = result / np.linalg.norm(result)
-
-                        # Check convergence
-                        if np.linalg.norm(v_new - v) < tolerance:
-                            logger.verbose(f"  Converged after {iteration+1} iterations")
-                            break
-
-                        v = v_new
-
-                        if (iteration + 1) % 10 == 0:
-                            logger.verbose(f"  Iteration {iteration+1}/{max_iterations}")
-
-                    # Rayleigh quotient to get eigenvalue (= squared singular value)
-                    if hasattr(exact_matrix, 'matvec'):
-                        exact_result = exact_matrix.matvec(v)
-                    else:
-                        exact_result = exact_matrix @ v
-                    if hasattr(unitary_matrix, 'matvec'):
-                        approx_result = unitary_matrix.matvec(v)
-                    else:
-                        approx_result = unitary_matrix @ v
-                    diff_v = exact_result - approx_result
-
-                    if hasattr(exact_matrix, 'rmatvec'):
-                        exact_adjoint = exact_matrix.rmatvec(diff_v)
-                    else:
-                        exact_adjoint = exact_matrix.conj().T @ diff_v
-                    if hasattr(unitary_matrix, 'rmatvec'):
-                        approx_adjoint = unitary_matrix.rmatvec(diff_v)
-                    else:
-                        approx_adjoint = unitary_matrix.conj().T @ diff_v
-                    result = exact_adjoint - approx_adjoint
-
-                    eigenvalue = np.vdot(v, result)
-                    error = np.sqrt(np.abs(eigenvalue))
-
-                    logger.info(f"Spectral norm error (matrix-free, power iteration): {error:.6e}")
-                    results['matrix_spectral_error'] = float(error)
-
-                else:
-                    raise ValueError(f"Unknown matrix norm type: {norm_type}")
+            # Matrix-free case: not implemented in Phase 1
+            raise NotImplementedError(
+                "Matrix-free matrix norm error analysis not yet implemented. "
+                "Phase 1 supports only dense matrices (systems with n ≤ 15 qubits). "
+                "This feature is planned for Phase 2 to support larger systems. "
+                "Note: Matrix norm errors require O(N²) matrix-vector products in matrix-free mode, "
+                "which may be impractical for very large systems anyway."
+            )
 
     # =============================================================================================
     # 3. STATE-DEPENDENT ERRORS
