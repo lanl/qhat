@@ -1,14 +1,3 @@
-"""
-QHAT Analysis Configuration: Trotter Method
-
-This config demonstrates resource estimation using Trotter decomposition.
-For comprehensive analysis including error metrics, see examples/config_full_analysis.py
-
-PHASE 2 IMPROVEMENTS (2026-07):
-  If you enable error analysis, it now uses OperatorRepresentation framework internally
-  to correctly compare time-evolution operators. No config changes needed!
-"""
-
 my_method = "Trotter"
 #my_method = "pauli-lcu"
 #my_method = "double-factorization"
