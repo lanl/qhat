@@ -553,7 +553,7 @@ def error_analysis(
     """
     from qhat.analysis.matrix_operations import PauliStringOperator
     from qhat.analysis.file_io import load_eigendecomposition, load_state
-    from analysis.operators import OperatorRepresentation
+    from qhat.analysis.operators import OperatorRepresentation
     import scipy.linalg
 
     logger.info("Starting error analysis")

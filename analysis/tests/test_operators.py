@@ -13,7 +13,7 @@ These tests verify:
 import numpy as np
 import pytest
 import scipy.linalg
-from analysis.operators import OperatorRepresentation
+from qhat.analysis.operators import OperatorRepresentation
 
 
 class TestBasicCreation:
