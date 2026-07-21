@@ -524,14 +524,16 @@ def error_analysis(
         exact_matrix=None,
         unitary_matrix=None,
         exact_eigendecomp=None,
-        approx_eigendecomp=None) -> dict:
+        approx_eigendecomp=None,
+        timestep=None,
+        energy_shift=0.0) -> dict:
     """
     Compute error metrics comparing exact and approximate representations.
 
     Three independent error types:
-    1. Eigenvalue errors (if enable_eigenvalue_errors is True)
-    2. Matrix norm errors (if error_matrix_norms is not None)
-    3. State-dependent errors (if error_state_inputs is not None)
+    1. Eigenvalue errors - Compares eigenenergies: λ(H_approx) vs λ(H_exact)
+    2. Matrix norm errors - Compares time evolution operators: ||U_exact - U_approx||
+    3. State-dependent errors - Compares time-evolved states: ||U_exact|ψ⟩ - U_approx|ψ⟩||
 
     Parameters:
         config_analysis: Analysis configuration with error analysis settings
@@ -541,6 +543,10 @@ def error_analysis(
         unitary_matrix: Pre-computed unitary matrix (optional)
         exact_eigendecomp: Pre-computed exact eigendecomposition (optional)
         approx_eigendecomp: Pre-computed approximate eigendecomposition (optional)
+        timestep: Time evolution parameter t (required for matrix/state errors).
+                  Used to compute U_exact = exp(-i * H_exact * t) from H_exact.
+        energy_shift: Energy shift E applied to approximate Hamiltonian (default: 0.0).
+                      Used to match global phases: U_exact_shifted = exp(i*E*t) * U_exact.
 
     Returns:
         Dictionary with error metrics
@@ -1356,7 +1362,9 @@ def analyze_algorithm(
             exact_matrix=exact_matrix,
             unitary_matrix=unitary_matrix,
             exact_eigendecomp=exact_eigendecomp,
-            approx_eigendecomp=approx_eigendecomp
+            approx_eigendecomp=approx_eigendecomp,
+            timestep=timestep,
+            energy_shift=energy_shift
         )
 
     if config_analysis.exact_simulation_inputs is not None:
