@@ -165,11 +165,9 @@ class AlgorithmConfiguration(ConfigurationBase):
 class AnalysisConfiguration(ConfigurationBase):
     def __init__(self):
         self.resource_estimator = None
-        self.matrix_output_file = None
+        self.algorithm_matrix_output_file = None
         self.numerical_simulation_inputs = None
-        self.exact_matrix_output_file = None
         self.matrix_memory_threshold_gb = 16.0
-        self.eigendecomposition_matrices = None
         self.enable_eigenvalue_errors = False
         self.error_matrix_norms = None
         self.error_state_inputs = None
@@ -326,11 +324,9 @@ class AnalysisConfiguration(ConfigurationBase):
     def _generate_TOML_table(self):
         table = tomlkit.table()
         self.save_if_present(table, "resource_estimator")
-        self.save_if_present(table, "matrix_output_file")
+        self.save_if_present(table, "algorithm_matrix_output_file")
         self.save_if_present(table, "numerical_simulation_inputs")
-        self.save_if_present(table, "exact_matrix_output_file")
         self.save_if_present(table, "matrix_memory_threshold_gb")
-        self.save_if_present(table, "eigendecomposition_matrices")
         self.save_if_present(table, "enable_eigenvalue_errors")
         self.save_if_present(table, "error_matrix_norms")
         self.save_if_present(table, "error_state_inputs")

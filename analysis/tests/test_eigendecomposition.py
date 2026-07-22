@@ -175,7 +175,13 @@ def test_eigendecomposition_sorting():
     matrix = np.diag(unsorted_energies)
 
     config = AnalysisConfiguration()
-    config.eigendecomposition_matrices = "exact"
+    # Use flexible API to request exact eigendecomposition
+    config.save_eigendecomposition_to_file(
+        filename='exact_eig.npz',
+        operator='exact',
+        form='hamiltonian',
+        shift='unshifted'
+    )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -205,7 +211,12 @@ def test_eigendecomposition_pauli_z():
     pauli_z = np.array([[1, 0], [0, -1]], dtype=complex)
 
     config = AnalysisConfiguration()
-    config.eigendecomposition_matrices = "exact"
+    config.save_eigendecomposition_to_file(
+        filename='exact_eig.npz',
+        operator='exact',
+        form='hamiltonian',
+        shift='unshifted'
+    )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -236,7 +247,12 @@ def test_eigendecomposition_orthonormality():
     matrix = np.array([[2, 1], [1, 2]], dtype=complex)
 
     config = AnalysisConfiguration()
-    config.eigendecomposition_matrices = "exact"
+    config.save_eigendecomposition_to_file(
+        filename='exact_eig.npz',
+        operator='exact',
+        form='hamiltonian',
+        shift='unshifted'
+    )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -289,7 +305,13 @@ def test_eigendecomposition_no_timestep_error():
     matrix = np.eye(2, dtype=complex)
 
     config = AnalysisConfiguration()
-    config.eigendecomposition_matrices = "approximate"
+    # Use flexible API to request approximate eigendecomposition
+    config.save_eigendecomposition_to_file(
+        filename='approx_eig.npz',
+        operator='approximate',
+        form='time_evolution',
+        shift='unshifted'
+    )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
