@@ -482,17 +482,30 @@ The `analysis/examples/` directory contains configuration files demonstrating va
 
 The basic `config.py` file presents a simple configuration for generating resource estimates. It loads data from the tensors file in the `examples` directory and demonstrates switching between Trotterization-based and double-factorization-based analysis (showing that configuration files are Python scripts, not just key-value lists).
 
-### Comprehensive Example: `config_full_analysis.py`
+### Complete Options Reference: `all_analyses.config`
 
-The `config_full_analysis.py` file demonstrates **ALL currently available analysis capabilities**:
+**This is the definitive reference for ALL available options in the QHAT analysis tool.**
+
+The `all_analyses.config` file demonstrates every available feature and configuration parameter:
 
 1. **Resource Estimation**: Quantum gate counts, qubit requirements, circuit depth
-2. **Matrix Output**: Save the unitary matrix representation to various formats (.npz, .h5, .txt)
-3. **Numerical Simulation**: Apply the unitary to one or more input quantum states
+2. **Flexible Operator Output**: Save any combination of operator forms (16 different combinations)
+   - Matrix or eigendecomposition representation
+   - Exact or approximate operators
+   - Hamiltonian or time-evolution form
+   - Unshifted (physical) or shifted (QPE) energy scales
+3. **Full Algorithm Circuit**: Complete algorithm matrix (U_approx for time evolution, QPE circuit for QPE)
+4. **Numerical Simulation**: Apply operators to quantum states
+5. **Error Analysis**: Eigenvalue errors, matrix norm errors, state-dependent errors
+6. **All Configuration Options**: Hamiltonian loading, encoding methods, algorithm selection
 
-This comprehensive example serves as a complete reference showing how to:
-- Configure all available analyses in one file
-- Use different output formats
+**NOTE**: This file produces ~18 output files and is computationally expensive. It is intended as a comprehensive reference for developers and users learning the tool, not for production use.
+
+For practical workflows, see `config.py` (basic) or `config_error_analysis_demo.py` (error analysis tutorial).
+
+### Error Analysis Tutorial: `config_error_analysis_demo.py`
+
+Focused tutorial demonstrating error analysis workflows for quantifying approximation quality
 - Process multiple input states
 - Structure configuration files with clear documentation
 - Set up for future features (exact matrices, eigendecomposition, error analysis)
