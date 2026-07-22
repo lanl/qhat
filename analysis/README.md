@@ -501,11 +501,24 @@ The `all_analyses.config` file demonstrates every available feature and configur
 
 **NOTE**: This file produces ~18 output files and is computationally expensive. It is intended as a comprehensive reference for developers and users learning the tool, not for production use.
 
-For practical workflows, see `config.py` (basic) or `config_error_analysis_demo.py` (error analysis tutorial).
+For practical workflows, see `config.py` (basic) or `error_analysis_tutorial.config` (error analysis tutorial).
 
-### Error Analysis Tutorial: `config_error_analysis_demo.py`
+### Error Analysis Tutorial: `error_analysis_tutorial.config`
 
-Focused tutorial demonstrating error analysis workflows for quantifying approximation quality
+**A pedagogical tutorial teaching error analysis from first principles.**
+
+This tutorial configuration teaches you how to use QHAT's error analysis features to quantify
+the accuracy of approximate quantum algorithms. It provides:
+
+- **Clear learning objectives** and step-by-step progression
+- **Three types of error analysis** with detailed explanations:
+  - Eigenvalue errors (energy accuracy)
+  - Matrix norm errors (global operator accuracy)
+  - State-dependent errors (specific state accuracy)
+- **Interpretation guidance** for understanding results
+- **Experimentation suggestions** to learn the accuracy vs. cost trade-off
+
+Recommended for: New users learning error analysis, anyone needing to validate algorithm accuracy
 - Process multiple input states
 - Structure configuration files with clear documentation
 - Set up for future features (exact matrices, eigendecomposition, error analysis)
