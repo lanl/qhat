@@ -159,10 +159,14 @@ def output_unitary_matrix(
         algorithm,
         unitary_matrix) -> dict:
     """
-    Generate and save the unitary matrix representation of the algorithm.
+    Generate and save the unitary matrix representation of the full algorithm circuit.
+
+    This saves the complete algorithm as computed by tensor_contract() - for time
+    evolution this is the U_approx operator, for QPE this is the full QPE circuit
+    including prep + controlled-U + inverse QFT.
 
     Parameters:
-        config_analysis: Analysis configuration with matrix_output_format and matrix_output_file
+        config_analysis: Analysis configuration with algorithm_matrix_output_file
         algorithm: The algorithm bloq to analyze
         unitary_matrix: The unitary matrix to save (pre-computed)
 
@@ -188,7 +192,7 @@ def output_unitary_matrix(
         unitarity_error = None
 
     # Save matrix to file (format auto-detected from extension)
-    output_file = config_analysis.matrix_output_file
+    output_file = config_analysis.algorithm_matrix_output_file
     save_matrix(
         output_file, unitary_matrix,
         unitarity_error=unitarity_error,
@@ -238,80 +242,8 @@ def _compute_exact_matrix(hamiltonian, config_analysis):
 
 # -------------------------------------------------------------------------------------------------
 
-def exact_matrix_output(
-        config_analysis: AnalysisConfiguration,
-        hamiltonian,
-        exact_matrix) -> dict:
-    """
-    Save the exact Hamiltonian matrix representation.
-
-    Parameters:
-        config_analysis: Analysis configuration with exact_matrix_output_file
-        hamiltonian: The Hamiltonian object
-        exact_matrix: The exact matrix to save (pre-computed)
-
-    Returns:
-        Dictionary with matrix metadata: shape, file, format, hermiticity_error, norm
-
-    Note:
-        For large systems, exact_matrix may be a matrix-free operator rather than
-        a dense array. In that case, certain properties (like saving to file) may
-        not be supported or may require special handling.
-    """
-    from qhat.analysis.matrix_operations import PauliStringOperator
-
-    # Check if this is a matrix-free operator
-    is_matrix_free = isinstance(exact_matrix, PauliStringOperator)
-
-    if is_matrix_free:
-        logger.verbose(f"Matrix-free operator with shape: {exact_matrix.shape}")
-        logger.info(
-            "WARNING: Matrix-free operator cannot be directly saved to file. "
-            "Skipping matrix output for large system."
-        )
-        return {
-            'matrix_shape': exact_matrix.shape,
-            'matrix_file': None,
-            'matrix_format': None,
-            'hermiticity_error': None,
-            'matrix_norm': None,
-            'matrix_free': True,
-            'note': 'Matrix-free operator not saved (too large)'
-        }
-
-    # For dense matrices, proceed with normal output
-    logger.verbose(f"Matrix shape: {exact_matrix.shape}")
-    logger.verbose(f"Matrix dtype: {exact_matrix.dtype}")
-
-    # Compute Hermiticity check: ||H - H†||_F
-    try:
-        matrix_norm = np.linalg.norm(exact_matrix, ord='fro')
-        H_dag = np.conj(exact_matrix.T)
-        hermiticity_error = np.linalg.norm(exact_matrix - H_dag, ord='fro')
-        logger.verbose(f"Matrix Frobenius norm: {matrix_norm:.6e}")
-        logger.verbose(f"Hermiticity error ||H - H†||_F: {hermiticity_error:.6e}")
-    except Exception as e:
-        logger.info(f"WARNING: Could not compute Hermiticity check: {e}")
-        matrix_norm = None
-        hermiticity_error = None
-
-    # Save matrix to file (format auto-detected from extension)
-    output_file = config_analysis.exact_matrix_output_file
-    save_matrix(
-        output_file, exact_matrix,
-        hermiticity_error=hermiticity_error,
-        matrix_norm=matrix_norm
-    )
-
-    # Return metadata
-    return {
-        'matrix_shape': exact_matrix.shape,
-        'matrix_file': str(output_file),
-        'matrix_format': Path(output_file).suffix,
-        'hermiticity_error': float(hermiticity_error) if hermiticity_error is not None else None,
-        'matrix_norm': float(matrix_norm) if matrix_norm is not None else None,
-        'matrix_free': False
-    }
+# exact_matrix_output() function removed - use flexible API instead:
+# analysis.save_matrix_to_file(filename='...', operator='exact', form='hamiltonian', shift='unshifted')
 
 # -------------------------------------------------------------------------------------------------
 
@@ -497,8 +429,6 @@ def eigendecomposition_analysis(
         return {}
 
     logger.info(f"Starting eigendecomposition analysis")
-    if config_analysis.eigendecomposition_matrices is not None:
-        logger.verbose(f"  eigendecomposition_matrices: {config_analysis.eigendecomposition_matrices}")
     if config_analysis.enable_eigenvalue_errors:
         logger.verbose(f"  enable_eigenvalue_errors: True (requires both eigendecompositions)")
 
@@ -575,7 +505,7 @@ def error_analysis(
         if exact_eigendecomp is None or approx_eigendecomp is None:
             raise ValueError(
                 "Both eigendecompositions must be computed in order to compare eigenenergies. "
-                "Ensure eigendecomposition_matrices is set to 'both' when enable_eigenvalue_errors is True."
+                "Use the flexible API to save both eigendecompositions when enable_eigenvalue_errors is True."
             )
 
         # Get eigenenergies from both decompositions (both already sorted by energy)
@@ -633,7 +563,8 @@ def error_analysis(
         if exact_matrix is None:
             raise ValueError(
                 "Matrix/state error analysis requires the exact Hamiltonian matrix. "
-                "Ensure exact_matrix_output_file is set or eigendecomposition is enabled."
+                "Use the flexible API: analysis.save_matrix_to_file(operator='exact', ...) "
+                "or enable eigendecomposition."
             )
 
         if unitary_matrix is None:
@@ -1027,7 +958,7 @@ def requires_exact_eigendecomposition(config_analysis: AnalysisConfiguration) ->
     Determine if exact eigendecomposition needs to be computed.
 
     Exact eigendecomposition is required for:
-    - Eigendecomposition analysis with eigendecomposition_matrices = 'exact' or 'both'
+    - Flexible API requests exact eigendecompositions
     - Eigenvalue error analysis (always needs both eigendecompositions)
 
     Parameters:
@@ -1036,15 +967,17 @@ def requires_exact_eigendecomposition(config_analysis: AnalysisConfiguration) ->
     Returns:
         True if exact eigendecomposition computation is needed, False otherwise
     """
-    # Eigendecomposition requested if eigendecomposition_matrices is not None
-    eigendecomposition_requested = config_analysis.eigendecomposition_matrices is not None
+    # Check if flexible API requests exact operator eigendecompositions
+    has_exact_eigendecomp_request = any(
+        req['operator'] == 'exact'
+        for req in config_analysis._eigendecomposition_output_requests
+    )
 
     # Need exact eigendecomposition if:
-    # 1. Eigendecomposition requested and matrices setting includes 'exact' or 'both'
+    # 1. Flexible API requests it
     # 2. Eigenvalue error analysis is enabled (always needs both)
     return (
-        (eigendecomposition_requested and
-         config_analysis.eigendecomposition_matrices in ['exact', 'both']) or
+        has_exact_eigendecomp_request or
         config_analysis.enable_eigenvalue_errors
     )
 
@@ -1054,7 +987,7 @@ def requires_approximate_eigendecomposition(config_analysis: AnalysisConfigurati
     Determine if approximate eigendecomposition needs to be computed.
 
     Approximate eigendecomposition is required for:
-    - Eigendecomposition analysis with eigendecomposition_matrices = 'approximate' or 'both'
+    - Flexible API requests approximate eigendecompositions
     - Eigenvalue error analysis (always needs both eigendecompositions)
 
     Parameters:
@@ -1063,15 +996,17 @@ def requires_approximate_eigendecomposition(config_analysis: AnalysisConfigurati
     Returns:
         True if approximate eigendecomposition computation is needed, False otherwise
     """
-    # Eigendecomposition requested if eigendecomposition_matrices is not None
-    eigendecomposition_requested = config_analysis.eigendecomposition_matrices is not None
+    # Check if flexible API requests approximate operator eigendecompositions
+    has_approx_eigendecomp_request = any(
+        req['operator'] == 'approximate'
+        for req in config_analysis._eigendecomposition_output_requests
+    )
 
     # Need approximate eigendecomposition if:
-    # 1. Eigendecomposition requested and matrices setting includes 'approximate' or 'both'
+    # 1. Flexible API requests it
     # 2. Eigenvalue error analysis is enabled (always needs both)
     return (
-        (eigendecomposition_requested and
-         config_analysis.eigendecomposition_matrices in ['approximate', 'both']) or
+        has_approx_eigendecomp_request or
         config_analysis.enable_eigenvalue_errors
     )
 
@@ -1092,8 +1027,14 @@ def requires_exact_matrix(config_analysis: AnalysisConfiguration) -> bool:
     Returns:
         True if exact matrix computation is needed, False otherwise
     """
+    # Check if flexible API requests exact operator matrices
+    has_exact_flexible_output = any(
+        req['operator'] == 'exact'
+        for req in config_analysis._matrix_output_requests
+    )
+
     return (
-        config_analysis.exact_matrix_output_file is not None or
+        has_exact_flexible_output or
         requires_exact_eigendecomposition(config_analysis) or
         config_analysis.error_matrix_norms is not None or
         config_analysis.error_state_inputs is not None
@@ -1118,7 +1059,7 @@ def requires_approximate_matrix(config_analysis: AnalysisConfiguration) -> bool:
         True if approximate matrix computation is needed, False otherwise
     """
     return (
-        config_analysis.matrix_output_file is not None or
+        config_analysis.algorithm_matrix_output_file is not None or
         config_analysis.numerical_simulation_inputs is not None or
         requires_approximate_eigendecomposition(config_analysis) or
         config_analysis.error_matrix_norms is not None or
@@ -1167,22 +1108,16 @@ def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfigura
 
     # Check if matrices will be computed and auto-enable output if not already set
     if requires_approximate_matrix(config_analysis):
-        if config_analysis.matrix_output_file is None:
+        if config_analysis.algorithm_matrix_output_file is None:
             default_filename = "unitary_matrix.npz"
             logger.info(
                 f"INFO: Approximate/unitary matrix will be computed for requested analyses. "
                 f"Auto-enabling matrix output to '{default_filename}' (essentially free)."
             )
-            config_analysis.matrix_output_file = default_filename
+            config_analysis.algorithm_matrix_output_file = default_filename
 
-    if requires_exact_matrix(config_analysis):
-        if config_analysis.exact_matrix_output_file is None:
-            default_filename = "exact_hamiltonian.npz"
-            logger.info(
-                f"INFO: Exact Hamiltonian matrix will be computed for requested analyses. "
-                f"Auto-enabling exact matrix output to '{default_filename}' (essentially free)."
-            )
-            config_analysis.exact_matrix_output_file = default_filename
+    # Note: No auto-enabling for exact matrix - users should use flexible API
+    # analysis.save_matrix_to_file(operator='exact', form='hamiltonian', ...)
 
 # -------------------------------------------------------------------------------------------------
 
@@ -1491,9 +1426,8 @@ def analyze_algorithm(
 
     # Validate at least one analysis requested
     if (config_analysis.resource_estimator is None and
-        config_analysis.matrix_output_file is None and
+        config_analysis.algorithm_matrix_output_file is None and
         config_analysis.numerical_simulation_inputs is None and
-        config_analysis.exact_matrix_output_file is None and
         not eigendecomposition_requested and
         not error_analysis_requested and
         config_analysis.exact_simulation_inputs is None and
@@ -1501,16 +1435,14 @@ def analyze_algorithm(
         raise ValueError(
             "No analyses requested. Set at least one of:\n"
             "  - resource_estimator (e.g., 'pyliqtr', 'cirq')\n"
-            "  - matrix_output_file (e.g., 'matrix.npz', 'matrix.h5', 'matrix.txt')\n"
+            "  - algorithm_matrix_output_file (e.g., 'matrix.npz') - full algorithm circuit matrix\n"
             "  - numerical_simulation_inputs (e.g., 'state.npy' or ['state1.npy', 'state2.npy'])\n"
-            "  - exact_matrix_output_file (e.g., 'exact_hamiltonian.npz')\n"
-            "  - eigendecomposition_matrices (e.g., 'exact', 'approximate', or 'both')\n"
             "  - enable_eigenvalue_errors (True to compute errors for all eigenvalues)\n"
             "  - error_matrix_norms (e.g., 'frobenius' or ['frobenius', 'spectral'])\n"
             "  - error_state_inputs (e.g., 'state.npy')\n"
             "  - exact_simulation_inputs (e.g., 'state.npy')\n"
-            "  - analysis.save_matrix_to_file(...) (flexible matrix output API)\n"
-            "  - analysis.save_eigendecomposition_to_file(...) (flexible eigendecomposition output API)"
+            "  - analysis.save_matrix_to_file(...) - flexible matrix output API\n"
+            "  - analysis.save_eigendecomposition_to_file(...) - flexible eigendecomposition output API"
         )
 
     results = {}
@@ -1539,13 +1471,11 @@ def analyze_algorithm(
         logger.info(f"Performing resource estimation using {config_analysis.resource_estimator}.")
         results["resource_estimates"] = estimate_resources(config_analysis, algorithm)
 
-    if config_analysis.matrix_output_file is not None:
-        logger.info("Generating unitary matrix output.")
+    if config_analysis.algorithm_matrix_output_file is not None:
+        logger.info("Generating algorithm matrix output.")
         results["matrix_output"] = output_unitary_matrix(config_analysis, algorithm, unitary_matrix)
 
-    if config_analysis.exact_matrix_output_file is not None:
-        logger.info("Generating exact Hamiltonian matrix output.")
-        results["exact_matrix_output"] = exact_matrix_output(config_analysis, hamiltonian, exact_matrix)
+    # exact_matrix_output removed - use flexible API instead
 
     if config_analysis.numerical_simulation_inputs is not None:
         logger.info("Performing numerical simulation.")

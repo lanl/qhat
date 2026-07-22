@@ -29,7 +29,7 @@ def test_exact_eigendecomposition_required_when_matrices_exact():
     """Test that exact eigendecomposition is required when eigendecomposition_matrices='exact'."""
     config = AnalysisConfiguration()
     config.num_eigenvalues = 5
-    config.eigendecomposition_matrices = 'exact'
+    config.save_eigendecomposition_to_file(filename='exact.npz', operator='exact', form='hamiltonian', shift='unshifted')
     assert requires_exact_eigendecomposition(config)
 
 
@@ -37,7 +37,8 @@ def test_exact_eigendecomposition_required_when_matrices_both():
     """Test that exact eigendecomposition is required when eigendecomposition_matrices='both'."""
     config = AnalysisConfiguration()
     config.num_eigenvalues = 5
-    config.eigendecomposition_matrices = 'both'
+    config.save_eigendecomposition_to_file(filename='exact.npz', operator='exact', form='hamiltonian', shift='unshifted')
+    config.save_eigendecomposition_to_file(filename='approx.npz', operator='approximate', form='time_evolution', shift='unshifted')
     assert requires_exact_eigendecomposition(config)
 
 
@@ -45,7 +46,7 @@ def test_exact_eigendecomposition_not_required_when_matrices_approximate():
     """Test that exact eigendecomposition is not required when eigendecomposition_matrices='approximate'."""
     config = AnalysisConfiguration()
     config.num_eigenvalues = 5
-    config.eigendecomposition_matrices = 'approximate'
+    config.save_eigendecomposition_to_file(filename='approx.npz', operator='approximate', form='time_evolution', shift='unshifted')
     assert not requires_exact_eigendecomposition(config)
 
 
@@ -62,7 +63,7 @@ def test_exact_eigendecomposition_with_all_eigenvalues():
     """Test that exact eigendecomposition works with num_eigenvalues='all'."""
     config = AnalysisConfiguration()
     config.num_eigenvalues = 'all'
-    config.eigendecomposition_matrices = 'exact'
+    config.save_eigendecomposition_to_file(filename='exact.npz', operator='exact', form='hamiltonian', shift='unshifted')
     assert requires_exact_eigendecomposition(config)
 
 
@@ -80,7 +81,7 @@ def test_approximate_eigendecomposition_required_when_matrices_approximate():
     """Test that approximate eigendecomposition is required when eigendecomposition_matrices='approximate'."""
     config = AnalysisConfiguration()
     config.num_eigenvalues = 5
-    config.eigendecomposition_matrices = 'approximate'
+    config.save_eigendecomposition_to_file(filename='approx.npz', operator='approximate', form='time_evolution', shift='unshifted')
     assert requires_approximate_eigendecomposition(config)
 
 
@@ -88,7 +89,8 @@ def test_approximate_eigendecomposition_required_when_matrices_both():
     """Test that approximate eigendecomposition is required when eigendecomposition_matrices='both'."""
     config = AnalysisConfiguration()
     config.num_eigenvalues = 5
-    config.eigendecomposition_matrices = 'both'
+    config.save_eigendecomposition_to_file(filename='exact.npz', operator='exact', form='hamiltonian', shift='unshifted')
+    config.save_eigendecomposition_to_file(filename='approx.npz', operator='approximate', form='time_evolution', shift='unshifted')
     assert requires_approximate_eigendecomposition(config)
 
 
@@ -96,7 +98,7 @@ def test_approximate_eigendecomposition_not_required_when_matrices_exact():
     """Test that approximate eigendecomposition is not required when eigendecomposition_matrices='exact'."""
     config = AnalysisConfiguration()
     config.num_eigenvalues = 5
-    config.eigendecomposition_matrices = 'exact'
+    config.save_eigendecomposition_to_file(filename='exact.npz', operator='exact', form='hamiltonian', shift='unshifted')
     assert not requires_approximate_eigendecomposition(config)
 
 
@@ -120,7 +122,7 @@ def test_exact_matrix_not_required_by_default():
 def test_exact_matrix_required_for_output_file():
     """Test that exact matrix is required when exact_matrix_output_file is set."""
     config = AnalysisConfiguration()
-    config.exact_matrix_output_file = 'exact.npz'
+    config.save_matrix_to_file(filename='exact.npz', operator='exact', form='hamiltonian', shift='unshifted')
     assert requires_exact_matrix(config)
 
 
@@ -128,7 +130,7 @@ def test_exact_matrix_required_for_exact_eigendecomposition():
     """Test that exact matrix is required when exact eigendecomposition is needed."""
     config = AnalysisConfiguration()
     config.num_eigenvalues = 5
-    config.eigendecomposition_matrices = 'exact'
+    config.save_eigendecomposition_to_file(filename='exact.npz', operator='exact', form='hamiltonian', shift='unshifted')
     assert requires_exact_matrix(config)
 
 
@@ -136,7 +138,8 @@ def test_exact_matrix_required_for_both_eigendecomposition():
     """Test that exact matrix is required when both eigendecompositions are needed."""
     config = AnalysisConfiguration()
     config.num_eigenvalues = 5
-    config.eigendecomposition_matrices = 'both'
+    config.save_eigendecomposition_to_file(filename='exact.npz', operator='exact', form='hamiltonian', shift='unshifted')
+    config.save_eigendecomposition_to_file(filename='approx.npz', operator='approximate', form='time_evolution', shift='unshifted')
     assert requires_exact_matrix(config)
 
 
@@ -174,7 +177,7 @@ def test_approximate_matrix_not_required_by_default():
 def test_approximate_matrix_required_for_output_file():
     """Test that approximate matrix is required when matrix_output_file is set."""
     config = AnalysisConfiguration()
-    config.matrix_output_file = 'matrix.npz'
+    config.algorithm_matrix_output_file = 'matrix.npz'
     assert requires_approximate_matrix(config)
 
 
@@ -189,7 +192,7 @@ def test_approximate_matrix_required_for_approximate_eigendecomposition():
     """Test that approximate matrix is required when approximate eigendecomposition is needed."""
     config = AnalysisConfiguration()
     config.num_eigenvalues = 5
-    config.eigendecomposition_matrices = 'approximate'
+    config.save_eigendecomposition_to_file(filename='approx.npz', operator='approximate', form='time_evolution', shift='unshifted')
     assert requires_approximate_matrix(config)
 
 
@@ -197,7 +200,8 @@ def test_approximate_matrix_required_for_both_eigendecomposition():
     """Test that approximate matrix is required when both eigendecompositions are needed."""
     config = AnalysisConfiguration()
     config.num_eigenvalues = 5
-    config.eigendecomposition_matrices = 'both'
+    config.save_eigendecomposition_to_file(filename='exact.npz', operator='exact', form='hamiltonian', shift='unshifted')
+    config.save_eigendecomposition_to_file(filename='approx.npz', operator='approximate', form='time_evolution', shift='unshifted')
     assert requires_approximate_matrix(config)
 
 
@@ -257,7 +261,8 @@ def test_eigendecomposition_dependency_on_matrices():
     """Test that eigendecomposition correctly implies matrix computation."""
     config = AnalysisConfiguration()
     config.num_eigenvalues = 5
-    config.eigendecomposition_matrices = 'both'
+    config.save_eigendecomposition_to_file(filename='exact.npz', operator='exact', form='hamiltonian', shift='unshifted')
+    config.save_eigendecomposition_to_file(filename='approx.npz', operator='approximate', form='time_evolution', shift='unshifted')
 
     # Both eigendecompositions should be required
     assert requires_exact_eigendecomposition(config)

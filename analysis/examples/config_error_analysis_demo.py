@@ -59,28 +59,44 @@ algorithm.method = "time evolution"
 analysis.resource_estimator = "pyLIQTR"
 
 # -------------------------------------------------------------------------------------------------
-# Matrix Output - Required for Error Analysis
+# Matrix and Eigendecomposition Output - Required for Error Analysis
 # -------------------------------------------------------------------------------------------------
-# Error analysis needs both exact Hamiltonian and approximate unitary matrices
+# Error analysis needs matrices and eigendecompositions from both exact and approximate operators
 
-analysis.exact_matrix_output_file = "error_demo_exact_hamiltonian.npz"
+# EXACT OPERATOR: Use flexible API to save exact Hamiltonian
+analysis.save_matrix_to_file(
+    filename='error_demo_exact_hamiltonian.npz',
+    operator='exact',
+    form='hamiltonian',
+    shift='unshifted'
+)
 # The exact Hamiltonian (no approximations)
-# Will be automatically converted to U_exact = exp(-i*H*t) for comparison
+# Will be automatically converted to U_exact = exp(-i*H*t) for error comparison
 
-analysis.matrix_output_file = "error_demo_approx_unitary.npz"
-# The approximate time-evolution operator from Trotter decomposition
-# Automatically converted to the same energy scale as U_exact for fair comparison
+# EXACT EIGENDECOMPOSITION: Save exact eigenvalues for eigenvalue error analysis
+analysis.save_eigendecomposition_to_file(
+    filename='error_demo_exact_eigendecomp.npz',
+    operator='exact',
+    form='hamiltonian',
+    shift='unshifted'
+)
+# Eigenenergies and eigenvectors of H_exact (ground state + excited states)
 
-# -------------------------------------------------------------------------------------------------
-# Eigendecomposition - Required for Eigenvalue Errors
-# -------------------------------------------------------------------------------------------------
-# Compute eigenvalues of both exact and approximate operators
+# APPROXIMATE ALGORITHM: Save the full algorithm circuit matrix
+analysis.algorithm_matrix_output_file = "error_demo_algorithm_output.npz"
+# The unitary matrix produced by the Trotter circuit
+# For time evolution: this is U_approx
+# For QPE: this would be the full QPE circuit
 
-analysis.eigendecomposition_matrices = "both"
-# This produces:
-#   - Eigenenergies of H_exact (ground state, excited states)
-#   - Eigenenergies of H_approx (extracted from U_approx eigenphases)
-# Energy shifts are automatically handled for fair comparison
+# APPROXIMATE EIGENDECOMPOSITION: Save approximate eigenvalues for eigenvalue error analysis
+analysis.save_eigendecomposition_to_file(
+    filename='error_demo_approx_eigendecomp.npz',
+    operator='approximate',
+    form='time_evolution',
+    shift='shifted'
+)
+# Eigenenergies extracted from U_approx eigenphases
+# Energy shifts are automatically handled for fair comparison with exact energies
 
 # -------------------------------------------------------------------------------------------------
 # Error Analysis - Three Independent Error Types
@@ -150,11 +166,11 @@ analysis.error_state_inputs = "examples/Be-H_1.30_sto-6g_as-003-003_jw.npy"
 #    - Unitarity checks (should be ~1e-15 for both exact and approximate)
 #    - Error analysis results
 #
-# 2. Matrix files:
-#    - error_demo_exact_hamiltonian.npz: The exact Hamiltonian
-#    - error_demo_approx_unitary.npz: The approximate time-evolution operator
-#    - exact_eigendecomposition.npz: Eigenenergies and eigenvectors of H_exact
-#    - approximate_eigendecomposition.npz: Eigenenergies of H_approx
+# 2. Output files:
+#    - error_demo_exact_hamiltonian.npz: The exact Hamiltonian matrix
+#    - error_demo_exact_eigendecomp.npz: Eigenenergies and eigenvectors of H_exact
+#    - error_demo_algorithm_output.npz: The full algorithm circuit (U_approx for time evolution)
+#    - error_demo_approx_eigendecomp.npz: Eigenenergies extracted from U_approx
 #    - error_analysis.npz: All error analysis results in one file
 #
 # 3. Error analysis results:

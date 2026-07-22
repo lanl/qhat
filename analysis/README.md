@@ -205,7 +205,7 @@ development are may not be reliable yet.
 
 #### Matrix Output
 
-- **Unitary Matrix Output**: Setting `analysis.matrix_output_file` to a filename will compute and
+- **Unitary Matrix Output**: Setting `analysis.algorithm_algorithm_matrix_output_file` to a filename will compute and
   save the full unitary matrix representation of the algorithm. Supported formats:
   - `.npz`: NumPy compressed format
   - `.h5` or `.hdf5`: HDF5 format with compression
@@ -215,10 +215,10 @@ development are may not be reliable yet.
   
   **Example**:
   ```python
-  analysis.matrix_output_file = "unitary_matrix.npz"
+  analysis.algorithm_algorithm_matrix_output_file = "unitary_matrix.npz"
   ```
 
-- **Exact Hamiltonian Matrix Output**: Setting `analysis.exact_matrix_output_file` to a filename
+- **Exact Hamiltonian Matrix Output**: Use the flexible API `analysis.save_matrix_to_file()` with `operator='exact'`
   will compute and save the exact matrix representation of the Hamiltonian **without any
   approximations**.  Supported formats are the same as for unitary matrix output.
   
@@ -233,7 +233,7 @@ development are may not be reliable yet.
   
   **Example**:
   ```python
-  analysis.exact_matrix_output_file = "exact_hamiltonian.npz"
+  analysis.exact_algorithm_matrix_output_file = "exact_hamiltonian.npz"
   ```
   
   **Note**: For large systems, the exact matrix computation creates a matrix-free LinearOperator
@@ -242,7 +242,7 @@ development are may not be reliable yet.
 
 #### Eigendecomposition Analysis
 
-- **Eigendecomposition Analysis**: Setting `analysis.eigendecomposition_matrices` enables full-spectrum eigendecomposition for exact and/or approximate matrices.
+- **Eigendecomposition Analysis**: Use the flexible API `analysis.save_eigendecomposition_to_file()` to compute eigendecompositions.
 
   **Key features**:
   - **Always computes full spectrum** (all eigenstates)
@@ -252,7 +252,7 @@ development are may not be reliable yet.
 
   **Configuration parameter**:
   
-  - **`eigendecomposition_matrices`**: Which matrices to eigendecompose
+  - **flexible eigendecomposition API**: Which matrices to eigendecompose
     - `None` (default): Eigendecomposition disabled
     - `"exact"`: Only eigendecompose the exact Hamiltonian matrix
     - `"approximate"`: Only eigendecompose the algorithm's unitary matrix
@@ -279,13 +279,13 @@ development are may not be reliable yet.
   **Examples**:
   ```python
   # Full spectrum for small system (exact Hamiltonian)
-  analysis.eigendecomposition_matrices = "exact"
+  analysis.save_eigendecomposition_to_file(filename='...', operator='exact', form='hamiltonian', shift='unshifted')
 
   # Full spectrum for approximate algorithm
-  analysis.eigendecomposition_matrices = "approximate"
+  analysis.save_eigendecomposition_to_file(filename='...', operator='approximate', form='time_evolution', shift='shifted')
 
   # Both (required for eigenvalue error comparison)
-  analysis.eigendecomposition_matrices = "both"
+  # Use save_eigendecomposition_to_file for both exact and approximate
   ```
 
   **Size limitations**:
@@ -304,7 +304,7 @@ development are may not be reliable yet.
     - Set to `True` to compute errors for ALL eigenstates (full spectrum)
     - Compares eigenenergies element-wise after both are sorted by energy
     - Ground state (exact) compared with ground state (approximate), etc.
-    - Requires `eigendecomposition_matrices = "both"` (auto-set if not already "both")
+    - Requires `both eigendecompositions requested via flexible API` (auto-set if not already "both")
     - **Best for**: Validating eigenenergy accuracy across the full spectrum
 
   - **`error_matrix_norms`**: Which matrix norms to compute (default: None, disabled)
@@ -461,9 +461,9 @@ depending on the analyses requested:
 - **Log file**: Default `analysis.log`, configurable via `general.logfile`
 - **TOML summary**: Hash-based filename (e.g., `12345678901234567890.toml`) containing inputs and
   results. Shows final results but not intermediate values.
-- **Matrix file** (if `matrix_output_file` specified): Unitary matrix in specified format (`.npz`,
+- **Matrix file** (if `algorithm_matrix_output_file` specified): Unitary matrix in specified format (`.npz`,
   `.h5`, or `.txt`)
-- **Exact matrix file** (if `exact_matrix_output_file` specified): Exact Hamiltonian matrix
+- **Exact matrix file** (if `exact_algorithm_matrix_output_file` specified): Exact Hamiltonian matrix
 - **Eigendecomposition files** (if `num_eigenvalues` > 0): `exact_eigendecomposition.npz` and/or
   `approximate_eigendecomposition.npz`
 - **Error analysis file** (if any error analysis enabled): `error_analysis.npz`
