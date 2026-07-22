@@ -18,7 +18,7 @@ energy_error = meV_to_Hartree(1e4)  # 0.01 keV
 # GENERAL CONFIGURATION
 # =================================================================================================
 
-general.print_verbose()  # Options: print_default(), print_verbose(), print_debug()
+general.print_debug()  # Options: print_default(), print_verbose(), print_debug()
 general.logfile = "Be-H_full_analysis.log"
 
 # =================================================================================================
