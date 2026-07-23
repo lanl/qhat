@@ -159,10 +159,14 @@ def output_unitary_matrix(
         algorithm,
         unitary_matrix) -> dict:
     """
-    Generate and save the unitary matrix representation of the algorithm.
+    Generate and save the unitary matrix representation of the full algorithm circuit.
+
+    This saves the complete algorithm as computed by tensor_contract() - for time
+    evolution this is the U_approx operator, for QPE this is the full QPE circuit
+    including prep + controlled-U + inverse QFT.
 
     Parameters:
-        config_analysis: Analysis configuration with matrix_output_format and matrix_output_file
+        config_analysis: Analysis configuration with algorithm_matrix_output_file
         algorithm: The algorithm bloq to analyze
         unitary_matrix: The unitary matrix to save (pre-computed)
 
@@ -188,7 +192,7 @@ def output_unitary_matrix(
         unitarity_error = None
 
     # Save matrix to file (format auto-detected from extension)
-    output_file = config_analysis.matrix_output_file
+    output_file = config_analysis.algorithm_matrix_output_file
     save_matrix(
         output_file, unitary_matrix,
         unitarity_error=unitarity_error,
@@ -238,80 +242,8 @@ def _compute_exact_matrix(hamiltonian, config_analysis):
 
 # -------------------------------------------------------------------------------------------------
 
-def exact_matrix_output(
-        config_analysis: AnalysisConfiguration,
-        hamiltonian,
-        exact_matrix) -> dict:
-    """
-    Save the exact Hamiltonian matrix representation.
-
-    Parameters:
-        config_analysis: Analysis configuration with exact_matrix_output_file
-        hamiltonian: The Hamiltonian object
-        exact_matrix: The exact matrix to save (pre-computed)
-
-    Returns:
-        Dictionary with matrix metadata: shape, file, format, hermiticity_error, norm
-
-    Note:
-        For large systems, exact_matrix may be a matrix-free operator rather than
-        a dense array. In that case, certain properties (like saving to file) may
-        not be supported or may require special handling.
-    """
-    from qhat.analysis.matrix_operations import PauliStringOperator
-
-    # Check if this is a matrix-free operator
-    is_matrix_free = isinstance(exact_matrix, PauliStringOperator)
-
-    if is_matrix_free:
-        logger.verbose(f"Matrix-free operator with shape: {exact_matrix.shape}")
-        logger.info(
-            "WARNING: Matrix-free operator cannot be directly saved to file. "
-            "Skipping matrix output for large system."
-        )
-        return {
-            'matrix_shape': exact_matrix.shape,
-            'matrix_file': None,
-            'matrix_format': None,
-            'hermiticity_error': None,
-            'matrix_norm': None,
-            'matrix_free': True,
-            'note': 'Matrix-free operator not saved (too large)'
-        }
-
-    # For dense matrices, proceed with normal output
-    logger.verbose(f"Matrix shape: {exact_matrix.shape}")
-    logger.verbose(f"Matrix dtype: {exact_matrix.dtype}")
-
-    # Compute Hermiticity check: ||H - H†||_F
-    try:
-        matrix_norm = np.linalg.norm(exact_matrix, ord='fro')
-        H_dag = np.conj(exact_matrix.T)
-        hermiticity_error = np.linalg.norm(exact_matrix - H_dag, ord='fro')
-        logger.verbose(f"Matrix Frobenius norm: {matrix_norm:.6e}")
-        logger.verbose(f"Hermiticity error ||H - H†||_F: {hermiticity_error:.6e}")
-    except Exception as e:
-        logger.info(f"WARNING: Could not compute Hermiticity check: {e}")
-        matrix_norm = None
-        hermiticity_error = None
-
-    # Save matrix to file (format auto-detected from extension)
-    output_file = config_analysis.exact_matrix_output_file
-    save_matrix(
-        output_file, exact_matrix,
-        hermiticity_error=hermiticity_error,
-        matrix_norm=matrix_norm
-    )
-
-    # Return metadata
-    return {
-        'matrix_shape': exact_matrix.shape,
-        'matrix_file': str(output_file),
-        'matrix_format': Path(output_file).suffix,
-        'hermiticity_error': float(hermiticity_error) if hermiticity_error is not None else None,
-        'matrix_norm': float(matrix_norm) if matrix_norm is not None else None,
-        'matrix_free': False
-    }
+# exact_matrix_output() function removed - use flexible API instead:
+# analysis.save_matrix_to_file(filename='...', operator='exact', form='hamiltonian', shift='unshifted')
 
 # -------------------------------------------------------------------------------------------------
 
@@ -486,18 +418,19 @@ def eigendecomposition_analysis(
     Raises:
         ValueError: If required matrices or timestep are not provided
     """
-    which_matrices = config_analysis.eigendecomposition_matrices
+    # Determine which eigendecompositions need to be computed
+    # Use requires_* functions to check if eigendecompositions are needed
+    # (handles both explicit requests and implicit needs like eigenvalue error analysis)
+    need_exact = requires_exact_eigendecomposition(config_analysis)
+    need_approx = requires_approximate_eigendecomposition(config_analysis)
 
-    if which_matrices is None:
-        logger.info("Eigendecomposition analysis not requested (eigendecomposition_matrices is None)")
+    if not need_exact and not need_approx:
+        logger.info("Eigendecomposition analysis not requested")
         return {}
 
     logger.info(f"Starting eigendecomposition analysis")
-    logger.verbose(f"  eigendecomposition_matrices: {which_matrices}")
-
-    # Determine which matrices we need
-    need_exact = which_matrices in ['exact', 'both']
-    need_approx = which_matrices in ['approximate', 'both']
+    if config_analysis.enable_eigenvalue_errors:
+        logger.verbose(f"  enable_eigenvalue_errors: True (requires both eigendecompositions)")
 
     results = {}
 
@@ -526,7 +459,9 @@ def error_analysis(
         exact_eigendecomp=None,
         approx_eigendecomp=None,
         timestep=None,
-        energy_shift=0.0) -> dict:
+        energy_shift=0.0,
+        exact_op=None,
+        approx_op=None) -> dict:
     """
     Compute error metrics comparing exact and approximate representations.
 
@@ -553,6 +488,7 @@ def error_analysis(
     """
     from qhat.analysis.matrix_operations import PauliStringOperator
     from qhat.analysis.file_io import load_eigendecomposition, load_state
+    from qhat.analysis.operators import OperatorRepresentation
     import scipy.linalg
 
     logger.info("Starting error analysis")
@@ -569,7 +505,7 @@ def error_analysis(
         if exact_eigendecomp is None or approx_eigendecomp is None:
             raise ValueError(
                 "Both eigendecompositions must be computed in order to compare eigenenergies. "
-                "Ensure eigendecomposition_matrices is set to 'both' when enable_eigenvalue_errors is True."
+                "Use the flexible API to save both eigendecompositions when enable_eigenvalue_errors is True."
             )
 
         # Get eigenenergies from both decompositions (both already sorted by energy)
@@ -603,25 +539,16 @@ def error_analysis(
         }
 
     # =============================================================================================
-    # OPERATOR CONVERSION: Ensure compatible representations for error analysis
+    # OPERATOR CONVERSION: Wrap operators in OperatorRepresentation for clean handling
     # =============================================================================================
     # Available inputs:
     #   - exact_matrix: H_exact (unshifted Hamiltonian, dense matrix or PauliStringOperator)
     #   - unitary_matrix: U_s,approx (energy-shifted time-evolution operator)
     #
-    # Required for comparisons:
-    #   - Eigenvalue errors: Need energies λ(H), can extract from either H or U matrices
-    #   - Matrix norm errors: Need U_exact and U_approx (both unshifted unitaries)
-    #   - State errors: Need U_exact and U_approx (both unshifted unitaries)
-    #
-    # Conversion strategy (dense case only in Phase 1):
-    #   1. Convert U_s,approx → U_approx: Remove energy shift (scalar multiplication)
-    #   2. Convert H_exact → U_exact: Matrix exponential
-    #   3. Apply energy shift to U_exact for phase matching
-
-    # Store converted operators
-    exact_unitary_matrix = None  # Will hold U_exact (unshifted)
-    approx_unitary_matrix = None  # Will hold U_approx (unshifted)
+    # OperatorRepresentation provides unified interface for conversions:
+    #   - H ↔ U (Hamiltonian ↔ time-evolution operator)
+    #   - Shifted ↔ unshifted (energy shift application/removal)
+    #   - Dense matrix ↔ eigendecomposition
 
     # Check if matrix/state errors are requested (these need unitary operators)
     needs_unitaries = (
@@ -630,13 +557,14 @@ def error_analysis(
     )
 
     if needs_unitaries:
-        logger.info("Converting operators for matrix/state error analysis")
+        logger.info("Preparing operators for matrix/state error analysis")
 
         # Validate required inputs
         if exact_matrix is None:
             raise ValueError(
                 "Matrix/state error analysis requires the exact Hamiltonian matrix. "
-                "Ensure exact_matrix_output_file is set or eigendecomposition is enabled."
+                "Use the flexible API: analysis.save_matrix_to_file(operator='exact', ...) "
+                "or enable eigendecomposition."
             )
 
         if unitary_matrix is None:
@@ -656,59 +584,47 @@ def error_analysis(
         is_approx_dense = isinstance(unitary_matrix, np.ndarray)
 
         if not (is_exact_dense and is_approx_dense):
-            # Matrix-free case: not implemented in Phase 1
+            # Matrix-free case: not implemented yet
             raise NotImplementedError(
-                "Matrix/state error analysis not yet implemented for matrix-free operators. "
-                "Phase 1 supports only dense matrices (systems with n ≤ 15 qubits). "
-                "Reduce system size to enable dense matrix computation, or disable these error types."
+                "Matrix/state error analysis not yet implemented for matrix-free operators."
             )
 
-        # DENSE CASE: Convert both operators to unshifted time-evolution operators
-        logger.verbose(f"Converting to unshifted time-evolution operators")
-        logger.verbose(f"  Timestep: t = {timestep}")
-        logger.verbose(f"  Energy shift: E = {energy_shift}")
+        # Create OperatorRepresentation instances if not provided
+        if exact_op is None or approx_op is None:
+            from qhat.analysis.operators import OperatorRepresentation
 
-        # Step 1: Convert approximate operator: U_s,approx → U_approx
-        # U_s,approx = exp(i*E*t) * U_approx, so U_approx = exp(-i*E*t) * U_s,approx
-        phase_factor = np.exp(-1j * energy_shift * timestep)
-        approx_unitary_matrix = phase_factor * unitary_matrix
-        logger.verbose(f"  Converted U_s,approx → U_approx (removed phase: exp(-i*{energy_shift}*{timestep}))")
+            logger.verbose(f"Creating OperatorRepresentation instances")
+            logger.verbose(f"  Timestep: t = {timestep}")
+            logger.verbose(f"  Energy shift: E = {energy_shift}")
 
-        # Verify approximate operator is unitary
-        dimension = approx_unitary_matrix.shape[0]
-        identity = np.eye(dimension)
-        approx_unitarity_error = np.linalg.norm(
-            approx_unitary_matrix.conj().T @ approx_unitary_matrix - identity,
-            'fro'
-        )
-        logger.verbose(f"  U_approx unitarity check: ||U†U - I||_F = {approx_unitarity_error:.6e}")
-        if approx_unitarity_error > 1e-10:
-            logger.warning(
-                f"WARNING: U_approx unitarity error {approx_unitarity_error:.6e} exceeds 1e-10. "
-                f"This may indicate numerical issues or that the algorithm does not produce a unitary."
+            # Wrap exact Hamiltonian in OperatorRepresentation
+            # Note: exact_matrix is H' = H + E*I (shifted up by E to make eigenvalues positive)
+            # unitary_matrix is U' = exp(-i*H'*t) (also uses the shifted Hamiltonian)
+            # Both are on the shifted scale, and we want to unshift to the physical H for comparison.
+            exact_op = OperatorRepresentation(
+                data=exact_matrix,
+                operator_type='hamiltonian',
+                energy_shifted=True,  # Input IS shifted (H' = H + E*I)
+                representation='dense_matrix',
+                timestep=timestep,
+                energy_shift=energy_shift  # Will unshift by subtracting E
             )
+            logger.verbose(f"  Created exact operator representation (H', shifted)")
 
-        # Step 2: Convert exact Hamiltonian: H_exact → U_exact
-        # U_exact = exp(-i * H_exact * t / ℏ)
-        # Note: Assuming ℏ = 1 in natural units (standard in quantum chemistry)
-        logger.verbose(f"  Computing U_exact = exp(-i*H_exact*t) via matrix exponential")
-        H_times_t = -1j * exact_matrix * timestep
-        exact_unitary_matrix = scipy.linalg.expm(H_times_t)
-        logger.verbose(f"  Matrix exponential computed for dimension {dimension}")
-
-        # Verify exact operator is unitary
-        exact_unitarity_error = np.linalg.norm(
-            exact_unitary_matrix.conj().T @ exact_unitary_matrix - identity,
-            'fro'
-        )
-        logger.verbose(f"  U_exact unitarity check: ||U†U - I||_F = {exact_unitarity_error:.6e}")
-        if exact_unitarity_error > 1e-10:
-            logger.warning(
-                f"WARNING: U_exact unitarity error {exact_unitarity_error:.6e} exceeds 1e-10. "
-                f"This may indicate numerical issues with the matrix exponential for large systems."
+            # Wrap approximate time-evolution operator in OperatorRepresentation
+            approx_op = OperatorRepresentation(
+                data=unitary_matrix,
+                operator_type='time_evolution',
+                energy_shifted=True,  # Input IS shifted (U' from H')
+                representation='dense_matrix',
+                timestep=timestep,
+                energy_shift=energy_shift  # Will unshift with phase factor
             )
+            logger.verbose(f"  Created approx operator representation (U', shifted)")
 
-        logger.info(f"Operator conversion complete: U_exact and U_approx ready for comparison")
+            logger.info(f"Operator representations ready for conversion on demand")
+        else:
+            logger.verbose("Using pre-created OperatorRepresentation instances (shared with other analyses)")
 
     # =============================================================================================
     # 2. MATRIX NORM ERRORS: ||U_exact - U_approx||
@@ -745,11 +661,47 @@ def error_analysis(
             # Small systems: direct computation of ||U_exact - U_approx||
             logger.verbose(f"Using dense matrices for norm computation (dimension={dimension})")
 
-            # Use the converted unitary operators (computed in conversion section above)
-            if exact_unitary_matrix is None or approx_unitary_matrix is None:
+            # Get unshifted time-evolution operators from OperatorRepresentation
+            if exact_op is None or approx_op is None:
                 raise RuntimeError(
-                    "Unitary matrices should have been computed but are None. "
+                    "Operator representations should have been created but are None. "
                     "This is an internal error in the operator conversion logic."
+                )
+
+            logger.verbose(f"  Converting H' → U (unshifted, physical)")
+            exact_unitary_matrix = exact_op.get(
+                operator_type='time_evolution',
+                energy_shifted=False,  # Get physical U from H
+                representation='dense_matrix'
+            )
+
+            logger.verbose(f"  Converting U' → U (unshifted, physical)")
+            approx_unitary_matrix = approx_op.get(
+                operator_type='time_evolution',
+                energy_shifted=False,  # Get physical U
+                representation='dense_matrix'
+            )
+
+            # Verify unitarity
+            identity = np.eye(dimension)
+            exact_unitarity_error = np.linalg.norm(
+                exact_unitary_matrix.conj().T @ exact_unitary_matrix - identity,
+                'fro'
+            )
+            approx_unitarity_error = np.linalg.norm(
+                approx_unitary_matrix.conj().T @ approx_unitary_matrix - identity,
+                'fro'
+            )
+            logger.verbose(f"  U_exact unitarity check: ||U†U - I||_F = {exact_unitarity_error:.6e}")
+            logger.verbose(f"  U_approx unitarity check: ||U†U - I||_F = {approx_unitarity_error:.6e}")
+
+            if exact_unitarity_error > 1e-10:
+                logger.warning(
+                    f"WARNING: U_exact unitarity error {exact_unitarity_error:.6e} exceeds 1e-10."
+                )
+            if approx_unitarity_error > 1e-10:
+                logger.warning(
+                    f"WARNING: U_approx unitarity error {approx_unitarity_error:.6e} exceeds 1e-10."
                 )
 
             diff_matrix = exact_unitary_matrix - approx_unitary_matrix
@@ -769,13 +721,11 @@ def error_analysis(
                     raise ValueError(f"Unknown matrix norm type: {norm_type}")
 
         else:
-            # Matrix-free case: not implemented in Phase 1
+            # Matrix-free case: not implemented yet
             raise NotImplementedError(
                 "Matrix-free matrix norm error analysis not yet implemented. "
-                "Phase 1 supports only dense matrices (systems with n ≤ 15 qubits). "
-                "This feature is planned for Phase 2 to support larger systems. "
-                "Note: Matrix norm errors require O(N²) matrix-vector products in matrix-free mode, "
-                "which may be impractical for very large systems anyway."
+                "Note: Matrix norm errors require O(N²) matrix-vector products in matrix-free "
+                "mode, which may be impractical for very large systems anyway."
             )
 
     # =============================================================================================
@@ -801,6 +751,26 @@ def error_analysis(
                 "State-dependent error analysis requires the approximate/unitary matrix, but it was not computed. "
             )
 
+        # Get unshifted time-evolution operators (reuse from matrix norm errors if already computed)
+        if exact_op is None or approx_op is None:
+            raise RuntimeError(
+                "Operator representations should have been created but are None. "
+                "This is an internal error in the operator conversion logic."
+            )
+
+        logger.verbose(f"  Getting U (unshifted, physical) for state evolution")
+        exact_unitary_matrix = exact_op.get(
+            operator_type='time_evolution',
+            energy_shifted=False,  # Get physical U
+            representation='dense_matrix'
+        )
+
+        approx_unitary_matrix = approx_op.get(
+            operator_type='time_evolution',
+            energy_shifted=False,  # Get physical U
+            representation='dense_matrix'
+        )
+
         state_errors = []
 
         for state_file in state_files:
@@ -813,15 +783,8 @@ def error_analysis(
                 logger.info(f"ERROR: Failed to load state from {state_file}: {e}")
                 raise
 
-            # Use the converted unitary operators (computed in conversion section above)
-            if exact_unitary_matrix is None or approx_unitary_matrix is None:
-                raise RuntimeError(
-                    "Unitary matrices should have been computed but are None. "
-                    "This is an internal error in the operator conversion logic."
-                )
-
             # Apply exact time evolution operator: U_exact |ψ⟩
-            # Note: For Phase 1 dense case, these are always numpy arrays (not matrix-free)
+            # Note: For dense case, these are always numpy arrays (not matrix-free)
             exact_final = exact_unitary_matrix @ initial_state
 
             # Apply approximate time evolution operator: U_approx |ψ⟩
@@ -995,7 +958,7 @@ def requires_exact_eigendecomposition(config_analysis: AnalysisConfiguration) ->
     Determine if exact eigendecomposition needs to be computed.
 
     Exact eigendecomposition is required for:
-    - Eigendecomposition analysis with eigendecomposition_matrices = 'exact' or 'both'
+    - Flexible API requests exact eigendecompositions
     - Eigenvalue error analysis (always needs both eigendecompositions)
 
     Parameters:
@@ -1004,15 +967,17 @@ def requires_exact_eigendecomposition(config_analysis: AnalysisConfiguration) ->
     Returns:
         True if exact eigendecomposition computation is needed, False otherwise
     """
-    # Eigendecomposition requested if eigendecomposition_matrices is not None
-    eigendecomposition_requested = config_analysis.eigendecomposition_matrices is not None
+    # Check if flexible API requests exact operator eigendecompositions
+    has_exact_eigendecomp_request = any(
+        req['operator'] == 'exact'
+        for req in config_analysis._eigendecomposition_output_requests
+    )
 
     # Need exact eigendecomposition if:
-    # 1. Eigendecomposition requested and matrices setting includes 'exact' or 'both'
+    # 1. Flexible API requests it
     # 2. Eigenvalue error analysis is enabled (always needs both)
     return (
-        (eigendecomposition_requested and
-         config_analysis.eigendecomposition_matrices in ['exact', 'both']) or
+        has_exact_eigendecomp_request or
         config_analysis.enable_eigenvalue_errors
     )
 
@@ -1022,7 +987,7 @@ def requires_approximate_eigendecomposition(config_analysis: AnalysisConfigurati
     Determine if approximate eigendecomposition needs to be computed.
 
     Approximate eigendecomposition is required for:
-    - Eigendecomposition analysis with eigendecomposition_matrices = 'approximate' or 'both'
+    - Flexible API requests approximate eigendecompositions
     - Eigenvalue error analysis (always needs both eigendecompositions)
 
     Parameters:
@@ -1031,15 +996,17 @@ def requires_approximate_eigendecomposition(config_analysis: AnalysisConfigurati
     Returns:
         True if approximate eigendecomposition computation is needed, False otherwise
     """
-    # Eigendecomposition requested if eigendecomposition_matrices is not None
-    eigendecomposition_requested = config_analysis.eigendecomposition_matrices is not None
+    # Check if flexible API requests approximate operator eigendecompositions
+    has_approx_eigendecomp_request = any(
+        req['operator'] == 'approximate'
+        for req in config_analysis._eigendecomposition_output_requests
+    )
 
     # Need approximate eigendecomposition if:
-    # 1. Eigendecomposition requested and matrices setting includes 'approximate' or 'both'
+    # 1. Flexible API requests it
     # 2. Eigenvalue error analysis is enabled (always needs both)
     return (
-        (eigendecomposition_requested and
-         config_analysis.eigendecomposition_matrices in ['approximate', 'both']) or
+        has_approx_eigendecomp_request or
         config_analysis.enable_eigenvalue_errors
     )
 
@@ -1060,8 +1027,14 @@ def requires_exact_matrix(config_analysis: AnalysisConfiguration) -> bool:
     Returns:
         True if exact matrix computation is needed, False otherwise
     """
+    # Check if flexible API requests exact operator matrices
+    has_exact_flexible_output = any(
+        req['operator'] == 'exact'
+        for req in config_analysis._matrix_output_requests
+    )
+
     return (
-        config_analysis.exact_matrix_output_file is not None or
+        has_exact_flexible_output or
         requires_exact_eigendecomposition(config_analysis) or
         config_analysis.error_matrix_norms is not None or
         config_analysis.error_state_inputs is not None
@@ -1086,7 +1059,7 @@ def requires_approximate_matrix(config_analysis: AnalysisConfiguration) -> bool:
         True if approximate matrix computation is needed, False otherwise
     """
     return (
-        config_analysis.matrix_output_file is not None or
+        config_analysis.algorithm_matrix_output_file is not None or
         config_analysis.numerical_simulation_inputs is not None or
         requires_approximate_eigendecomposition(config_analysis) or
         config_analysis.error_matrix_norms is not None or
@@ -1117,23 +1090,9 @@ def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfigura
     """
 
     # Check eigenvalue error analysis dependencies
-    if config_analysis.enable_eigenvalue_errors:
-        # Check if eigendecomposition is configured
-        eigendecomposition_configured = config_analysis.eigendecomposition_matrices is not None
-
-        if not eigendecomposition_configured:
-            raise ValueError(
-                "enable_eigenvalue_errors requires eigendecomposition. "
-                "Set eigendecomposition_matrices to 'both' to enable eigenvalue error analysis."
-            )
-
-        # Must compute both eigendecompositions to compare
-        if config_analysis.eigendecomposition_matrices != 'both':
-            logger.info(
-                "INFO: enable_eigenvalue_errors requires both exact and approximate eigendecompositions. "
-                f"Auto-setting eigendecomposition_matrices from '{config_analysis.eigendecomposition_matrices}' to 'both'."
-            )
-            config_analysis.eigendecomposition_matrices = 'both'
+    # Note: If enable_eigenvalue_errors is True, the requires_*_eigendecomposition() functions
+    # will return True, ensuring eigendecompositions are computed even if not explicitly requested
+    # for output. No validation error needed - the system auto-enables what's required.
 
     # Normalize string-or-list config values to always be lists
     # This allows downstream code to always assume list type
@@ -1149,22 +1108,16 @@ def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfigura
 
     # Check if matrices will be computed and auto-enable output if not already set
     if requires_approximate_matrix(config_analysis):
-        if config_analysis.matrix_output_file is None:
+        if config_analysis.algorithm_matrix_output_file is None:
             default_filename = "unitary_matrix.npz"
             logger.info(
                 f"INFO: Approximate/unitary matrix will be computed for requested analyses. "
                 f"Auto-enabling matrix output to '{default_filename}' (essentially free)."
             )
-            config_analysis.matrix_output_file = default_filename
+            config_analysis.algorithm_matrix_output_file = default_filename
 
-    if requires_exact_matrix(config_analysis):
-        if config_analysis.exact_matrix_output_file is None:
-            default_filename = "exact_hamiltonian.npz"
-            logger.info(
-                f"INFO: Exact Hamiltonian matrix will be computed for requested analyses. "
-                f"Auto-enabling exact matrix output to '{default_filename}' (essentially free)."
-            )
-            config_analysis.exact_matrix_output_file = default_filename
+    # Note: No auto-enabling for exact matrix - users should use flexible API
+    # analysis.save_matrix_to_file(operator='exact', form='hamiltonian', ...)
 
 # -------------------------------------------------------------------------------------------------
 
@@ -1260,6 +1213,175 @@ def exact_numerical_simulation(
 
 # -------------------------------------------------------------------------------------------------
 
+def save_requested_operator_outputs(
+        config_analysis: AnalysisConfiguration,
+        exact_matrix,
+        unitary_matrix,
+        timestep,
+        energy_shift,
+        exact_op=None,
+        approx_op=None) -> dict:
+    """
+    Save all requested operator forms using OperatorRepresentation.
+
+    Parameters
+    ----------
+    config_analysis : AnalysisConfiguration
+        Configuration with output requests
+    exact_matrix : ndarray
+        Exact Hamiltonian matrix (shifted, H' = H + E*I)
+    unitary_matrix : ndarray
+        Approximate time-evolution operator (from shifted Hamiltonian)
+    timestep : float
+        Time evolution parameter
+    energy_shift : float
+        Energy shift value
+
+    Returns
+    -------
+    dict
+        Information about saved files
+    """
+    from qhat.analysis.operators import OperatorRepresentation
+    from qhat.analysis.file_io import save_matrix, save_eigendecomposition
+    import datetime
+
+    results = {
+        'matrix_outputs': [],
+        'eigendecomposition_outputs': []
+    }
+
+    # Check if any requests exist
+    if not config_analysis._matrix_output_requests and not config_analysis._eigendecomposition_output_requests:
+        return results
+
+    # Create OperatorRepresentation wrappers if not provided
+    if exact_op is None or approx_op is None:
+        from qhat.analysis.operators import OperatorRepresentation
+
+        logger.verbose("Creating OperatorRepresentation instances for flexible output")
+        logger.verbose(f"  Timestep: t = {timestep}")
+        logger.verbose(f"  Energy shift: E = {energy_shift}")
+
+        # Exact operator (from shifted Hamiltonian)
+        exact_op = OperatorRepresentation(
+            data=exact_matrix,
+            operator_type='hamiltonian',
+            energy_shifted=True,  # Input is H' = H + E*I
+            representation='dense_matrix',
+            timestep=timestep,
+            energy_shift=energy_shift
+        )
+        logger.verbose("  Created exact operator representation (H', shifted)")
+
+        # Approximate operator (from shifted Hamiltonian via Trotter/etc)
+        approx_op = OperatorRepresentation(
+            data=unitary_matrix,
+            operator_type='time_evolution',
+            energy_shifted=True,  # Input is U' from H'
+            representation='dense_matrix',
+            timestep=timestep,
+            energy_shift=energy_shift
+        )
+        logger.verbose("  Created approximate operator representation (U', shifted)")
+    else:
+        logger.verbose("Using pre-created OperatorRepresentation instances (shared with error analysis)")
+
+    operators = {
+        'exact': exact_op,
+        'approximate': approx_op
+    }
+
+    # Process matrix output requests
+    for request in config_analysis._matrix_output_requests:
+        op = operators[request['operator']]
+        energy_shifted = (request['shift'] == 'shifted')
+
+        logger.info(
+            f"Saving {request['operator']} {request['form']} "
+            f"({request['shift']}) matrix to {request['filename']}"
+        )
+
+        matrix = op.get(
+            operator_type=request['form'],
+            energy_shifted=energy_shifted,
+            representation='dense_matrix'
+        )
+
+        # Save with metadata
+        metadata = {
+            'operator': request['operator'],
+            'form': request['form'],
+            'shift': request['shift'],
+            'timestep': timestep,
+            'energy_shift': energy_shift,
+            'timestamp': datetime.datetime.now().isoformat(),
+            'shape': matrix.shape
+        }
+
+        save_matrix(request['filename'], matrix)
+
+        results['matrix_outputs'].append({
+            'filename': request['filename'],
+            'operator': request['operator'],
+            'form': request['form'],
+            'shift': request['shift'],
+            'shape': matrix.shape
+        })
+
+    # Process eigendecomposition output requests
+    for request in config_analysis._eigendecomposition_output_requests:
+        op = operators[request['operator']]
+        energy_shifted = (request['shift'] == 'shifted')
+
+        logger.info(
+            f"Saving {request['operator']} {request['form']} "
+            f"({request['shift']}) eigendecomposition to {request['filename']}"
+        )
+
+        eigendata = op.get(
+            operator_type=request['form'],
+            energy_shifted=energy_shifted,
+            representation='eigendecomposition'
+        )
+
+        # Sort by eigenvalues (ascending)
+        sort_indices = np.argsort(eigendata['eigenvalues'].real)
+        eigenvalues_sorted = eigendata['eigenvalues'][sort_indices]
+        eigenvectors_sorted = eigendata['eigenvectors'][:, sort_indices]
+
+        # Save with metadata
+        metadata = {
+            'operator': request['operator'],
+            'form': request['form'],
+            'shift': request['shift'],
+            'timestep': timestep,
+            'energy_shift': energy_shift,
+            'timestamp': datetime.datetime.now().isoformat(),
+            'dimension': len(eigenvalues_sorted)
+        }
+
+        save_eigendecomposition(
+            request['filename'],
+            eigenenergies=eigenvalues_sorted,
+            eigenvectors=eigenvectors_sorted,
+            matrix_type=f"{request['operator']}_{request['form']}_{request['shift']}",
+            timestep=timestep
+        )
+
+        results['eigendecomposition_outputs'].append({
+            'filename': request['filename'],
+            'operator': request['operator'],
+            'form': request['form'],
+            'shift': request['shift'],
+            'num_eigenvalues': len(eigenvalues_sorted),
+            'eigenvalue_range': [float(eigenvalues_sorted[0].real), float(eigenvalues_sorted[-1].real)]
+        })
+
+    return results
+
+# -------------------------------------------------------------------------------------------------
+
 def analyze_algorithm(
         config_analysis: AnalysisConfiguration,
         algorithm,
@@ -1296,25 +1418,31 @@ def analyze_algorithm(
         config_analysis.error_state_inputs is not None
     )
 
+    # Check if flexible output API is used
+    flexible_outputs_requested = (
+        config_analysis._matrix_output_requests or
+        config_analysis._eigendecomposition_output_requests
+    )
+
     # Validate at least one analysis requested
     if (config_analysis.resource_estimator is None and
-        config_analysis.matrix_output_file is None and
+        config_analysis.algorithm_matrix_output_file is None and
         config_analysis.numerical_simulation_inputs is None and
-        config_analysis.exact_matrix_output_file is None and
         not eigendecomposition_requested and
         not error_analysis_requested and
-        config_analysis.exact_simulation_inputs is None):
+        config_analysis.exact_simulation_inputs is None and
+        not flexible_outputs_requested):
         raise ValueError(
             "No analyses requested. Set at least one of:\n"
             "  - resource_estimator (e.g., 'pyliqtr', 'cirq')\n"
-            "  - matrix_output_file (e.g., 'matrix.npz', 'matrix.h5', 'matrix.txt')\n"
+            "  - algorithm_matrix_output_file (e.g., 'matrix.npz') - full algorithm circuit matrix\n"
             "  - numerical_simulation_inputs (e.g., 'state.npy' or ['state1.npy', 'state2.npy'])\n"
-            "  - exact_matrix_output_file (e.g., 'exact_hamiltonian.npz')\n"
-            "  - eigendecomposition_matrices (e.g., 'exact', 'approximate', or 'both')\n"
             "  - enable_eigenvalue_errors (True to compute errors for all eigenvalues)\n"
             "  - error_matrix_norms (e.g., 'frobenius' or ['frobenius', 'spectral'])\n"
             "  - error_state_inputs (e.g., 'state.npy')\n"
-            "  - exact_simulation_inputs (e.g., 'state.npy')"
+            "  - exact_simulation_inputs (e.g., 'state.npy')\n"
+            "  - analysis.save_matrix_to_file(...) - flexible matrix output API\n"
+            "  - analysis.save_eigendecomposition_to_file(...) - flexible eigendecomposition output API"
         )
 
     results = {}
@@ -1343,13 +1471,11 @@ def analyze_algorithm(
         logger.info(f"Performing resource estimation using {config_analysis.resource_estimator}.")
         results["resource_estimates"] = estimate_resources(config_analysis, algorithm)
 
-    if config_analysis.matrix_output_file is not None:
-        logger.info("Generating unitary matrix output.")
+    if config_analysis.algorithm_matrix_output_file is not None:
+        logger.info("Generating algorithm matrix output.")
         results["matrix_output"] = output_unitary_matrix(config_analysis, algorithm, unitary_matrix)
 
-    if config_analysis.exact_matrix_output_file is not None:
-        logger.info("Generating exact Hamiltonian matrix output.")
-        results["exact_matrix_output"] = exact_matrix_output(config_analysis, hamiltonian, exact_matrix)
+    # exact_matrix_output removed - use flexible API instead
 
     if config_analysis.numerical_simulation_inputs is not None:
         logger.info("Performing numerical simulation.")
@@ -1375,6 +1501,44 @@ def analyze_algorithm(
         if 'approximate_eigendecomposition' in eig_results:
             approx_eigendecomp = eig_results['approximate_eigendecomposition']
 
+    # Create OperatorRepresentation instances once for reuse across analyses
+    # This avoids redundant eigendecompositions when both error analysis and flexible outputs are requested
+    exact_op = None
+    approx_op = None
+    needs_operators = (
+        error_analysis_requested or
+        len(config_analysis._matrix_output_requests) > 0 or
+        len(config_analysis._eigendecomposition_output_requests) > 0
+    )
+    if needs_operators:
+        from qhat.analysis.operators import OperatorRepresentation
+
+        logger.info("Creating shared OperatorRepresentation instances")
+        logger.verbose(f"  Timestep: t = {timestep}")
+        logger.verbose(f"  Energy shift: E = {energy_shift}")
+
+        # Exact operator (from shifted Hamiltonian H' = H + E*I)
+        exact_op = OperatorRepresentation(
+            data=exact_matrix,
+            operator_type='hamiltonian',
+            energy_shifted=True,
+            representation='dense_matrix',
+            timestep=timestep,
+            energy_shift=energy_shift
+        )
+        logger.verbose("  Created exact operator representation (H', shifted)")
+
+        # Approximate operator (from shifted time-evolution U' = exp(-i*H'*t))
+        approx_op = OperatorRepresentation(
+            data=unitary_matrix,
+            operator_type='time_evolution',
+            energy_shifted=True,
+            representation='dense_matrix',
+            timestep=timestep,
+            energy_shift=energy_shift
+        )
+        logger.verbose("  Created approximate operator representation (U', shifted)")
+
     # Error analysis: receives eigendecomposition data, does not recompute
     if error_analysis_requested:
         logger.info("Performing error analysis.")
@@ -1385,13 +1549,45 @@ def analyze_algorithm(
             exact_eigendecomp=exact_eigendecomp,
             approx_eigendecomp=approx_eigendecomp,
             timestep=timestep,
-            energy_shift=energy_shift
+            energy_shift=energy_shift,
+            exact_op=exact_op,
+            approx_op=approx_op
         )
 
     if config_analysis.exact_simulation_inputs is not None:
         logger.info("Performing exact numerical simulation.")
         results["exact_simulation"] = exact_numerical_simulation(
             config_analysis, hamiltonian, exact_matrix
+        )
+
+    # Flexible operator outputs
+    if config_analysis._matrix_output_requests or config_analysis._eigendecomposition_output_requests:
+        logger.info("Saving requested operator outputs.")
+        # Need both exact_matrix and unitary_matrix
+        if exact_matrix is None:
+            raise ValueError(
+                "Flexible operator output requires exact_matrix. "
+                "This should have been caught during validation."
+            )
+        if unitary_matrix is None:
+            raise ValueError(
+                "Flexible operator output requires unitary_matrix. "
+                "This should have been caught during validation."
+            )
+        if timestep is None:
+            raise ValueError(
+                "Flexible operator output requires timestep parameter. "
+                "Pass timestep to analyze_algorithm()."
+            )
+
+        results["flexible_operator_outputs"] = save_requested_operator_outputs(
+            config_analysis,
+            exact_matrix,
+            unitary_matrix,
+            timestep,
+            energy_shift,
+            exact_op=exact_op,
+            approx_op=approx_op
         )
 
     # TODO: Add gate parallelism / gate depth analysis
