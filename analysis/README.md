@@ -263,16 +263,19 @@ development are may not be reliable yet.
 
 #### Error Analysis
 
-- **Error Analysis**: Enables three types of error metrics comparing exact and approximate representations. Each error type is independently enabled by setting its corresponding configuration parameter.
+- **Error Analysis**: Enables three types of error metrics comparing exact and approximate
+  representations. Each error type is independently enabled by setting its corresponding
+  configuration parameter.
 
   **Configuration parameters**:
   
-  - **`enable_eigenvalue_errors`**: Enable eigenenergy error comparison (default: False, disabled)
-    - **Note**: Parameter name uses "eigenvalue" for historical reasons, but compares **eigenenergies** (H eigenvalues, not U eigenvalues)
+  - **`enable_eigenvalue_errors`**: Enable eigenenergy comparison (default: False, disabled)
+    - **Note**: Parameter name uses "eigenvalue" but compares **eigenenergies** (H eigenvalues, not
+      U eigenvalues)
     - Set to `True` to compute errors for ALL eigenstates (full spectrum)
     - Compares eigenenergies element-wise after both are sorted by energy
     - Ground state (exact) compared with ground state (approximate), etc.
-    - Requires `both eigendecompositions requested via flexible API` (auto-set if not already "both")
+    - Does not compare eigenvectors
     - **Best for**: Validating eigenenergy accuracy across the full spectrum
 
   - **`error_matrix_norms`**: Which matrix norms to compute (default: None, disabled)
@@ -285,7 +288,7 @@ development are may not be reliable yet.
       - ||H_exact - H_approx||_2 = largest singular value
       - More expensive to compute, especially for large systems
     - **For large systems (>15 qubits)**: Uses matrix-free computation
-      - Frobenius: Requires 2^N matrix-vector products (minutes for 20 qubits)
+      - Frobenius: Requires 2^N matrix-vector products
       - Spectral: Uses power iteration (can take longer)
       - Progress warnings displayed during computation
     - **Best for**: Physical bounds on algorithm error
@@ -296,15 +299,8 @@ development are may not be reliable yet.
     - Compares: ||H_exact|ψ⟩ - H_approx|ψ⟩||
     - **Best-scaling error metric** for large systems
       - Only requires O(2^N) memory (state vectors), not O(2^(2N)) (matrices)
-      - Can reach 30 qubits
       - Fast: just applies operators to states
     - **Best for**: Error on specific physically relevant states
-
-  **System size guidance**:
-  - **≤15 qubits**: All error types fast (dense matrix operations)
-  - **16-20 qubits**: Matrix norms slow (matrix-free), state errors still fast
-  - **20-30 qubits**: Use eigenvalue + state errors; avoid matrix norms unless necessary
-  - **Production recommendation**: Eigenvalue errors (k=1-5) + state errors for best performance
 
   **Output file**: `error_analysis.npz` containing all computed error metrics
 
@@ -330,7 +326,8 @@ development are may not be reliable yet.
   ```
 
   **When to use each error type**:
-  - **Eigenvalue errors**: Use when you want to validate all eigenvalues computed in the eigendecomposition
+  - **Eigenvalue errors**: Use when you want to validate eigenvalues computed in the
+    eigendecomposition
   - **Matrix norm errors**: Use for physical bounds, but expensive for large systems
   - **State errors**: Use for specific physically relevant states, scales best
 
@@ -375,8 +372,8 @@ development are may not be reliable yet.
 #### Exact Numerical Simulation
 
 - **Exact Numerical Simulation**: Setting `analysis.exact_simulation_inputs` to one or more state
-  vector files will apply the **exact Hamiltonian matrix** (without Trotter or other approximations)
-  to the input state(s), producing output state(s).
+  vector files will apply the **exact Hamiltonian matrix** (without Trotter or other
+  approximations) to the input state(s), producing output state(s).
 
   **Purpose**: Compare exact time evolution with approximate algorithm results
 
@@ -429,26 +426,32 @@ depending on the analyses requested:
 - **Log file**: Default `analysis.log`, configurable via `general.logfile`
 - **TOML summary**: Hash-based filename (e.g., `12345678901234567890.toml`) containing inputs and
   results. Shows final results but not intermediate values.
-- **Matrix file** (if `algorithm_matrix_output_file` specified): Unitary matrix in specified format (`.npz`,
-  `.h5`, or `.txt`)
-- **Exact matrix file** (if `exact_algorithm_matrix_output_file` specified): Exact Hamiltonian matrix
-- **Eigendecomposition files** (if `num_eigenvalues` > 0): `exact_eigendecomposition.npz` and/or
-  `approximate_eigendecomposition.npz`
+- **Matrix file** (if `algorithm_matrix_output_file` specified): Unitary matrix in specified format
+  (`.npz`, `.h5`, or `.txt`)
+- **Matrix files** (if `save_matrix_to_file` used): Exact and/or approximate Hamiltonian and/or
+  time-evolution operator as a matrix
+- **Eigendecomposition files** (if `save_eigendecomposition_to_file` used): Eigendecomposition of
+  corresponding matrices
 - **Error analysis file** (if any error analysis enabled): `error_analysis.npz`
 - **Final state files** (if `numerical_simulation_inputs` specified): Evolved quantum states with
   `_final` suffix (e.g., `initial_state.npy` → `initial_state_final.npy`)
 - **Exact final state files** (if `exact_simulation_inputs` specified): Exactly evolved states with
   `_exact_final` suffix (e.g., `initial_state.npy` → `initial_state_exact_final.npy`)
 
-The logfile is typically most useful for understanding the analysis process and intermediate values.
+The logfile is typically most useful for understanding the analysis process and intermediate
+values.
 
 ## Examples
 
-The `analysis/examples/` directory contains configuration files demonstrating various analysis capabilities:
+The `analysis/examples/` directory contains configuration files demonstrating various analysis
+capabilities:
 
 ### Basic Example: `config.py`
 
-The basic `config.py` file presents a simple configuration for generating resource estimates. It loads data from the tensors file in the `examples` directory and demonstrates switching between Trotterization-based and double-factorization-based analysis (showing that configuration files are Python scripts, not just key-value lists).
+The basic `config.py` file presents a simple configuration for generating resource estimates. It
+loads data from the tensors file in the `examples` directory and demonstrates switching between
+Trotterization-based and double-factorization-based analysis (showing that configuration files are
+Python scripts, not just key-value lists).
 
 ### Complete Options Reference: `all_analyses.config`
 
@@ -462,14 +465,17 @@ The `all_analyses.config` file demonstrates every available feature and configur
    - Exact or approximate operators
    - Hamiltonian or time-evolution form
    - Unshifted (physical) or shifted (QPE) energy scales
-3. **Full Algorithm Circuit**: Complete algorithm matrix (U_approx for time evolution, QPE circuit for QPE)
+3. **Full Algorithm Circuit**: Complete algorithm matrix (U_approx for time evolution, QPE circuit
+   for QPE)
 4. **Numerical Simulation**: Apply operators to quantum states
 5. **Error Analysis**: Eigenvalue errors, matrix norm errors, state-dependent errors
 6. **All Configuration Options**: Hamiltonian loading, encoding methods, algorithm selection
 
-**NOTE**: This file produces ~18 output files and is computationally expensive. It is intended as a comprehensive reference for developers and users learning the tool, not for production use.
+**NOTE**: This file produces ~18 output files and is computationally expensive. It is intended as a
+comprehensive reference for developers and users learning the tool, not for production use.
 
-For practical workflows, see `config.py` (basic) or `error_analysis_tutorial.config` (error analysis tutorial).
+For practical workflows, see `config.py` (basic) or `error_analysis_tutorial.config` (error
+analysis tutorial).
 
 ### Error Analysis Tutorial: `error_analysis_tutorial.config`
 
