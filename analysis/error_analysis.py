@@ -3,6 +3,7 @@ import logging
 
 from qhat.analysis.config_types import AnalysisConfiguration
 from qhat.analysis.file_io import load_state
+from qhat.analysis.matrix_operations import compute_unitarity_error
 
 logger = logging.getLogger(__name__)
 
@@ -241,15 +242,8 @@ def error_analysis(
             )
 
             # Verify unitarity
-            identity = np.eye(dimension)
-            exact_unitarity_error = np.linalg.norm(
-                exact_unitary_matrix.conj().T @ exact_unitary_matrix - identity,
-                'fro'
-            )
-            approx_unitarity_error = np.linalg.norm(
-                approx_unitary_matrix.conj().T @ approx_unitary_matrix - identity,
-                'fro'
-            )
+            exact_unitarity_error = compute_unitarity_error(exact_unitary_matrix)
+            approx_unitarity_error = compute_unitarity_error(approx_unitary_matrix)
             logger.verbose(f"  U_exact unitarity check: ||U†U - I||_F = {exact_unitarity_error:.6e}")
             logger.verbose(f"  U_approx unitarity check: ||U†U - I||_F = {approx_unitarity_error:.6e}")
 

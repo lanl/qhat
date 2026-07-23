@@ -16,6 +16,7 @@ import datetime
 
 from qhat.analysis.config_types import AnalysisConfiguration
 from qhat.analysis.file_io import save_matrix, save_eigendecomposition
+from qhat.analysis.matrix_operations import compute_unitarity_error
 
 logger = logging.getLogger(__name__)
 
@@ -156,9 +157,7 @@ def output_unitary_matrix(
     # Compute unitarity check: ||U†U - I||_F
     try:
         matrix_norm = np.linalg.norm(unitary_matrix, ord='fro')
-        U_dag_U = np.conj(unitary_matrix.T) @ unitary_matrix
-        identity = np.eye(unitary_matrix.shape[0])
-        unitarity_error = np.linalg.norm(U_dag_U - identity, ord='fro')
+        unitarity_error = compute_unitarity_error(unitary_matrix)
         logger.verbose(f"Matrix Frobenius norm: {matrix_norm:.6e}")
         logger.verbose(f"Unitarity error ||U†U - I||_F: {unitarity_error:.6e}")
     except Exception as e:
