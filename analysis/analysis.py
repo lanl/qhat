@@ -524,14 +524,16 @@ def error_analysis(
         exact_matrix=None,
         unitary_matrix=None,
         exact_eigendecomp=None,
-        approx_eigendecomp=None) -> dict:
+        approx_eigendecomp=None,
+        timestep=None,
+        energy_shift=0.0) -> dict:
     """
     Compute error metrics comparing exact and approximate representations.
 
     Three independent error types:
-    1. Eigenvalue errors (if enable_eigenvalue_errors is True)
-    2. Matrix norm errors (if error_matrix_norms is not None)
-    3. State-dependent errors (if error_state_inputs is not None)
+    1. Eigenvalue errors - Compares eigenenergies: λ(H_approx) vs λ(H_exact)
+    2. Matrix norm errors - Compares time evolution operators: ||U_exact - U_approx||
+    3. State-dependent errors - Compares time-evolved states: ||U_exact|ψ⟩ - U_approx|ψ⟩||
 
     Parameters:
         config_analysis: Analysis configuration with error analysis settings
@@ -541,6 +543,10 @@ def error_analysis(
         unitary_matrix: Pre-computed unitary matrix (optional)
         exact_eigendecomp: Pre-computed exact eigendecomposition (optional)
         approx_eigendecomp: Pre-computed approximate eigendecomposition (optional)
+        timestep: Time evolution parameter t (required for matrix/state errors).
+                  Used to compute U_exact = exp(-i * H_exact * t) from H_exact.
+        energy_shift: Energy shift E applied to approximate Hamiltonian (default: 0.0).
+                      Used to match global phases: U_exact_shifted = exp(i*E*t) * U_exact.
 
     Returns:
         Dictionary with error metrics
@@ -597,8 +603,118 @@ def error_analysis(
         }
 
     # =============================================================================================
-    # 2. MATRIX NORM ERRORS
+    # OPERATOR CONVERSION: Ensure compatible representations for error analysis
     # =============================================================================================
+    # Available inputs:
+    #   - exact_matrix: H_exact (unshifted Hamiltonian, dense matrix or PauliStringOperator)
+    #   - unitary_matrix: U_s,approx (energy-shifted time-evolution operator)
+    #
+    # Required for comparisons:
+    #   - Eigenvalue errors: Need energies λ(H), can extract from either H or U matrices
+    #   - Matrix norm errors: Need U_exact and U_approx (both unshifted unitaries)
+    #   - State errors: Need U_exact and U_approx (both unshifted unitaries)
+    #
+    # Conversion strategy (dense case only in Phase 1):
+    #   1. Convert U_s,approx → U_approx: Remove energy shift (scalar multiplication)
+    #   2. Convert H_exact → U_exact: Matrix exponential
+    #   3. Apply energy shift to U_exact for phase matching
+
+    # Store converted operators
+    exact_unitary_matrix = None  # Will hold U_exact (unshifted)
+    approx_unitary_matrix = None  # Will hold U_approx (unshifted)
+
+    # Check if matrix/state errors are requested (these need unitary operators)
+    needs_unitaries = (
+        config_analysis.error_matrix_norms is not None or
+        config_analysis.error_state_inputs is not None
+    )
+
+    if needs_unitaries:
+        logger.info("Converting operators for matrix/state error analysis")
+
+        # Validate required inputs
+        if exact_matrix is None:
+            raise ValueError(
+                "Matrix/state error analysis requires the exact Hamiltonian matrix. "
+                "Ensure exact_matrix_output_file is set or eigendecomposition is enabled."
+            )
+
+        if unitary_matrix is None:
+            raise ValueError(
+                "Matrix/state error analysis requires the approximate unitary matrix. "
+                "The algorithm must produce a unitary matrix representation."
+            )
+
+        if timestep is None:
+            raise ValueError(
+                "Matrix/state error analysis requires timestep parameter. "
+                "Ensure the algorithm provides a timestep (e.g., time evolution algorithms)."
+            )
+
+        # Check if dense or matrix-free
+        is_exact_dense = isinstance(exact_matrix, np.ndarray)
+        is_approx_dense = isinstance(unitary_matrix, np.ndarray)
+
+        if not (is_exact_dense and is_approx_dense):
+            # Matrix-free case: not implemented in Phase 1
+            raise NotImplementedError(
+                "Matrix/state error analysis not yet implemented for matrix-free operators. "
+                "Phase 1 supports only dense matrices (systems with n ≤ 15 qubits). "
+                "Reduce system size to enable dense matrix computation, or disable these error types."
+            )
+
+        # DENSE CASE: Convert both operators to unshifted time-evolution operators
+        logger.verbose(f"Converting to unshifted time-evolution operators")
+        logger.verbose(f"  Timestep: t = {timestep}")
+        logger.verbose(f"  Energy shift: E = {energy_shift}")
+
+        # Step 1: Convert approximate operator: U_s,approx → U_approx
+        # U_s,approx = exp(i*E*t) * U_approx, so U_approx = exp(-i*E*t) * U_s,approx
+        phase_factor = np.exp(-1j * energy_shift * timestep)
+        approx_unitary_matrix = phase_factor * unitary_matrix
+        logger.verbose(f"  Converted U_s,approx → U_approx (removed phase: exp(-i*{energy_shift}*{timestep}))")
+
+        # Verify approximate operator is unitary
+        dimension = approx_unitary_matrix.shape[0]
+        identity = np.eye(dimension)
+        approx_unitarity_error = np.linalg.norm(
+            approx_unitary_matrix.conj().T @ approx_unitary_matrix - identity,
+            'fro'
+        )
+        logger.verbose(f"  U_approx unitarity check: ||U†U - I||_F = {approx_unitarity_error:.6e}")
+        if approx_unitarity_error > 1e-10:
+            logger.warning(
+                f"WARNING: U_approx unitarity error {approx_unitarity_error:.6e} exceeds 1e-10. "
+                f"This may indicate numerical issues or that the algorithm does not produce a unitary."
+            )
+
+        # Step 2: Convert exact Hamiltonian: H_exact → U_exact
+        # U_exact = exp(-i * H_exact * t / ℏ)
+        # Note: Assuming ℏ = 1 in natural units (standard in quantum chemistry)
+        logger.verbose(f"  Computing U_exact = exp(-i*H_exact*t) via matrix exponential")
+        H_times_t = -1j * exact_matrix * timestep
+        exact_unitary_matrix = scipy.linalg.expm(H_times_t)
+        logger.verbose(f"  Matrix exponential computed for dimension {dimension}")
+
+        # Verify exact operator is unitary
+        exact_unitarity_error = np.linalg.norm(
+            exact_unitary_matrix.conj().T @ exact_unitary_matrix - identity,
+            'fro'
+        )
+        logger.verbose(f"  U_exact unitarity check: ||U†U - I||_F = {exact_unitarity_error:.6e}")
+        if exact_unitarity_error > 1e-10:
+            logger.warning(
+                f"WARNING: U_exact unitarity error {exact_unitarity_error:.6e} exceeds 1e-10. "
+                f"This may indicate numerical issues with the matrix exponential for large systems."
+            )
+
+        logger.info(f"Operator conversion complete: U_exact and U_approx ready for comparison")
+
+    # =============================================================================================
+    # 2. MATRIX NORM ERRORS: ||U_exact - U_approx||
+    # =============================================================================================
+    # Compares unshifted time evolution operators (both represent physical Hamiltonian).
+    # Operators were converted in the section above.
 
     if config_analysis.error_matrix_norms is not None:
         # Note: error_matrix_norms is normalized to list during validation
@@ -626,138 +742,47 @@ def error_analysis(
         num_qubits = int(np.log2(dimension))
 
         if is_dense:
-            # Small systems: direct computation
+            # Small systems: direct computation of ||U_exact - U_approx||
             logger.verbose(f"Using dense matrices for norm computation (dimension={dimension})")
-            diff_matrix = exact_matrix - unitary_matrix
+
+            # Use the converted unitary operators (computed in conversion section above)
+            if exact_unitary_matrix is None or approx_unitary_matrix is None:
+                raise RuntimeError(
+                    "Unitary matrices should have been computed but are None. "
+                    "This is an internal error in the operator conversion logic."
+                )
+
+            diff_matrix = exact_unitary_matrix - approx_unitary_matrix
 
             for norm_type in norms_to_compute:
                 if norm_type == 'frobenius':
                     error = np.linalg.norm(diff_matrix, 'fro')
-                    logger.info(f"Frobenius norm error: {error:.6e}")
+                    logger.info(f"Frobenius norm ||U_exact - U_approx||_F: {error:.6e}")
                     results['matrix_frobenius_error'] = float(error)
 
                 elif norm_type == 'spectral':
                     error = np.linalg.norm(diff_matrix, 2)
-                    logger.info(f"Spectral norm error: {error:.6e}")
+                    logger.info(f"Spectral norm ||U_exact - U_approx||_2: {error:.6e}")
                     results['matrix_spectral_error'] = float(error)
 
                 else:
                     raise ValueError(f"Unknown matrix norm type: {norm_type}")
 
         else:
-            # Large systems: matrix-free computation
-            logger.info(f"WARNING: Matrix-free norm computation for {num_qubits} qubits")
-            logger.info(f"  This requires 2^{num_qubits} = {dimension:,} matrix-vector products")
-            logger.info(f"  Estimated time: {'<1 minute' if dimension < 10000 else '1-10 minutes' if dimension < 100000 else '10+ minutes'}")
-
-            for norm_type in norms_to_compute:
-                if norm_type == 'frobenius':
-                    # Compute ||A||_F^2 = sum_i ||A e_i||^2
-                    logger.verbose("Computing Frobenius norm via matrix-vector products")
-                    frobenius_squared = 0.0
-                    for i in range(dimension):
-                        if i % max(1, dimension // 10) == 0:
-                            logger.verbose(f"  Progress: {i}/{dimension} ({100*i//dimension}%)")
-                        # Create basis vector e_i
-                        e_i = np.zeros(dimension, dtype=complex)
-                        e_i[i] = 1.0
-                        # Compute difference: (H - U) e_i
-                        if hasattr(exact_matrix, 'matvec'):
-                            exact_result = exact_matrix.matvec(e_i)
-                        else:
-                            exact_result = exact_matrix @ e_i
-                        if hasattr(unitary_matrix, 'matvec'):
-                            approx_result = unitary_matrix.matvec(e_i)
-                        else:
-                            approx_result = unitary_matrix @ e_i
-                        diff_i = exact_result - approx_result
-                        frobenius_squared += np.linalg.norm(diff_i) ** 2
-
-                    error = np.sqrt(frobenius_squared)
-                    logger.info(f"Frobenius norm error (matrix-free): {error:.6e}")
-                    results['matrix_frobenius_error'] = float(error)
-
-                elif norm_type == 'spectral':
-                    # Compute ||A||_2 = largest singular value via power iteration
-                    logger.verbose("Computing spectral norm via power iteration")
-
-                    # Random starting vector
-                    v = np.random.randn(dimension) + 1j * np.random.randn(dimension)
-                    v = v / np.linalg.norm(v)
-
-                    max_iterations = 100
-                    tolerance = 1e-6
-
-                    for iteration in range(max_iterations):
-                        # Apply (H - U)† (H - U) to v
-                        # First: (H - U) v
-                        if hasattr(exact_matrix, 'matvec'):
-                            exact_result = exact_matrix.matvec(v)
-                        else:
-                            exact_result = exact_matrix @ v
-                        if hasattr(unitary_matrix, 'matvec'):
-                            approx_result = unitary_matrix.matvec(v)
-                        else:
-                            approx_result = unitary_matrix @ v
-                        diff_v = exact_result - approx_result
-
-                        # Then: (H - U)† diff_v
-                        if hasattr(exact_matrix, 'rmatvec'):
-                            exact_adjoint = exact_matrix.rmatvec(diff_v)
-                        else:
-                            exact_adjoint = exact_matrix.conj().T @ diff_v
-                        if hasattr(unitary_matrix, 'rmatvec'):
-                            approx_adjoint = unitary_matrix.rmatvec(diff_v)
-                        else:
-                            approx_adjoint = unitary_matrix.conj().T @ diff_v
-                        result = exact_adjoint - approx_adjoint
-
-                        # Normalize
-                        v_new = result / np.linalg.norm(result)
-
-                        # Check convergence
-                        if np.linalg.norm(v_new - v) < tolerance:
-                            logger.verbose(f"  Converged after {iteration+1} iterations")
-                            break
-
-                        v = v_new
-
-                        if (iteration + 1) % 10 == 0:
-                            logger.verbose(f"  Iteration {iteration+1}/{max_iterations}")
-
-                    # Rayleigh quotient to get eigenvalue (= squared singular value)
-                    if hasattr(exact_matrix, 'matvec'):
-                        exact_result = exact_matrix.matvec(v)
-                    else:
-                        exact_result = exact_matrix @ v
-                    if hasattr(unitary_matrix, 'matvec'):
-                        approx_result = unitary_matrix.matvec(v)
-                    else:
-                        approx_result = unitary_matrix @ v
-                    diff_v = exact_result - approx_result
-
-                    if hasattr(exact_matrix, 'rmatvec'):
-                        exact_adjoint = exact_matrix.rmatvec(diff_v)
-                    else:
-                        exact_adjoint = exact_matrix.conj().T @ diff_v
-                    if hasattr(unitary_matrix, 'rmatvec'):
-                        approx_adjoint = unitary_matrix.rmatvec(diff_v)
-                    else:
-                        approx_adjoint = unitary_matrix.conj().T @ diff_v
-                    result = exact_adjoint - approx_adjoint
-
-                    eigenvalue = np.vdot(v, result)
-                    error = np.sqrt(np.abs(eigenvalue))
-
-                    logger.info(f"Spectral norm error (matrix-free, power iteration): {error:.6e}")
-                    results['matrix_spectral_error'] = float(error)
-
-                else:
-                    raise ValueError(f"Unknown matrix norm type: {norm_type}")
+            # Matrix-free case: not implemented in Phase 1
+            raise NotImplementedError(
+                "Matrix-free matrix norm error analysis not yet implemented. "
+                "Phase 1 supports only dense matrices (systems with n ≤ 15 qubits). "
+                "This feature is planned for Phase 2 to support larger systems. "
+                "Note: Matrix norm errors require O(N²) matrix-vector products in matrix-free mode, "
+                "which may be impractical for very large systems anyway."
+            )
 
     # =============================================================================================
-    # 3. STATE-DEPENDENT ERRORS
+    # 3. STATE-DEPENDENT ERRORS: ||U_exact|ψ⟩ - U_approx|ψ⟩||
     # =============================================================================================
+    # Compares time evolution applied to specific quantum states.
+    # Uses the same unshifted operators (U_exact, U_approx) as matrix norm errors.
 
     if config_analysis.error_state_inputs is not None:
         # Note: error_state_inputs is normalized to list during validation
@@ -788,24 +813,26 @@ def error_analysis(
                 logger.info(f"ERROR: Failed to load state from {state_file}: {e}")
                 raise
 
-            # Apply exact operator
-            if hasattr(exact_matrix, 'matvec'):
-                exact_final = exact_matrix.matvec(initial_state)
-            else:
-                exact_final = exact_matrix @ initial_state
+            # Use the converted unitary operators (computed in conversion section above)
+            if exact_unitary_matrix is None or approx_unitary_matrix is None:
+                raise RuntimeError(
+                    "Unitary matrices should have been computed but are None. "
+                    "This is an internal error in the operator conversion logic."
+                )
 
-            # Apply approximate operator
-            if hasattr(unitary_matrix, 'matvec'):
-                approx_final = unitary_matrix.matvec(initial_state)
-            else:
-                approx_final = unitary_matrix @ initial_state
+            # Apply exact time evolution operator: U_exact |ψ⟩
+            # Note: For Phase 1 dense case, these are always numpy arrays (not matrix-free)
+            exact_final = exact_unitary_matrix @ initial_state
 
-            # Compute error
+            # Apply approximate time evolution operator: U_approx |ψ⟩
+            approx_final = approx_unitary_matrix @ initial_state
+
+            # Compute error: ||U_exact|ψ⟩ - U_approx|ψ⟩||
             diff = exact_final - approx_final
             absolute_error = np.linalg.norm(diff)
             relative_error = absolute_error / np.linalg.norm(exact_final)
 
-            logger.info(f"  {state_file}: absolute error = {absolute_error:.6e}, relative error = {relative_error:.6e}")
+            logger.info(f"  {state_file}: ||U_exact|ψ⟩ - U_approx|ψ⟩|| = {absolute_error:.6e} (relative: {relative_error:.6e})")
 
             state_errors.append({
                 'input_file': state_file,
@@ -1356,7 +1383,9 @@ def analyze_algorithm(
             exact_matrix=exact_matrix,
             unitary_matrix=unitary_matrix,
             exact_eigendecomp=exact_eigendecomp,
-            approx_eigendecomp=approx_eigendecomp
+            approx_eigendecomp=approx_eigendecomp,
+            timestep=timestep,
+            energy_shift=energy_shift
         )
 
     if config_analysis.exact_simulation_inputs is not None:
