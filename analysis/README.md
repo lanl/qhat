@@ -126,10 +126,10 @@ supports
   - `error_scale`: This option is deprecated.
   - `trotter_implementation`: (Optional) Choose between two Trotter implementations:
     - `"flattened"` (default, recommended): Flattened QHAT implementation with flat expansion and
-      optional term combining. Term combining reduces operation count (benefit varies by Hamiltonian).
-      Uses `CommutingPauliStringEvolution` internally, enabling future grouping of commuting terms.
-      This implementation has comprehensive test coverage (57 tests) and is recommended for all use
-      cases.
+      optional term combining. Term combining reduces operation count (benefit varies by
+      Hamiltonian).  Uses `CommutingPauliStringEvolution` internally, enabling future grouping of
+      commuting terms.  This implementation has comprehensive test coverage (57 tests) and is
+      recommended for all use cases.
     - `"original"`: Original QHAT implementation with nested bloq structure
       (RampedTrotterizedUnitary → RampedTrotterStep → TrotterRamp). Warning: This implementation
       has little to no test coverage and may not work correctly in all cases. Use only for exact
@@ -140,7 +140,8 @@ supports
     - `False`: Keep all terms separate. Useful for comparing results with the original
       implementation. When disabled, produces the same gate counts as the original implementation.
   - `trotter_order`: (Optional) Explicitly specify which Trotter order to use:
-    - `None` (default): Automatically select between first-order and second-order based on cost-effectiveness
+    - `None` (default): Automatically select between first-order and second-order based on
+      cost-effectiveness
     - `"first order"`: Force use of first-order Trotter
     - `"second order"`: Force use of second-order Trotter
     - `"fourth order"`: Force use of fourth-order Trotter using five-term Suzuki recursion (step
@@ -205,8 +206,9 @@ development are may not be reliable yet.
 
 #### Matrix Output
 
-- **Unitary Matrix Output**: Setting `analysis.algorithm_algorithm_matrix_output_file` to a filename will compute and
-  save the full unitary matrix representation of the algorithm. Supported formats:
+- **Full-Algorithm Unitary Matrix Output**: Setting `analysis.algorithm_matrix_output_file` to a
+  filename will compute and save the full unitary matrix representation of the algorithm. Supported
+  formats:
   - `.npz`: NumPy compressed format
   - `.h5` or `.hdf5`: HDF5 format with compression
   - `.txt`, `.dat`, or `.csv`: Human-readable sparse text format
@@ -215,26 +217,35 @@ development are may not be reliable yet.
   
   **Example**:
   ```python
-  analysis.algorithm_algorithm_matrix_output_file = "unitary_matrix.npz"
+  analysis.algorithm_matrix_output_file = "unitary_matrix.npz"
   ```
 
-- **Exact Hamiltonian Matrix Output**: Use the flexible API `analysis.save_matrix_to_file()` with `operator='exact'`
-  will compute and save the exact matrix representation of the Hamiltonian **without any
-  approximations**.  Supported formats are the same as for unitary matrix output.
+- **Hamiltonian / Time-Evolution Matrix Output**: Use the flexible API
+  `analysis.save_matrix_to_file()` with `operator='exact'` or `operator='approximate'` will compute
+  and save the matrix representation of the Hamiltonian or time-evolution operator.  Supported
+  formats are the same as for full-algorithm matrix output.
   
   This is useful for:
   - Validating approximate algorithms by comparing exact vs approximate eigenvalues
   - Computing exact ground state energies for small systems
   - Testing and debugging algorithm implementations
   
-  **System size considerations**:
-  - **Small systems (≤15 qubits)**: Full dense matrix is computed and saved to file
-  - **Large systems (>15 qubits)**: Matrix-free operator is created but not saved (too large)
-  
   **Example**:
   ```python
-  analysis.exact_algorithm_matrix_output_file = "exact_hamiltonian.npz"
+  analysis.save_matrix_to_file(
+      filename='H_approx.npz',
+      operator='approximate',
+      form='Hamiltonian',
+      shift='unshifted'
+  )
   ```
+
+  Parameters:
+  - `filename`: the name of the file to create, extension defines the file format
+  - `operator`: `'approximate'` or `'exact'`
+  - `form`: `'Hamiltonian'` for H or `'time_evolution'` for U = exp(-iHt/ℏ)
+  - `shift`: `'unshifted'` for the physical energy scale or `'shifted'` to include the energy-shift
+    applied by the Trotterization method to make all eigenvalues non-negative
   
   **Note**: For large systems, the exact matrix computation creates a matrix-free LinearOperator
   that can be used with scipy sparse eigensolvers, but cannot be directly saved to a file. The
@@ -242,56 +253,13 @@ development are may not be reliable yet.
 
 #### Eigendecomposition Analysis
 
-- **Eigendecomposition Analysis**: Use the flexible API `analysis.save_eigendecomposition_to_file()` to compute eigendecompositions.
+- **Eigendecomposition Analysis**: Use the flexible API
+  `analysis.save_eigendecomposition_to_file()` to compute eigendecompositions.
 
   **Key features**:
   - **Always computes full spectrum** (all eigenstates)
-  - **Sorted by eigenenergy** (ascending order: ground state first)
-  - **Converts phases to energies** for approximate case
   - **Only feasible for small systems**
-
-  **Configuration parameter**:
-  
-  - **flexible eigendecomposition API**: Which matrices to eigendecompose
-    - `None` (default): Eigendecomposition disabled
-    - `"exact"`: Only eigendecompose the exact Hamiltonian matrix
-    - `"approximate"`: Only eigendecompose the algorithm's unitary matrix
-    - `"both"`: Eigendecompose both matrices (required for eigenvalue error analysis)
-
-  **Terminology** (used consistently in code, file names, and documentation):
-  - **eigenenergy**: Eigenvalue of Hamiltonian H (units: energy, e.g., Hartrees)
-  - **unitary_eigenvalue**: Eigenvalue of time evolution unitary U = exp(-iHt/ℏ) (complex, on unit circle)
-  - **eigenphase**: Phase φ = (E·t/ℏ) ∈ [0, 2π) extracted from unitary eigenvalue
-
-  **Phase-to-energy conversion** (approximate case only):
-  - Unitary eigenvalues: λ_U = exp(-iφ) where φ = E·t/ℏ
-  - Eigenphases: φ ∈ [0, 2π) (include 0, exclude 2π)
-  - Eigenenergies: E = φ·ℏ/t
-  - **Assumption**: Hamiltonian is shifted/scaled by existing code to ensure phases fall in [0, 2π)
-
-  **Output files**:
-  - `exact_eigendecomposition.npz`: Exact Hamiltonian eigenstates (if requested)
-  - `approximate_eigendecomposition.npz`: Approximate eigenstates from unitary (if requested)
-  - Each file contains: `eigenenergies` (sorted), `eigenvectors` (reordered to match), metadata
-  - Approximate files also include `timestep`, and optionally `unitary_eigenvalues`, `eigenphases`
-  - **Sorted order**: Index 0 = ground state, 1 = first excited state, etc.
-
-  **Examples**:
-  ```python
-  # Full spectrum for small system (exact Hamiltonian)
-  analysis.save_eigendecomposition_to_file(filename='...', operator='exact', form='hamiltonian', shift='unshifted')
-
-  # Full spectrum for approximate algorithm
-  analysis.save_eigendecomposition_to_file(filename='...', operator='approximate', form='time_evolution', shift='shifted')
-
-  # Both (required for eigenvalue error comparison)
-  # Use save_eigendecomposition_to_file for both exact and approximate
-  ```
-
-  **Size limitations**:
-  - Only practical for small systems
-  - For larger systems, eigendecomposition will fail with clear error message
-  - Matrix must fit in memory (no matrix-free operator support)
+  - **Same parameters** as `save_matrix_to_file()`
 
 #### Error Analysis
 
