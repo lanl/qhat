@@ -1,9 +1,7 @@
 import ctypes
 import logging
 import os
-import pprint
 import subprocess
-import sys
 import tomlkit
 from tomlkit.toml_file import TOMLFile
 
@@ -18,15 +16,6 @@ class ConfigurationBase:
             value = getattr(self, name)
             if value is not None:
                 table[name] = value
-
-# -------------------------------------------------------------------------------------------------
-
-# TODO: Where should this live?
-def value(x, default):
-    if x is None:
-        return default
-    else:
-        return x
 
 # -------------------------------------------------------------------------------------------------
 # user types

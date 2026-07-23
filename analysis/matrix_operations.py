@@ -30,6 +30,33 @@ logger = logging.getLogger(__name__)
 
 
 # =================================================================================================
+# Matrix Validation Utilities
+# =================================================================================================
+
+def compute_unitarity_error(matrix):
+    """
+    Compute the Frobenius norm deviation from unitarity.
+
+    For a unitary matrix U, U†U = I. This function computes ||U†U - I||_F
+    to measure how far the matrix deviates from being unitary.
+
+    Parameters:
+        matrix: numpy array (2D complex matrix)
+
+    Returns:
+        float: Frobenius norm ||U†U - I||_F
+
+    Example:
+        >>> U = np.eye(2, dtype=complex)  # Identity is unitary
+        >>> compute_unitarity_error(U)
+        0.0
+    """
+    identity = np.eye(matrix.shape[0])
+    U_dag_U = matrix.conj().T @ matrix
+    return np.linalg.norm(U_dag_U - identity, ord='fro')
+
+
+# =================================================================================================
 # Pauli Matrix Definitions
 # =================================================================================================
 
