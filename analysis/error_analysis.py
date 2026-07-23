@@ -71,6 +71,29 @@ def error_analysis(
         exact_eigenenergies = exact_eigendecomp['eigenenergies']
         approx_eigenenergies = approx_eigendecomp['eigenenergies']
 
+        #exact_eigenenergies = exact_op.get(
+        #    operator_type='Hamiltonian',
+        #    energy_shifted=False,
+        #    representation='eigendecomposition'
+        #)["eigenvalues"]
+        #print(exact_eigenenergies)
+
+        #logger.info("Computing eigenenergy errors for all eigenstates")
+
+        ## Get eigenenergies from both decompositions (both already sorted by energy)
+        #exact_eigenenergies = exact_op.get(
+        #    operator_type='Hamiltonian',
+        #    energy_shifted=False,
+        #    representation='eigendecomposition'
+        #)["eigenvalues"]
+        #print("exact_eigenenergies:\n", exact_eigenenergies)
+        #approx_eigenenergies = approx_op.get(
+        #    operator_type='Hamiltonian',
+        #    energy_shifted=False,
+        #    representation='eigendecomposition'
+        #)["eigenvalues"]
+        #print("approx_eigenenergies:\n", approx_eigenenergies)
+
         # Verify same dimension (should have all eigenvalues since full decomposition)
         if len(exact_eigenenergies) != len(approx_eigenenergies):
             raise ValueError(

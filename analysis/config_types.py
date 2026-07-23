@@ -153,19 +153,31 @@ class AlgorithmConfiguration(ConfigurationBase):
 
 class AnalysisConfiguration(ConfigurationBase):
     def __init__(self):
-        self.resource_estimator = None
-        self.algorithm_matrix_output_file = None
-        self.numerical_simulation_inputs = None
-        self.matrix_memory_threshold_gb = 16.0
-        self.enable_eigenvalue_errors = False
-        self.error_matrix_norms = None
-        self.error_state_inputs = None
-        self.exact_simulation_inputs = None
-
+        # Internal (not user-facing) options ______________________________________________________
         # New flexible output API
         self._matrix_output_requests = []
         self._eigendecomposition_output_requests = []
-
+        # External (user-facing) options __________________________________________________________
+        # Do resource estimation (e.g., qubit and gate counts)
+        self.resource_estimator = None
+        # Write unitary matrix of full algorithm to a file
+        self.algorithm_matrix_output_file = None
+        # Do numerical simulation with the provided starting state(s)
+        # -- numerical_simulation_inputs: using the constructed algorithm
+        # -- exact_simulation_inputs: currently not doing what would be expected
+        self.numerical_simulation_inputs = None
+        self.exact_simulation_inputs = None
+        # Memory threshold above which dense matrices are no longer generated
+        # - Switch to matrix-free representation, which disables some features such as saving
+        #   matrices or eigendecompositions
+        self.matrix_memory_threshold_gb = 16.0
+        # Compute error based on eigenvalues
+        self.enable_eigenvalue_errors = False
+        # Compute error based on matrix norm(s)
+        self.error_matrix_norms = None
+        # Compute error based on reference state(s)
+        self.error_state_inputs = None
+    # Write a matrix to a file
     def save_matrix_to_file(self, filename, operator, form, shift):
         """
         Request saving a matrix to file.
@@ -212,13 +224,14 @@ class AnalysisConfiguration(ConfigurationBase):
         self._validate_output_request(filename, operator, form, shift)
 
         # Store request
+        # TODO: Deduplicate
         self._matrix_output_requests.append({
             'filename': filename,
             'operator': operator,
             'form': form,
             'shift': shift
         })
-
+    # Write an eigendecomposition to a file
     def save_eigendecomposition_to_file(self, filename, operator, form, shift):
         """
         Request saving an eigendecomposition to file.
@@ -273,6 +286,7 @@ class AnalysisConfiguration(ConfigurationBase):
         self._validate_output_request(filename, operator, form, shift)
 
         # Store request
+        # TODO: Deduplicate
         self._eigendecomposition_output_requests.append({
             'filename': filename,
             'operator': operator,
@@ -320,8 +334,6 @@ class AnalysisConfiguration(ConfigurationBase):
         self.save_if_present(table, "error_matrix_norms")
         self.save_if_present(table, "error_state_inputs")
         self.save_if_present(table, "exact_simulation_inputs")
-
-        # Save new output requests
         if self._matrix_output_requests:
             table['matrix_output_requests'] = self._matrix_output_requests
         if self._eigendecomposition_output_requests:

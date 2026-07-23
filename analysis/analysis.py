@@ -212,6 +212,166 @@ def analyze_algorithm(
 
     # Note: Configuration validation happens in driver.py before Hamiltonian is loaded
 
+    ###    # TODO: exact_simulation_inputs is not None -- warn that this is not correctly implemented
+    ###
+    ###    # Aggregate options to help summarize options _________________________________________________
+    ###
+    ###    # TODO: Should some of these be methods of config_analysis?
+    ###
+    ###    # Check what analyses are requested
+    ###    # - any error analyses turned on
+    ###    error_analysis_requested = (
+    ###        config_analysis.enable_eigenvalue_errors or
+    ###        config_analysis.error_matrix_norms is not None or
+    ###        config_analysis.error_state_inputs is not None
+    ###    )
+    ###    # - exact and/or approximate OperatorRepresentation needed
+    ###    # TODO: Should probably do some kind of remapping so that the split isn't matrix vs
+    ###    #       eigendecomposition but exact vs approximate, because that will represent the data
+    ###    #       better.  Change the inputs or just remap internally?
+    ###    def _request_present(output_requests, operator):
+    ###        return any(d["operator"] == operator for d in output_requests)
+    ###    exact_op_needed = (
+    ###        error_analysis_requested or
+    ###        _request_present(config_analysis._matrix_output_requests, "exact") or
+    ###        _request_present(config_analysis._eigendecomposition_output_requests, "exact")
+    ###    )
+    ###    approximate_op_needed = (
+    ###        error_analysis_requested or
+    ###        _request_present(config_analysis._matrix_output_requests, "approximate") or
+    ###        _request_present(config_analysis._eigendecomposition_output_requests, "approximate")
+    ###    )
+    ###    # - exact Hamiltonian matrix needed
+    ###    exact_H_needed = exact_op_needed
+    ###    # - approximate time-evolution matrix needed
+    ###    # TODO
+    ###    # - full algorithm matrix needed
+    ###    algorithm_matrix_needed = (
+    ###        config_analysis.algorithm_matrix_output_file is not None or
+    ###        config_analysis.numerical_simulation_inputs is not None
+    ###    )
+    ###
+    ###    # Validate at least one analysis requested
+    ###    if (not algorithm_matrix_needed and
+    ###        not error_analysis_requested and
+    ###        not exact_op_needed and
+    ###        not approximate_op_needed and 
+    ###        config_analysis.resource_estimator is None and
+    ###        config_analysis.exact_simluation_inputs is None):
+    ###        raise ValueError("No analyses requested. Turn on at least one analysis.\n")
+    ###
+    ###    # Preliminary calculations ____________________________________________________________________
+    ###
+    ###    # TODO: These blocks look like they could and perhaps should be functions
+    ###
+    ###    # Construct the unitary matrix equivalent to the full algorithm
+    ###    algorithm_mat = None
+    ###    if algorithm_matrix_needed:
+    ###        logger.verbose("Constructing the unitary matrix equivalent to the full algorithm")
+    ###        algorithm_mat = _compute_unitary_matrix(algorithm)
+    ###        logger.info("Created full algorithm matrix")
+    ###
+    ###    # Construct the "exact" (from the true Hamiltonian) OperatorRepresentation if necessary
+    ###    exact_op = None
+    ###    if exact_op_needed:
+    ###        if hamiltonian is None:
+    ###            raise ValueError(
+    ###                "Exact matrix computation requires hamiltonian parameter. "
+    ###                "Pass hamiltonian to analyze_algorithm()."
+    ###            )
+    ###        logger.verbose("Constructing the exact energy-shifted Hamiltonian matrix")
+    ###        exact_matrix = _compute_exact_matrix(hamiltonian, config_analysis)
+    ###        logger.verbose(
+    ###            "Constructing the exact OperatorRepresentation instance"
+    ###            f" (t = {timestep}, ΔE = {energy_shift})"
+    ###        )
+    ###        from qhat.analysis.operators import OperatorRepresentation
+    ###        exact_op = OperatorRepresentation(
+    ###            data=exact_matrix,
+    ###            operator_type='hamiltonian',
+    ###            energy_shifted=True,
+    ###            representation='dense_matrix',
+    ###            timestep=timestep,
+    ###            energy_shift=energy_shift
+    ###        )
+    ###        logger.info("Created exact operator representation")
+    ###
+    ###    # Construct the "approximate" (from the unitary Hamiltonian encoding) OperatorRepresentation if
+    ###    # necessary
+    ###    approx_op = None
+    ###    if approximate_op_needed:
+    ###        # TODO:
+    ###        #if hamiltonian is None:
+    ###        #    raise ValueError(
+    ###        #        "Exact matrix computation requires hamiltonian parameter. "
+    ###        #        "Pass hamiltonian to analyze_algorithm()."
+    ###        #    )
+    ###        logger.verbose("Constructing the approximate energy-shifted time-evolution matrix")
+    ###        approx_matrix = _compute_unitary_matrix(algorithm) # TODO: Not the right operator!
+    ###        logger.verbose(
+    ###            "Constructing the approximate OperatorRepresentation instance"
+    ###            f" (t = {timestep}, ΔE = {energy_shift})"
+    ###        )
+    ###        from qhat.analysis.operators import OperatorRepresentation
+    ###        approx_op = OperatorRepresentation(
+    ###            data=approx_matrix,
+    ###            operator_type='time_evolution',
+    ###            energy_shifted=True,
+    ###            representation='dense_matrix',
+    ###            timestep=timestep,
+    ###            energy_shift=energy_shift
+    ###        )
+    ###        logger.info("Created approximate operator representation")
+    ###
+    ###    # Storage in which to aggregate the results ___________________________________________________
+    ###
+    ###    results = {}
+    ###
+    ###    # Perform analyses ____________________________________________________________________________
+    ###
+    ###    # Analysis Category : resource estimation _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    ###    if config_analysis.resource_estimator is not None:
+    ###        # TODO: Modify to allow resource estimation with multiple approaches
+    ###        logger.info(f"Performing resource estimation using {config_analysis.resource_estimator}.")
+    ###        results["resource_estimates"] = estimate_resources(config_analysis, algorithm)
+    ###
+    ###    # Analysis Category : error analysis  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    ###    if error_analysis_requested:
+    ###        logger.info("Performing error analysis.")
+    ###        results["error_analysis"] = error_analysis(
+    ###            config_analysis, hamiltonian, algorithm,
+    ###            exact_matrix=exact_matrix,
+    ###            unitary_matrix=approx_matrix,
+    ###            #exact_eigendecomp=exact_eigendecomp,
+    ###            exact_eigendecomp=None,
+    ###            #approx_eigendecomp=approx_eigendecomp,
+    ###            approx_eigendecomp=None,
+    ###            timestep=timestep,
+    ###            energy_shift=energy_shift,
+    ###            exact_op=exact_op,
+    ###            approx_op=approx_op
+    ###        )
+    ###
+    ###    # Analysis Category : matrices and eigendecompositions  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    ###    results["matrices_and_eigendecompositions"] = save_requested_operator_outputs(
+    ###        config_analysis,
+    ###        exact_matrix,
+    ###        approx_matrix,
+    ###        timestep,
+    ###        energy_shift,
+    ###        exact_op=exact_op,
+    ###        approx_op=approx_op
+    ###    )
+    ###    if config_analysis.algorithm_matrix_output_file is not None:
+    ###        logger.info("Generating algorithm matrix output.")
+    ###        results["matrix_output"] = output_unitary_matrix(config_analysis, algorithm, algorithm_mat)
+    ###
+    ###    # Analysis Category : numerical simulation  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    ###    if config_analysis.numerical_simulation_inputs is not None:
+    ###        logger.info("Performing numerical simulation of the full algorithm.")
+    ###        results["numerical_simulation"] = \
+    ###            numerical_simulation(config_analysis, algorithm, algorithm_mat)
+
     # Check what analyses are requested
     eigendecomposition_requested = (
         requires_exact_eigendecomposition(config_analysis) or
