@@ -1,4 +1,4 @@
-from functools import cache, reduce
+from functools import reduce
 import h5py
 import json
 import logging
@@ -15,7 +15,7 @@ from openfermion import (
 )
 from pyscf import ao2mo, gto, lib, scf
 
-from qhat.analysis.config_types import GeneralConfiguration, HamiltonianConfiguration
+from qhat.analysis.config_types import HamiltonianConfiguration
 from qhat.analysis.utils import value
 from qhat.common.bosons_binary import BosonicBinaryEncoding
 from qhat.common.MixedFermionBosonOperator import MixedFermionBosonOperator
