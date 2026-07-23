@@ -13,7 +13,6 @@ from openfermion import (
     count_qubits,
     jordan_wigner,
 )
-from pyscf import ao2mo, gto, lib, scf
 
 from qhat.analysis.config_types import HamiltonianConfiguration
 from qhat.analysis.utils import value
