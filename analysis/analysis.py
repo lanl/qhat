@@ -16,38 +16,9 @@ from qhat.analysis.matrix_eigendecomposition import (
     eigendecomposition_analysis,
     save_requested_operator_outputs
 )
+from qhat.analysis.utils import normalize_string_or_list_to_list
 
 logger = logging.getLogger(__name__)
-
-# -------------------------------------------------------------------------------------------------
-# Helper functions
-# -------------------------------------------------------------------------------------------------
-
-def _normalize_string_or_list_to_list(value):
-    """
-    Normalize a configuration value that can be either a string or list into a list.
-
-    This is a common pattern for config options that accept either a single item (string)
-    or multiple items (list).
-
-    Parameters:
-        value: Either a string or a list of strings (or None)
-
-    Returns:
-        A list (or None if input was None)
-
-    Examples:
-        _normalize_string_or_list_to_list("item") -> ["item"]
-        _normalize_string_or_list_to_list(["a", "b"]) -> ["a", "b"]
-        _normalize_string_or_list_to_list(None) -> None
-    """
-    if value is None:
-        return None
-    elif isinstance(value, str):
-        return [value]
-    else:
-        # Already a list (or list-like)
-        return value
 
 # -------------------------------------------------------------------------------------------------
 # Functions to determine what expensive computations are required
@@ -196,13 +167,13 @@ def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfigura
 
     # Normalize string-or-list config values to always be lists
     # This allows downstream code to always assume list type
-    config_analysis.error_matrix_norms = _normalize_string_or_list_to_list(
+    config_analysis.error_matrix_norms = normalize_string_or_list_to_list(
         config_analysis.error_matrix_norms
     )
-    config_analysis.error_state_inputs = _normalize_string_or_list_to_list(
+    config_analysis.error_state_inputs = normalize_string_or_list_to_list(
         config_analysis.error_state_inputs
     )
-    config_analysis.numerical_simulation_inputs = _normalize_string_or_list_to_list(
+    config_analysis.numerical_simulation_inputs = normalize_string_or_list_to_list(
         config_analysis.numerical_simulation_inputs
     )
 

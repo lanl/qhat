@@ -4,6 +4,7 @@ from pathlib import Path
 
 from qhat.analysis.config_types import AnalysisConfiguration
 from qhat.analysis.file_io import load_state, save_state
+from qhat.analysis.utils import normalize_string_or_list_to_list
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ def numerical_simulation(
             f"got {type(raw_inputs).__name__}"
         )
 
-    input_files = _normalize_string_or_list_to_list(raw_inputs)
+    input_files = normalize_string_or_list_to_list(raw_inputs)
 
     logger.info(f"Running numerical simulation on {len(input_files)} input state(s)")
 
@@ -184,32 +185,3 @@ def exact_numerical_simulation(
 
     return {'exact_simulations': results}
 
-# -------------------------------------------------------------------------------------------------
-# Helper functions
-# -------------------------------------------------------------------------------------------------
-
-def _normalize_string_or_list_to_list(value):
-    """
-    Normalize a configuration value that can be either a string or list into a list.
-
-    This is a common pattern for config options that accept either a single item (string)
-    or multiple items (list).
-
-    Parameters:
-        value: Either a string or a list of strings (or None)
-
-    Returns:
-        A list (or None if input was None)
-
-    Examples:
-        _normalize_string_or_list_to_list("item") -> ["item"]
-        _normalize_string_or_list_to_list(["a", "b"]) -> ["a", "b"]
-        _normalize_string_or_list_to_list(None) -> None
-    """
-    if value is None:
-        return None
-    elif isinstance(value, str):
-        return [value]
-    else:
-        # Already a list (or list-like)
-        return value
