@@ -87,7 +87,7 @@ def test_get_state_format_from_extension():
 
 def test_invalid_extension_raises_error():
     """Test that invalid extensions raise ValueError."""
-    with pytest.raises(ValueError, match="Cannot determine format"):
+    with pytest.raises(ValueError, match="Cannot determine state format"):
         _get_state_format_from_extension("state.txt")
     print("✓ Test passed: invalid_extension_raises_error")
 

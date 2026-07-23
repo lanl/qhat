@@ -5,15 +5,16 @@ import numpy as np
 
 from qualtran.bloqs.block_encoding import LCUBlockEncoding
 from qualtran.bloqs.multiplexers.select_pauli_lcu import SelectPauliLCU
-from qualtran.bloqs.state_preparation import StatePreparationAliasSampling, StatePreparationViaRotations
+from qualtran.bloqs.state_preparation import StatePreparationAliasSampling
 
 from pyLIQTR.BlockEncodings.DoubleFactorized import DoubleFactorized
 from pyLIQTR.BlockEncodings.LinearT import Fermionic_LinearT
 from pyLIQTR.BlockEncodings.PauliStringLCU import PauliStringLCU as PyLIQTRPauliStringLCU
 from pyLIQTR.ProblemInstances.ChemicalHamiltonian import ChemicalHamiltonian
 
-from qhat.analysis.config_types import GeneralConfiguration, UnitaryConfiguration, value
+from qhat.analysis.config_types import UnitaryConfiguration
 from qhat.analysis.ordering import reorder_paulis
+from qhat.analysis.utils import value
 
 logger = logging.getLogger(__name__)
 
