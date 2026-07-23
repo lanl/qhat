@@ -15,7 +15,8 @@ from openfermion import (
 )
 from pyscf import ao2mo, gto, lib, scf
 
-from qhat.analysis.config_types import GeneralConfiguration, HamiltonianConfiguration, value
+from qhat.analysis.config_types import GeneralConfiguration, HamiltonianConfiguration
+from qhat.analysis.utils import value
 from qhat.common.bosons_binary import BosonicBinaryEncoding
 from qhat.common.MixedFermionBosonOperator import MixedFermionBosonOperator
 from qhat.common.pauli_string import PauliString

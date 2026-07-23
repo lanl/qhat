@@ -15,7 +15,7 @@ import tempfile
 import os
 
 from qhat.analysis.file_io import save_eigendecomposition, load_eigendecomposition
-from qhat.analysis.matrix_eigendecomposition import convert_unitary_eigenvalues_to_eigenenergies
+from qhat.analysis.operators import convert_unitary_eigenvalues_to_eigenenergies
 
 
 # =================================================================================================

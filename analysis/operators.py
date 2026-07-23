@@ -17,6 +17,51 @@ from typing import Dict, Optional, Union, Literal
 logger = logging.getLogger(__name__)
 
 
+# =================================================================================================
+# Conversion Utilities
+# =================================================================================================
+
+def convert_unitary_eigenvalues_to_eigenenergies(unitary_eigenvalues, timestep, hbar=1.0):
+    """
+    Convert unitary eigenvalues e^(-iφ) to Hamiltonian eigenenergies E.
+
+    The time evolution operator is U = exp(-iHt/ℏ), so if H has eigenenergy E,
+    then U has eigenvalue exp(-iEt/ℏ) = exp(-iφ) where φ = Et/ℏ is the eigenphase.
+
+    Assumption: The Hamiltonian has been shifted and scaled (by existing code) such that
+    all eigenenergies produce eigenphases in the range [0, 2π), preventing aliasing.
+
+    Parameters:
+        unitary_eigenvalues: Complex eigenvalues of unitary U = exp(-iHt/ℏ) (on unit circle)
+        timestep: Time evolution parameter t (units: ℏ/energy, e.g., ℏ/Hartree)
+        hbar: Value of ℏ (default: 1.0 for atomic units)
+
+    Returns:
+        tuple: (eigenenergies, eigenphases)
+            eigenenergies: Real eigenvalues of Hamiltonian (shifted/scaled, units: energy)
+            eigenphases: Phases φ ∈ [0, 2π) where φ = Et/ℏ
+    """
+    # Extract phases using np.angle, which returns [-π, π]
+    # Since U = exp(-iφ), we have arg(U) = -φ (mod 2π)
+    phases_neg_pi_to_pi = np.angle(unitary_eigenvalues)
+
+    # Eigenphase φ = -arg(U), then map to [0, 2π) convention
+    eigenphases_raw = -phases_neg_pi_to_pi
+    eigenphases = np.where(eigenphases_raw < 0,
+                           eigenphases_raw + 2*np.pi,
+                           eigenphases_raw)
+
+    # Convert to eigenenergies: E = φ * ℏ / t
+    # These are shifted/scaled eigenenergies that correspond to the phases in [0, 2π)
+    eigenenergies = eigenphases * hbar / timestep
+
+    return eigenenergies, eigenphases
+
+
+# =================================================================================================
+# OperatorRepresentation Class
+# =================================================================================================
+
 class OperatorRepresentation:
     """
     Unified representation of quantum operators with lazy conversion between forms.
