@@ -91,6 +91,32 @@ def _save_matrix_text(output_path, unitary_matrix, unitarity_error, matrix_norm,
                     f.write(f"{i},{j},{val.real:.16e},{val.imag:.16e}\n")
 
 
+def _get_format_from_extension(filename, extension_map, data_type="file"):
+    """
+    Generic helper to infer format from file extension.
+
+    Parameters:
+        filename: File path or name
+        extension_map: Dictionary mapping extensions to format names
+        data_type: Type of data (for error messages, e.g., "matrix", "state")
+
+    Returns:
+        format_name: The format string from the extension_map
+
+    Raises:
+        ValueError: If extension is not recognized
+    """
+    ext = Path(filename).suffix.lower()
+
+    if ext not in extension_map:
+        raise ValueError(
+            f"Cannot determine {data_type} format from extension '{ext}'. "
+            f"Supported extensions: {', '.join(extension_map.keys())}"
+        )
+
+    return extension_map[ext]
+
+
 def _get_matrix_format_from_extension(filename):
     """
     Infer matrix format from file extension.
@@ -106,17 +132,7 @@ def _get_matrix_format_from_extension(filename):
         '.dat': 'text',
         '.csv': 'text',
     }
-
-    # Get extension from filename
-    ext = Path(filename).suffix.lower()
-
-    if ext not in extension_map:
-        raise ValueError(
-            f"Cannot determine format from extension '{ext}'. "
-            f"Supported extensions: {', '.join(extension_map.keys())}"
-        )
-
-    return extension_map[ext]
+    return _get_format_from_extension(filename, extension_map, "matrix")
 
 
 def save_matrix(output_path, unitary_matrix, unitarity_error=None, matrix_norm=None, hermiticity_error=None):
@@ -183,17 +199,7 @@ def _get_state_format_from_extension(filename):
     extension_map = {
         '.npy': 'numpy',
     }
-
-    # Get extension from filename
-    ext = Path(filename).suffix.lower()
-
-    if ext not in extension_map:
-        raise ValueError(
-            f"Cannot determine format from extension '{ext}'. "
-            f"Supported extensions: {', '.join(extension_map.keys())}"
-        )
-
-    return extension_map[ext]
+    return _get_format_from_extension(filename, extension_map, "state")
 
 
 # =================================================================================================
