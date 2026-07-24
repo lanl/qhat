@@ -360,28 +360,11 @@ def eigendecomposition_analysis(
 # -------------------------------------------------------------------------------------------------
 
 def save_requested_operator_outputs(
-        config_analysis: AnalysisConfiguration,
-        exact_matrix,
-        unitary_matrix,
-        timestep,
-        energy_shift,
-        exact_op=None,
-        approx_op=None) -> dict:
+        operator_output_requests,
+        exact_op,
+        approx_op) -> dict:
     """
     Save all requested operator forms using OperatorRepresentation.
-
-    Parameters
-    ----------
-    config_analysis : AnalysisConfiguration
-        Configuration with output requests
-    exact_matrix : ndarray
-        Exact Hamiltonian matrix (shifted, H' = H + E*I)
-    unitary_matrix : ndarray
-        Approximate time-evolution operator (from shifted Hamiltonian)
-    timestep : float
-        Time evolution parameter
-    energy_shift : float
-        Energy shift value
 
     Returns
     -------
@@ -396,40 +379,14 @@ def save_requested_operator_outputs(
     }
 
     # Check if any requests exist
-    if not config_analysis._operator_output_requests:
+    if not operator_output_requests:
         return results
 
     # Create OperatorRepresentation wrappers if not provided
-    if exact_op is None or approx_op is None:
-        from qhat.analysis.operators import OperatorRepresentation
-
-        logger.verbose("Creating OperatorRepresentation instances for flexible output")
-        logger.verbose(f"  Timestep: t = {timestep}")
-        logger.verbose(f"  Energy shift: E = {energy_shift}")
-
-        # Exact operator (from shifted Hamiltonian)
-        exact_op = OperatorRepresentation(
-            data=exact_matrix,
-            operator_type='hamiltonian',
-            energy_shifted=True,  # Input is H' = H + E*I
-            representation='dense_matrix',
-            timestep=timestep,
-            energy_shift=energy_shift
-        )
-        logger.verbose("  Created exact operator representation (H', shifted)")
-
-        # Approximate operator (from shifted Hamiltonian via Trotter/etc)
-        approx_op = OperatorRepresentation(
-            data=unitary_matrix,
-            operator_type='time_evolution',
-            energy_shifted=True,  # Input is U' from H'
-            representation='dense_matrix',
-            timestep=timestep,
-            energy_shift=energy_shift
-        )
-        logger.verbose("  Created approximate operator representation (U', shifted)")
-    else:
-        logger.verbose("Using pre-created OperatorRepresentation instances (shared with error analysis)")
+    if exact_op is None:
+        raise ValueError("Missing exact_op in save_requested_operator_outputs.")
+    if approx_op is None:
+        raise ValueError("Missing approx_op in save_requested_operator_outputs.")
 
     operators = {
         'exact': exact_op,
@@ -437,7 +394,7 @@ def save_requested_operator_outputs(
     }
 
     # Process operator output requests
-    for request in config_analysis._operator_output_requests:
+    for request in operator_output_requests:
         op = operators[request['source']]
         energy_shifted = request['energy_shifted']
         representation = request['representation']
@@ -484,7 +441,7 @@ def save_requested_operator_outputs(
                 eigenenergies=eigenvalues_sorted,
                 eigenvectors=eigenvectors_sorted,
                 matrix_type=f"{request['source']}_{request['operator_type']}_{shift_str}",
-                timestep=timestep
+                timestep=approx_op.timestep
             )
 
             results['eigendecomposition_outputs'].append({

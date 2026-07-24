@@ -354,13 +354,9 @@ def analyze_algorithm(
     ###
     ###    # Analysis Category : matrices and eigendecompositions  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     ###    results["matrices_and_eigendecompositions"] = save_requested_operator_outputs(
-    ###        config_analysis,
-    ###        exact_matrix,
-    ###        approx_matrix,
-    ###        timestep,
-    ###        energy_shift,
-    ###        exact_op=exact_op,
-    ###        approx_op=approx_op
+    ###        config_analysis._operator_output_requests,
+    ###        exact_op,
+    ###        approx_op
     ###    )
     ###    if config_analysis.algorithm_matrix_output_file is not None:
     ###        logger.info("Generating algorithm matrix output.")
@@ -544,13 +540,9 @@ def analyze_algorithm(
             )
 
         results["flexible_operator_outputs"] = save_requested_operator_outputs(
-            config_analysis,
-            exact_matrix,
-            unitary_matrix,
-            timestep,
-            energy_shift,
-            exact_op=exact_op,
-            approx_op=approx_op
+            config_analysis._operator_output_requests,
+            exact_op,
+            approx_op
         )
 
     # TODO: Add gate parallelism / gate depth analysis
