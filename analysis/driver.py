@@ -96,7 +96,8 @@ def run():
     state.store_results(analyze_algorithm(
         state.config_analysis,
         algorithm,
-        hamiltonian=physical_hamiltonian,
+        approximate_time_evolution=unitary_hamiltonian,
+        exact_hamiltonian=physical_hamiltonian,
         timestep=timestep,
         energy_shift=energy_shift
     ))
