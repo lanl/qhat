@@ -29,8 +29,6 @@ def error_analysis(
         config_analysis: Analysis configuration with error analysis settings
         hamiltonian: Hamiltonian object
         algorithm: Algorithm bloq
-        exact_matrix: Pre-computed exact matrix (optional)
-        unitary_matrix: Pre-computed unitary matrix (optional)
         exact_eigendecomp: Pre-computed exact eigendecomposition (optional)
         approx_eigendecomp: Pre-computed approximate eigendecomposition (optional)
         timestep: Time evolution parameter t (required for matrix/state errors).
@@ -51,15 +49,6 @@ def error_analysis(
     results = {}
 
     # TODO: Break into functions for different types of error
-
-    # TODO: Where is this actually needed?
-    # TODO: Should this be energy-shifted or not?
-    exact_matrix = exact_op.get(operator_type="Hamiltonian",
-                                energy_shifted=True,
-                                representation="dense_matrix")
-    approx_matrix = exact_op.get(operator_type="Hamiltonian",
-                                 energy_shifted=True,
-                                 representation="dense_matrix")
 
     # =============================================================================================
     # 1. EIGENENERGY ERROR
@@ -132,94 +121,6 @@ def error_analysis(
         }
 
     # =============================================================================================
-    # OPERATOR CONVERSION: Wrap operators in OperatorRepresentation for clean handling
-    # =============================================================================================
-    # Available inputs:
-    #   - exact_matrix: H_exact (unshifted Hamiltonian, dense matrix or PauliStringOperator)
-    #   - approx_matrix: U_s,approx (energy-shifted time-evolution operator)
-    #
-    # OperatorRepresentation provides unified interface for conversions:
-    #   - H ↔ U (Hamiltonian ↔ time-evolution operator)
-    #   - Shifted ↔ unshifted (energy shift application/removal)
-    #   - Dense matrix ↔ eigendecomposition
-
-    # Check if matrix/state errors are requested (these need unitary operators)
-    needs_unitaries = (
-        config_analysis.error_matrix_norms is not None or
-        config_analysis.error_state_inputs is not None
-    )
-
-    if needs_unitaries:
-        logger.info("Preparing operators for matrix/state error analysis")
-
-        # Validate required inputs
-        if exact_matrix is None:
-            raise ValueError(
-                "Matrix/state error analysis requires the exact Hamiltonian matrix. "
-                "Use the flexible API: analysis.save_operator_to_file(source='exact', operator_type='hamiltonian', energy_shifted=False, representation='matrix', ...) "
-                "or enable eigendecomposition."
-            )
-
-        if approx_matrix is None:
-            raise ValueError(
-                "Matrix/state error analysis requires the approximate unitary matrix. "
-                "The algorithm must produce a unitary matrix representation."
-            )
-
-        if timestep is None:
-            raise ValueError(
-                "Matrix/state error analysis requires timestep parameter. "
-                "Ensure the algorithm provides a timestep (e.g., time evolution algorithms)."
-            )
-
-        # Check if dense or matrix-free
-        is_exact_dense = isinstance(exact_matrix, np.ndarray)
-        is_approx_dense = isinstance(approx_matrix, np.ndarray)
-
-        if not (is_exact_dense and is_approx_dense):
-            # Matrix-free case: not implemented yet
-            raise NotImplementedError(
-                "Matrix/state error analysis not yet implemented for matrix-free operators."
-            )
-
-        # Create OperatorRepresentation instances if not provided
-        if exact_op is None or approx_op is None:
-            from qhat.analysis.operators import OperatorRepresentation
-
-            logger.verbose(f"Creating OperatorRepresentation instances")
-            logger.verbose(f"  Timestep: t = {timestep}")
-            logger.verbose(f"  Energy shift: E = {energy_shift}")
-
-            # Wrap exact Hamiltonian in OperatorRepresentation
-            # Note: exact_matrix is H' = H + E*I (shifted up by E to make eigenvalues positive)
-            # approx_matrix is U' = exp(-i*H'*t) (also uses the shifted Hamiltonian)
-            # Both are on the shifted scale, and we want to unshift to the physical H for comparison.
-            exact_op = OperatorRepresentation(
-                data=exact_matrix,
-                operator_type='hamiltonian',
-                energy_shifted=True,  # Input IS shifted (H' = H + E*I)
-                representation='dense_matrix',
-                timestep=timestep,
-                energy_shift=energy_shift  # Will unshift by subtracting E
-            )
-            logger.verbose(f"  Created exact operator representation (H', shifted)")
-
-            # Wrap approximate time-evolution operator in OperatorRepresentation
-            approx_op = OperatorRepresentation(
-                data=approx_matrix,
-                operator_type='time_evolution',
-                energy_shifted=True,  # Input IS shifted (U' from H')
-                representation='dense_matrix',
-                timestep=timestep,
-                energy_shift=energy_shift  # Will unshift with phase factor
-            )
-            logger.verbose(f"  Created approx operator representation (U', shifted)")
-
-            logger.info(f"Operator representations ready for conversion on demand")
-        else:
-            logger.verbose("Using pre-created OperatorRepresentation instances (shared with other analyses)")
-
-    # =============================================================================================
     # 2. MATRIX NORM ERRORS: ||U_exact - U_approx||
     # =============================================================================================
     # Compares unshifted time evolution operators (both represent physical Hamiltonian).
@@ -231,88 +132,60 @@ def error_analysis(
 
         logger.info(f"Computing matrix norm errors: {norms_to_compute}")
 
-        # Require matrices to be provided by caller
-        if exact_matrix is None:
-            raise ValueError(
-                "Matrix norm error analysis requires the exact Hamiltonian matrix, but it was not computed. "
+        # Small systems: direct computation of ||U_exact - U_approx||
+        logger.verbose(f"Using dense matrices for norm computation")
+
+        # Get unshifted time-evolution operators from OperatorRepresentation
+        if exact_op is None or approx_op is None:
+            raise RuntimeError(
+                "Operator representations should have been created but are None. "
+                "This is an internal error in the operator conversion logic."
             )
 
-        if approx_matrix is None:
-            raise ValueError(
-                "Matrix norm error analysis requires the approximate/unitary matrix, but it was not computed. "
+        logger.verbose(f"  Converting H' → U (unshifted, physical)")
+        exact_unitary_matrix = exact_op.get(
+            operator_type='time_evolution',
+            energy_shifted=False,  # Get physical U from H
+            representation='dense_matrix'
+        )
+
+        logger.verbose(f"  Converting U' → U (unshifted, physical)")
+        approx_unitary_matrix = approx_op.get(
+            operator_type='time_evolution',
+            energy_shifted=False,  # Get physical U
+            representation='dense_matrix'
+        )
+
+        # Verify unitarity
+        exact_unitarity_error = compute_unitarity_error(exact_unitary_matrix)
+        approx_unitarity_error = compute_unitarity_error(approx_unitary_matrix)
+        logger.verbose(f"  U_exact unitarity check: ||U†U - I||_F = {exact_unitarity_error:.6e}")
+        logger.verbose(f"  U_approx unitarity check: ||U†U - I||_F = {approx_unitarity_error:.6e}")
+
+        if exact_unitarity_error > 1e-10:
+            logger.warning(
+                f"WARNING: U_exact unitarity error {exact_unitarity_error:.6e} exceeds 1e-10."
+            )
+        if approx_unitarity_error > 1e-10:
+            logger.warning(
+                f"WARNING: U_approx unitarity error {approx_unitarity_error:.6e} exceeds 1e-10."
             )
 
-        # Check if matrices are dense or matrix-free
-        is_exact_dense = isinstance(exact_matrix, np.ndarray)
-        is_approx_dense = isinstance(approx_matrix, np.ndarray)
-        is_dense = is_exact_dense and is_approx_dense
+        diff_matrix = exact_unitary_matrix - approx_unitary_matrix
 
-        dimension = exact_matrix.shape[0]
-        num_qubits = int(np.log2(dimension))
+        for norm_type in norms_to_compute:
+            if norm_type == 'frobenius':
+                error = np.linalg.norm(diff_matrix, 'fro')
+                logger.info(f"Frobenius norm ||U_exact - U_approx||_F: {error:.6e}")
+                results['matrix_frobenius_error'] = float(error)
 
-        if is_dense:
-            # Small systems: direct computation of ||U_exact - U_approx||
-            logger.verbose(f"Using dense matrices for norm computation (dimension={dimension})")
+            elif norm_type == 'spectral':
+                error = np.linalg.norm(diff_matrix, 2)
+                logger.info(f"Spectral norm ||U_exact - U_approx||_2: {error:.6e}")
+                results['matrix_spectral_error'] = float(error)
 
-            # Get unshifted time-evolution operators from OperatorRepresentation
-            if exact_op is None or approx_op is None:
-                raise RuntimeError(
-                    "Operator representations should have been created but are None. "
-                    "This is an internal error in the operator conversion logic."
-                )
-
-            logger.verbose(f"  Converting H' → U (unshifted, physical)")
-            exact_unitary_matrix = exact_op.get(
-                operator_type='time_evolution',
-                energy_shifted=False,  # Get physical U from H
-                representation='dense_matrix'
-            )
-
-            logger.verbose(f"  Converting U' → U (unshifted, physical)")
-            approx_unitary_matrix = approx_op.get(
-                operator_type='time_evolution',
-                energy_shifted=False,  # Get physical U
-                representation='dense_matrix'
-            )
-
-            # Verify unitarity
-            exact_unitarity_error = compute_unitarity_error(exact_unitary_matrix)
-            approx_unitarity_error = compute_unitarity_error(approx_unitary_matrix)
-            logger.verbose(f"  U_exact unitarity check: ||U†U - I||_F = {exact_unitarity_error:.6e}")
-            logger.verbose(f"  U_approx unitarity check: ||U†U - I||_F = {approx_unitarity_error:.6e}")
-
-            if exact_unitarity_error > 1e-10:
-                logger.warning(
-                    f"WARNING: U_exact unitarity error {exact_unitarity_error:.6e} exceeds 1e-10."
-                )
-            if approx_unitarity_error > 1e-10:
-                logger.warning(
-                    f"WARNING: U_approx unitarity error {approx_unitarity_error:.6e} exceeds 1e-10."
-                )
-
-            diff_matrix = exact_unitary_matrix - approx_unitary_matrix
-
-            for norm_type in norms_to_compute:
-                if norm_type == 'frobenius':
-                    error = np.linalg.norm(diff_matrix, 'fro')
-                    logger.info(f"Frobenius norm ||U_exact - U_approx||_F: {error:.6e}")
-                    results['matrix_frobenius_error'] = float(error)
-
-                elif norm_type == 'spectral':
-                    error = np.linalg.norm(diff_matrix, 2)
-                    logger.info(f"Spectral norm ||U_exact - U_approx||_2: {error:.6e}")
-                    results['matrix_spectral_error'] = float(error)
-
-                else:
-                    raise ValueError(f"Unknown matrix norm type: {norm_type}")
-
-        else:
-            # Matrix-free case: not implemented yet
-            raise NotImplementedError(
-                "Matrix-free matrix norm error analysis not yet implemented. "
-                "Note: Matrix norm errors require O(N²) matrix-vector products in matrix-free "
-                "mode, which may be impractical for very large systems anyway."
-            )
+            else:
+                raise ValueError(f"Unknown matrix norm type: {norm_type}")
 
     # =============================================================================================
     # 3. STATE-DEPENDENT ERRORS: ||U_exact|ψ⟩ - U_approx|ψ⟩||
@@ -325,17 +198,6 @@ def error_analysis(
         state_files = config_analysis.error_state_inputs
 
         logger.info(f"Computing state-dependent errors for {len(state_files)} state(s)")
-
-        # Require matrices to be provided by caller
-        if exact_matrix is None:
-            raise ValueError(
-                "State-dependent error analysis requires the exact Hamiltonian matrix, but it was not computed. "
-            )
-
-        if approx_matrix is None:
-            raise ValueError(
-                "State-dependent error analysis requires the approximate/unitary matrix, but it was not computed. "
-            )
 
         # Get unshifted time-evolution operators (reuse from matrix norm errors if already computed)
         if exact_op is None or approx_op is None:
