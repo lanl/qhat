@@ -155,8 +155,7 @@ class AnalysisConfiguration(ConfigurationBase):
     def __init__(self):
         # Internal (not user-facing) options ______________________________________________________
         # New flexible output API
-        self._matrix_output_requests = []
-        self._eigendecomposition_output_requests = []
+        self._operator_output_requests = []
         # External (user-facing) options __________________________________________________________
         # Do resource estimation (e.g., qubit and gate counts)
         self.resource_estimator = None
@@ -177,140 +176,97 @@ class AnalysisConfiguration(ConfigurationBase):
         self.error_matrix_norms = None
         # Compute error based on reference state(s)
         self.error_state_inputs = None
-    # Write a matrix to a file
-    def save_matrix_to_file(self, filename, operator, form, shift):
+    # Write an operator to a file
+    def save_operator_to_file(self, filename, source, operator_type, energy_shifted, representation):
         """
-        Request saving a matrix to file.
+        Request saving an operator to file.
 
         All parameters are required to ensure explicit specification.
 
         Parameters
         ----------
         filename : str
-            Output filename (e.g., 'H_exact.npz')
-            Supported extensions: .npz, .h5, .hdf5, .txt
-        operator : {'exact', 'approximate'}
+            Output filename (e.g., 'H_exact.npz', 'H_exact_eig.npz')
+            Supported extensions: .npz, .h5, .hdf5, .txt (for matrix representation)
+        source : {'exact', 'approximate'}
             Which operator to save
             'exact' = true Hamiltonian (no approximations)
             'approximate' = algorithm output (Trotter, LCU, etc.)
-        form : {'hamiltonian', 'time_evolution'}
-            Which representation to save
-            'hamiltonian' = Hamiltonian matrix H
-            'time_evolution' = Time-evolution operator U = exp(-i*H*t)
-        shift : {'unshifted', 'shifted'}
+        operator_type : {'hamiltonian', 'time_evolution'}
+            Which operator form to save
+            'hamiltonian' = Hamiltonian matrix H (or its eigenbasis)
+            'time_evolution' = Time-evolution operator U = exp(-i*H*t) (or its eigenbasis)
+        energy_shifted : bool
             Whether to include energy shift
-            'unshifted' = physical energy scale (can have negative eigenvalues)
-            'shifted' = QPE energy scale (all eigenvalues positive)
+            False = physical energy scale (can have negative eigenvalues)
+            True = QPE energy scale (all eigenvalues positive)
+        representation : {'matrix', 'eigendecomposition'}
+            How to store the operator
+            'matrix' = full matrix representation
+            'eigendecomposition' = eigenenergies and eigenvectors
 
-        Examples
-        --------
-        >>> # Save physical Hamiltonian
-        >>> analysis.save_matrix_to_file(
-        ...     filename='H_exact.npz',
-        ...     operator='exact',
-        ...     form='hamiltonian',
-        ...     shift='unshifted'
-        ... )
-
-        >>> # Save approximate time-evolution operator (shifted for QPE)
-        >>> analysis.save_matrix_to_file(
-        ...     filename='U_approx_shifted.npz',
-        ...     operator='approximate',
-        ...     form='time_evolution',
-        ...     shift='shifted'
-        ... )
-        """
-        # Validate inputs
-        self._validate_output_request(filename, operator, form, shift)
-
-        # Store request
-        # TODO: Deduplicate
-        self._matrix_output_requests.append({
-            'filename': filename,
-            'operator': operator,
-            'form': form,
-            'shift': shift
-        })
-    # Write an eigendecomposition to a file
-    def save_eigendecomposition_to_file(self, filename, operator, form, shift):
-        """
-        Request saving an eigendecomposition to file.
-
-        All parameters are required to ensure explicit specification.
-
-        Parameters
-        ----------
-        filename : str
-            Output filename (e.g., 'H_exact_eig.npz')
-            Supported extensions: .npz, .h5, .hdf5
-        operator : {'exact', 'approximate'}
-            Which operator to eigendecompose
-            'exact' = true Hamiltonian (no approximations)
-            'approximate' = algorithm output (Trotter, LCU, etc.)
-        form : {'hamiltonian', 'time_evolution'}
-            Which representation to eigendecompose
-            'hamiltonian' = diagonalize H to get eigenenergies
-            'time_evolution' = diagonalize U and convert phases to energies
-        shift : {'unshifted', 'shifted'}
-            Whether eigenvalues include energy shift
-            'unshifted' = physical energy scale
-            'shifted' = QPE energy scale (shifted eigenvalues)
-
-        Output file contains:
+        Output for representation='eigendecomposition' contains:
             eigenenergies : ndarray
                 Eigenvalues (sorted ascending)
             eigenvectors : ndarray
                 Eigenvectors (columns correspond to eigenvalues)
             metadata : dict
-                operator, form, shift, timestamp, dimension
+                source, operator_type, energy_shifted, timestamp, dimension
 
         Examples
         --------
-        >>> # Save eigendecomposition of physical Hamiltonian
-        >>> analysis.save_eigendecomposition_to_file(
-        ...     filename='H_exact_eig.npz',
-        ...     operator='exact',
-        ...     form='hamiltonian',
-        ...     shift='unshifted'
+        >>> # Save physical Hamiltonian as a matrix
+        >>> analysis.save_operator_to_file(
+        ...     filename='H_exact.npz',
+        ...     source='exact',
+        ...     operator_type='hamiltonian',
+        ...     energy_shifted=False,
+        ...     representation='matrix'
         ... )
 
-        >>> # Save eigendecomposition of approximate unitary
-        >>> analysis.save_eigendecomposition_to_file(
+        >>> # Save approximate time-evolution operator (shifted for QPE) as eigendecomposition
+        >>> analysis.save_operator_to_file(
         ...     filename='U_approx_eig.npz',
-        ...     operator='approximate',
-        ...     form='time_evolution',
-        ...     shift='unshifted'
+        ...     source='approximate',
+        ...     operator_type='time_evolution',
+        ...     energy_shifted=True,
+        ...     representation='eigendecomposition'
         ... )
         """
         # Validate inputs
-        self._validate_output_request(filename, operator, form, shift)
+        self._validate_output_request(filename, source, operator_type, energy_shifted, representation)
 
         # Store request
         # TODO: Deduplicate
-        self._eigendecomposition_output_requests.append({
+        self._operator_output_requests.append({
             'filename': filename,
-            'operator': operator,
-            'form': form,
-            'shift': shift
+            'source': source,
+            'operator_type': operator_type,
+            'energy_shifted': energy_shifted,
+            'representation': representation
         })
 
-    def _validate_output_request(self, filename, operator, form, shift):
+    def _validate_output_request(self, filename, source, operator_type, energy_shifted, representation):
         """Validate output request parameters."""
-        valid_operators = ['exact', 'approximate']
-        valid_forms = ['hamiltonian', 'time_evolution']
-        valid_shifts = ['unshifted', 'shifted']
+        valid_sources = ['exact', 'approximate']
+        valid_operator_types = ['hamiltonian', 'time_evolution']
+        valid_representations = ['matrix', 'eigendecomposition']
 
-        if operator not in valid_operators:
+        if source not in valid_sources:
             raise ValueError(
-                f"operator must be one of {valid_operators}, got '{operator}'"
+                f"source must be one of {valid_sources}, got '{source}'"
             )
-        if form not in valid_forms:
+        if operator_type not in valid_operator_types:
             raise ValueError(
-                f"form must be one of {valid_forms}, got '{form}'"
+                f"operator_type must be one of {valid_operator_types}, got '{operator_type}'"
             )
-        if shift not in valid_shifts:
+        if not isinstance(energy_shifted, bool):
+            raise TypeError(
+                f"energy_shifted must be a boolean, got {type(energy_shifted).__name__}"
+            )
+        if representation not in valid_representations:
             raise ValueError(
-                f"shift must be one of {valid_shifts}, got '{shift}'"
+                f"representation must be one of {valid_representations}, got '{representation}'"
             )
 
         # Validate filename
@@ -334,10 +290,8 @@ class AnalysisConfiguration(ConfigurationBase):
         self.save_if_present(table, "error_matrix_norms")
         self.save_if_present(table, "error_state_inputs")
         self.save_if_present(table, "exact_simulation_inputs")
-        if self._matrix_output_requests:
-            table['matrix_output_requests'] = self._matrix_output_requests
-        if self._eigendecomposition_output_requests:
-            table['eigendecomposition_output_requests'] = self._eigendecomposition_output_requests
+        if self._operator_output_requests:
+            table['operator_output_requests'] = self._operator_output_requests
 
         return table
 

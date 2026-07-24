@@ -176,11 +176,12 @@ def test_eigendecomposition_sorting():
 
     config = AnalysisConfiguration()
     # Use flexible API to request exact eigendecomposition
-    config.save_eigendecomposition_to_file(
+    config.save_operator_to_file(
         filename='exact_eig.npz',
-        operator='exact',
-        form='hamiltonian',
-        shift='unshifted'
+        source='exact',
+        operator_type='hamiltonian',
+        energy_shifted=False,
+        representation='eigendecomposition'
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -211,11 +212,12 @@ def test_eigendecomposition_pauli_z():
     pauli_z = np.array([[1, 0], [0, -1]], dtype=complex)
 
     config = AnalysisConfiguration()
-    config.save_eigendecomposition_to_file(
+    config.save_operator_to_file(
         filename='exact_eig.npz',
-        operator='exact',
-        form='hamiltonian',
-        shift='unshifted'
+        source='exact',
+        operator_type='hamiltonian',
+        energy_shifted=False,
+        representation='eigendecomposition'
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -247,11 +249,12 @@ def test_eigendecomposition_orthonormality():
     matrix = np.array([[2, 1], [1, 2]], dtype=complex)
 
     config = AnalysisConfiguration()
-    config.save_eigendecomposition_to_file(
+    config.save_operator_to_file(
         filename='exact_eig.npz',
-        operator='exact',
-        form='hamiltonian',
-        shift='unshifted'
+        source='exact',
+        operator_type='hamiltonian',
+        energy_shifted=False,
+        representation='eigendecomposition'
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -306,11 +309,12 @@ def test_eigendecomposition_no_timestep_error():
 
     config = AnalysisConfiguration()
     # Use flexible API to request approximate eigendecomposition
-    config.save_eigendecomposition_to_file(
+    config.save_operator_to_file(
         filename='approx_eig.npz',
-        operator='approximate',
-        form='time_evolution',
-        shift='unshifted'
+        source='approximate',
+        operator_type='time_evolution',
+        energy_shifted=False,
+        representation='eigendecomposition'
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:

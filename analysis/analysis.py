@@ -35,8 +35,8 @@ def requires_exact_eigendecomposition(config_analysis: AnalysisConfiguration) ->
     """
     # Check if flexible API requests exact operator eigendecompositions
     has_exact_eigendecomp_request = any(
-        req['operator'] == 'exact'
-        for req in config_analysis._eigendecomposition_output_requests
+        req['source'] == 'exact' and req['representation'] == 'eigendecomposition'
+        for req in config_analysis._operator_output_requests
     )
 
     # Need exact eigendecomposition if:
@@ -64,8 +64,8 @@ def requires_approximate_eigendecomposition(config_analysis: AnalysisConfigurati
     """
     # Check if flexible API requests approximate operator eigendecompositions
     has_approx_eigendecomp_request = any(
-        req['operator'] == 'approximate'
-        for req in config_analysis._eigendecomposition_output_requests
+        req['source'] == 'approximate' and req['representation'] == 'eigendecomposition'
+        for req in config_analysis._operator_output_requests
     )
 
     # Need approximate eigendecomposition if:
@@ -95,8 +95,8 @@ def requires_exact_matrix(config_analysis: AnalysisConfiguration) -> bool:
     """
     # Check if flexible API requests exact operator matrices
     has_exact_flexible_output = any(
-        req['operator'] == 'exact'
-        for req in config_analysis._matrix_output_requests
+        req['source'] == 'exact' and req['representation'] == 'matrix'
+        for req in config_analysis._operator_output_requests
     )
 
     return (
@@ -183,7 +183,7 @@ def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfigura
             config_analysis.algorithm_matrix_output_file = default_filename
 
     # Note: No auto-enabling for exact matrix - users should use flexible API
-    # analysis.save_matrix_to_file(operator='exact', form='hamiltonian', ...)
+    # analysis.save_operator_to_file(source='exact', operator_type='hamiltonian', energy_shifted=False, representation='matrix', ...)
 
 # -------------------------------------------------------------------------------------------------
 
@@ -384,10 +384,7 @@ def analyze_algorithm(
     )
 
     # Check if flexible output API is used
-    flexible_outputs_requested = (
-        config_analysis._matrix_output_requests or
-        config_analysis._eigendecomposition_output_requests
-    )
+    flexible_outputs_requested = bool(config_analysis._operator_output_requests)
 
     # Validate at least one analysis requested
     if (config_analysis.resource_estimator is None and
@@ -406,8 +403,8 @@ def analyze_algorithm(
             "  - error_matrix_norms (e.g., 'frobenius' or ['frobenius', 'spectral'])\n"
             "  - error_state_inputs (e.g., 'state.npy')\n"
             "  - exact_simulation_inputs (e.g., 'state.npy')\n"
-            "  - analysis.save_matrix_to_file(...) - flexible matrix output API\n"
-            "  - analysis.save_eigendecomposition_to_file(...) - flexible eigendecomposition output API"
+            "  - analysis.save_operator_to_file(..., representation='matrix') - flexible matrix output API\n"
+            "  - analysis.save_operator_to_file(..., representation='eigendecomposition') - flexible eigendecomposition output API"
         )
 
     results = {}
@@ -474,8 +471,7 @@ def analyze_algorithm(
     approx_op = None
     needs_operators = (
         error_analysis_requested or
-        len(config_analysis._matrix_output_requests) > 0 or
-        len(config_analysis._eigendecomposition_output_requests) > 0
+        len(config_analysis._operator_output_requests) > 0
     )
     if needs_operators:
         from qhat.analysis.operators import OperatorRepresentation
@@ -528,7 +524,7 @@ def analyze_algorithm(
         )
 
     # Flexible operator outputs
-    if config_analysis._matrix_output_requests or config_analysis._eigendecomposition_output_requests:
+    if config_analysis._operator_output_requests:
         logger.info("Saving requested operator outputs.")
         # Need both exact_matrix and unitary_matrix
         if exact_matrix is None:

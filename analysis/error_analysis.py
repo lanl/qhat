@@ -145,7 +145,7 @@ def error_analysis(
         if exact_matrix is None:
             raise ValueError(
                 "Matrix/state error analysis requires the exact Hamiltonian matrix. "
-                "Use the flexible API: analysis.save_matrix_to_file(operator='exact', ...) "
+                "Use the flexible API: analysis.save_operator_to_file(source='exact', operator_type='hamiltonian', energy_shifted=False, representation='matrix', ...) "
                 "or enable eigendecomposition."
             )
 

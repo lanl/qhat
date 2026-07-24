@@ -396,7 +396,7 @@ def save_requested_operator_outputs(
     }
 
     # Check if any requests exist
-    if not config_analysis._matrix_output_requests and not config_analysis._eigendecomposition_output_requests:
+    if not config_analysis._operator_output_requests:
         return results
 
     # Create OperatorRepresentation wrappers if not provided
@@ -436,90 +436,64 @@ def save_requested_operator_outputs(
         'approximate': approx_op
     }
 
-    # Process matrix output requests
-    for request in config_analysis._matrix_output_requests:
-        op = operators[request['operator']]
-        energy_shifted = (request['shift'] == 'shifted')
+    # Process operator output requests
+    for request in config_analysis._operator_output_requests:
+        op = operators[request['source']]
+        energy_shifted = request['energy_shifted']
+        representation = request['representation']
 
+        shift_str = 'shifted' if energy_shifted else 'unshifted'
         logger.info(
-            f"Saving {request['operator']} {request['form']} "
-            f"({request['shift']}) matrix to {request['filename']}"
+            f"Saving {request['source']} {request['operator_type']} "
+            f"({shift_str}) as {representation} to {request['filename']}"
         )
 
-        matrix = op.get(
-            operator_type=request['form'],
-            energy_shifted=energy_shifted,
-            representation='dense_matrix'
-        )
+        if representation == 'matrix':
+            # Get and save matrix representation
+            matrix = op.get(
+                operator_type=request['operator_type'],
+                energy_shifted=energy_shifted,
+                representation='dense_matrix'
+            )
 
-        # Save with metadata
-        metadata = {
-            'operator': request['operator'],
-            'form': request['form'],
-            'shift': request['shift'],
-            'timestep': timestep,
-            'energy_shift': energy_shift,
-            'timestamp': datetime.datetime.now().isoformat(),
-            'shape': matrix.shape
-        }
+            save_matrix(request['filename'], matrix)
 
-        save_matrix(request['filename'], matrix)
+            results['matrix_outputs'].append({
+                'filename': request['filename'],
+                'source': request['source'],
+                'operator_type': request['operator_type'],
+                'energy_shifted': energy_shifted,
+                'shape': matrix.shape
+            })
 
-        results['matrix_outputs'].append({
-            'filename': request['filename'],
-            'operator': request['operator'],
-            'form': request['form'],
-            'shift': request['shift'],
-            'shape': matrix.shape
-        })
+        elif representation == 'eigendecomposition':
+            # Get and save eigendecomposition representation
+            eigendata = op.get(
+                operator_type=request['operator_type'],
+                energy_shifted=energy_shifted,
+                representation='eigendecomposition'
+            )
 
-    # Process eigendecomposition output requests
-    for request in config_analysis._eigendecomposition_output_requests:
-        op = operators[request['operator']]
-        energy_shifted = (request['shift'] == 'shifted')
+            # Sort by eigenvalues (ascending)
+            sort_indices = np.argsort(eigendata['eigenvalues'].real)
+            eigenvalues_sorted = eigendata['eigenvalues'][sort_indices]
+            eigenvectors_sorted = eigendata['eigenvectors'][:, sort_indices]
 
-        logger.info(
-            f"Saving {request['operator']} {request['form']} "
-            f"({request['shift']}) eigendecomposition to {request['filename']}"
-        )
+            save_eigendecomposition(
+                request['filename'],
+                eigenenergies=eigenvalues_sorted,
+                eigenvectors=eigenvectors_sorted,
+                matrix_type=f"{request['source']}_{request['operator_type']}_{shift_str}",
+                timestep=timestep
+            )
 
-        eigendata = op.get(
-            operator_type=request['form'],
-            energy_shifted=energy_shifted,
-            representation='eigendecomposition'
-        )
-
-        # Sort by eigenvalues (ascending)
-        sort_indices = np.argsort(eigendata['eigenvalues'].real)
-        eigenvalues_sorted = eigendata['eigenvalues'][sort_indices]
-        eigenvectors_sorted = eigendata['eigenvectors'][:, sort_indices]
-
-        # Save with metadata
-        metadata = {
-            'operator': request['operator'],
-            'form': request['form'],
-            'shift': request['shift'],
-            'timestep': timestep,
-            'energy_shift': energy_shift,
-            'timestamp': datetime.datetime.now().isoformat(),
-            'dimension': len(eigenvalues_sorted)
-        }
-
-        save_eigendecomposition(
-            request['filename'],
-            eigenenergies=eigenvalues_sorted,
-            eigenvectors=eigenvectors_sorted,
-            matrix_type=f"{request['operator']}_{request['form']}_{request['shift']}",
-            timestep=timestep
-        )
-
-        results['eigendecomposition_outputs'].append({
-            'filename': request['filename'],
-            'operator': request['operator'],
-            'form': request['form'],
-            'shift': request['shift'],
-            'num_eigenvalues': len(eigenvalues_sorted),
-            'eigenvalue_range': [float(eigenvalues_sorted[0].real), float(eigenvalues_sorted[-1].real)]
-        })
+            results['eigendecomposition_outputs'].append({
+                'filename': request['filename'],
+                'source': request['source'],
+                'operator_type': request['operator_type'],
+                'energy_shifted': energy_shifted,
+                'num_eigenvalues': len(eigenvalues_sorted),
+                'eigenvalue_range': [float(eigenvalues_sorted[0].real), float(eigenvalues_sorted[-1].real)]
+            })
 
     return results
