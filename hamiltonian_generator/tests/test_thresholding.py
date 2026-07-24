@@ -87,7 +87,7 @@ def _synthetic_active_space_molecule():
     This reproduces the active-space ranges used by the original lithium
     fixture without requiring a generated binary artifact.
     """
-    threshold = DEFAULT_COEFFIC_THRESHOLD
+    threshold = DEFAULT_COEFFICIENT_THRESHOLD
     n_spatial_orbitals = 6
 
     molecule = MolecularData(
