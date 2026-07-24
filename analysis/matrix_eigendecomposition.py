@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 # Matrix computation
 # -------------------------------------------------------------------------------------------------
 
+# TODO: Do I need this function?
 def _compute_unitary_matrix(algorithm):
     """
     Compute the unitary matrix representation of the algorithm.
@@ -57,6 +58,7 @@ def _compute_unitary_matrix(algorithm):
 
 # -------------------------------------------------------------------------------------------------
 
+# TODO: Do I need this function?
 def _compute_exact_matrix(hamiltonian, config_analysis):
     """
     Compute the exact matrix representation of the Hamiltonian.
@@ -91,21 +93,13 @@ def _compute_exact_matrix(hamiltonian, config_analysis):
 # Matrix output
 # -------------------------------------------------------------------------------------------------
 
-def output_unitary_matrix(
-        config_analysis: AnalysisConfiguration,
-        algorithm,
-        unitary_matrix) -> dict:
+def output_unitary_matrix(filename, unitary_matrix) -> dict:
     """
-    Generate and save the unitary matrix representation of the full algorithm circuit.
-
-    This saves the complete algorithm as computed by tensor_contract() - for time
-    evolution this is the U_approx operator, for QPE this is the full QPE circuit
-    including prep + controlled-U + inverse QFT.
+    Save unitary matrix to a file
 
     Parameters:
-        config_analysis: Analysis configuration with algorithm_matrix_output_file
-        algorithm: The algorithm bloq to analyze
-        unitary_matrix: The unitary matrix to save (pre-computed)
+        filename: Name of file to save matrix to
+        unitary_matrix: The unitary matrix to save
 
     Returns:
         Dictionary with matrix metadata: shape, file, format, unitarity_error, norm
@@ -127,7 +121,7 @@ def output_unitary_matrix(
         unitarity_error = None
 
     # Save matrix to file (format auto-detected from extension)
-    output_file = config_analysis.algorithm_matrix_output_file
+    output_file = filename
     save_matrix(
         output_file, unitary_matrix,
         unitarity_error=unitarity_error,

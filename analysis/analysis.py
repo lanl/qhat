@@ -364,7 +364,7 @@ def analyze_algorithm(
     ###    )
     ###    if config_analysis.algorithm_matrix_output_file is not None:
     ###        logger.info("Generating algorithm matrix output.")
-    ###        results["matrix_output"] = output_unitary_matrix(config_analysis, algorithm, algorithm_mat)
+    ###        results["matrix_output"] = output_unitary_matrix(config_analysis.algorithm_matrix_output_file, algorithm_mat)
     ###
     ###    # Analysis Category : numerical simulation  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     ###    if config_analysis.numerical_simulation_inputs is not None:
@@ -438,7 +438,7 @@ def analyze_algorithm(
 
     if config_analysis.algorithm_matrix_output_file is not None:
         logger.info("Generating algorithm matrix output.")
-        results["matrix_output"] = output_unitary_matrix(config_analysis, algorithm, unitary_matrix)
+        results["matrix_output"] = output_unitary_matrix(config_analysis.algorithm_matrix_output_file, unitary_matrix)
 
     # exact_matrix_output removed - use flexible API instead
 
