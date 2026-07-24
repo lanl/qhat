@@ -15,8 +15,6 @@ def error_analysis(
         algorithm,
         exact_op,
         approx_op,
-        exact_matrix=None,
-        unitary_matrix=None,
         timestep=None,
         energy_shift=0.0) -> dict:
     """
@@ -52,6 +50,17 @@ def error_analysis(
 
     results = {}
 
+    # TODO: Break into functions for different types of error
+
+    # TODO: Where is this actually needed?
+    # TODO: Should this be energy-shifted or not?
+    exact_matrix = exact_op.get(operator_type="Hamiltonian",
+                                energy_shifted=True,
+                                representation="dense_matrix")
+    approx_matrix = exact_op.get(operator_type="Hamiltonian",
+                                 energy_shifted=True,
+                                 representation="dense_matrix")
+
     # =============================================================================================
     # 1. EIGENENERGY ERROR
     # =============================================================================================
@@ -67,10 +76,9 @@ def error_analysis(
 
         # Get eigenenergies from both decompositions (both already sorted by energy)
         def get_eigenvalues(op):
-            return op.get(
-                    operator_type="Hamiltonian",
-                    energy_shifted=False,
-                    representation="eigendecomposition")["eigenvalues"]
+            return op.get(operator_type="Hamiltonian",
+                          energy_shifted=False,
+                          representation="eigendecomposition")["eigenvalues"]
         exact_eigenenergies = get_eigenvalues(exact_op)
         approx_eigenenergies = get_eigenvalues(approx_op)
 
@@ -128,7 +136,7 @@ def error_analysis(
     # =============================================================================================
     # Available inputs:
     #   - exact_matrix: H_exact (unshifted Hamiltonian, dense matrix or PauliStringOperator)
-    #   - unitary_matrix: U_s,approx (energy-shifted time-evolution operator)
+    #   - approx_matrix: U_s,approx (energy-shifted time-evolution operator)
     #
     # OperatorRepresentation provides unified interface for conversions:
     #   - H ↔ U (Hamiltonian ↔ time-evolution operator)
@@ -152,7 +160,7 @@ def error_analysis(
                 "or enable eigendecomposition."
             )
 
-        if unitary_matrix is None:
+        if approx_matrix is None:
             raise ValueError(
                 "Matrix/state error analysis requires the approximate unitary matrix. "
                 "The algorithm must produce a unitary matrix representation."
@@ -166,7 +174,7 @@ def error_analysis(
 
         # Check if dense or matrix-free
         is_exact_dense = isinstance(exact_matrix, np.ndarray)
-        is_approx_dense = isinstance(unitary_matrix, np.ndarray)
+        is_approx_dense = isinstance(approx_matrix, np.ndarray)
 
         if not (is_exact_dense and is_approx_dense):
             # Matrix-free case: not implemented yet
@@ -184,7 +192,7 @@ def error_analysis(
 
             # Wrap exact Hamiltonian in OperatorRepresentation
             # Note: exact_matrix is H' = H + E*I (shifted up by E to make eigenvalues positive)
-            # unitary_matrix is U' = exp(-i*H'*t) (also uses the shifted Hamiltonian)
+            # approx_matrix is U' = exp(-i*H'*t) (also uses the shifted Hamiltonian)
             # Both are on the shifted scale, and we want to unshift to the physical H for comparison.
             exact_op = OperatorRepresentation(
                 data=exact_matrix,
@@ -198,7 +206,7 @@ def error_analysis(
 
             # Wrap approximate time-evolution operator in OperatorRepresentation
             approx_op = OperatorRepresentation(
-                data=unitary_matrix,
+                data=approx_matrix,
                 operator_type='time_evolution',
                 energy_shifted=True,  # Input IS shifted (U' from H')
                 representation='dense_matrix',
@@ -229,14 +237,14 @@ def error_analysis(
                 "Matrix norm error analysis requires the exact Hamiltonian matrix, but it was not computed. "
             )
 
-        if unitary_matrix is None:
+        if approx_matrix is None:
             raise ValueError(
                 "Matrix norm error analysis requires the approximate/unitary matrix, but it was not computed. "
             )
 
         # Check if matrices are dense or matrix-free
         is_exact_dense = isinstance(exact_matrix, np.ndarray)
-        is_approx_dense = isinstance(unitary_matrix, np.ndarray)
+        is_approx_dense = isinstance(approx_matrix, np.ndarray)
         is_dense = is_exact_dense and is_approx_dense
 
         dimension = exact_matrix.shape[0]
@@ -324,7 +332,7 @@ def error_analysis(
                 "State-dependent error analysis requires the exact Hamiltonian matrix, but it was not computed. "
             )
 
-        if unitary_matrix is None:
+        if approx_matrix is None:
             raise ValueError(
                 "State-dependent error analysis requires the approximate/unitary matrix, but it was not computed. "
             )

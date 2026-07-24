@@ -547,8 +547,6 @@ def analyze_algorithm(
             config_analysis, hamiltonian, algorithm,
             exact_op=exact_op,
             approx_op=approx_op,
-            exact_matrix=exact_matrix,
-            unitary_matrix=unitary_matrix,
             timestep=timestep,
             energy_shift=energy_shift
         )
