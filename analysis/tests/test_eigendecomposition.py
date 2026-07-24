@@ -15,7 +15,7 @@ import tempfile
 import os
 
 from qhat.analysis.file_io import save_eigendecomposition, load_eigendecomposition
-from qhat.analysis.analysis import convert_unitary_eigenvalues_to_eigenenergies
+from qhat.analysis.operators import convert_unitary_eigenvalues_to_eigenenergies
 
 
 # =================================================================================================
@@ -167,7 +167,7 @@ def test_convert_unitary_eigenvalues_multiple():
 
 def test_eigendecomposition_sorting():
     """Test that eigendecomposition results are sorted by eigenenergy."""
-    from qhat.analysis.analysis import eigendecomposition_analysis
+    from qhat.analysis.matrix_eigendecomposition import eigendecomposition_analysis
     from qhat.analysis.config_types import AnalysisConfiguration
 
     # Create diagonal matrix with unsorted eigenvalues
@@ -175,7 +175,13 @@ def test_eigendecomposition_sorting():
     matrix = np.diag(unsorted_energies)
 
     config = AnalysisConfiguration()
-    config.eigendecomposition_matrices = "exact"
+    # Use flexible API to request exact eigendecomposition
+    config.save_eigendecomposition_to_file(
+        filename='exact_eig.npz',
+        operator='exact',
+        form='hamiltonian',
+        shift='unshifted'
+    )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -198,14 +204,19 @@ def test_eigendecomposition_sorting():
 
 def test_eigendecomposition_pauli_z():
     """Test eigendecomposition of Pauli Z matrix."""
-    from qhat.analysis.analysis import eigendecomposition_analysis
+    from qhat.analysis.matrix_eigendecomposition import eigendecomposition_analysis
     from qhat.analysis.config_types import AnalysisConfiguration
 
     # Pauli Z = [[1, 0], [0, -1]], eigenvalues: -1, +1
     pauli_z = np.array([[1, 0], [0, -1]], dtype=complex)
 
     config = AnalysisConfiguration()
-    config.eigendecomposition_matrices = "exact"
+    config.save_eigendecomposition_to_file(
+        filename='exact_eig.npz',
+        operator='exact',
+        form='hamiltonian',
+        shift='unshifted'
+    )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -228,7 +239,7 @@ def test_eigendecomposition_pauli_z():
 
 def test_eigendecomposition_orthonormality():
     """Test that eigenvectors are orthonormal."""
-    from qhat.analysis.analysis import eigendecomposition_analysis
+    from qhat.analysis.matrix_eigendecomposition import eigendecomposition_analysis
     from qhat.analysis.config_types import AnalysisConfiguration
     from qhat.analysis.file_io import load_eigendecomposition
 
@@ -236,7 +247,12 @@ def test_eigendecomposition_orthonormality():
     matrix = np.array([[2, 1], [1, 2]], dtype=complex)
 
     config = AnalysisConfiguration()
-    config.eigendecomposition_matrices = "exact"
+    config.save_eigendecomposition_to_file(
+        filename='exact_eig.npz',
+        operator='exact',
+        form='hamiltonian',
+        shift='unshifted'
+    )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -267,7 +283,7 @@ def test_eigendecomposition_orthonormality():
 
 def test_eigendecomposition_matrix_free_error():
     """Test that matrix-free operators raise appropriate error."""
-    from qhat.analysis.analysis import _eigendecompose_full
+    from qhat.analysis.matrix_eigendecomposition import _eigendecompose_full
     from qhat.analysis.matrix_operations import PauliStringOperator
 
     # Create a mock matrix-free operator
@@ -283,13 +299,19 @@ def test_eigendecomposition_matrix_free_error():
 
 def test_eigendecomposition_no_timestep_error():
     """Test that approximate eigendecomposition without timestep raises error."""
-    from qhat.analysis.analysis import eigendecomposition_analysis
+    from qhat.analysis.matrix_eigendecomposition import eigendecomposition_analysis
     from qhat.analysis.config_types import AnalysisConfiguration
 
     matrix = np.eye(2, dtype=complex)
 
     config = AnalysisConfiguration()
-    config.eigendecomposition_matrices = "approximate"
+    # Use flexible API to request approximate eigendecomposition
+    config.save_eigendecomposition_to_file(
+        filename='approx_eig.npz',
+        operator='approximate',
+        form='time_evolution',
+        shift='unshifted'
+    )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()

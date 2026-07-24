@@ -34,10 +34,9 @@ from qualtran import CtrlSpec
 from qualtran.bloqs.phase_estimation import TextbookQPE, QubitizationQPE
 from qualtran.bloqs.qubitization.qubitization_walk_operator import QubitizationWalkOperator
 
-from pyLIQTR.PhaseEstimation.pe import PhaseEstimation
 from pyLIQTR.qubitization.phase_estimation import QubitizedPhaseEstimation
 
-from qhat.analysis.config_types import AlgorithmConfiguration, GeneralConfiguration
+from qhat.analysis.config_types import AlgorithmConfiguration
 
 logger = logging.getLogger(__name__)
 

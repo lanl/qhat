@@ -121,7 +121,7 @@ def test_matrix_computed_once_for_multiple_analyses():
 
         # Configure both matrix output and numerical simulation
         matrix_output_path = os.path.join(tmpdir, "matrix.npz")
-        config_analysis.matrix_output_file = matrix_output_path
+        config_analysis.algorithm_matrix_output_file = matrix_output_path
 
         input_path = os.path.join(tmpdir, "state.npy")
         state = np.array([1.0, 0.0, 0.0, 0.0], dtype=complex)
@@ -263,7 +263,7 @@ def test_combined_matrix_output_and_simulation():
 
         # Configure both analyses
         matrix_path = os.path.join(tmpdir, "matrix.npz")
-        config_analysis.matrix_output_file = matrix_path
+        config_analysis.algorithm_matrix_output_file = matrix_path
 
         input_path = os.path.join(tmpdir, "state.npy")
         state = np.array([1.0, 0.0, 0.0, 0.0], dtype=complex)
