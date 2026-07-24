@@ -545,14 +545,12 @@ def analyze_algorithm(
         logger.info("Performing error analysis.")
         results["error_analysis"] = error_analysis(
             config_analysis, hamiltonian, algorithm,
+            exact_op=exact_op,
+            approx_op=approx_op,
             exact_matrix=exact_matrix,
             unitary_matrix=unitary_matrix,
-            exact_eigendecomp=exact_op_decomp,
-            approx_eigendecomp=approx_op_decomp,
             timestep=timestep,
-            energy_shift=energy_shift,
-            exact_op=exact_op,
-            approx_op=approx_op
+            energy_shift=energy_shift
         )
 
     if config_analysis.exact_simulation_inputs is not None:

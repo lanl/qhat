@@ -13,14 +13,12 @@ def error_analysis(
         config_analysis: AnalysisConfiguration,
         hamiltonian,
         algorithm,
+        exact_op,
+        approx_op,
         exact_matrix=None,
         unitary_matrix=None,
-        exact_eigendecomp=None,
-        approx_eigendecomp=None,
         timestep=None,
-        energy_shift=0.0,
-        exact_op=None,
-        approx_op=None) -> dict:
+        energy_shift=0.0) -> dict:
     """
     Compute error metrics comparing exact and approximate representations.
 
@@ -61,15 +59,20 @@ def error_analysis(
     if config_analysis.enable_eigenvalue_errors:
         logger.info("Computing eigenenergy errors for all eigenstates")
 
-        if exact_eigendecomp is None or approx_eigendecomp is None:
+        if exact_op is None or approx_op is None:
             raise ValueError(
                 "Both eigendecompositions must be computed in order to compare eigenenergies. "
                 "Use the flexible API to save both eigendecompositions when enable_eigenvalue_errors is True."
             )
 
         # Get eigenenergies from both decompositions (both already sorted by energy)
-        exact_eigenenergies = exact_eigendecomp['eigenvalues']
-        approx_eigenenergies = approx_eigendecomp['eigenvalues']
+        def get_eigenvalues(op):
+            return op.get(
+                    operator_type="Hamiltonian",
+                    energy_shifted=False,
+                    representation="eigendecomposition")["eigenvalues"]
+        exact_eigenenergies = get_eigenvalues(exact_op)
+        approx_eigenenergies = get_eigenvalues(approx_op)
 
         #exact_eigenenergies = exact_op.get(
         #    operator_type='Hamiltonian',
