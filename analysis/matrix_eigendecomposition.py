@@ -287,6 +287,19 @@ def _process_eigendecomposition(matrix, matrix_type, timestep=None, energy_shift
 # Eigendecomposition analysis
 # -------------------------------------------------------------------------------------------------
 
+# eigendecomposition analysis
+# - selectively dispatches to _process_eigendecomposition (the selection appears to be kind of a
+#   mess, so I'm not sure it's reliable and I haven't actually analyzed it in detail)
+# - _process_eigendecomposition
+#   - accepts a matrix
+#   - eigendecomposes the matrix
+#   - knows that approx = shifted time-evolution, exact = shifted Hamiltonian
+#   - converts raw eigenvalues to unshifted eigenenergies
+#   - sorts eigendecomposition by eigenenergies
+#   - write (exact|approximate)_eigendecomposition.npz (with metadata)
+#   - returns some summary metadata (including the list of eigenvalues)
+# - generates *_eigendecomposition.npz, returns metadata including list of eigenvalues
+
 def eigendecomposition_analysis(
         config_analysis: AnalysisConfiguration,
         timestep=None,

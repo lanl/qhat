@@ -68,8 +68,8 @@ def error_analysis(
             )
 
         # Get eigenenergies from both decompositions (both already sorted by energy)
-        exact_eigenenergies = exact_eigendecomp['eigenenergies']
-        approx_eigenenergies = approx_eigendecomp['eigenenergies']
+        exact_eigenenergies = exact_eigendecomp['eigenvalues']
+        approx_eigenenergies = approx_eigendecomp['eigenvalues']
 
         #exact_eigenenergies = exact_op.get(
         #    operator_type='Hamiltonian',

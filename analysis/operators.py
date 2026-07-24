@@ -281,9 +281,9 @@ class OperatorRepresentation:
             )
         eigenvalues = self._convert_eigenvalues(
             eigenvalues,
-            from_type=self._original_type,
+            from_type=self._original_type.lower(),
             from_shifted=self._original_shifted,
-            to_type=operator_type,
+            to_type=operator_type.lower(),
             to_shifted=energy_shifted
         )
 
@@ -451,9 +451,16 @@ class OperatorRepresentation:
                 "Conversion from time-evolution to Hamiltonian operator requires timestep"
             )
 
-        # log(exp(-i*E*t/ℏ)) should give -i*E*t/ℏ, so E = i*ℏ*log(...)/t
-        # np.log uses principal branch with phase in (-π, π]
-        return 1j * self.hbar * np.log(eigenvalues) / self.timestep
+        # get phase in [0, 2π) instead of (-π, π]
+        phase = -1 * np.angle(eigenvalues)
+        phase = np.where(phase < 0, phase + 2*np.pi, phase)
+
+        # convert phase angle to energy eigenvalue
+        H_eigen = phase * self.hbar / self.timestep
+
+        # ensure Hamiltonian eigenvalues are real
+        assert(all(abs(H_eigen.imag) < 1.0e-9 * abs(H_eigen)))
+        return H_eigen.real
 
     def _apply_energy_shift(self, eigenvalues: np.ndarray, operator_type: str) -> np.ndarray:
         """
@@ -466,9 +473,13 @@ class OperatorRepresentation:
         This matches the driver.py convention where energy_shift(+E) adds E to eigenvalues.
         """
         if operator_type == 'hamiltonian':
-            return eigenvalues + self.energy_shift  # FIXED: was - (sign error)
+            return eigenvalues - self.energy_shift
         else:  # time_evolution
-            phase_factor = np.exp(-1j * self.energy_shift * self.timestep / self.hbar)  # FIXED: was +1j
+            phase_factor = np.exp(1j * self.energy_shift * self.timestep / self.hbar)
+            print(f"phase factor = {phase_factor}")
+            print(f"energy shift = {self.energy_shift}")
+            print(f"time step    = {self.timestep}")
+            print(f"hbar         = {self.hbar}")
             return phase_factor * eigenvalues
 
     def _remove_energy_shift(self, eigenvalues: np.ndarray, operator_type: str) -> np.ndarray:
@@ -482,7 +493,11 @@ class OperatorRepresentation:
         This matches the driver.py convention where energy_shift(+E) adds E to eigenvalues.
         """
         if operator_type == 'hamiltonian':
-            return eigenvalues - self.energy_shift  # FIXED: was + (sign error)
+            return eigenvalues + self.energy_shift
         else:  # time_evolution
-            phase_factor = np.exp(1j * self.energy_shift * self.timestep / self.hbar)  # FIXED: was -1j
+            phase_factor = np.exp(-1j * self.energy_shift * self.timestep / self.hbar)
+            print(f"phase factor = {phase_factor}")
+            print(f"energy shift = {self.energy_shift}")
+            print(f"time step    = {self.timestep}")
+            print(f"hbar         = {self.hbar}")
             return phase_factor * eigenvalues

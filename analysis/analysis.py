@@ -439,28 +439,6 @@ def analyze_algorithm(
         logger.info("Performing numerical simulation.")
         results["numerical_simulation"] = numerical_simulation(config_analysis, algorithm, unitary_matrix)
 
-    # Eigendecomposition: single decision point for computing eigendecompositions
-    exact_eigendecomp = None
-    approx_eigendecomp = None
-    if eigendecomposition_requested:
-        logger.info("Performing eigendecomposition analysis.")
-        eig_results = eigendecomposition_analysis(
-            config_analysis,
-            timestep=timestep,
-            energy_shift=energy_shift,
-            exact_matrix=exact_matrix,
-            unitary_matrix=unitary_matrix,
-            requires_exact_eigendecomposition_func=requires_exact_eigendecomposition,
-            requires_approximate_eigendecomposition_func=requires_approximate_eigendecomposition
-        )
-        results["eigendecomposition"] = eig_results
-
-        # Extract eigendecomposition data for use by error_analysis
-        if 'exact_eigendecomposition' in eig_results:
-            exact_eigendecomp = eig_results['exact_eigendecomposition']
-        if 'approximate_eigendecomposition' in eig_results:
-            approx_eigendecomp = eig_results['approximate_eigendecomposition']
-
     # Create OperatorRepresentation instances once for reuse across analyses
     # This avoids redundant eigendecompositions when both error analysis and flexible outputs are requested
     exact_op = None
@@ -498,6 +476,70 @@ def analyze_algorithm(
         )
         logger.verbose("  Created approximate operator representation (U', shifted)")
 
+
+
+    # =============================================================================================
+    # The old method recovers the correct approximate energy eigenvalues.  The new method has a
+    # uniform offset that's not obviously related to the energy shift or time step.
+
+    print("#" * 99)
+
+    # Eigendecomposition: single decision point for computing eigendecompositions
+    exact_eigendecomp = None
+    approx_eigendecomp = None
+    if eigendecomposition_requested:
+        logger.info("Performing eigendecomposition analysis.")
+        eig_results = eigendecomposition_analysis(
+            config_analysis,
+            timestep=timestep,
+            energy_shift=energy_shift,
+            exact_matrix=exact_matrix,
+            unitary_matrix=unitary_matrix,
+            requires_exact_eigendecomposition_func=requires_exact_eigendecomposition,
+            requires_approximate_eigendecomposition_func=requires_approximate_eigendecomposition
+        )
+        results["eigendecomposition"] = eig_results
+
+        # Extract eigendecomposition data for use by error_analysis
+        if 'exact_eigendecomposition' in eig_results:
+            exact_eigendecomp = eig_results['exact_eigendecomposition']
+        if 'approximate_eigendecomposition' in eig_results:
+            approx_eigendecomp = eig_results['approximate_eigendecomposition']
+
+    print("#" * 99)
+
+    exact_op_decomp = exact_op.get(
+            operator_type="Hamiltonian", energy_shifted=False, representation="eigendecomposition")
+    exact_old = sorted(exact_eigendecomp["eigenenergies"])
+    exact_new = sorted(exact_op_decomp["eigenvalues"])
+
+    approx_op_decomp = approx_op.get(
+            operator_type="Hamiltonian", energy_shifted=False, representation="eigendecomposition")
+    approx_old = sorted(approx_eigendecomp["eigenenergies"])
+    approx_new = sorted(approx_op_decomp["eigenvalues"])
+
+    assert(len(exact_old) == len(exact_new))
+    assert(len(exact_old) == len(approx_old))
+    assert(len(approx_old) == len(approx_new))
+    print("#" * 99)
+    print(f'{"    EXACT ENERGY EIGENVALUES":<39}'
+          f'{"    APPROXIMATE ENERGY EIGENVALUES":<39}')
+    import numpy as np
+    for n in range(len(exact_old)):
+        print(f"   {exact_old[n]:10.3e}"
+              f"   {exact_new[n]:10.3e}"
+              f"   {exact_new[n]-exact_old[n]:10.3e}"
+              f"   {approx_old[n]:10.3e}"
+              f"   {approx_new[n]:10.3e}"
+              f"   {approx_new[n]-approx_old[n]:10.3e}")
+    print("#" * 99)
+
+    # =============================================================================================
+
+
+
+
+
     # Error analysis: receives eigendecomposition data, does not recompute
     if error_analysis_requested:
         logger.info("Performing error analysis.")
@@ -505,8 +547,8 @@ def analyze_algorithm(
             config_analysis, hamiltonian, algorithm,
             exact_matrix=exact_matrix,
             unitary_matrix=unitary_matrix,
-            exact_eigendecomp=exact_eigendecomp,
-            approx_eigendecomp=approx_eigendecomp,
+            exact_eigendecomp=exact_op_decomp,
+            approx_eigendecomp=approx_op_decomp,
             timestep=timestep,
             energy_shift=energy_shift,
             exact_op=exact_op,
@@ -520,6 +562,7 @@ def analyze_algorithm(
         )
 
     # Flexible operator outputs
+    # TODO: Why are we extracting a private data value?  Is it private just to "hide" it from users?
     if config_analysis._operator_output_requests:
         logger.info("Saving requested operator outputs.")
         # Need both exact_matrix and unitary_matrix
