@@ -369,55 +369,6 @@ development are may not be reliable yet.
   np.save("initial_state.npy", psi)
   ```
 
-#### Exact Numerical Simulation
-
-- **Exact Numerical Simulation**: Setting `analysis.exact_simulation_inputs` to one or more state
-  vector files will apply the **exact Hamiltonian matrix** (without Trotter or other
-  approximations) to the input state(s), producing output state(s).
-
-  **Purpose**: Compare exact time evolution with approximate algorithm results
-
-  **Input format**: Same as approximate simulation (NumPy `.npy` format). Input can be:
-  - Single filename (string): `"initial_state.npy"`
-  - Multiple filenames (list): `["state1.npy", "state2.npy", "state3.npy"]`
-
-  **Output naming**: Automatic suffix `_exact_final` is added to input filename:
-  - `initial_state.npy` → `initial_state_exact_final.npy`
-  - This distinguishes from approximate simulation output (`_final`)
-
-  **Scaling**: Can reach 25-30 qubits using matrix-free operators from Branch 1
-  - For large systems, uses `PauliStringOperator` (matrix-free)
-  - Memory: O(2^N) for state vectors, not O(2^(2N)) for matrices
-  - Computation time depends on number of Pauli terms in Hamiltonian
-
-  **Example**:
-  ```python
-  # Single state exact simulation
-  analysis.exact_simulation_inputs = "initial_state.npy"
-
-  # Multiple states
-  analysis.exact_simulation_inputs = [
-      "ground_state.npy",
-      "excited_state.npy",
-      "superposition.npy"
-  ]
-  ```
-
-  **Comparing exact vs approximate**:
-  You can run both simulations on the same input states:
-  ```python
-  # Run both approximate and exact simulations
-  analysis.numerical_simulation_inputs = "initial_state.npy"
-  analysis.exact_simulation_inputs = "initial_state.npy"
-  
-  # Produces:
-  #   initial_state_final.npy       (approximate result)
-  #   initial_state_exact_final.npy (exact result)
-  # Then manually compare the output states
-  ```
-
-  **Note**: State vectors must be compatible with Hamiltonian dimension (2^N)
-
 ## Generated Files
 
 The script will print a log both to the screen and to a logfile. It also generates output files

@@ -3,7 +3,7 @@ import logging
 from qhat.analysis.config_types import AnalysisConfiguration
 from qhat.analysis.resource_estimation import estimate_resources
 from qhat.analysis.error_analysis import error_analysis
-from qhat.analysis.numerical_simulation import numerical_simulation, exact_numerical_simulation
+from qhat.analysis.numerical_simulation import numerical_simulation
 from qhat.analysis.matrix_eigendecomposition import (
     _compute_unitary_matrix,
     _compute_exact_matrix,
@@ -212,8 +212,6 @@ def analyze_algorithm(
 
     # Note: Configuration validation happens in driver.py before Hamiltonian is loaded
 
-    ###    # TODO: exact_simulation_inputs is not None -- warn that this is not correctly implemented
-    ###
     ###    # Aggregate options to help summarize options _________________________________________________
     ###
     ###    # TODO: Should some of these be methods of config_analysis?
@@ -388,7 +386,6 @@ def analyze_algorithm(
         config_analysis.numerical_simulation_inputs is None and
         not eigendecomposition_requested and
         not error_analysis_requested and
-        config_analysis.exact_simulation_inputs is None and
         not flexible_outputs_requested):
         raise ValueError(
             "No analyses requested. Set at least one of:\n"
@@ -398,7 +395,6 @@ def analyze_algorithm(
             "  - enable_eigenvalue_errors (True to compute errors for all eigenvalues)\n"
             "  - error_matrix_norms (e.g., 'frobenius' or ['frobenius', 'spectral'])\n"
             "  - error_state_inputs (e.g., 'state.npy')\n"
-            "  - exact_simulation_inputs (e.g., 'state.npy')\n"
             "  - analysis.save_operator_to_file(..., representation='matrix') - flexible matrix output API\n"
             "  - analysis.save_operator_to_file(..., representation='eigendecomposition') - flexible eigendecomposition output API"
         )
@@ -487,12 +483,6 @@ def analyze_algorithm(
             energy_shift=energy_shift
         )
 
-    if config_analysis.exact_simulation_inputs is not None:
-        logger.info("Performing exact numerical simulation.")
-        results["exact_simulation"] = exact_numerical_simulation(
-            config_analysis, hamiltonian, exact_matrix
-        )
-
     # Flexible operator outputs
     # TODO: Why are we extracting a private data value?  Is it private just to "hide" it from users?
     if config_analysis._operator_output_requests:
@@ -522,6 +512,11 @@ def analyze_algorithm(
 
     # TODO: Add gate parallelism / gate depth analysis
     # TODO: Would it be useful to analyze in terms of a different basis (e.g., Toffoli gates)?
+
+
+
+
+
 
 
     # =============================================================================================

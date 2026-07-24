@@ -163,9 +163,7 @@ class AnalysisConfiguration(ConfigurationBase):
         self.algorithm_matrix_output_file = None
         # Do numerical simulation with the provided starting state(s)
         # -- numerical_simulation_inputs: using the constructed algorithm
-        # -- exact_simulation_inputs: currently not doing what would be expected
         self.numerical_simulation_inputs = None
-        self.exact_simulation_inputs = None
         # Memory threshold above which dense matrices are no longer generated
         # - Switch to matrix-free representation, which disables some features such as saving
         #   matrices or eigendecompositions
@@ -289,7 +287,6 @@ class AnalysisConfiguration(ConfigurationBase):
         self.save_if_present(table, "enable_eigenvalue_errors")
         self.save_if_present(table, "error_matrix_norms")
         self.save_if_present(table, "error_state_inputs")
-        self.save_if_present(table, "exact_simulation_inputs")
         if self._operator_output_requests:
             table['operator_output_requests'] = self._operator_output_requests
 
