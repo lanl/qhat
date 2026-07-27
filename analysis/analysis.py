@@ -319,6 +319,8 @@ def analyze_algorithm(
     # Perform analyses ____________________________________________________________________________
 
     # Analysis Category : resource estimation _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    # TODO: Add gate parallelism / gate depth analysis
+    # TODO: Would it be useful to analyze in terms of a different basis (e.g., Toffoli gates)?
     if config_analysis.resource_estimator is not None:
         # TODO: Modify to allow resource estimation with multiple approaches
         logger.info(f"Performing resource estimation using {config_analysis.resource_estimator}.")
@@ -355,84 +357,7 @@ def analyze_algorithm(
         results["numerical_simulation"] = \
             numerical_simulation(config_analysis, algorithm, algorithm_mat)
 
-
-
-
-
-
-
-    logger.info("END OF NEW ANALYSIS / START OF OLD ANALYSIS")
-
-
-
-
-
-
-
-
-
-    # TODO: Add gate parallelism / gate depth analysis
-    # TODO: Would it be useful to analyze in terms of a different basis (e.g., Toffoli gates)?
-
-
-
-
-
-
-
-    # =============================================================================================
-    # TODO: Figure out the problem with the new method's approximate energy eigenvalue.
-    # The old method recovers the correct approximate energy eigenvalues.  The new method has a
-    # uniform offset that's not obviously related to the energy shift or time step.
-
-    print("#" * 99)
-
-    eig_results = eigendecomposition_analysis(
-        config_analysis,
-        tevol_hbar=timestep,
-        energy_shift=energy_shift,
-        exact_matrix=exact_matrix,
-        unitary_matrix=approx_matrix,
-        requires_exact_eigendecomposition_func=requires_exact_eigendecomposition,
-        requires_approximate_eigendecomposition_func=requires_approximate_eigendecomposition
-    )
-    exact_eigendecomp = eig_results['exact_eigendecomposition']
-    approx_eigendecomp = eig_results['approximate_eigendecomposition']
-
-    print("#" * 99)
-
-    exact_op_decomp = exact_op.get(
-            operator_type="Hamiltonian", energy_shifted=False, representation="eigendecomposition")
-    exact_old = sorted(exact_eigendecomp["eigenenergies"])
-    exact_new = sorted(exact_op_decomp["eigenvalues"])
-
-    approx_op_decomp = approx_op.get(
-            operator_type="Hamiltonian", energy_shifted=False, representation="eigendecomposition")
-    approx_old = sorted(approx_eigendecomp["eigenenergies"])
-    approx_new = sorted(approx_op_decomp["eigenvalues"])
-
-    assert(len(exact_old) == len(exact_new))
-    assert(len(exact_old) == len(approx_old))
-    assert(len(approx_old) == len(approx_new))
-    print("#" * 99)
-    print(f'{"    EXACT ENERGY EIGENVALUES":<39}'
-          f'{"    APPROXIMATE ENERGY EIGENVALUES":<39}')
-    import numpy as np
-    for n in range(len(exact_old)):
-        print(f"   {exact_old[n]:10.3e}"
-              f"   {exact_new[n]:10.3e}"
-              f"   {exact_new[n]-exact_old[n]:10.3e}"
-              f"   {approx_old[n]:10.3e}"
-              f"   {approx_new[n]:10.3e}"
-              f"   {approx_new[n]-approx_old[n]:10.3e}")
-    print("#" * 99)
-
-    # =============================================================================================
-
-
-
-
-
+    # Epiloque ____________________________________________________________________________________
 
     logger.info("Algorithm analysis complete.")
 
