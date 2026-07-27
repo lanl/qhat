@@ -465,12 +465,6 @@ class OperatorRepresentation:
     def _apply_energy_shift(self, eigenvalues: np.ndarray, operator_type: str) -> np.ndarray:
         """
         Apply energy shift to eigenvalues.
-
-        CONVENTION CHANGE (2026-07-21): Now matches hamiltonian.py driver convention.
-        For Hamiltonians: H_shifted = H + E*I, so λ_shifted = λ + E
-        For time-evolution: U_shifted = exp(-i*E*t/ℏ)*U, so λ_U_shifted = exp(-i*E*t/ℏ)*λ_U
-
-        This matches the driver.py convention where energy_shift(+E) adds E to eigenvalues.
         """
         if operator_type == 'hamiltonian':
             return eigenvalues - self.energy_shift
@@ -485,12 +479,6 @@ class OperatorRepresentation:
     def _remove_energy_shift(self, eigenvalues: np.ndarray, operator_type: str) -> np.ndarray:
         """
         Remove energy shift from eigenvalues (inverse of _apply_energy_shift).
-
-        CONVENTION CHANGE (2026-07-21): Now matches hamiltonian.py driver convention.
-        For Hamiltonians: H = H_shifted - E*I, so λ = λ_shifted - E
-        For time-evolution: U = exp(+i*E*t/ℏ)*U_shifted, so λ_U = exp(+i*E*t/ℏ)*λ_U_shifted
-
-        This matches the driver.py convention where energy_shift(+E) adds E to eigenvalues.
         """
         if operator_type == 'hamiltonian':
             return eigenvalues + self.energy_shift
