@@ -190,21 +190,21 @@ def _eigendecompose_full(matrix, matrix_type):
 
 # -------------------------------------------------------------------------------------------------
 
-def _process_eigendecomposition(matrix, matrix_type, timestep=None, energy_shift=0.0):
+def _process_eigendecomposition(matrix, matrix_type, tevol_hbar=None, energy_shift=0.0):
     """
     Process full eigendecomposition: compute, convert (if unitary), sort, save, and return data.
 
     Args:
         matrix: Matrix to decompose (dense array, matrix-free not supported)
         matrix_type: String describing the matrix type ('exact' or 'approximate')
-        timestep: Required for matrix_type='approximate' to convert phases to eigenenergies
+        tevol_hbar: Required for matrix_type='approximate' to convert phases to eigenenergies
         energy_shift: Energy shift to add back to eigenenergies (for comparison on same scale)
 
     Returns:
         Dictionary with eigenenergies, eigenvectors, file path, and metadata
 
     Raises:
-        ValueError: If matrix is None or if timestep not provided for approximate
+        ValueError: If matrix is None or if tevol_hbar not provided for approximate
     """
     logger.info(f"Computing {matrix_type} matrix eigendecomposition (full spectrum)")
 
@@ -219,12 +219,12 @@ def _process_eigendecomposition(matrix, matrix_type, timestep=None, energy_shift
 
     # Convert to eigenenergies and sort
     if matrix_type == 'approximate':
-        if timestep is None:
-            raise ValueError("timestep is required for approximate eigendecomposition to convert phases to eigenenergies")
+        if tevol_hbar is None:
+            raise ValueError("tevol_hbar is required for approximate eigendecomposition to convert phases to eigenenergies")
 
         # Convert unitary eigenvalues to eigenenergies
         eigenenergies, eigenphases = convert_unitary_eigenvalues_to_eigenenergies(
-            eigenvalues_raw, timestep
+            eigenvalues_raw, tevol_hbar
         )
 
         # Apply energy shift correction to restore original energy scale
@@ -247,7 +247,7 @@ def _process_eigendecomposition(matrix, matrix_type, timestep=None, energy_shift
             eigenenergies=eigenenergies_sorted,
             eigenvectors=eigenvectors_sorted,
             matrix_type=matrix_type,
-            timestep=timestep,
+            timestep=tevol_hbar,
             unitary_eigenvalues=eigenvalues_raw,
             eigenphases=eigenphases
         )
@@ -302,7 +302,7 @@ def _process_eigendecomposition(matrix, matrix_type, timestep=None, energy_shift
 
 def eigendecomposition_analysis(
         config_analysis: AnalysisConfiguration,
-        timestep=None,
+        tevol_hbar=None,
         energy_shift=0.0,
         exact_matrix=None,
         unitary_matrix=None,
@@ -316,7 +316,7 @@ def eigendecomposition_analysis(
 
     Parameters:
         config_analysis: Analysis configuration with eigendecomposition settings
-        timestep: Time evolution parameter (required for approximate eigendecomposition)
+        tevol_hbar: Time evolution parameter (required for approximate eigendecomposition)
         energy_shift: Energy shift applied to Hamiltonian (added back to eigenenergies for comparison)
         exact_matrix: Pre-computed exact matrix (required if eigendecomposition_matrices is 'exact' or 'both')
         unitary_matrix: Pre-computed unitary matrix (required if eigendecomposition_matrices is 'approximate' or 'both')
@@ -327,7 +327,7 @@ def eigendecomposition_analysis(
         Dictionary with eigendecomposition data (eigenenergies, eigenvectors) and metadata
 
     Raises:
-        ValueError: If required matrices or timestep are not provided
+        ValueError: If required matrices or tevol_hbar are not provided
     """
     # Determine which eigendecompositions need to be computed
     # Use requires_* functions to check if eigendecompositions are needed
@@ -357,13 +357,13 @@ def eigendecomposition_analysis(
     # Compute exact eigendecomposition if requested
     if need_exact:
         results['exact_eigendecomposition'] = _process_eigendecomposition(
-            exact_matrix, 'exact', timestep=None, energy_shift=energy_shift
+            exact_matrix, 'exact', tevol_hbar=None, energy_shift=energy_shift
         )
 
     # Compute approximate eigendecomposition if requested
     if need_approx:
         results['approximate_eigendecomposition'] = _process_eigendecomposition(
-            unitary_matrix, 'approximate', timestep=timestep, energy_shift=energy_shift
+            unitary_matrix, 'approximate', tevol_hbar=tevol_hbar, energy_shift=energy_shift
         )
 
     return results
@@ -454,7 +454,7 @@ def save_requested_operator_outputs(
                 eigenenergies=eigenvalues_sorted,
                 eigenvectors=eigenvectors_sorted,
                 matrix_type=f"{request['source']}_{request['operator_type']}_{shift_str}",
-                timestep=approx_op.timestep
+                timestep=approx_op.tevol_hbar
             )
 
             results['eigendecomposition_outputs'].append({

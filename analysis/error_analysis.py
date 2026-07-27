@@ -31,7 +31,7 @@ def error_analysis(
         algorithm: Algorithm bloq
         exact_eigendecomp: Pre-computed exact eigendecomposition (optional)
         approx_eigendecomp: Pre-computed approximate eigendecomposition (optional)
-        timestep: Time evolution parameter t (required for matrix/state errors).
+        timestep: Time evolution parameter t/ħ (required for matrix/state errors).
                   Used to compute U_exact = exp(-i * H_exact * t) from H_exact.
         energy_shift: Energy shift E applied to approximate Hamiltonian (default: 0.0).
                       Used to match global phases: U_exact_shifted = exp(i*E*t) * U_exact.

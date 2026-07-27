@@ -55,7 +55,7 @@ def create_identical_operator_representations(t=1.0):
         operator_type='hamiltonian',
         energy_shifted=False,
         representation='dense_matrix',
-        timestep=t
+        tevol_hbar=t
     )
 
     approx_op = OperatorRepresentation(
@@ -63,7 +63,7 @@ def create_identical_operator_representations(t=1.0):
         operator_type='hamiltonian',
         energy_shifted=False,
         representation='dense_matrix',
-        timestep=t
+        tevol_hbar=t
     )
 
     return exact_op, approx_op
@@ -83,7 +83,7 @@ def create_different_operator_representations(t=1.0):
         operator_type='hamiltonian',
         energy_shifted=False,
         representation='dense_matrix',
-        timestep=t
+        tevol_hbar=t
     )
 
     approx_op = OperatorRepresentation(
@@ -91,7 +91,7 @@ def create_different_operator_representations(t=1.0):
         operator_type='hamiltonian',
         energy_shifted=False,
         representation='dense_matrix',
-        timestep=t
+        tevol_hbar=t
     )
 
     return exact_op, approx_op
@@ -122,7 +122,7 @@ def test_eigenenergy_error_zero_when_identical():
                 operator_type='hamiltonian',
                 energy_shifted=False,
                 representation='eigendecomposition',
-                timestep=1.0
+                tevol_hbar=1.0
             )
 
             approx_op = OperatorRepresentation(
@@ -130,7 +130,7 @@ def test_eigenenergy_error_zero_when_identical():
                 operator_type='hamiltonian',
                 energy_shifted=False,
                 representation='eigendecomposition',
-                timestep=1.0
+                tevol_hbar=1.0
             )
 
             # Compute errors
@@ -177,7 +177,7 @@ def test_eigenenergy_error_nonzero_when_different():
                 operator_type='hamiltonian',
                 energy_shifted=False,
                 representation='eigendecomposition',
-                timestep=1.0
+                tevol_hbar=1.0
             )
 
             approx_op = OperatorRepresentation(
@@ -185,7 +185,7 @@ def test_eigenenergy_error_nonzero_when_different():
                 operator_type='hamiltonian',
                 energy_shifted=False,
                 representation='eigendecomposition',
-                timestep=1.0
+                tevol_hbar=1.0
             )
 
             # Compute errors
@@ -509,7 +509,7 @@ def test_all_error_types_together():
                 operator_type='hamiltonian',
                 energy_shifted=False,
                 representation='dense_matrix',
-                timestep=t
+                tevol_hbar=t
             )
 
             approx_op = OperatorRepresentation(
@@ -517,7 +517,7 @@ def test_all_error_types_together():
                 operator_type='hamiltonian',
                 energy_shifted=False,
                 representation='dense_matrix',
-                timestep=t
+                tevol_hbar=t
             )
 
             # Save state
@@ -563,7 +563,7 @@ def test_error_output_file_created():
                 operator_type='hamiltonian',
                 energy_shifted=False,
                 representation='eigendecomposition',
-                timestep=1.0
+                tevol_hbar=1.0
             )
 
             approx_op = OperatorRepresentation(
@@ -571,7 +571,7 @@ def test_error_output_file_created():
                 operator_type='hamiltonian',
                 energy_shifted=False,
                 representation='eigendecomposition',
-                timestep=1.0
+                tevol_hbar=1.0
             )
 
             # Compute errors
@@ -637,7 +637,7 @@ def test_missing_state_file():
         operator_type='hamiltonian',
         energy_shifted=False,
         representation='dense_matrix',
-        timestep=1.0
+        tevol_hbar=1.0
     )
 
     approx_op = OperatorRepresentation(
@@ -645,7 +645,7 @@ def test_missing_state_file():
         operator_type='hamiltonian',
         energy_shifted=False,
         representation='dense_matrix',
-        timestep=1.0
+        tevol_hbar=1.0
     )
 
     config = AnalysisConfiguration()
@@ -749,7 +749,7 @@ def test_eigenvalue_relative_error():
                 operator_type='hamiltonian',
                 energy_shifted=False,
                 representation='eigendecomposition',
-                timestep=1.0
+                tevol_hbar=1.0
             )
 
             approx_op = OperatorRepresentation(
@@ -757,7 +757,7 @@ def test_eigenvalue_relative_error():
                 operator_type='hamiltonian',
                 energy_shifted=False,
                 representation='eigendecomposition',
-                timestep=1.0
+                tevol_hbar=1.0
             )
 
             results = error_analysis(
@@ -794,7 +794,7 @@ def test_state_relative_error():
         operator_type='hamiltonian',
         energy_shifted=False,
         representation='dense_matrix',
-        timestep=t
+        tevol_hbar=t
     )
 
     approx_op = OperatorRepresentation(
@@ -802,7 +802,7 @@ def test_state_relative_error():
         operator_type='hamiltonian',
         energy_shifted=False,
         representation='dense_matrix',
-        timestep=t
+        tevol_hbar=t
     )
 
     config = AnalysisConfiguration()

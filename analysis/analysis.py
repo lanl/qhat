@@ -284,7 +284,7 @@ def analyze_algorithm(
             operator_type='hamiltonian',
             energy_shifted=True,
             representation='dense_matrix',
-            timestep=timestep,
+            tevol_hbar=timestep,
             energy_shift=energy_shift
         )
         logger.info("Created exact operator representation")
@@ -307,7 +307,7 @@ def analyze_algorithm(
             operator_type='time_evolution',
             energy_shifted=True,
             representation='dense_matrix',
-            timestep=timestep,
+            tevol_hbar=timestep,
             energy_shift=energy_shift
         )
         logger.info("Created approximate operator representation")
@@ -389,7 +389,7 @@ def analyze_algorithm(
 
     eig_results = eigendecomposition_analysis(
         config_analysis,
-        timestep=timestep,
+        tevol_hbar=timestep,
         energy_shift=energy_shift,
         exact_matrix=exact_matrix,
         unitary_matrix=approx_matrix,

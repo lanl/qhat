@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # Conversion Utilities
 # =================================================================================================
 
-def convert_unitary_eigenvalues_to_eigenenergies(unitary_eigenvalues, timestep, hbar=1.0):
+def convert_unitary_eigenvalues_to_eigenenergies(unitary_eigenvalues, tevol_hbar):
     """
     Convert unitary eigenvalues e^(-iφ) to Hamiltonian eigenenergies E.
 
@@ -35,8 +35,7 @@ def convert_unitary_eigenvalues_to_eigenenergies(unitary_eigenvalues, timestep, 
 
     Parameters:
         unitary_eigenvalues: Complex eigenvalues of unitary U = exp(-iHt/ℏ) (on unit circle)
-        timestep: Time evolution parameter t (units: ℏ/energy, e.g., ℏ/Hartree)
-        hbar: Value of ℏ (default: 1.0 for atomic units)
+        tevol_hbar: Time evolution parameter t/ℏ (units: 1/energy, e.g., 1/Hartree)
 
     Returns:
         tuple: (eigenenergies, eigenphases)
@@ -51,7 +50,7 @@ def convert_unitary_eigenvalues_to_eigenenergies(unitary_eigenvalues, timestep, 
     eigenphases = -theta
 
     # Convert to eigenenergies: E = φ * ℏ / t
-    eigenenergies = eigenphases * hbar / timestep
+    eigenenergies = eigenphases / tevol_hbar
 
     return eigenenergies, eigenphases
 
@@ -84,7 +83,7 @@ class OperatorRepresentation:
     ...     operator_type='hamiltonian',
     ...     energy_shifted=False,
     ...     representation='dense_matrix',
-    ...     timestep=1.0
+    ...     tevol_hbar=1.0
     ... )
     >>>
     >>> # Get as unshifted time-evolution operator
@@ -109,9 +108,8 @@ class OperatorRepresentation:
         operator_type: Literal['hamiltonian', 'time_evolution'],
         energy_shifted: bool = False,
         representation: Literal['dense_matrix', 'eigendecomposition'] = 'dense_matrix',
-        timestep: Optional[float] = None,
+        tevol_hbar: Optional[float] = None,
         energy_shift: float = 0.0,
-        hbar: float = 1.0
     ):
         """
         Initialize from a known representation.
@@ -128,12 +126,10 @@ class OperatorRepresentation:
             Whether this representation includes an energy shift (default: False)
         representation : {'dense_matrix', 'eigendecomposition'}, optional
             The form of the input data (default: 'dense_matrix')
-        timestep : float, optional
+        tevol_hbar: float, optional
             Time evolution parameter t, required for converting between H and U
         energy_shift : float, optional
             Energy shift value E (default: 0.0, meaning no shift)
-        hbar : float, optional
-            Value of ℏ in natural units (default: 1.0)
 
         Raises
         ------
@@ -147,9 +143,8 @@ class OperatorRepresentation:
         self._original_repr = representation
 
         # Store parameters
-        self.timestep = timestep
+        self.tevol_hbar = tevol_hbar
         self.energy_shift = energy_shift
-        self.hbar = hbar
 
         # Validate data format
         if representation == 'dense_matrix':
@@ -189,7 +184,7 @@ class OperatorRepresentation:
         logger.info(
             f"OperatorRepresentation created: type={operator_type}, "
             f"shifted={energy_shifted}, repr={representation}, dim={dim}, "
-            f"timestep={timestep}, E_shift={energy_shift}"
+            f"timestep/hbar={tevol_hbar}, E_shift={energy_shift}"
         )
 
     def get(
@@ -220,7 +215,7 @@ class OperatorRepresentation:
         Raises
         ------
         ValueError
-            If conversion requires timestep but it was not provided
+            If conversion requires tevol_hbar but it was not provided
 
         Notes
         -----
@@ -387,7 +382,7 @@ class OperatorRepresentation:
         3. Remove energy shift if not desired: λ_shifted → λ_unshifted
 
         The energy shift centers eigenvalues around zero, placing them in the range
-        [-dE, +dE] where dE is the one-norm bound. With timestep t/ℏ = π/dE, this
+        [-dE, +dE] where dE is the one-norm bound. With tevol_hbar t/ℏ = π/dE, this
         maps shifted eigenvalues to phases in [-π, +π], which matches np.angle()'s
         output range directly. This eliminates the need for phase wrapping and correctly
         handles the logarithm branch cut.
@@ -435,11 +430,11 @@ class OperatorRepresentation:
 
         U = exp(-i*H*t/ℏ), so λ_U = exp(-i*λ_H*t/ℏ)
         """
-        if self.timestep is None:
+        if self.tevol_hbar is None:
             raise ValueError(
-                "Conversion from Hamiltonian to time-evolution operator requires timestep"
+                "Conversion from Hamiltonian to time-evolution operator requires tevol_hbar"
             )
-        return np.exp(-1j * eigenvalues * self.timestep / self.hbar)
+        return np.exp(-1j * eigenvalues * self.tevol_hbar)
 
     def _time_evolution_to_hamiltonian(self, eigenvalues: np.ndarray) -> np.ndarray:
         """
@@ -454,13 +449,13 @@ class OperatorRepresentation:
         We use θ = angle(λ_U) ∈ (-π, π] from the principal branch of the logarithm.
 
         The Hamiltonian is energy-shifted to center eigenvalues around zero, placing
-        them in the range [-dE, +dE] where dE is the one-norm bound. With timestep
+        them in the range [-dE, +dE] where dE is the one-norm bound. With tevol_hbar
         t/ℏ = π/dE, this maps eigenvalues to phases in [-π, +π], which matches the
         output range of np.angle() directly - no phase wrapping needed!
         """
-        if self.timestep is None:
+        if self.tevol_hbar is None:
             raise ValueError(
-                "Conversion from time-evolution to Hamiltonian operator requires timestep"
+                "Conversion from time-evolution to Hamiltonian operator requires tevol_hbar"
             )
 
         # Extract phase angle: θ = angle(U) ∈ (-π, π]
@@ -468,7 +463,7 @@ class OperatorRepresentation:
         phase = -1 * np.angle(eigenvalues)
 
         # Convert phase angle to energy eigenvalue (no wrapping needed!)
-        H_eigen = phase * self.hbar / self.timestep
+        H_eigen = phase / self.tevol_hbar
 
         # ensure Hamiltonian eigenvalues are real
         assert(all(abs(H_eigen.imag) < 1.0e-9 * abs(H_eigen)))
@@ -481,11 +476,10 @@ class OperatorRepresentation:
         if operator_type == 'hamiltonian':
             return eigenvalues + self.energy_shift
         else:  # time_evolution
-            phase_factor = np.exp(-1j * self.energy_shift * self.timestep / self.hbar)
-            print(f"phase factor = {phase_factor}")
-            print(f"energy shift = {self.energy_shift}")
-            print(f"time step    = {self.timestep}")
-            print(f"hbar         = {self.hbar}")
+            phase_factor = np.exp(-1j * self.energy_shift * self.tevol_hbar)
+            print(f"phase factor     = {phase_factor}")
+            print(f"energy shift     = {self.energy_shift}")
+            print(f"time step / hbar = {self.tevol_hbar}")
             return phase_factor * eigenvalues
 
     def _remove_energy_shift(self, eigenvalues: np.ndarray, operator_type: str) -> np.ndarray:
@@ -495,9 +489,8 @@ class OperatorRepresentation:
         if operator_type == 'hamiltonian':
             return eigenvalues - self.energy_shift
         else:  # time_evolution
-            phase_factor = np.exp(1j * self.energy_shift * self.timestep / self.hbar)
-            print(f"phase factor = {phase_factor}")
-            print(f"energy shift = {self.energy_shift}")
-            print(f"time step    = {self.timestep}")
-            print(f"hbar         = {self.hbar}")
+            phase_factor = np.exp(1j * self.energy_shift * self.tevol_hbar)
+            print(f"phase factor     = {phase_factor}")
+            print(f"energy shift     = {self.energy_shift}")
+            print(f"time step / hbar = {self.tevol_hbar}")
             return phase_factor * eigenvalues
