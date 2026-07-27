@@ -8,7 +8,6 @@ from qhat.analysis.matrix_eigendecomposition import (
     _compute_unitary_matrix,
     _compute_exact_matrix,
     output_unitary_matrix,
-    eigendecomposition_analysis,
     save_requested_operator_outputs
 )
 from qhat.analysis.utils import normalize_string_or_list_to_list
