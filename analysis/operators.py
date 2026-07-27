@@ -18,44 +18,6 @@ logger = logging.getLogger(__name__)
 
 
 # =================================================================================================
-# Conversion Utilities
-# =================================================================================================
-
-def convert_unitary_eigenvalues_to_eigenenergies(unitary_eigenvalues, tevol_hbar):
-    """
-    Convert unitary eigenvalues e^(-iφ) to Hamiltonian eigenenergies E.
-
-    The time evolution operator is U = exp(-iHt/ℏ), so if H has eigenenergy E,
-    then U has eigenvalue exp(-iEt/ℏ) = exp(-iφ) where φ = Et/ℏ is the eigenphase.
-
-    The Hamiltonian is energy-shifted to center the eigenvalue range around zero, placing them in
-    the range [-dE, +dE] where dE is the one-norm bound. With timestep t/ℏ = π/dE, this maps
-    eigenvalues to phases in [-π, +π], which matches the output range of np.angle() directly, other
-    than the difference between [-π, π] and (-π, π].
-
-    Parameters:
-        unitary_eigenvalues: Complex eigenvalues of unitary U = exp(-iHt/ℏ) (on unit circle)
-        tevol_hbar: Time evolution parameter t/ℏ (units: 1/energy, e.g., 1/Hartree)
-
-    Returns:
-        tuple: (eigenenergies, eigenphases)
-            eigenenergies: Real eigenvalues of Hamiltonian (shifted, units: energy)
-            eigenphases: Phases φ = Et/ℏ ∈ [-π, +π] where φ = -θ
-    """
-    # Extract phases using np.angle, which returns θ ∈ (-π, π]
-    # Since U = exp(-iEt/ℏ) = exp(i*θ), we have θ = -Et/ℏ
-    theta = np.angle(unitary_eigenvalues)
-
-    # Eigenphase φ = -θ = Et/ℏ (no wrapping needed)
-    eigenphases = -theta
-
-    # Convert to eigenenergies: E = φ * ℏ / t
-    eigenenergies = eigenphases / tevol_hbar
-
-    return eigenenergies, eigenphases
-
-
-# =================================================================================================
 # OperatorRepresentation Class
 # =================================================================================================
 

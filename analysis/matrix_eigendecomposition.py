@@ -17,7 +17,6 @@ import datetime
 from qhat.analysis.config_types import AnalysisConfiguration
 from qhat.analysis.file_io import save_matrix, save_eigendecomposition
 from qhat.analysis.matrix_operations import compute_unitarity_error
-from qhat.analysis.operators import convert_unitary_eigenvalues_to_eigenenergies
 
 logger = logging.getLogger(__name__)
 
