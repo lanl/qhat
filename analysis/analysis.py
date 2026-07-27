@@ -156,10 +156,9 @@ def analyze_algorithm(
     # TODO: Add gate parallelism / gate depth analysis
     # TODO: Would it be useful to analyze in terms of a different basis (e.g., Toffoli gates)?
     if config_analysis.resource_estimator is not None:
-        # TODO: Modify to allow resource estimation with multiple approaches
         logger.info(f"Performing resource estimation using {config_analysis.resource_estimator}.")
         results["resource_estimates"] = estimate_resources(config_analysis.resource_estimator, algorithm)
-        print("keys = ", results["resource_estimates"].keys())
+        logger.verbose(f"Resource estimation methods: {list(results['resource_estimates'].keys())}")
 
     # Analysis Category : error analysis  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     if error_analysis_requested:

@@ -158,6 +158,7 @@ class AnalysisConfiguration(ConfigurationBase):
         self._operator_output_requests = []
         # External (user-facing) options __________________________________________________________
         # Do resource estimation (e.g., qubit and gate counts)
+        # Can be a string ('pyliqtr', 'qualtran', 'cirq') or list (['pyliqtr', 'qualtran'])
         self.resource_estimator = None
         # Write unitary matrix of full algorithm to a file
         self.algorithm_matrix_output_file = None

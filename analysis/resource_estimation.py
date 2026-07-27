@@ -5,6 +5,7 @@ from qualtran.resource_counting import get_cost_value, QubitCount
 from qualtran.cirq_interop.t_complexity_protocol import t_complexity
 
 from qhat.analysis.config_types import AnalysisConfiguration
+from qhat.analysis.utils import normalize_string_or_list_to_list
 
 logger = logging.getLogger(__name__)
 
@@ -58,14 +59,36 @@ def resource_estimation_qualtran(algorithm) -> dict:
 # -------------------------------------------------------------------------------------------------
 
 def estimate_resources(resource_estimator, algorithm) -> dict:
+    """
+    Estimate quantum algorithm resources using one or more methods.
 
-    estimator_normalized = resource_estimator.lower()
-    if estimator_normalized == "pyliqtr":
-        return resource_estimation_pyliqtr(algorithm)
-    elif estimator_normalized == "cirq":
-        return resource_estimation_cirq(algorithm)
-    elif estimator_normalized == "qualtran":
-        return resource_estimation_qualtran(algorithm)
-    else:
-        raise ValueError(
-                f"Invalid resource estimator method \"{resource_estimator}\".")
+    Parameters:
+        resource_estimator: String or list of strings specifying estimation method(s)
+                           Valid values: 'pyliqtr', 'qualtran', 'cirq'
+        algorithm: Algorithm bloq to analyze
+
+    Returns:
+        Dictionary with resource estimates for each method
+    """
+    logger.info(f"Computing resource estimates: {resource_estimator}")
+
+    results = {}
+    for estimator in normalize_string_or_list_to_list(resource_estimator):
+        estimator_normalized = estimator.lower()
+
+        if estimator_normalized == "pyliqtr":
+            logger.verbose(f"Estimating resources with pyLIQTR")
+            results['pyliqtr'] = resource_estimation_pyliqtr(algorithm)
+        elif estimator_normalized == "cirq":
+            logger.verbose(f"Estimating resources with Cirq")
+            results['cirq'] = resource_estimation_cirq(algorithm)
+        elif estimator_normalized == "qualtran":
+            logger.verbose(f"Estimating resources with Qualtran")
+            results['qualtran'] = resource_estimation_qualtran(algorithm)
+        else:
+            raise ValueError(
+                f"Invalid resource estimator method \"{estimator}\". "
+                f"Valid options: 'pyliqtr', 'qualtran', 'cirq'"
+            )
+
+    return results
