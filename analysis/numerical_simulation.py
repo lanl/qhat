@@ -11,14 +11,14 @@ logger = logging.getLogger(__name__)
 # -------------------------------------------------------------------------------------------------
 
 def numerical_simulation(
-        config_analysis: AnalysisConfiguration,
+        input_state_files,
         algorithm,
         unitary_matrix) -> dict:
     """
     Perform numerical simulation by applying the unitary matrix to input state(s).
 
     Parameters:
-        config_analysis: Analysis configuration with numerical_simulation_inputs
+        input_state_files: name or collection of names for input state files
         algorithm: The algorithm bloq to analyze
         unitary_matrix: The unitary matrix to apply (pre-computed)
 
@@ -30,24 +30,23 @@ def numerical_simulation(
     logger.verbose(f"Matrix shape: {unitary_matrix.shape}")
 
     # Normalize inputs to list (in case this function is called directly without validation)
-    raw_inputs = config_analysis.numerical_simulation_inputs
-    if raw_inputs is None:
+    if input_state_files is None:
         raise ValueError("numerical_simulation_inputs is None")
 
     # Validate type before normalization
-    if not isinstance(raw_inputs, (str, list)):
+    if not isinstance(input_state_files, (str, list)):
         raise ValueError(
             f"numerical_simulation_inputs must be a string or list of strings, "
-            f"got {type(raw_inputs).__name__}"
+            f"got {type(input_state_files).__name__}"
         )
 
-    input_files = normalize_string_or_list_to_list(raw_inputs)
+    input_file_list = normalize_string_or_list_to_list(input_state_files)
 
-    logger.info(f"Running numerical simulation on {len(input_files)} input state(s)")
+    logger.info(f"Running numerical simulation on {len(input_file_list)} input state(s)")
 
     results = []
 
-    for input_file in input_files:
+    for input_file in input_file_list:
         logger.verbose(f"Processing {input_file}")
 
         # Load initial state

@@ -59,7 +59,7 @@ def test_analyze_algorithm_requires_at_least_one_analysis():
     algorithm = MockAlgorithm(unitary)
 
     with pytest.raises(ValueError, match="No analyses requested"):
-        analyze_algorithm(config_analysis, algorithm)
+        analyze_algorithm(config_analysis, algorithm, unitary_encoding="ramped trotter")
 
     print("✓ Test passed: analyze_algorithm_requires_at_least_one_analysis")
 
@@ -80,7 +80,7 @@ def test_analyze_algorithm_accepts_numerical_simulation():
         algorithm = MockAlgorithm(unitary)
 
         # Should not raise
-        results = analyze_algorithm(config_analysis, algorithm)
+        results = analyze_algorithm(config_analysis, algorithm, unitary_encoding="ramped trotter")
 
         assert 'numerical_simulation' in results
         print("✓ Test passed: analyze_algorithm_accepts_numerical_simulation")
@@ -107,7 +107,7 @@ def test_matrix_computed_once_for_single_analysis():
         unitary = np.eye(4, dtype=complex)
         algorithm = MockAlgorithm(unitary, compute_count)
 
-        analyze_algorithm(config_analysis, algorithm)
+        analyze_algorithm(config_analysis, algorithm, unitary_encoding="ramped trotter")
 
         # Should compute exactly once
         assert compute_count[0] == 1, f"Expected 1 computation, got {compute_count[0]}"
@@ -133,7 +133,7 @@ def test_matrix_computed_once_for_multiple_analyses():
         unitary = np.eye(4, dtype=complex)
         algorithm = MockAlgorithm(unitary, compute_count)
 
-        results = analyze_algorithm(config_analysis, algorithm)
+        results = analyze_algorithm(config_analysis, algorithm, unitary_encoding="ramped trotter")
 
         # Should compute exactly once even though two analyses use it
         assert compute_count[0] == 1, f"Expected 1 computation, got {compute_count[0]}"
@@ -164,7 +164,7 @@ def test_matrix_not_computed_if_not_needed():
     try:
         # This will fail because we don't have a proper algorithm for resource estimation,
         # but we can check that tensor_contract was never called
-        analyze_algorithm(config_analysis, algorithm)
+        analyze_algorithm(config_analysis, algorithm, unitary_encoding="ramped trotter")
     except Exception:
         pass  # Expected to fail, we just want to check compute count
 
@@ -198,7 +198,7 @@ def test_end_to_end_single_state():
         config_analysis.numerical_simulation_inputs = input_path
 
         algorithm = MockAlgorithm(unitary)
-        results = analyze_algorithm(config_analysis, algorithm)
+        results = analyze_algorithm(config_analysis, algorithm, unitary_encoding="ramped trotter")
 
         # Verify results structure
         assert 'numerical_simulation' in results
@@ -237,7 +237,7 @@ def test_end_to_end_multiple_states():
         config_analysis.numerical_simulation_inputs = input_paths
 
         algorithm = MockAlgorithm(unitary)
-        results = analyze_algorithm(config_analysis, algorithm)
+        results = analyze_algorithm(config_analysis, algorithm, unitary_encoding="ramped trotter")
 
         # Verify all simulations completed
         assert len(results['numerical_simulation']['simulations']) == 3
@@ -274,7 +274,7 @@ def test_combined_matrix_output_and_simulation():
         compute_count = [0]
         algorithm = MockAlgorithm(unitary, compute_count)
 
-        results = analyze_algorithm(config_analysis, algorithm)
+        results = analyze_algorithm(config_analysis, algorithm, unitary_encoding="ramped trotter")
 
         # Verify both outputs
         assert 'matrix_output' in results
@@ -323,7 +323,7 @@ def test_large_system_performance():
         config_analysis.numerical_simulation_inputs = input_path
 
         algorithm = MockAlgorithm(unitary)
-        results = analyze_algorithm(config_analysis, algorithm)
+        results = analyze_algorithm(config_analysis, algorithm, unitary_encoding="ramped trotter")
 
         # Verify output
         output_path = os.path.join(tmpdir, "state_final.npy")

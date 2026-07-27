@@ -10,16 +10,12 @@ logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------------------------------
 
-def resource_estimation_cirq(
-        config_analysis: AnalysisConfiguration,
-        algorithm) -> dict:
+def resource_estimation_cirq(algorithm) -> dict:
     raise NotImplementedError
 
 # -------------------------------------------------------------------------------------------------
 
-def resource_estimation_pyliqtr(
-        config_analysis: AnalysisConfiguration,
-        algorithm) -> dict:
+def resource_estimation_pyliqtr(algorithm) -> dict:
 
     logger.verbose("Estimating resources with pyLIQTR.")
 
@@ -44,9 +40,7 @@ def resource_estimation_pyliqtr(
 
 # -------------------------------------------------------------------------------------------------
 
-def resource_estimation_qualtran(
-        config_analysis: AnalysisConfiguration,
-        algorithm) -> dict:
+def resource_estimation_qualtran(algorithm) -> dict:
 
     logger.verbose("Estimating resources with Qualtran.")
 
@@ -63,16 +57,15 @@ def resource_estimation_qualtran(
 
 # -------------------------------------------------------------------------------------------------
 
-def estimate_resources(
-        config_analysis: AnalysisConfiguration,
-        algorithm) -> dict:
+def estimate_resources(resource_estimator, algorithm) -> dict:
 
-    if config_analysis.resource_estimator.lower() == "pyliqtr":
-        return resource_estimation_pyliqtr(config_analysis, algorithm)
-    elif config_analysis.resource_estimator.lower() == "cirq":
-        return resource_estimation_cirq(config_analysis, algorithm)
-    elif config_analysis.resource_estimator.lower() == "qualtran":
-        return resource_estimation_qualtran(config_analysis, algorithm)
+    estimator_normalized = resource_estimator.lower()
+    if estimator_normalized == "pyliqtr":
+        return resource_estimation_pyliqtr(algorithm)
+    elif estimator_normalized == "cirq":
+        return resource_estimation_cirq(algorithm)
+    elif estimator_normalized == "qualtran":
+        return resource_estimation_qualtran(algorithm)
     else:
         raise ValueError(
-                f"Invalid resource estimator method \"{config_analysis.resource_estimator}\".")
+                f"Invalid resource estimator method \"{resource_estimator}\".")

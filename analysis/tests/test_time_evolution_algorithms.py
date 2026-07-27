@@ -222,7 +222,7 @@ class TestResourceEstimation:
         analysis_config = AnalysisConfiguration()
         analysis_config.resource_estimator = "pyLIQTR"
 
-        results = analyze_algorithm(analysis_config, algorithm)
+        results = analyze_algorithm(analysis_config, algorithm, unitary_encoding="ramped trotter")
 
         assert "resource_estimates" in results
         resources = results["resource_estimates"]
@@ -244,7 +244,7 @@ class TestResourceEstimation:
         analysis_config = AnalysisConfiguration()
         analysis_config.resource_estimator = "pyLIQTR"
 
-        results = analyze_algorithm(analysis_config, algorithm)
+        results = analyze_algorithm(analysis_config, algorithm, unitary_encoding="ramped trotter")
 
         assert "resource_estimates" in results
         resources = results["resource_estimates"]
@@ -263,14 +263,14 @@ class TestResourceEstimation:
         config_te = AlgorithmConfiguration()
         config_te.method = "time evolution"
         algorithm_te = build_algorithm(config_te, unitary, P0=None)
-        results_te = analyze_algorithm(analysis_config, algorithm_te)
+        results_te = analyze_algorithm(analysis_config, algorithm_te, unitary_encoding="ramped trotter")
         resources_te = results_te["resource_estimates"]
 
         # Controlled time evolution resources
         config_cte = AlgorithmConfiguration()
         config_cte.method = "controlled time evolution"
         algorithm_cte = build_algorithm(config_cte, unitary, P0=None)
-        results_cte = analyze_algorithm(analysis_config, algorithm_cte)
+        results_cte = analyze_algorithm(analysis_config, algorithm_cte, unitary_encoding="ramped trotter")
         resources_cte = results_cte["resource_estimates"]
 
         # Controlled should have at least as many gates
@@ -288,7 +288,7 @@ class TestResourceEstimation:
         for pauli_string in ["XY", "XYZ", "XYZI"]:
             unitary = PauliStringEvolution(pauli_string, coefficient=1.0, time=1.0)
             algorithm = build_algorithm(algorithm_config, unitary, P0=None)
-            results = analyze_algorithm(analysis_config, algorithm)
+            results = analyze_algorithm(analysis_config, algorithm, unitary_encoding="ramped trotter")
 
             t_count = results["resource_estimates"]["T_count"]
             clifford_count = results["resource_estimates"]["Clifford_count"]

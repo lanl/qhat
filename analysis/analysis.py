@@ -189,6 +189,7 @@ def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfigura
 def analyze_algorithm(
         config_analysis: AnalysisConfiguration,
         algorithm,
+        unitary_encoding,
         approximate_time_evolution=None,
         exact_hamiltonian=None,
         timestep=None,
@@ -199,6 +200,7 @@ def analyze_algorithm(
     Parameters:
         config_analysis: Analysis configuration
         algorithm: Algorithm bloq to analyze
+        unitary_encoding: Method used to encode the Hamiltonian into a unitary operator
         exact_hamiltonian: Hamiltonian object (required for exact matrix/simulation)
         timestep: Time evolution parameter (required for approximate eigendecomposition)
                  If not provided, approximate eigendecomposition will fail.
@@ -216,25 +218,39 @@ def analyze_algorithm(
 
     # TODO: Should some of these be methods of config_analysis?
 
-    # Check what analyses are requested
-    # - any error analyses turned on
+    # Is the unitary encoding message Trotter?  Some analyses only apply to Trotter.
+    is_trotter = unitary_encoding in ["ramped trotter"]
+
+    # Are any error analyses turned on?
     error_analysis_requested = (
         config_analysis.enable_eigenvalue_errors or
         config_analysis.error_matrix_norms is not None or
         config_analysis.error_state_inputs is not None
     )
-    # - exact and/or approximate OperatorRepresentation needed
-    def _request_present(output_requests, operator):
-        return any(d["operator"] == operator for d in output_requests)
-    exact_op_needed = (
-        error_analysis_requested or
-        _request_present(config_analysis._operator_output_requests, "exact")
-    )
-    approximate_op_needed = (
-        error_analysis_requested or
-        _request_present(config_analysis._operator_output_requests, "approximate")
-    )
-    # - full algorithm matrix needed
+
+    # Consistency check: currently cannot do error analysis on non-Trotter methods
+    if error_analysis_requested and not is_trotter:
+        logger.warning("Error analysis was requested, but currently not available for non-Trotter "
+                       "unitary encodings.  Turning off error analyses.")
+        error_analysis_requested = False
+
+    # Are exact and/or approximate OperatorRepresentation needed?
+    exact_op_requests = [d for d in config_analysis._operator_output_requests
+                         if d["source"] == "exact"]
+    approx_op_requests = [d for d in config_analysis._operator_output_requests
+                          if d["source"] == "approximate"]
+    exact_op_needed = error_analysis_requested or len(exact_op_requests) > 0
+    approximate_op_needed = error_analysis_requested or len(approx_op_requests) > 0
+
+    # Consistency check: approximate operator cannot be constructed for non-Trotter methods
+    # - We've already rules out error_analysis_requested, so that means that the user has asked
+    #     for a Hamiltonian or time-evolution operator to be written to a file
+    if approximate_op_needed and not is_trotter:
+        logger.warning("Saving the approximate operator is currently unavailable for non-Trotter "
+                       "unitary encodings.  Turning off these requests.")
+        approx_op_requests = []
+
+    # Is full algorithm matrix needed?
     algorithm_matrix_needed = (
         config_analysis.algorithm_matrix_output_file is not None or
         config_analysis.numerical_simulation_inputs is not None
@@ -253,6 +269,8 @@ def analyze_algorithm(
         f"   exact OperatorRepresentation needed:       {exact_op_needed}",
         f"   approximate OperatorRepresentation needed: {approximate_op_needed}",
         f"   full algorithm unitary matrix needed:      {algorithm_matrix_needed}",
+        f"   number of exact operator output requests:  {len(exact_op_requests)}",
+        f"   number of approx operator output requests: {len(approx_op_requests)}",
     ]))
 
     # Preliminary calculations ____________________________________________________________________
@@ -272,7 +290,7 @@ def analyze_algorithm(
         if exact_hamiltonian is None:
             raise ValueError("Exact matrix/eigendecomposition computation requires exact_hamiltonian parameter.")
         logger.verbose("Constructing the exact energy-shifted Hamiltonian matrix")
-        exact_matrix = _compute_exact_matrix(exact_hamiltonian, config_analysis)
+        exact_matrix = _compute_exact_matrix(exact_hamiltonian, config_analysis.matrix_memory_threshold_gb)
         logger.verbose(
             "Constructing the exact OperatorRepresentation instance"
             f" (t = {timestep}, ΔE = {energy_shift})"
@@ -323,7 +341,7 @@ def analyze_algorithm(
     if config_analysis.resource_estimator is not None:
         # TODO: Modify to allow resource estimation with multiple approaches
         logger.info(f"Performing resource estimation using {config_analysis.resource_estimator}.")
-        results["resource_estimates"] = estimate_resources(config_analysis, algorithm)
+        results["resource_estimates"] = estimate_resources(config_analysis.resource_estimator, algorithm)
         print("keys = ", results["resource_estimates"].keys())
 
     # Analysis Category : error analysis  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
@@ -341,11 +359,10 @@ def analyze_algorithm(
     # TODO: Why are we extracting a private data value?  Is it private just to "hide" it from users?
     if len(config_analysis._operator_output_requests) > 0:
         logger.info("Generating matrix and/or eigendecomposition outputs and saving to file(s).")
-        results["matrices_and_eigendecompositions"] = save_requested_operator_outputs(
-            config_analysis._operator_output_requests,
-            exact_op,
-            approx_op
-        )
+        me_results = dict()
+        me_results.update(save_requested_operator_outputs(exact_op_requests, exact_op, "exact"))
+        me_results.update(save_requested_operator_outputs(approx_op_requests, approx_op, "approx"))
+        results["matrices_and_eigendecompositions"] = me_results
     if config_analysis.algorithm_matrix_output_file is not None:
         logger.info(f"Generating algorithm matrix output and saving to file {config_analysis.algorithm_matrix_output_file}.")
         results["matrix_output"] = output_unitary_matrix(config_analysis.algorithm_matrix_output_file, algorithm_mat)
@@ -354,7 +371,7 @@ def analyze_algorithm(
     if config_analysis.numerical_simulation_inputs is not None:
         logger.info("Performing numerical simulation of the full algorithm.")
         results["numerical_simulation"] = \
-            numerical_simulation(config_analysis, algorithm, algorithm_mat)
+            numerical_simulation(config_analysis.numerical_simulation_inputs, algorithm, algorithm_mat)
 
     # Epiloque ____________________________________________________________________________________
 

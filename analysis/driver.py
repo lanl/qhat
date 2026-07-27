@@ -99,6 +99,7 @@ def run():
     state.store_results(analyze_algorithm(
         state.config_analysis,
         algorithm,
+        state.config_unitary.method,
         approximate_time_evolution=unitary_hamiltonian,
         exact_hamiltonian=physical_hamiltonian,
         timestep=timestep,

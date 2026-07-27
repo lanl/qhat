@@ -157,14 +157,10 @@ def test_numerical_simulation_single_input():
         input_state = np.array([1.0, 0.0, 0.0, 0.0], dtype=complex)
         np.save(input_path, input_state)
 
-        # Configure analysis
-        config_analysis = AnalysisConfiguration()
-        config_analysis.numerical_simulation_inputs = input_path
-
         # Run simulation with precomputed matrix
         algorithm = MockAlgorithm(unitary)
         result = numerical_simulation(
-            config_analysis,
+            input_path,
             algorithm,
             unitary_matrix=unitary
         )
@@ -209,14 +205,10 @@ def test_numerical_simulation_multiple_inputs():
             # Compute expected output manually
             expected_outputs.append(unitary @ state)
 
-        # Configure analysis
-        config_analysis = AnalysisConfiguration()
-        config_analysis.numerical_simulation_inputs = input_paths
-
         # Run simulation
         algorithm = MockAlgorithm(unitary)
         result = numerical_simulation(
-            config_analysis,
+            input_paths,
             algorithm,
             unitary_matrix=unitary
         )
@@ -247,13 +239,10 @@ def test_numerical_simulation_preserves_unitarity():
         input_state = np.array([0.5, 0.5, 0.5, 0.5], dtype=complex)
         np.save(input_path, input_state)
 
-        # Configure and run
-        config_analysis = AnalysisConfiguration()
-        config_analysis.numerical_simulation_inputs = input_path
-
+        # Run simulation
         algorithm = MockAlgorithm(unitary)
         result = numerical_simulation(
-            config_analysis,
+            input_path,
             algorithm,
             unitary_matrix=unitary
         )
@@ -291,12 +280,9 @@ def test_numerical_simulation_computes_correct_result():
         expected_output = np.array([0.0, 1.0, 0.0, 0.0], dtype=complex)
 
         # Run simulation
-        config_analysis = AnalysisConfiguration()
-        config_analysis.numerical_simulation_inputs = input_path
-
         algorithm = MockAlgorithm(unitary)
         numerical_simulation(
-            config_analysis,
+            input_path,
             algorithm,
             unitary_matrix=unitary
         )
@@ -321,15 +307,11 @@ def test_numerical_simulation_dimension_mismatch_raises_error():
         input_state[0] = 1.0
         np.save(input_path, input_state)
 
-        # Configure
-        config_analysis = AnalysisConfiguration()
-        config_analysis.numerical_simulation_inputs = input_path
-
         # Should raise dimension mismatch error
         algorithm = MockAlgorithm(unitary)
         with pytest.raises(ValueError, match="Dimension mismatch"):
             numerical_simulation(
-                config_analysis,
+                input_path,
                 algorithm,
                 unitary_matrix=unitary
             )
@@ -373,15 +355,12 @@ def test_compute_unitary_matrix_missing_tensor_contract():
 
 def test_numerical_simulation_invalid_input_type():
     """Test error handling for invalid input type."""
-    config_analysis = AnalysisConfiguration()
-    config_analysis.numerical_simulation_inputs = 123  # Invalid: not string or list
-
     unitary = np.eye(4, dtype=complex)
     algorithm = MockAlgorithm(unitary)
 
     with pytest.raises(ValueError, match="must be a string or list of strings"):
         numerical_simulation(
-            config_analysis,
+            123,  # Invalid: not string or list
             algorithm,
             unitary_matrix=unitary
         )
@@ -416,12 +395,9 @@ def test_output_filename_generation():
             np.save(input_path, input_state)
 
             # Run simulation
-            config_analysis = AnalysisConfiguration()
-            config_analysis.numerical_simulation_inputs = input_path
-
             algorithm = MockAlgorithm(unitary)
             result = numerical_simulation(
-                config_analysis,
+                input_path,
                 algorithm,
                 unitary_matrix=unitary
             )
@@ -455,12 +431,9 @@ def test_complex_superposition_state():
         np.save(input_path, input_state)
 
         # Run simulation
-        config_analysis = AnalysisConfiguration()
-        config_analysis.numerical_simulation_inputs = input_path
-
         algorithm = MockAlgorithm(R)
         result = numerical_simulation(
-            config_analysis,
+            input_path,
             algorithm,
             unitary_matrix=R
         )

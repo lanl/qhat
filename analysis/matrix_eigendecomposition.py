@@ -58,17 +58,17 @@ def _compute_unitary_matrix(algorithm):
 # -------------------------------------------------------------------------------------------------
 
 # TODO: Why is this prefixed with an underscore as if it's intended to be private?
-def _compute_exact_matrix(hamiltonian, config_analysis):
+def _compute_exact_matrix(hamiltonian, matrix_memory_threshold_gb):
     """
     Compute the exact matrix representation of the Hamiltonian.
 
     This computes the Hamiltonian matrix without any approximations (no Trotter,
     no double-factorization). The choice between dense and sparse/matrix-free
-    representation is based on the memory threshold in config_analysis.
+    representation is based on the memory threshold in matrix_memory_threshold_gb.
 
     Parameters:
         hamiltonian: The Hamiltonian object
-        config_analysis: Analysis configuration with matrix_memory_threshold_gb
+        matrix_memory_threshold_gb: memory threshold (in GB) for dense matrices
 
     Returns:
         Dense numpy array (small systems) or PauliStringOperator (large systems)
@@ -78,9 +78,7 @@ def _compute_exact_matrix(hamiltonian, config_analysis):
     """
     logger.verbose("Computing exact Hamiltonian matrix...")
     try:
-        return hamiltonian.to_matrix(
-            memory_threshold_gb=config_analysis.matrix_memory_threshold_gb
-        )
+        return hamiltonian.to_matrix(memory_threshold_gb=matrix_memory_threshold_gb)
     except Exception as e:
         logger.info(
             f"ERROR: Failed to compute exact Hamiltonian matrix: {e}\n"
@@ -141,10 +139,7 @@ def output_unitary_matrix(filename, unitary_matrix) -> dict:
 # Flexible operator output system
 # -------------------------------------------------------------------------------------------------
 
-def save_requested_operator_outputs(
-        operator_output_requests,
-        exact_op,
-        approx_op) -> dict:
+def save_requested_operator_outputs(operator_output_requests, op, name) -> dict:
     """
     Save all requested operator forms using OperatorRepresentation.
 
@@ -165,19 +160,11 @@ def save_requested_operator_outputs(
         return results
 
     # Create OperatorRepresentation wrappers if not provided
-    if exact_op is None:
-        raise ValueError("Missing exact_op in save_requested_operator_outputs.")
-    if approx_op is None:
-        raise ValueError("Missing approx_op in save_requested_operator_outputs.")
-
-    operators = {
-        'exact': exact_op,
-        'approximate': approx_op
-    }
+    if len(operator_output_requests) > 0 and op is None:
+        raise ValueError(f"Missing {name}_op in save_requested_operator_outputs.")
 
     # Process operator output requests
     for request in operator_output_requests:
-        op = operators[request['source']]
         energy_shifted = request['energy_shifted']
         representation = request['representation']
 
@@ -223,7 +210,7 @@ def save_requested_operator_outputs(
                 eigenenergies=eigenvalues_sorted,
                 eigenvectors=eigenvectors_sorted,
                 matrix_type=f"{request['source']}_{request['operator_type']}_{shift_str}",
-                timestep=approx_op.tevol_hbar
+                timestep=op.tevol_hbar
             )
 
             results['eigendecomposition_outputs'].append({
