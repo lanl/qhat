@@ -24,41 +24,39 @@ logger = logging.getLogger(__name__)
 # Matrix computation
 # -------------------------------------------------------------------------------------------------
 
-# TODO: Why is this prefixed with an underscore as if it's intended to be private?
-def _compute_unitary_matrix(algorithm):
+def compute_unitary_matrix(bloq):
     """
-    Compute the unitary matrix representation of the algorithm.
+    Compute the unitary matrix representation of a bloq.
 
     Parameters:
-        algorithm: The algorithm bloq to analyze
+        bloq: The bloq to analyze
 
     Returns:
         The unitary matrix as a numpy array
 
     Raises:
-        AttributeError: If algorithm doesn't have tensor_contract() method
+        AttributeError: If bloq doesn't have tensor_contract() method
         Exception: If tensor_contract() fails
     """
-    if not hasattr(algorithm, 'tensor_contract'):
+    if not hasattr(bloq, 'tensor_contract'):
         raise AttributeError(
-            f"Algorithm of type {type(algorithm).__name__} does not have a "
+            f"Algorithm of type {type(bloq).__name__} does not have a "
             "'tensor_contract()' method. Cannot generate unitary matrix."
         )
 
     logger.verbose("Computing unitary matrix via tensor contraction...")
     try:
-        return algorithm.tensor_contract()
+        return bloq.tensor_contract()
     except Exception as e:
         logger.info(
             f"ERROR: Failed to compute unitary matrix: {e}\n"
-            "This may indicate a bug in the algorithm's tensor_contract() implementation."
+            "This may indicate a bug in the bloq's tensor_contract() implementation."
         )
         raise
 
 # -------------------------------------------------------------------------------------------------
 
-# TODO: Why is this prefixed with an underscore as if it's intended to be private?
-def _compute_exact_matrix(hamiltonian, matrix_memory_threshold_gb):
+def compute_exact_matrix(hamiltonian, matrix_memory_threshold_gb):
     """
     Compute the exact matrix representation of the Hamiltonian.
 
@@ -76,7 +74,9 @@ def _compute_exact_matrix(hamiltonian, matrix_memory_threshold_gb):
     Raises:
         Exception: If matrix computation fails
     """
-    logger.verbose("Computing exact Hamiltonian matrix...")
+    if hamiltonian is None:
+            raise ValueError("Exact matrix/eigendecomposition computation requires "
+                             "exact_hamiltonian parameter.")
     try:
         return hamiltonian.to_matrix(memory_threshold_gb=matrix_memory_threshold_gb)
     except Exception as e:

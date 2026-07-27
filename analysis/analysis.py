@@ -1,16 +1,16 @@
 import logging
 
 from qhat.analysis.config_types import AnalysisConfiguration
-from qhat.analysis.resource_estimation import estimate_resources
 from qhat.analysis.error_analysis import error_analysis
-from qhat.analysis.numerical_simulation import numerical_simulation
 from qhat.analysis.matrix_eigendecomposition import (
-    _compute_unitary_matrix,
-    _compute_exact_matrix,
+    compute_unitary_matrix,
+    compute_exact_matrix,
     output_unitary_matrix,
     save_requested_operator_outputs
 )
-#from qhat.analysis.utils import normalize_string_or_list_to_list
+from qhat.analysis.numerical_simulation import numerical_simulation
+from qhat.analysis.operators import OperatorRepresentation
+from qhat.analysis.resource_estimation import estimate_resources
 
 logger = logging.getLogger(__name__)
 
@@ -103,27 +103,20 @@ def analyze_algorithm(
 
     # Preliminary calculations ____________________________________________________________________
 
-    # TODO: These blocks look like they could and perhaps should be functions
-
     # Construct the unitary matrix equivalent to the full algorithm
     algorithm_mat = None
     if algorithm_matrix_needed:
-        logger.verbose("Constructing the unitary matrix equivalent to the full algorithm")
-        algorithm_mat = _compute_unitary_matrix(algorithm)
+        logger.verbose("Constructing the unitary matrix equivalent to the full algorithm.")
+        algorithm_mat = compute_unitary_matrix(algorithm)
         logger.info("Created full algorithm matrix")
 
     # Construct the "exact" (from the true Hamiltonian) OperatorRepresentation if necessary
     exact_op = None
     if exact_op_needed:
-        if exact_hamiltonian is None:
-            raise ValueError("Exact matrix/eigendecomposition computation requires exact_hamiltonian parameter.")
         logger.verbose("Constructing the exact energy-shifted Hamiltonian matrix")
-        exact_matrix = _compute_exact_matrix(exact_hamiltonian, config_analysis.matrix_memory_threshold_gb)
-        logger.verbose(
-            "Constructing the exact OperatorRepresentation instance"
-            f" (t = {timestep}, ΔE = {energy_shift})"
-        )
-        from qhat.analysis.operators import OperatorRepresentation
+        exact_matrix = compute_exact_matrix(exact_hamiltonian, config_analysis.matrix_memory_threshold_gb)
+        logger.info("Created exact matrix")
+        logger.verbose(f"Constructing the exact operator(t = {timestep}, ΔE = {energy_shift})")
         exact_op = OperatorRepresentation(
             data=exact_matrix,
             operator_type='hamiltonian',
@@ -138,15 +131,11 @@ def analyze_algorithm(
     # necessary
     approx_op = None
     if approximate_op_needed:
-        if approximate_time_evolution is None:
-            raise ValueError("Approximate matrix/eigendecomposition computation requires approximate_time_evolution parameter.")
         logger.verbose("Constructing the approximate energy-shifted time-evolution matrix")
-        approx_matrix = _compute_unitary_matrix(approximate_time_evolution)
+        approx_matrix = compute_unitary_matrix(approximate_time_evolution)
+        logger.info("Created approximate matrix")
         logger.verbose(
-            "Constructing the approximate OperatorRepresentation instance"
-            f" (t = {timestep}, ΔE = {energy_shift})"
-        )
-        from qhat.analysis.operators import OperatorRepresentation
+            "Constructing the approximate operator (t = {timestep}, ΔE = {energy_shift})")
         approx_op = OperatorRepresentation(
             data=approx_matrix,
             operator_type='time_evolution',
