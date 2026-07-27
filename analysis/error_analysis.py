@@ -4,6 +4,7 @@ import logging
 from qhat.analysis.config_types import AnalysisConfiguration
 from qhat.analysis.file_io import load_state
 from qhat.analysis.matrix_operations import compute_unitarity_error
+from qhat.analysis.utils import normalize_string_or_list_to_list
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +99,7 @@ def _compute_matrix_norm_errors(exact_unitary_matrix, approx_unitary_matrix, nor
     diff_matrix = exact_unitary_matrix - approx_unitary_matrix
 
     results = {}
-    for norm_type in norms_to_compute:
+    for norm_type in normalize_string_or_list_to_list(norms_to_compute):
         if norm_type == 'frobenius':
             error = np.linalg.norm(diff_matrix, 'fro')
             logger.info(f"Frobenius norm ||U_exact - U_approx||_F: {error:.6e}")
@@ -132,7 +133,7 @@ def _compute_state_dependent_errors(exact_unitary_matrix, approx_unitary_matrix,
 
     state_errors = []
 
-    for state_file in state_files:
+    for state_file in normalize_string_or_list_to_list(state_files):
         logger.verbose(f"Processing {state_file}")
 
         # Load state

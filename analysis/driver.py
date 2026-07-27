@@ -10,7 +10,7 @@ import math
 
 from qhat.common.logging_utils import configure_logging
 from qhat.analysis.algorithm import build_algorithm, compute_initial_phase_qubits
-from qhat.analysis.analysis import analyze_algorithm, validate_and_autocomplete_analysis_config
+from qhat.analysis.analysis import analyze_algorithm
 from qhat.analysis.configuration import load_configuration
 from qhat.analysis.hamiltonian import get_physical_hamiltonian
 from qhat.analysis.unitary import encode_as_unitary
@@ -36,12 +36,6 @@ def run():
     logger.info("=" * 99)
     logger.info(f"Logfile: {state.config_general.logfile}")
     logger.info(f"Git hash: {state.config_general.git_hash}")
-
-    # Validate analysis configuration _____________________________________________________________
-
-    logger.info("Validating analysis configuration...")
-    validate_and_autocomplete_analysis_config(state.config_analysis)
-    logger.info("Configuration validated successfully.")
 
     # Hamiltonian _________________________________________________________________________________
 

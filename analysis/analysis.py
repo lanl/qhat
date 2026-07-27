@@ -10,51 +10,9 @@ from qhat.analysis.matrix_eigendecomposition import (
     output_unitary_matrix,
     save_requested_operator_outputs
 )
-from qhat.analysis.utils import normalize_string_or_list_to_list
+#from qhat.analysis.utils import normalize_string_or_list_to_list
 
 logger = logging.getLogger(__name__)
-
-# -------------------------------------------------------------------------------------------------
-
-def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfiguration) -> None:
-    """
-    Validate configuration consistency and auto-enable dependent analyses where appropriate.
-
-    This function is called early in driver.py, after loading configuration but before
-    loading the Hamiltonian. This allows for fail-fast behavior if configuration is invalid.
-
-    This function checks for:
-    1. Missing dependencies (raises errors if configuration is needed)
-    2. Opportunities to auto-enable analyses (logs when enabling)
-
-    Parameters:
-        config_analysis: Analysis configuration to validate and potentially modify
-
-    Raises:
-        ValueError: If configuration is inconsistent and cannot be auto-corrected
-
-    Note:
-        This function modifies the config_analysis object in-place when auto-enabling analyses.
-    """
-
-    # Check eigenvalue error analysis dependencies
-    # Note: If enable_eigenvalue_errors is True, the requires_*_eigendecomposition() functions
-    # will return True, ensuring eigendecompositions are computed even if not explicitly requested
-    # for output. No validation error needed - the system auto-enables what's required.
-
-    # Normalize string-or-list config values to always be lists
-    # This allows downstream code to always assume list type
-    # TODO: Can these kinds of normalization be done on immediately by using a function instead of
-    #       a parameter?
-    config_analysis.error_matrix_norms = normalize_string_or_list_to_list(
-        config_analysis.error_matrix_norms
-    )
-    config_analysis.error_state_inputs = normalize_string_or_list_to_list(
-        config_analysis.error_state_inputs
-    )
-    config_analysis.numerical_simulation_inputs = normalize_string_or_list_to_list(
-        config_analysis.numerical_simulation_inputs
-    )
 
 # -------------------------------------------------------------------------------------------------
 
