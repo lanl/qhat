@@ -15,123 +15,6 @@ from qhat.analysis.utils import normalize_string_or_list_to_list
 logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------------------------------
-# Functions to determine what expensive computations are required
-# -------------------------------------------------------------------------------------------------
-
-def requires_exact_eigendecomposition(config_analysis: AnalysisConfiguration) -> bool:
-    """
-    Determine if exact eigendecomposition needs to be computed.
-
-    Exact eigendecomposition is required for:
-    - Flexible API requests exact eigendecompositions
-    - Eigenvalue error analysis (always needs both eigendecompositions)
-
-    Parameters:
-        config_analysis: Analysis configuration
-
-    Returns:
-        True if exact eigendecomposition computation is needed, False otherwise
-    """
-    # Check if flexible API requests exact operator eigendecompositions
-    has_exact_eigendecomp_request = any(
-        req['source'] == 'exact' and req['representation'] == 'eigendecomposition'
-        for req in config_analysis._operator_output_requests
-    )
-
-    # Need exact eigendecomposition if:
-    # 1. Flexible API requests it
-    # 2. Eigenvalue error analysis is enabled (always needs both)
-    return (
-        has_exact_eigendecomp_request or
-        config_analysis.enable_eigenvalue_errors
-    )
-
-
-def requires_approximate_eigendecomposition(config_analysis: AnalysisConfiguration) -> bool:
-    """
-    Determine if approximate eigendecomposition needs to be computed.
-
-    Approximate eigendecomposition is required for:
-    - Flexible API requests approximate eigendecompositions
-    - Eigenvalue error analysis (always needs both eigendecompositions)
-
-    Parameters:
-        config_analysis: Analysis configuration
-
-    Returns:
-        True if approximate eigendecomposition computation is needed, False otherwise
-    """
-    # Check if flexible API requests approximate operator eigendecompositions
-    has_approx_eigendecomp_request = any(
-        req['source'] == 'approximate' and req['representation'] == 'eigendecomposition'
-        for req in config_analysis._operator_output_requests
-    )
-
-    # Need approximate eigendecomposition if:
-    # 1. Flexible API requests it
-    # 2. Eigenvalue error analysis is enabled (always needs both)
-    return (
-        has_approx_eigendecomp_request or
-        config_analysis.enable_eigenvalue_errors
-    )
-
-
-def requires_exact_matrix(config_analysis: AnalysisConfiguration) -> bool:
-    """
-    Determine if the exact Hamiltonian matrix needs to be computed.
-
-    The exact matrix is required for:
-    - Exact matrix output to file
-    - Exact eigendecomposition (which depends on the matrix)
-    - Matrix norm error analysis
-    - State-dependent error analysis
-
-    Parameters:
-        config_analysis: Analysis configuration
-
-    Returns:
-        True if exact matrix computation is needed, False otherwise
-    """
-    # Check if flexible API requests exact operator matrices
-    has_exact_flexible_output = any(
-        req['source'] == 'exact' and req['representation'] == 'matrix'
-        for req in config_analysis._operator_output_requests
-    )
-
-    return (
-        has_exact_flexible_output or
-        requires_exact_eigendecomposition(config_analysis) or
-        config_analysis.error_matrix_norms is not None or
-        config_analysis.error_state_inputs is not None
-    )
-
-
-def requires_approximate_matrix(config_analysis: AnalysisConfiguration) -> bool:
-    """
-    Determine if the approximate/unitary matrix needs to be computed.
-
-    The approximate matrix is required for:
-    - Matrix output to file
-    - Numerical simulation
-    - Approximate eigendecomposition (which depends on the matrix)
-    - Matrix norm error analysis
-    - State-dependent error analysis
-
-    Parameters:
-        config_analysis: Analysis configuration
-
-    Returns:
-        True if approximate matrix computation is needed, False otherwise
-    """
-    return (
-        config_analysis.algorithm_matrix_output_file is not None or
-        config_analysis.numerical_simulation_inputs is not None or
-        requires_approximate_eigendecomposition(config_analysis) or
-        config_analysis.error_matrix_norms is not None or
-        config_analysis.error_state_inputs is not None
-    )
-
-# -------------------------------------------------------------------------------------------------
 
 def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfiguration) -> None:
     """
@@ -161,6 +44,8 @@ def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfigura
 
     # Normalize string-or-list config values to always be lists
     # This allows downstream code to always assume list type
+    # TODO: Can these kinds of normalization be done on immediately by using a function instead of
+    #       a parameter?
     config_analysis.error_matrix_norms = normalize_string_or_list_to_list(
         config_analysis.error_matrix_norms
     )
@@ -170,19 +55,6 @@ def validate_and_autocomplete_analysis_config(config_analysis: AnalysisConfigura
     config_analysis.numerical_simulation_inputs = normalize_string_or_list_to_list(
         config_analysis.numerical_simulation_inputs
     )
-
-    # Check if matrices will be computed and auto-enable output if not already set
-    if requires_approximate_matrix(config_analysis):
-        if config_analysis.algorithm_matrix_output_file is None:
-            default_filename = "unitary_matrix.npz"
-            logger.info(
-                f"INFO: Approximate/unitary matrix will be computed for requested analyses. "
-                f"Auto-enabling matrix output to '{default_filename}' (essentially free)."
-            )
-            config_analysis.algorithm_matrix_output_file = default_filename
-
-    # Note: No auto-enabling for exact matrix - users should use flexible API
-    # analysis.save_operator_to_file(source='exact', operator_type='hamiltonian', energy_shifted=False, representation='matrix', ...)
 
 # -------------------------------------------------------------------------------------------------
 
