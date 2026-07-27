@@ -384,9 +384,14 @@ class OperatorRepresentation:
         Convert eigenvalues between different operator representations.
 
         Conversion path:
-        1. Remove energy shift if present: λ_shifted → λ_unshifted
-        2. Convert operator type: H ↔ U
-        3. Apply energy shift if desired: λ_unshifted → λ_shifted
+        1. Apply energy shift if not present: λ_unshifted → λ_shifted
+        2. Convert operator type: H ↔ U or U ↔ H
+        3. Remove energy shift if not desired: λ_shifted → λ_unshifted
+
+        The reason for this is that the energy shift is chosen so that the shifted energies are
+        non-negative.  When converting from U to H with the shift applied, we know that the phases
+        should be in the range [0, 2π).  That allows us to correctly handle aliasing due to the
+        fact that θ + 2π k is indistinguishable from θ when taking the logarithm.
 
         Parameters
         ----------
@@ -408,20 +413,20 @@ class OperatorRepresentation:
         """
         result = eigenvalues.copy()
 
-        # Step 1: Remove energy shift if present (go to unshifted state)
-        if from_shifted:
-            result = self._remove_energy_shift(result, from_type)
+        # Step 1: Apply energy shift if not present (go to shifted state)
+        if not from_shifted:
+            result = self._apply_energy_shift(result, from_type)
 
-        # Step 2: Convert operator type (both unshifted at this point)
+        # Step 2: Convert operator type (both shifted at this point)
         if from_type != to_type:
             if from_type == 'hamiltonian' and to_type == 'time_evolution':
                 result = self._hamiltonian_to_time_evolution(result)
             elif from_type == 'time_evolution' and to_type == 'hamiltonian':
                 result = self._time_evolution_to_hamiltonian(result)
 
-        # Step 3: Apply energy shift if desired
-        if to_shifted:
-            result = self._apply_energy_shift(result, to_type)
+        # Step 3: Remove energy shift if not desired
+        if not to_shifted:
+            result = self._remove_energy_shift(result, to_type)
 
         return result
 
