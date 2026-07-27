@@ -173,7 +173,6 @@ def analyze_algorithm(
         )
 
     # Analysis Category : matrices and eigendecompositions  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-    # TODO: Why are we extracting a private data value?  Is it private just to "hide" it from users?
     if len(config_analysis._operator_output_requests) > 0:
         logger.info("Generating matrix and/or eigendecomposition outputs and saving to file(s).")
         me_results = dict()
