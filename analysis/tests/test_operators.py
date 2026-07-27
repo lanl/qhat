@@ -30,7 +30,7 @@ class TestBasicCreation:
             tevol_hbar=1.0
         )
         assert op is not None
-        assert op.timestep == 1.0
+        assert op.tevol_hbar == 1.0
         assert op.energy_shift == 0.0
 
     def test_create_from_eigendecomposition(self):
@@ -126,7 +126,7 @@ class TestHamiltonianToTimeEvolution:
             tevol_hbar=None  # No timestep provided
         )
 
-        with pytest.raises(ValueError, match="timestep"):
+        with pytest.raises(ValueError, match="tevol_hbar"):
             op.get(operator_type='time_evolution')
 
 
