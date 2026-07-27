@@ -5,7 +5,7 @@ Tests cover:
 - Eigenvalue error computation
 - Matrix norm errors (Frobenius and spectral)
 - State-dependent errors
-- Integration with eigendecomposition
+- Integration with OperatorRepresentation
 - File I/O for error results
 """
 
@@ -13,33 +13,21 @@ import numpy as np
 import pytest
 import tempfile
 import os
-from pathlib import Path
 import scipy.linalg
 
-from qhat.analysis.analysis import error_analysis, validate_and_autocomplete_analysis_config
+from qhat.analysis.error_analysis import error_analysis
 from qhat.analysis.config_types import AnalysisConfiguration
 from qhat.analysis.file_io import save_state
 from qhat.analysis.operators import OperatorRepresentation
 
 
 # =================================================================================================
-# Helper Functions for Phase 1 Tests
+# Helper Functions
 # =================================================================================================
 
 def create_test_hamiltonian():
     """Create a simple test Hamiltonian (Pauli Z)."""
     return np.array([[1.0, 0.0], [0.0, -1.0]], dtype=complex)
-
-
-def hamiltonian_to_unitary(H, t=1.0, energy_shift=0.0):
-    """Convert Hamiltonian to time-evolution operator.
-
-    Returns the energy-shifted unitary U_s = exp(i*E*t) * exp(-i*H*t)
-    that can be passed as unitary_matrix to error_analysis().
-    """
-    U = scipy.linalg.expm(-1j * H * t)
-    U_shifted = np.exp(1j * energy_shift * t) * U
-    return U_shifted
 
 
 def create_identical_operator_representations(t=1.0):
@@ -210,6 +198,59 @@ def test_eigenenergy_error_nonzero_when_different():
             os.chdir(original_dir)
 
 
+def test_eigenvalue_relative_error():
+    """Test that relative eigenvalue errors are computed correctly."""
+    exact_eigenvalues = np.array([10.0, 20.0])
+    approx_eigenvalues = np.array([11.0, 18.0])
+    eigenvectors = np.eye(2, dtype=complex)
+
+    exact_eigendata = {'eigenvalues': exact_eigenvalues, 'eigenvectors': eigenvectors}
+    approx_eigendata = {'eigenvalues': approx_eigenvalues, 'eigenvectors': eigenvectors}
+
+    config = AnalysisConfiguration()
+    config.enable_eigenvalue_errors = True
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        original_dir = os.getcwd()
+        os.chdir(tmpdir)
+        try:
+            # Create OperatorRepresentation objects from eigendecompositions
+            exact_op = OperatorRepresentation(
+                data=exact_eigendata,
+                operator_type='hamiltonian',
+                energy_shifted=False,
+                representation='eigendecomposition',
+                tevol_hbar=1.0
+            )
+
+            approx_op = OperatorRepresentation(
+                data=approx_eigendata,
+                operator_type='hamiltonian',
+                energy_shifted=False,
+                representation='eigendecomposition',
+                tevol_hbar=1.0
+            )
+
+            results = error_analysis(
+                config,
+                hamiltonian=None,
+                algorithm=None,
+                exact_op=exact_op,
+                approx_op=approx_op,
+                timestep=1.0
+            )
+
+            # Check relative errors: (10 - 11) / |10| = -0.1, (20 - 18) / |20| = 0.1
+            expected_relative = np.array([-0.1, 0.1])
+            np.testing.assert_array_almost_equal(
+                results['eigenenergy_errors']['relative_errors'],
+                expected_relative.tolist()
+            )
+
+        finally:
+            os.chdir(original_dir)
+
+
 # =================================================================================================
 # Unit Tests: Matrix Norm Errors (Dense)
 # =================================================================================================
@@ -221,7 +262,6 @@ def test_frobenius_norm_zero_when_identical():
 
     config = AnalysisConfiguration()
     config.error_matrix_norms = 'frobenius'
-    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -251,7 +291,6 @@ def test_frobenius_norm_nonzero_when_different():
 
     config = AnalysisConfiguration()
     config.error_matrix_norms = 'frobenius'
-    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -282,7 +321,6 @@ def test_spectral_norm_zero_when_identical():
 
     config = AnalysisConfiguration()
     config.error_matrix_norms = 'spectral'
-    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -312,7 +350,6 @@ def test_spectral_norm_nonzero_when_different():
 
     config = AnalysisConfiguration()
     config.error_matrix_norms = 'spectral'
-    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -366,6 +403,32 @@ def test_both_matrix_norms():
             os.chdir(original_dir)
 
 
+def test_invalid_matrix_norm_type():
+    """Test error when requesting invalid matrix norm type."""
+    t = 1.0
+    exact_op, approx_op = create_identical_operator_representations(t)
+
+    config = AnalysisConfiguration()
+    config.error_matrix_norms = 'invalid'
+
+    with pytest.raises(ValueError, match="Unknown matrix norm type"):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_dir = os.getcwd()
+            os.chdir(tmpdir)
+            try:
+                error_analysis(
+                    config,
+                    hamiltonian=None,
+                    algorithm=None,
+                    exact_op=exact_op,
+                    approx_op=approx_op,
+                    timestep=t,
+                    energy_shift=0.0
+                )
+            finally:
+                os.chdir(original_dir)
+
+
 # =================================================================================================
 # Unit Tests: State-Dependent Errors
 # =================================================================================================
@@ -378,7 +441,6 @@ def test_state_error_zero_when_identical():
 
     config = AnalysisConfiguration()
     config.error_state_inputs = 'test_state.npy'
-    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -413,7 +475,6 @@ def test_state_error_nonzero_when_different():
 
     config = AnalysisConfiguration()
     config.error_state_inputs = 'test_state.npy'
-    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -479,6 +540,97 @@ def test_state_error_multiple_states():
             os.chdir(original_dir)
 
 
+def test_state_relative_error():
+    """Test that relative state errors are computed correctly."""
+    # Create two diagonal Hamiltonians that give different time evolutions
+    t = 1.0
+    H_exact = np.diag([2.0, 3.0])
+    H_approx = np.diag([2.1, 2.9])
+    state = np.array([1.0, 0.0], dtype=complex)
+
+    exact_op = OperatorRepresentation(
+        data=H_exact,
+        operator_type='hamiltonian',
+        energy_shifted=False,
+        representation='dense_matrix',
+        tevol_hbar=t
+    )
+
+    approx_op = OperatorRepresentation(
+        data=H_approx,
+        operator_type='hamiltonian',
+        energy_shifted=False,
+        representation='dense_matrix',
+        tevol_hbar=t
+    )
+
+    config = AnalysisConfiguration()
+    config.error_state_inputs = 'test_state.npy'
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        original_dir = os.getcwd()
+        os.chdir(tmpdir)
+        try:
+            save_state('test_state.npy', state)
+
+            results = error_analysis(
+                config,
+                hamiltonian=None,
+                algorithm=None,
+                exact_op=exact_op,
+                approx_op=approx_op,
+                timestep=t,
+                energy_shift=0.0
+            )
+
+            # Check that error is computed (specific value depends on the time evolution)
+            assert 'state_errors' in results
+            assert results['state_errors'][0]['relative_error'] > 0
+
+        finally:
+            os.chdir(original_dir)
+
+
+def test_missing_state_file():
+    """Test error when state file doesn't exist."""
+    matrix = np.eye(2, dtype=complex)
+
+    exact_op = OperatorRepresentation(
+        data=matrix,
+        operator_type='hamiltonian',
+        energy_shifted=False,
+        representation='dense_matrix',
+        tevol_hbar=1.0
+    )
+
+    approx_op = OperatorRepresentation(
+        data=matrix,
+        operator_type='hamiltonian',
+        energy_shifted=False,
+        representation='dense_matrix',
+        tevol_hbar=1.0
+    )
+
+    config = AnalysisConfiguration()
+    config.error_state_inputs = 'nonexistent.npy'
+
+    with pytest.raises(Exception):  # Will be FileNotFoundError or similar
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_dir = os.getcwd()
+            os.chdir(tmpdir)
+            try:
+                error_analysis(
+                    config,
+                    hamiltonian=None,
+                    algorithm=None,
+                    exact_op=exact_op,
+                    approx_op=approx_op,
+                    timestep=1.0
+                )
+            finally:
+                os.chdir(original_dir)
+
+
 # =================================================================================================
 # Integration Tests: All Error Types Together
 # =================================================================================================
@@ -493,11 +645,8 @@ def test_all_error_types_together():
 
     config = AnalysisConfiguration()
     config.enable_eigenvalue_errors = True
-    config.num_eigenvalues = 2  # Required for eigenvalue errors
-    config.eigendecomposition_matrices = 'both'  # Will be auto-set by validation, but explicit here
     config.error_matrix_norms = ['frobenius', 'spectral']
     config.error_state_inputs = 'test_state.npy'
-    validate_and_autocomplete_analysis_config(config)  # Normalize config values
 
     with tempfile.TemporaryDirectory() as tmpdir:
         original_dir = os.getcwd()
@@ -592,242 +741,6 @@ def test_error_output_file_created():
             data = np.load('error_analysis.npz')
             assert 'eigenenergy_absolute_errors' in data
             assert 'eigenenergy_relative_errors' in data
-
-        finally:
-            os.chdir(original_dir)
-
-
-# =================================================================================================
-# Error Handling Tests
-# =================================================================================================
-
-def test_invalid_matrix_norm_type():
-    """Test error when requesting invalid matrix norm type."""
-    t = 1.0
-    exact_op, approx_op = create_identical_operator_representations(t)
-
-    config = AnalysisConfiguration()
-    config.error_matrix_norms = 'invalid'
-    validate_and_autocomplete_analysis_config(config)  # Normalize config values
-
-    with pytest.raises(ValueError, match="Unknown matrix norm type"):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            original_dir = os.getcwd()
-            os.chdir(tmpdir)
-            try:
-                error_analysis(
-                    config,
-                    hamiltonian=None,
-                    algorithm=None,
-                    exact_op=exact_op,
-                    approx_op=approx_op,
-                    timestep=t,
-                    energy_shift=0.0
-                )
-            finally:
-                os.chdir(original_dir)
-
-
-def test_missing_state_file():
-    """Test error when state file doesn't exist."""
-    matrix = np.eye(2, dtype=complex)
-
-    exact_op = OperatorRepresentation(
-        data=matrix,
-        operator_type='hamiltonian',
-        energy_shifted=False,
-        representation='dense_matrix',
-        tevol_hbar=1.0
-    )
-
-    approx_op = OperatorRepresentation(
-        data=matrix,
-        operator_type='hamiltonian',
-        energy_shifted=False,
-        representation='dense_matrix',
-        tevol_hbar=1.0
-    )
-
-    config = AnalysisConfiguration()
-    config.error_state_inputs = 'nonexistent.npy'
-    validate_and_autocomplete_analysis_config(config)  # Normalize config values
-
-    with pytest.raises(Exception):  # Will be FileNotFoundError or similar
-        with tempfile.TemporaryDirectory() as tmpdir:
-            original_dir = os.getcwd()
-            os.chdir(tmpdir)
-            try:
-                error_analysis(
-                    config,
-                    hamiltonian=None,
-                    algorithm=None,
-                    exact_op=exact_op,
-                    approx_op=approx_op,
-                    timestep=1.0
-                )
-            finally:
-                os.chdir(original_dir)
-
-
-# =================================================================================================
-# Matrix-Free Operator Tests
-# =================================================================================================
-
-@pytest.mark.skip(reason="Matrix-free operators (Phase 3) not yet implemented in OperatorRepresentation")
-def test_state_error_with_matrix_free_operators():
-    """Test that matrix-free operators raise NotImplementedError (Phase 3)."""
-    # TODO: Update this test once OperatorRepresentation supports matrix-free operators
-    from qhat.analysis.matrix_operations import PauliStringOperator
-
-    # Create matrix-free operators
-    pauli_dict = {'II': 1.0}  # Identity operator
-    exact_pauli_op = PauliStringOperator(pauli_dict, num_qubits=2)
-    approx_pauli_op = PauliStringOperator(pauli_dict, num_qubits=2)
-
-    state = np.array([1.0, 0.0, 0.0, 0.0], dtype=complex)
-    t = 1.0
-
-    config = AnalysisConfiguration()
-    config.error_state_inputs = 'test_state.npy'
-    validate_and_autocomplete_analysis_config(config)  # Normalize config values
-
-    # Phase 3: Matrix-free operators not yet supported in OperatorRepresentation
-    # When implemented, create OperatorRepresentation with representation='matrix_free'
-    # exact_op = OperatorRepresentation(data=exact_pauli_op, ..., representation='matrix_free')
-    # approx_op = OperatorRepresentation(data=approx_pauli_op, ..., representation='matrix_free')
-    pass
-
-
-@pytest.mark.skip(reason="Matrix-free operators (Phase 3) not yet implemented in OperatorRepresentation")
-def test_frobenius_norm_with_matrix_free_small():
-    """Test that matrix-free operators raise NotImplementedError (Phase 3)."""
-    # TODO: Update this test once OperatorRepresentation supports matrix-free operators
-    from qhat.analysis.matrix_operations import PauliStringOperator
-
-    # 2-qubit system (dimension 4) - still small enough for both paths
-    pauli_dict_exact = {'II': 1.0}
-    pauli_dict_approx = {'II': 1.0}
-
-    exact_pauli_op = PauliStringOperator(pauli_dict_exact, num_qubits=2)
-    approx_pauli_op = PauliStringOperator(pauli_dict_approx, num_qubits=2)
-    t = 1.0
-
-    config = AnalysisConfiguration()
-    config.error_matrix_norms = 'frobenius'
-    validate_and_autocomplete_analysis_config(config)  # Normalize config values
-
-    # Phase 3: Matrix-free operators not yet supported in OperatorRepresentation
-    # When implemented, create OperatorRepresentation with representation='matrix_free'
-    # exact_op = OperatorRepresentation(data=exact_pauli_op, ..., representation='matrix_free')
-    # approx_op = OperatorRepresentation(data=approx_pauli_op, ..., representation='matrix_free')
-    pass
-
-
-# =================================================================================================
-# Relative Error Tests
-# =================================================================================================
-
-def test_eigenvalue_relative_error():
-    """Test that relative eigenvalue errors are computed correctly."""
-    exact_eigenvalues = np.array([10.0, 20.0])
-    approx_eigenvalues = np.array([11.0, 18.0])
-    eigenvectors = np.eye(2, dtype=complex)
-
-    exact_eigendata = {'eigenvalues': exact_eigenvalues, 'eigenvectors': eigenvectors}
-    approx_eigendata = {'eigenvalues': approx_eigenvalues, 'eigenvectors': eigenvectors}
-
-    config = AnalysisConfiguration()
-    config.enable_eigenvalue_errors = True
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        original_dir = os.getcwd()
-        os.chdir(tmpdir)
-        try:
-            # Create OperatorRepresentation objects from eigendecompositions
-            exact_op = OperatorRepresentation(
-                data=exact_eigendata,
-                operator_type='hamiltonian',
-                energy_shifted=False,
-                representation='eigendecomposition',
-                tevol_hbar=1.0
-            )
-
-            approx_op = OperatorRepresentation(
-                data=approx_eigendata,
-                operator_type='hamiltonian',
-                energy_shifted=False,
-                representation='eigendecomposition',
-                tevol_hbar=1.0
-            )
-
-            results = error_analysis(
-                config,
-                hamiltonian=None,
-                algorithm=None,
-                exact_op=exact_op,
-                approx_op=approx_op,
-                timestep=1.0
-            )
-
-            # Check relative errors
-            # (10 - 11) / |10| = -0.1, (20 - 18) / |20| = 0.1
-            expected_relative = np.array([-0.1, 0.1])
-            np.testing.assert_array_almost_equal(
-                results['eigenenergy_errors']['relative_errors'],
-                expected_relative.tolist()
-            )
-
-        finally:
-            os.chdir(original_dir)
-
-
-def test_state_relative_error():
-    """Test that relative state errors are computed correctly."""
-    # Create two diagonal Hamiltonians that give different time evolutions
-    t = 1.0
-    H_exact = np.diag([2.0, 3.0])
-    H_approx = np.diag([2.1, 2.9])
-    state = np.array([1.0, 0.0], dtype=complex)
-
-    exact_op = OperatorRepresentation(
-        data=H_exact,
-        operator_type='hamiltonian',
-        energy_shifted=False,
-        representation='dense_matrix',
-        tevol_hbar=t
-    )
-
-    approx_op = OperatorRepresentation(
-        data=H_approx,
-        operator_type='hamiltonian',
-        energy_shifted=False,
-        representation='dense_matrix',
-        tevol_hbar=t
-    )
-
-    config = AnalysisConfiguration()
-    config.error_state_inputs = 'test_state.npy'
-    validate_and_autocomplete_analysis_config(config)  # Normalize config values
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        original_dir = os.getcwd()
-        os.chdir(tmpdir)
-        try:
-            save_state('test_state.npy', state)
-
-            results = error_analysis(
-                config,
-                hamiltonian=None,
-                algorithm=None,
-                exact_op=exact_op,
-                approx_op=approx_op,
-                timestep=t,
-                energy_shift=0.0
-            )
-
-            # Check that error is computed (specific value depends on the time evolution)
-            assert 'state_errors' in results
-            assert results['state_errors'][0]['relative_error'] > 0
 
         finally:
             os.chdir(original_dir)
