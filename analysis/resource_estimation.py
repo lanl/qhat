@@ -36,7 +36,7 @@ def resource_estimation_pyliqtr(algorithm) -> dict:
     if "LogicalQubits" in resources:
         resource_dict["qubit_count"] = resources["LogicalQubits"]
     else:
-        get_cost_value(algorithm, QubitCount())
+        resource_dict["qubit_count"] = get_cost_value(algorithm, QubitCount())
     return resource_dict
 
 # -------------------------------------------------------------------------------------------------
