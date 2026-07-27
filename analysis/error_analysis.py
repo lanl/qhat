@@ -65,9 +65,9 @@ def error_analysis(
 
         # Get eigenenergies from both decompositions (both already sorted by energy)
         def get_eigenvalues(op):
-            return op.get(operator_type="Hamiltonian",
+            return np.sort(op.get(operator_type="Hamiltonian",
                           energy_shifted=False,
-                          representation="eigendecomposition")["eigenvalues"]
+                          representation="eigendecomposition")["eigenvalues"])
         exact_eigenenergies = get_eigenvalues(exact_op)
         approx_eigenenergies = get_eigenvalues(approx_op)
 

@@ -28,8 +28,10 @@ def convert_unitary_eigenvalues_to_eigenenergies(unitary_eigenvalues, timestep, 
     The time evolution operator is U = exp(-iHt/ℏ), so if H has eigenenergy E,
     then U has eigenvalue exp(-iEt/ℏ) = exp(-iφ) where φ = Et/ℏ is the eigenphase.
 
-    Assumption: The Hamiltonian has been shifted and scaled (by existing code) such that
-    all eigenenergies produce eigenphases in the range [0, 2π), preventing aliasing.
+    The Hamiltonian is energy-shifted to center the eigenvalue range around zero, placing them in
+    the range [-dE, +dE] where dE is the one-norm bound. With timestep t/ℏ = π/dE, this maps
+    eigenvalues to phases in [-π, +π], which matches the output range of np.angle() directly, other
+    than the difference between [-π, π] and (-π, π].
 
     Parameters:
         unitary_eigenvalues: Complex eigenvalues of unitary U = exp(-iHt/ℏ) (on unit circle)
@@ -38,21 +40,17 @@ def convert_unitary_eigenvalues_to_eigenenergies(unitary_eigenvalues, timestep, 
 
     Returns:
         tuple: (eigenenergies, eigenphases)
-            eigenenergies: Real eigenvalues of Hamiltonian (shifted/scaled, units: energy)
-            eigenphases: Phases φ ∈ [0, 2π) where φ = Et/ℏ
+            eigenenergies: Real eigenvalues of Hamiltonian (shifted, units: energy)
+            eigenphases: Phases φ = Et/ℏ ∈ [-π, +π] where φ = -θ
     """
-    # Extract phases using np.angle, which returns [-π, π]
-    # Since U = exp(-iφ), we have arg(U) = -φ (mod 2π)
-    phases_neg_pi_to_pi = np.angle(unitary_eigenvalues)
+    # Extract phases using np.angle, which returns θ ∈ (-π, π]
+    # Since U = exp(-iEt/ℏ) = exp(i*θ), we have θ = -Et/ℏ
+    theta = np.angle(unitary_eigenvalues)
 
-    # Eigenphase φ = -arg(U), then map to [0, 2π) convention
-    eigenphases_raw = -phases_neg_pi_to_pi
-    eigenphases = np.where(eigenphases_raw < 0,
-                           eigenphases_raw + 2*np.pi,
-                           eigenphases_raw)
+    # Eigenphase φ = -θ = Et/ℏ (no wrapping needed)
+    eigenphases = -theta
 
     # Convert to eigenenergies: E = φ * ℏ / t
-    # These are shifted/scaled eigenenergies that correspond to the phases in [0, 2π)
     eigenenergies = eigenphases * hbar / timestep
 
     return eigenenergies, eigenphases
@@ -388,10 +386,11 @@ class OperatorRepresentation:
         2. Convert operator type: H ↔ U or U ↔ H
         3. Remove energy shift if not desired: λ_shifted → λ_unshifted
 
-        The reason for this is that the energy shift is chosen so that the shifted energies are
-        non-negative.  When converting from U to H with the shift applied, we know that the phases
-        should be in the range [0, 2π).  That allows us to correctly handle aliasing due to the
-        fact that θ + 2π k is indistinguishable from θ when taking the logarithm.
+        The energy shift centers eigenvalues around zero, placing them in the range
+        [-dE, +dE] where dE is the one-norm bound. With timestep t/ℏ = π/dE, this
+        maps shifted eigenvalues to phases in [-π, +π], which matches np.angle()'s
+        output range directly. This eliminates the need for phase wrapping and correctly
+        handles the logarithm branch cut.
 
         Parameters
         ----------
@@ -446,21 +445,29 @@ class OperatorRepresentation:
         """
         Convert time-evolution eigenvalues to Hamiltonian eigenvalues.
 
-        H = i*ℏ*log(U)/t, so λ_H = i*ℏ*log(λ_U)/t
+        For U = exp(-i*H*t/ℏ) with eigenvalue λ_U = exp(i*θ), we have:
+            exp(i*θ) = exp(-i*E*t/ℏ)
+        where E is the Hamiltonian eigenvalue. Thus:
+            θ = -E*t/ℏ (mod 2π)
+            E = -θ*ℏ/t
 
-        Note: This involves logarithm branch cuts. We choose the principal branch
-        such that phases are in (-π, π].
+        We use θ = angle(λ_U) ∈ (-π, π] from the principal branch of the logarithm.
+
+        The Hamiltonian is energy-shifted to center eigenvalues around zero, placing
+        them in the range [-dE, +dE] where dE is the one-norm bound. With timestep
+        t/ℏ = π/dE, this maps eigenvalues to phases in [-π, +π], which matches the
+        output range of np.angle() directly - no phase wrapping needed!
         """
         if self.timestep is None:
             raise ValueError(
                 "Conversion from time-evolution to Hamiltonian operator requires timestep"
             )
 
-        # get phase in [0, 2π) instead of (-π, π]
+        # Extract phase angle: θ = angle(U) ∈ (-π, π]
+        # Since U = exp(-i*E*t/ℏ), we have E = -θ*ℏ/t
         phase = -1 * np.angle(eigenvalues)
-        phase = np.where(phase < 0, phase + 2*np.pi, phase)
 
-        # convert phase angle to energy eigenvalue
+        # Convert phase angle to energy eigenvalue (no wrapping needed!)
         H_eigen = phase * self.hbar / self.timestep
 
         # ensure Hamiltonian eigenvalues are real
@@ -472,9 +479,9 @@ class OperatorRepresentation:
         Apply energy shift to eigenvalues.
         """
         if operator_type == 'hamiltonian':
-            return eigenvalues - self.energy_shift
+            return eigenvalues + self.energy_shift
         else:  # time_evolution
-            phase_factor = np.exp(1j * self.energy_shift * self.timestep / self.hbar)
+            phase_factor = np.exp(-1j * self.energy_shift * self.timestep / self.hbar)
             print(f"phase factor = {phase_factor}")
             print(f"energy shift = {self.energy_shift}")
             print(f"time step    = {self.timestep}")
@@ -486,9 +493,9 @@ class OperatorRepresentation:
         Remove energy shift from eigenvalues (inverse of _apply_energy_shift).
         """
         if operator_type == 'hamiltonian':
-            return eigenvalues + self.energy_shift
+            return eigenvalues - self.energy_shift
         else:  # time_evolution
-            phase_factor = np.exp(-1j * self.energy_shift * self.timestep / self.hbar)
+            phase_factor = np.exp(1j * self.energy_shift * self.timestep / self.hbar)
             print(f"phase factor = {phase_factor}")
             print(f"energy shift = {self.energy_shift}")
             print(f"time step    = {self.timestep}")

@@ -57,10 +57,13 @@ def run():
         # first-pass computation of energy bounds
         Elo1, Ehi1 = physical_hamiltonian.compute_initial_energy_bounds(state.config_hamiltonian)
 
-        # energy-shift Hamiltonian
-        physical_hamiltonian.energy_shift(-1 * Elo1)
-        Elo2 = Elo1 - Elo1
-        Ehi2 = Ehi1 - Elo1
+        # energy-shift Hamiltonian to center at zero
+        # This maps eigenvalues from [Elo1, Ehi1] to [-(Ehi1-Elo1)/2, +(Ehi1-Elo1)/2]
+        # which enables phase angles in [-π, +π] (matching np.angle output directly)
+        E0 = (Elo1 + Ehi1) / 2
+        physical_hamiltonian.energy_shift(-E0)
+        Elo2 = Elo1 - E0
+        Ehi2 = Ehi1 - E0
         logger.verbose(f"-- shifted bounds = [{Elo2}, {Ehi2})")
         tevol_hbar = 2 * math.pi / (Ehi2 - Elo2)
         logger.verbose(f"-- preliminary evolution time = {tevol_hbar} * hbar")
