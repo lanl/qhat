@@ -23,7 +23,8 @@ def analyze_algorithm(
         approximate_time_evolution=None,
         exact_hamiltonian=None,
         timestep=None,
-        energy_shift=0.0) -> dict:
+        energy_shift=0.0,
+        config_general=None) -> dict:
     """
     Analyze a quantum algorithm.
 
@@ -35,6 +36,7 @@ def analyze_algorithm(
         timestep: Time evolution parameter (required for approximate eigendecomposition)
                  If not provided, approximate eigendecomposition will fail.
         energy_shift: Energy shift applied to Hamiltonian (for correcting eigenvalue comparisons)
+        config_general: General configuration (for output directory handling)
 
     Returns:
         Dictionary with analysis results
@@ -168,25 +170,29 @@ def analyze_algorithm(
             exact_op=exact_op,
             approx_op=approx_op,
             timestep=timestep,
-            energy_shift=energy_shift
+            energy_shift=energy_shift,
+            config_general=config_general
         )
 
     # Analysis Category : matrices and eigendecompositions  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     if len(config_analysis._operator_output_requests) > 0:
         logger.info("Generating matrix and/or eigendecomposition outputs and saving to file(s).")
         me_results = dict()
-        me_results.update(save_requested_operator_outputs(exact_op_requests, exact_op, "exact"))
-        me_results.update(save_requested_operator_outputs(approx_op_requests, approx_op, "approx"))
+        me_results.update(save_requested_operator_outputs(exact_op_requests, exact_op, "exact", config_general))
+        me_results.update(save_requested_operator_outputs(approx_op_requests, approx_op, "approx", config_general))
         results["matrices_and_eigendecompositions"] = me_results
     if config_analysis.algorithm_matrix_output_file is not None:
-        logger.info(f"Generating algorithm matrix output and saving to file {config_analysis.algorithm_matrix_output_file}.")
-        results["matrix_output"] = output_unitary_matrix(config_analysis.algorithm_matrix_output_file, algorithm_mat)
+        output_file = config_analysis.algorithm_matrix_output_file
+        if config_general:
+            output_file = config_general.get_output_path(output_file)
+        logger.info(f"Generating algorithm matrix output and saving to file {output_file}.")
+        results["matrix_output"] = output_unitary_matrix(output_file, algorithm_mat)
 
     # Analysis Category : numerical simulation  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     if config_analysis.numerical_simulation_inputs is not None:
         logger.info("Performing numerical simulation of the full algorithm.")
         results["numerical_simulation"] = \
-            numerical_simulation(config_analysis.numerical_simulation_inputs, algorithm, algorithm_mat)
+            numerical_simulation(config_analysis.numerical_simulation_inputs, algorithm, algorithm_mat, config_general)
 
     # Epiloque ____________________________________________________________________________________
 

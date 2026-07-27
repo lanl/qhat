@@ -22,11 +22,29 @@ class ConfigurationBase:
 # -------------------------------------------------------------------------------------------------
 
 class GeneralConfigurationUser:
+    """
+    User-facing configuration for general analysis settings.
+
+    Attributes
+    ----------
+    logfile : str
+        Name of the log file (default: "analysis.log")
+    output_directory : str
+        Base directory for all output files. If set, all output files (logfile, matrices,
+        eigendecompositions, numerical simulation outputs, error analysis) will be written
+        to this directory. The directory is created automatically if it doesn't exist.
+        If empty or not set, files are written to the current directory.
+        Examples:
+            "Be-H/" - all outputs go to Be-H/
+            "results/run1/" - all outputs go to results/run1/
+    """
     def __init__(self):
         # Logfile name
         self.logfile = "analysis.log"
         # How much information to print as the script runs
         self._loglevel = "info"
+        # Output directory for all generated files (empty string = current directory)
+        self.output_directory = ""
     def print_default(self):
         self._loglevel= "info"
     def print_verbose(self):
@@ -315,12 +333,58 @@ class GeneralConfiguration:
     def __init__(self, user_config: GeneralConfigurationUser):
         self.logfile = user_config.logfile
         self.loglevel = user_config._loglevel
+        self.output_directory = user_config.output_directory
         self.git_hash = _get_git_hash()
+
+    def get_output_path(self, filename):
+        """
+        Get the full output path for a file, respecting output_directory.
+
+        Parameters
+        ----------
+        filename : str
+            The filename or relative path
+
+        Returns
+        -------
+        str
+            Full path with output_directory prepended (if set)
+
+        Notes
+        -----
+        - If output_directory is empty or None, returns filename unchanged
+        - Uses os.path.join() for proper path joining
+        - Absolute paths in filename override output_directory
+        - Creates parent directories automatically
+
+        Examples
+        --------
+        >>> config.output_directory = "Be-H/"
+        >>> config.get_output_path("analysis.log")
+        'Be-H/analysis.log'
+        >>> config.get_output_path("logs/debug.log")
+        'Be-H/logs/debug.log'
+        >>> config.get_output_path("/tmp/file.log")
+        '/tmp/file.log'  # absolute path unchanged
+        """
+        if not self.output_directory:
+            output_path = filename
+        else:
+            output_path = os.path.join(self.output_directory, filename)
+
+        # Create parent directory if it doesn't exist
+        parent_dir = os.path.dirname(output_path)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
+
+        return output_path
 
     def _generate_TOML_table(self):
         table = tomlkit.table()
         table["logfile"] = self.logfile
         table["loglevel"] = self.loglevel
+        if self.output_directory:
+            table["output_directory"] = self.output_directory
         table["git_hash"] = self.git_hash
         return table
 
@@ -507,9 +571,11 @@ class State:
             filtered_value = self._filter_for_toml(self.results[key])
             document.add(key, filtered_value)
         filename = ".".join((str(self.overall_hash), "toml"))
-        tomlfile = TOMLFile(filename)
+        # Apply output directory if configured
+        output_path = self.config_general.get_output_path(filename)
+        tomlfile = TOMLFile(output_path)
         tomlfile.write(document)
-        logger.info(f"Summary file saved to \"{filename}\".")
+        logger.info(f"Summary file saved to \"{output_path}\".")
 
 # -------------------------------------------------------------------------------------------------
 

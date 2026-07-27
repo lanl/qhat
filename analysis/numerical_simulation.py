@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 def numerical_simulation(
         input_state_files,
         algorithm,
-        unitary_matrix) -> dict:
+        unitary_matrix,
+        config_general=None) -> dict:
     """
     Perform numerical simulation by applying the unitary matrix to input state(s).
 
@@ -21,6 +22,7 @@ def numerical_simulation(
         input_state_files: name or collection of names for input state files
         algorithm: The algorithm bloq to analyze
         unitary_matrix: The unitary matrix to apply (pre-computed)
+        config_general: General configuration for output directory handling
 
     Returns:
         Dictionary with simulation metadata: list of {input_file, output_file, output_norm}
@@ -74,6 +76,10 @@ def numerical_simulation(
         # Generate output filename: input.npy -> input_final.npy
         input_path = Path(input_file)
         output_file = str(input_path.parent / f"{input_path.stem}_final{input_path.suffix}")
+
+        # Apply output directory if configured
+        if config_general:
+            output_file = config_general.get_output_path(output_file)
 
         # Save final state
         try:

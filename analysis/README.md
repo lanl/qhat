@@ -22,15 +22,45 @@ Configuration is broken down by several parts of the processing script.
 
 ### General
 
-"General" configuration governs the behavior of the resource analysis script itself.  Currently the
-only controls under this heading relate to logging progress of the script.
+"General" configuration governs the behavior of the resource analysis script itself, including
+logging and output file organization.
+
+#### Output Directory
+
+You can organize all output files in a dedicated directory by setting **`general.output_directory`**.
+If set, all generated files (logfile, matrices, eigendecompositions, error analysis, numerical
+simulation outputs) will be written to this directory. The directory is created automatically if
+it doesn't exist.
+
+**Examples**:
+```python
+# All outputs go to Be-H/ subdirectory
+general.output_directory = "Be-H/"
+
+# All outputs go to nested results/run1/ subdirectory
+general.output_directory = "results/run1/"
+
+# No output directory (default) - files written to current directory
+general.output_directory = ""
+```
+
+**Path behavior**:
+- Relative paths in filenames are joined with `output_directory`: 
+  - `general.logfile = "logs/debug.log"` → `Be-H/logs/debug.log`
+- Absolute paths override `output_directory`:
+  - `general.logfile = "/tmp/debug.log"` → `/tmp/debug.log`
+- Parent directories are created automatically
+
+#### Logfile
 
 You can configure the log file that the script will write to by setting **`general.logfile`** to
-the name of the logfile you want to use.  The default is `analysis.log`.
+the name of the logfile you want to use.  The default is `analysis.log`. If `output_directory` is
+set, the logfile will be written to that directory.
 
-The other capability under general configuration is to set the log level, which is done by calling
-the following functions.  If you call multiple of these functions, whichever is called last takes
-precedence.
+#### Log Level
+
+The log level is set by calling one of the following functions. If you call multiple of these
+functions, whichever is called last takes precedence.
 
 - **`general.print_verbose()`** -- Calling this function increases the printouts to be more
   verbose, providing additional information as the resource analysis progresses.  This information
@@ -381,7 +411,8 @@ analysis will skip file output and note this in the results.
 ## Generated Files
 
 The script will print a log both to the screen and to a logfile. It also generates output files
-depending on the analyses requested:
+depending on the analyses requested. If `general.output_directory` is set, all output files are
+written to that directory.
 
 - **Log file**: Default `analysis.log`, configurable via `general.logfile`
 - **TOML summary**: Hash-based filename (e.g., `12345678901234567890.toml`) containing inputs and
@@ -395,6 +426,9 @@ depending on the analyses requested:
 - **Error analysis file** (if any error analysis enabled): `error_analysis.npz`
 - **Final state files** (if `numerical_simulation_inputs` specified): Evolved quantum states with
   `_final` suffix (e.g., `initial_state.npy` → `initial_state_final.npy`)
+
+**Note**: All file paths respect `general.output_directory` if set. This keeps outputs organized
+when running multiple analyses.
 
 The logfile is typically most useful for understanding the analysis process and intermediate
 values.

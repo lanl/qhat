@@ -166,17 +166,20 @@ def _compute_state_dependent_errors(exact_unitary_matrix, approx_unitary_matrix,
 
 # -------------------------------------------------------------------------------------------------
 
-def _save_error_results(results: dict) -> str:
+def _save_error_results(results: dict, config_general=None) -> str:
     """
     Save error analysis results to npz file.
 
     Parameters:
         results: Dictionary containing error analysis results
+        config_general: General configuration for output directory handling
 
     Returns:
         Path to output file
     """
     output_file = 'error_analysis.npz'
+    if config_general:
+        output_file = config_general.get_output_path(output_file)
     save_dict = {}
 
     if 'eigenenergy_errors' in results:
@@ -212,7 +215,8 @@ def error_analysis(
         exact_op,
         approx_op,
         timestep=None,
-        energy_shift=0.0) -> dict:
+        energy_shift=0.0,
+        config_general=None) -> dict:
     """
     Compute error metrics comparing exact and approximate representations.
 
@@ -294,7 +298,7 @@ def error_analysis(
 
     # Save results to file
     if results:
-        output_file = _save_error_results(results)
+        output_file = _save_error_results(results, config_general)
         results['output_file'] = output_file
 
     return results

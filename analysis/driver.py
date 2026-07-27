@@ -26,15 +26,16 @@ def run():
     state = load_configuration()
 
     # Configure logging based on user settings
+    logfile_path = state.config_general.get_output_path(state.config_general.logfile)
     configure_logging(
         level=state.config_general.loglevel,
-        logfile=state.config_general.logfile
+        logfile=logfile_path
     )
 
     logger.info("=" * 99)
     logger.info("ANALYSIS DRIVER START")
     logger.info("=" * 99)
-    logger.info(f"Logfile: {state.config_general.logfile}")
+    logger.info(f"Logfile: {logfile_path}")
     logger.info(f"Git hash: {state.config_general.git_hash}")
 
     # Hamiltonian _________________________________________________________________________________
@@ -97,7 +98,8 @@ def run():
         approximate_time_evolution=unitary_hamiltonian,
         exact_hamiltonian=physical_hamiltonian,
         timestep=timestep,
-        energy_shift=energy_shift
+        energy_shift=energy_shift,
+        config_general=state.config_general
     ))
 
     # Save Results ________________________________________________________________________________

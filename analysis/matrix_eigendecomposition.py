@@ -139,9 +139,20 @@ def output_unitary_matrix(filename, unitary_matrix) -> dict:
 # Flexible operator output system
 # -------------------------------------------------------------------------------------------------
 
-def save_requested_operator_outputs(operator_output_requests, op, name) -> dict:
+def save_requested_operator_outputs(operator_output_requests, op, name, config_general=None) -> dict:
     """
     Save all requested operator forms using OperatorRepresentation.
+
+    Parameters
+    ----------
+    operator_output_requests : list
+        List of output request dictionaries
+    op : OperatorRepresentation
+        Operator to save
+    name : str
+        Name for error messages (e.g., "exact", "approx")
+    config_general : GeneralConfiguration, optional
+        General configuration for output directory handling
 
     Returns
     -------
@@ -168,10 +179,15 @@ def save_requested_operator_outputs(operator_output_requests, op, name) -> dict:
         energy_shifted = request['energy_shifted']
         representation = request['representation']
 
+        # Get output path with directory handling
+        filename = request['filename']
+        if config_general:
+            filename = config_general.get_output_path(filename)
+
         shift_str = 'shifted' if energy_shifted else 'unshifted'
         logger.info(
             f"Saving {request['source']} {request['operator_type']} "
-            f"({shift_str}) as {representation} to {request['filename']}"
+            f"({shift_str}) as {representation} to {filename}"
         )
 
         if representation == 'matrix':
@@ -182,10 +198,10 @@ def save_requested_operator_outputs(operator_output_requests, op, name) -> dict:
                 representation='dense_matrix'
             )
 
-            save_matrix(request['filename'], matrix)
+            save_matrix(filename, matrix)
 
             results['matrix_outputs'].append({
-                'filename': request['filename'],
+                'filename': filename,
                 'source': request['source'],
                 'operator_type': request['operator_type'],
                 'energy_shifted': energy_shifted,
@@ -206,7 +222,7 @@ def save_requested_operator_outputs(operator_output_requests, op, name) -> dict:
             eigenvectors_sorted = eigendata['eigenvectors'][:, sort_indices]
 
             save_eigendecomposition(
-                request['filename'],
+                filename,
                 eigenenergies=eigenvalues_sorted,
                 eigenvectors=eigenvectors_sorted,
                 matrix_type=f"{request['source']}_{request['operator_type']}_{shift_str}",
@@ -214,7 +230,7 @@ def save_requested_operator_outputs(operator_output_requests, op, name) -> dict:
             )
 
             results['eigendecomposition_outputs'].append({
-                'filename': request['filename'],
+                'filename': filename,
                 'source': request['source'],
                 'operator_type': request['operator_type'],
                 'energy_shifted': energy_shifted,
