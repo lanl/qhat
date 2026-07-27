@@ -46,8 +46,6 @@ def analyze_algorithm(
 
     # Aggregate options to help summarize options _________________________________________________
 
-    # TODO: Should some of these be methods of config_analysis?
-
     # Is the unitary encoding message Trotter?  Some analyses only apply to Trotter.
     is_trotter = unitary_encoding in ["ramped trotter"]
 
