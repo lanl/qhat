@@ -226,12 +226,13 @@ class TestResourceEstimation:
 
         assert "resource_estimates" in results
         resources = results["resource_estimates"]
-        assert "T_count" in resources
-        assert "Clifford_count" in resources
+        assert "pyliqtr" in resources
+        assert "T_count" in resources["pyliqtr"]
+        assert "Clifford_count" in resources["pyliqtr"]
 
         # Should have non-negative counts
-        assert resources["T_count"] >= 0
-        assert resources["Clifford_count"] >= 0
+        assert resources["pyliqtr"]["T_count"] >= 0
+        assert resources["pyliqtr"]["Clifford_count"] >= 0
 
     def test_controlled_time_evolution_resource_estimation(self):
         """Resource estimation should work on controlled time evolution algorithms."""
@@ -248,10 +249,11 @@ class TestResourceEstimation:
 
         assert "resource_estimates" in results
         resources = results["resource_estimates"]
-        assert "T_count" in resources
-        assert "Clifford_count" in resources
-        assert resources["T_count"] >= 0
-        assert resources["Clifford_count"] >= 0
+        assert "pyliqtr" in resources
+        assert "T_count" in resources["pyliqtr"]
+        assert "Clifford_count" in resources["pyliqtr"]
+        assert resources["pyliqtr"]["T_count"] >= 0
+        assert resources["pyliqtr"]["Clifford_count"] >= 0
 
     def test_controlled_has_higher_resources(self):
         """Controlled version should have at least as many resources as base."""
@@ -274,8 +276,8 @@ class TestResourceEstimation:
         resources_cte = results_cte["resource_estimates"]
 
         # Controlled should have at least as many gates
-        assert resources_cte["T_count"] >= resources_te["T_count"]
-        assert resources_cte["Clifford_count"] >= resources_te["Clifford_count"]
+        assert resources_cte["pyliqtr"]["T_count"] >= resources_te["pyliqtr"]["T_count"]
+        assert resources_cte["pyliqtr"]["Clifford_count"] >= resources_te["pyliqtr"]["Clifford_count"]
 
     def test_resource_counts_are_reasonable(self):
         """Resource counts should be finite and non-negative."""
@@ -290,8 +292,8 @@ class TestResourceEstimation:
             algorithm = build_algorithm(algorithm_config, unitary, P0=None)
             results = analyze_algorithm(analysis_config, algorithm, unitary_encoding="ramped trotter")
 
-            t_count = results["resource_estimates"]["T_count"]
-            clifford_count = results["resource_estimates"]["Clifford_count"]
+            t_count = results["resource_estimates"]["pyliqtr"]["T_count"]
+            clifford_count = results["resource_estimates"]["pyliqtr"]["Clifford_count"]
 
             # Should be non-negative and finite
             assert 0 <= t_count < 1e10, f"T-count {t_count} unreasonable for {pauli_string}"

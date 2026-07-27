@@ -320,15 +320,15 @@ def test_numerical_simulation_dimension_mismatch_raises_error():
 
 
 def test_compute_unitary_matrix_helper():
-    """Test the _compute_unitary_matrix helper function."""
-    from qhat.analysis.analysis import _compute_unitary_matrix
+    """Test the compute_unitary_matrix helper function."""
+    from qhat.analysis.matrix_eigendecomposition import compute_unitary_matrix
 
     # Create unitary
     unitary = np.eye(4, dtype=complex)
     algorithm = MockAlgorithm(unitary)
 
     # Compute matrix
-    result = _compute_unitary_matrix(algorithm)
+    result = compute_unitary_matrix(algorithm)
 
     # Verify it matches
     assert np.allclose(result, unitary)
@@ -339,7 +339,7 @@ def test_compute_unitary_matrix_helper():
 
 def test_compute_unitary_matrix_missing_tensor_contract():
     """Test error handling when algorithm lacks tensor_contract method."""
-    from qhat.analysis.analysis import _compute_unitary_matrix
+    from qhat.analysis.matrix_eigendecomposition import compute_unitary_matrix
 
     # Create algorithm without tensor_contract method
     class BadAlgorithm:
@@ -348,7 +348,7 @@ def test_compute_unitary_matrix_missing_tensor_contract():
     algorithm = BadAlgorithm()
 
     with pytest.raises(AttributeError, match="does not have a 'tensor_contract.*' method"):
-        _compute_unitary_matrix(algorithm)
+        compute_unitary_matrix(algorithm)
 
     print("✓ Test passed: compute_unitary_matrix_missing_tensor_contract")
 

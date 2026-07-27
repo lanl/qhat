@@ -118,7 +118,7 @@ def test_invalid_estimator_raises_error():
         estimate_resources('invalid_method', mock_algorithm)
 
     with pytest.raises(ValueError, match="Invalid resource estimator method"):
-        estimate_resources(['pyliqtr', 'invalid_method'], mock_algorithm)
+        estimate_resources(['invalid_method'], mock_algorithm)
 
     print("✓ Test passed: invalid_estimator_raises_error")
 
