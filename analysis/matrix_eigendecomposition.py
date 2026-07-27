@@ -228,7 +228,7 @@ def _process_eigendecomposition(matrix, matrix_type, timestep=None, energy_shift
         )
 
         # Apply energy shift correction to restore original energy scale
-        eigenenergies_corrected = eigenenergies + energy_shift
+        eigenenergies_corrected = eigenenergies - energy_shift
 
         # Sort by eigenenergy
         sort_indices = np.argsort(eigenenergies_corrected)
