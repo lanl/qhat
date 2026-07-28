@@ -27,10 +27,7 @@ def run():
 
     # Configure logging based on user settings
     logfile_path = state.config_general.get_output_path(state.config_general.logfile)
-    configure_logging(
-        level=state.config_general.loglevel,
-        logfile=logfile_path
-    )
+    configure_logging(level=state.config_general.loglevel, logfile=logfile_path)
 
     logger.info("=" * 99)
     logger.info("ANALYSIS DRIVER START")
@@ -68,6 +65,11 @@ def run():
         tevol_hbar = 2 * math.pi / (Ehi3 - Elo3)
         logger.verbose(f"-- optimized evolution time = {tevol_hbar} * hbar")
 
+        # check for user-defined timestep
+        if getattr(state.config_unitary, 'timestep', None) is not None:
+            tevol_hbar = state.config_unitary.timestep
+            logger.verbose(f"-- user timestep override = {tevol_hbar} * hbar")
+
     # Unitary _____________________________________________________________________________________
 
     unitary_hamiltonian = encode_as_unitary(
@@ -84,21 +86,14 @@ def run():
 
     # Analysis ____________________________________________________________________________________
 
-    # Extract timestep for eigendecomposition analysis (if available)
-    # For ramped trotter, use tevol_hbar; otherwise check config_unitary.timestep
-    timestep = tevol_hbar if tevol_hbar is not None else getattr(state.config_unitary, 'timestep', None)
-
-    # Extract energy shift for correcting eigenvalue comparisons
-    energy_shift = physical_hamiltonian.get_energy_shift()
-
     state.store_results(analyze_algorithm(
         state.config_analysis,
         algorithm,
         state.config_unitary.method,
         approximate_time_evolution=unitary_hamiltonian,
         exact_hamiltonian=physical_hamiltonian,
-        timestep=timestep,
-        energy_shift=energy_shift,
+        timestep=tevol_hbar,
+        energy_shift=physical_hamiltonian.get_energy_shift(),
         config_general=state.config_general
     ))
 
@@ -106,6 +101,8 @@ def run():
 
     state.show_results()
     state.save_summary()
+
+    logger.warning("Analysis complete.")
 
 # =================================================================================================
 

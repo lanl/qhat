@@ -94,7 +94,7 @@ def analyze_algorithm(
         config_analysis.resource_estimator is None):
         raise ValueError("No analyses requested. Turn on at least one analysis.\n")
 
-    logger.verbose("\n".join(["Analysis summary flags:",
+    logger.debug("\n".join(["Analysis summary flags:",
         f"   error analysis requested:                  {error_analysis_requested}",
         f"   exact OperatorRepresentation needed:       {exact_op_needed}",
         f"   approximate OperatorRepresentation needed: {approximate_op_needed}",
@@ -108,17 +108,17 @@ def analyze_algorithm(
     # Construct the unitary matrix equivalent to the full algorithm
     algorithm_mat = None
     if algorithm_matrix_needed:
-        logger.verbose("Constructing the unitary matrix equivalent to the full algorithm.")
+        logger.info("Constructing the unitary matrix equivalent to the full algorithm.")
         algorithm_mat = compute_unitary_matrix(algorithm)
-        logger.info("Created full algorithm matrix")
+        logger.verbose("Created full algorithm matrix")
 
     # Construct the "exact" (from the true Hamiltonian) OperatorRepresentation if necessary
     exact_op = None
     if exact_op_needed:
-        logger.verbose("Constructing the exact energy-shifted Hamiltonian matrix")
+        logger.info("Constructing the exact energy-shifted Hamiltonian matrix")
         exact_matrix = compute_exact_matrix(exact_hamiltonian, config_analysis.matrix_memory_threshold_gb)
-        logger.info("Created exact matrix")
-        logger.verbose(f"Constructing the exact operator(t = {timestep}, ΔE = {energy_shift})")
+        logger.verbose("Created exact matrix")
+        logger.info(f"Constructing the exact operator(t = {timestep}, ΔE = {energy_shift})")
         exact_op = OperatorRepresentation(
             data=exact_matrix,
             operator_type='hamiltonian',
@@ -127,17 +127,16 @@ def analyze_algorithm(
             tevol_hbar=timestep,
             energy_shift=energy_shift
         )
-        logger.info("Created exact operator representation")
+        logger.verbose("Created exact operator representation")
 
     # Construct the "approximate" (from the unitary Hamiltonian encoding) OperatorRepresentation if
     # necessary
     approx_op = None
     if approximate_op_needed:
-        logger.verbose("Constructing the approximate energy-shifted time-evolution matrix")
+        logger.info("Constructing the approximate energy-shifted time-evolution matrix")
         approx_matrix = compute_unitary_matrix(approximate_time_evolution)
-        logger.info("Created approximate matrix")
-        logger.verbose(
-            "Constructing the approximate operator (t = {timestep}, ΔE = {energy_shift})")
+        logger.verbose("Created approximate matrix")
+        logger.info("Constructing the approximate operator (t = {timestep}, ΔE = {energy_shift})")
         approx_op = OperatorRepresentation(
             data=approx_matrix,
             operator_type='time_evolution',
@@ -146,7 +145,7 @@ def analyze_algorithm(
             tevol_hbar=timestep,
             energy_shift=energy_shift
         )
-        logger.info("Created approximate operator representation")
+        logger.verbose("Created approximate operator representation")
 
     # Storage in which to aggregate the results ___________________________________________________
 
@@ -160,7 +159,7 @@ def analyze_algorithm(
     if config_analysis.resource_estimator is not None:
         logger.info(f"Performing resource estimation using {config_analysis.resource_estimator}.")
         results["resource_estimates"] = estimate_resources(config_analysis.resource_estimator, algorithm)
-        logger.verbose(f"Resource estimation methods: {list(results['resource_estimates'].keys())}")
+        logger.verbose("Resource estimation complete")
 
     # Analysis Category : error analysis  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     if error_analysis_requested:
@@ -173,26 +172,35 @@ def analyze_algorithm(
             energy_shift=energy_shift,
             config_general=config_general
         )
+        logger.verbose("Error analysis complete.")
 
     # Analysis Category : matrices and eigendecompositions  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     if len(config_analysis._operator_output_requests) > 0:
         logger.info("Generating matrix and/or eigendecomposition outputs and saving to file(s).")
         me_results = dict()
-        me_results.update(save_requested_operator_outputs(exact_op_requests, exact_op, "exact", config_general))
-        me_results.update(save_requested_operator_outputs(approx_op_requests, approx_op, "approx", config_general))
+        me_results.update(save_requested_operator_outputs(
+            exact_op_requests, exact_op, "exact", config_general))
+        me_results.update(save_requested_operator_outputs(
+            approx_op_requests, approx_op, "approx", config_general))
         results["matrices_and_eigendecompositions"] = me_results
+        logger.verbose("Matrix/eigendecomposition outputs complete.")
     if config_analysis.algorithm_matrix_output_file is not None:
         output_file = config_analysis.algorithm_matrix_output_file
         if config_general:
             output_file = config_general.get_output_path(output_file)
         logger.info(f"Generating algorithm matrix output and saving to file {output_file}.")
         results["matrix_output"] = output_unitary_matrix(output_file, algorithm_mat)
+        logger.verbose(f"Algorithm matrix saved.")
 
     # Analysis Category : numerical simulation  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     if config_analysis.numerical_simulation_inputs is not None:
         logger.info("Performing numerical simulation of the full algorithm.")
-        results["numerical_simulation"] = \
-            numerical_simulation(config_analysis.numerical_simulation_inputs, algorithm, algorithm_mat, config_general)
+        results["numerical_simulation"] = numerical_simulation(
+                config_analysis.numerical_simulation_inputs,
+                algorithm,
+                algorithm_mat,
+                config_general)
+        logger.verbose("Numerical simulation complete.")
 
     # Epiloque ____________________________________________________________________________________
 

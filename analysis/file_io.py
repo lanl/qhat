@@ -242,7 +242,7 @@ def save_eigendecomposition(output_path, eigenenergies, eigenvectors, matrix_typ
         metadata['eigenphases'] = eigenphases
 
     np.savez(output_path, **metadata)
-    logger.info(f"Eigendecomposition saved to {output_path} ({len(eigenenergies)} eigenstates, sorted by energy)")
+    logger.info(f"Eigendecomposition saved to {output_path} ({len(eigenenergies)} eigenstates)")
 
 
 def load_eigendecomposition(path):

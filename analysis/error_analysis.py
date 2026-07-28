@@ -23,11 +23,10 @@ def _compute_eigenvalue_errors(exact_op, approx_op) -> dict:
     """
     logger.info("Computing eigenenergy errors for all eigenstates")
 
-    if exact_op is None or approx_op is None:
-        raise ValueError(
-            "Both eigendecompositions must be computed in order to compare eigenenergies. "
-            "Use the flexible API to save both eigendecompositions when enable_eigenvalue_errors is True."
-        )
+    if exact_op is None:
+        raise ValueError("missing exact operator")
+    if approx_op is None:
+        raise ValueError("missing approximate operator")
 
     # Get eigenenergies from both decompositions (both already sorted by energy)
     def get_eigenvalues(op):
@@ -40,8 +39,8 @@ def _compute_eigenvalue_errors(exact_op, approx_op) -> dict:
     # Verify same dimension (should have all eigenvalues since full decomposition)
     if len(exact_eigenenergies) != len(approx_eigenenergies):
         raise ValueError(
-            f"Dimension mismatch: exact has {len(exact_eigenenergies)} eigenstates, "
-            f"approximate has {len(approx_eigenenergies)} eigenstates."
+            f"Dimension mismatch: exact operator has {len(exact_eigenenergies)} eigenstates, "
+            f"approximate operator has {len(approx_eigenenergies)} eigenstates."
         )
 
     # Element-wise comparison (both already sorted by energy)
@@ -50,10 +49,10 @@ def _compute_eigenvalue_errors(exact_op, approx_op) -> dict:
 
     num_eigenstates = len(exact_eigenenergies)
     logger.info(f"Computed errors for {num_eigenstates} eigenstates (sorted by energy)")
-    logger.info(f"  Ground state: exact={exact_eigenenergies[0]:.6e}, approx={approx_eigenenergies[0]:.6e}, error={absolute_errors[0]:.6e}")
-    logger.info(f"  Highest state: exact={exact_eigenenergies[-1]:.6e}, approx={approx_eigenenergies[-1]:.6e}, error={absolute_errors[-1]:.6e}")
-    logger.info(f"  Max absolute error: {np.abs(absolute_errors).max():.6e}")
-    logger.info(f"  Max relative error: {np.abs(relative_errors).max():.6e}")
+    logger.verbose(f"  Ground state: exact={exact_eigenenergies[0]:.6e}, approx={approx_eigenenergies[0]:.6e}, error={absolute_errors[0]:.6e}")
+    logger.verbose(f"  Highest state: exact={exact_eigenenergies[-1]:.6e}, approx={approx_eigenenergies[-1]:.6e}, error={absolute_errors[-1]:.6e}")
+    logger.verbose(f"  Max absolute error: {np.abs(absolute_errors).max():.6e}")
+    logger.verbose(f"  Max relative error: {np.abs(relative_errors).max():.6e}")
 
     return {
         'eigenenergy_errors': {
@@ -89,11 +88,11 @@ def _compute_matrix_norm_errors(exact_unitary_matrix, approx_unitary_matrix, nor
 
     if exact_unitarity_error > 1e-10:
         logger.warning(
-            f"WARNING: U_exact unitarity error {exact_unitarity_error:.6e} exceeds 1e-10."
+            f"WARNING: U_exact unitarity error {exact_unitarity_error:.6e} > 1e-10."
         )
     if approx_unitarity_error > 1e-10:
         logger.warning(
-            f"WARNING: U_approx unitarity error {approx_unitarity_error:.6e} exceeds 1e-10."
+            f"WARNING: U_approx unitarity error {approx_unitarity_error:.6e} > 1e-10."
         )
 
     diff_matrix = exact_unitary_matrix - approx_unitary_matrix
@@ -140,7 +139,7 @@ def _compute_state_dependent_errors(exact_unitary_matrix, approx_unitary_matrix,
         try:
             initial_state = load_state(state_file)
         except Exception as e:
-            logger.info(f"ERROR: Failed to load state from {state_file}: {e}")
+            logger.error(f"ERROR: Failed to load state from {state_file}: {e}")
             raise
 
         # Apply exact time evolution operator: U_exact |ψ⟩
@@ -264,14 +263,13 @@ def error_analysis(
                 "This is an internal error in the operator conversion logic."
             )
 
-        logger.verbose("Extracting unitary matrices for error computations")
-        logger.verbose(f"  Converting H → U (unshifted, physical)")
+        logger.verbose("Converting shifted H to unshifted U, constructing matrix")
         exact_unitary_matrix = exact_op.get(
             operator_type='time_evolution',
             energy_shifted=False,
             representation='dense_matrix'
         )
-
+        logger.verbose("Converting shifted U to unshifted U, constructing matrix")
         approx_unitary_matrix = approx_op.get(
             operator_type='time_evolution',
             energy_shifted=False,

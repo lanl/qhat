@@ -28,9 +28,6 @@ def numerical_simulation(
         Dictionary with simulation metadata: list of {input_file, output_file, output_norm}
     """
 
-    # Log matrix properties
-    logger.verbose(f"Matrix shape: {unitary_matrix.shape}")
-
     # Normalize inputs to list (in case this function is called directly without validation)
     if input_state_files is None:
         raise ValueError("numerical_simulation_inputs is None")
@@ -49,7 +46,7 @@ def numerical_simulation(
     results = []
 
     for input_file in input_file_list:
-        logger.verbose(f"Processing {input_file}")
+        logger.verbose(f"  Processing {input_file}")
 
         # Load initial state
         try:
@@ -66,12 +63,12 @@ def numerical_simulation(
             )
 
         # Perform matrix-vector multiplication
-        logger.verbose("Performing matrix-vector multiplication")
+        logger.verbose("  Performing matrix-vector multiplication")
         final_state = unitary_matrix @ initial_state
 
         # Compute norm
         final_norm = np.linalg.norm(final_state)
-        logger.verbose(f"Final state norm: {final_norm:.6e}")
+        logger.verbose(f"  Final state norm: {final_norm:.6e}")
 
         # Generate output filename: input.npy -> input_final.npy
         input_path = Path(input_file)
@@ -88,7 +85,7 @@ def numerical_simulation(
             logger.info(f"ERROR: Failed to save state to {output_file}: {e}")
             raise
 
-        logger.info(f"Simulation complete: {input_file} -> {output_file}")
+        logger.info(f"  Simulation complete: {input_file} -> {output_file}")
 
         results.append({
             'input_file': input_file,

@@ -574,8 +574,9 @@ class State:
         # Apply output directory if configured
         output_path = self.config_general.get_output_path(filename)
         tomlfile = TOMLFile(output_path)
+        logger.info(f"Writing TOML summary file \"{output_path}\".")
         tomlfile.write(document)
-        logger.info(f"Summary file saved to \"{output_path}\".")
+        logger.verbose("Summary file saved.")
 
 # -------------------------------------------------------------------------------------------------
 

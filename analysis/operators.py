@@ -143,7 +143,7 @@ class OperatorRepresentation:
         else:
             dim = len(data['eigenvalues'])
 
-        logger.info(
+        logger.debug(
             f"OperatorRepresentation created: type={operator_type}, "
             f"shifted={energy_shifted}, repr={representation}, dim={dim}, "
             f"timestep/hbar={tevol_hbar}, E_shift={energy_shift}"
@@ -200,7 +200,7 @@ class OperatorRepresentation:
             )
             return self._cache[cache_key]
 
-        logger.info(
+        logger.verbose(
             f"OperatorRepresentation.get() cache miss - converting: "
             f"from (type={self._original_type}, shifted={self._original_shifted}, repr={self._original_repr}) "
             f"to (type={operator_type}, shifted={energy_shifted}, repr={representation})"
@@ -265,7 +265,7 @@ class OperatorRepresentation:
 
         # Cache and return
         self._cache[cache_key] = result
-        logger.info(
+        logger.verbose(
             f"Conversion complete and cached: "
             f"type={operator_type}, shifted={energy_shifted}, repr={representation}"
         )
@@ -303,14 +303,14 @@ class OperatorRepresentation:
             # Hamiltonians (shifted or unshifted) are Hermitian, use eigh
             # IMPORTANT: Must use eigh (not eig) for Hermitian matrices to get
             # properly orthonormal eigenvectors. Using eig() causes reconstruction errors.
-            logger.info(
+            logger.verbose(
                 f"Computing eigendecomposition (eigh): type={operator_type}, "
                 f"shifted={energy_shifted}, dim={dim} [O(N³) operation]"
             )
             eigenvalues, eigenvectors = scipy.linalg.eigh(data)
         else:
             # Time-evolution operators - use general eig
-            logger.info(
+            logger.verbose(
                 f"Computing eigendecomposition (eig): type={operator_type}, "
                 f"shifted={energy_shifted}, dim={dim} [O(N³) operation]"
             )
@@ -322,7 +322,7 @@ class OperatorRepresentation:
         }
 
         self._cache[cache_key] = result
-        logger.info(
+        logger.verbose(
             f"Eigendecomposition computed and cached: type={operator_type}, shifted={energy_shifted}"
         )
         return result
