@@ -51,18 +51,23 @@ def run():
 
         # energy-shift Hamiltonian to center at zero
         # This maps eigenvalues from [Elo1, Ehi1] to [-(Ehi1-Elo1)/2, +(Ehi1-Elo1)/2]
-        # which enables phase angles in [-π, +π] (matching np.angle output directly)
+        # With phase_scale_factor > 1, this enables phase angles in approximately [-π/s, +π/s]
+        # where s is the scale factor. This ensures phases never hit exactly ±π, avoiding
+        # aliasing ambiguity, while matching np.angle output range directly.
         E0 = (Elo1 + Ehi1) / 2
         physical_hamiltonian.energy_shift(-E0)
         Elo2 = Elo1 - E0
         Ehi2 = Ehi1 - E0
         logger.verbose(f"-- shifted bounds = [{Elo2}, {Ehi2})")
-        tevol_hbar = 2 * math.pi / (Ehi2 - Elo2)
+        # Apply phase scale factor to avoid ambiguity at ±π
+        phase_scale = getattr(state.config_unitary, 'phase_scale_factor', 1.0)
+        tevol_hbar = 2 * math.pi / (phase_scale * (Ehi2 - Elo2))
+        logger.verbose(f"-- phase scale factor = {phase_scale}")
         logger.verbose(f"-- preliminary evolution time = {tevol_hbar} * hbar")
 
         # preliminiary number of phase qubits, with upper bound correction
         P0, Elo3, Ehi3 = compute_initial_phase_qubits(state.config_algorithm, Elo2, Ehi2)
-        tevol_hbar = 2 * math.pi / (Ehi3 - Elo3)
+        tevol_hbar = 2 * math.pi / (phase_scale * (Ehi3 - Elo3))
         logger.verbose(f"-- optimized evolution time = {tevol_hbar} * hbar")
 
         # check for user-defined timestep

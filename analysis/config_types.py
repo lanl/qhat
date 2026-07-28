@@ -131,6 +131,16 @@ class UnitaryConfiguration(ConfigurationBase):
         self.trotter_combine_terms = kwargs.get("trotter_combine_terms", True)
         self.ordering_method = kwargs.get("ordering_method", None)
         self.trotter_order = kwargs.get("trotter_order", None)
+        self.phase_scale_factor = kwargs.get("phase_scale_factor", 1.01)
+        # Validate phase_scale_factor
+        if self.phase_scale_factor <= 0:
+            raise ValueError(
+                f"phase_scale_factor must be positive, got {self.phase_scale_factor}")
+        if self.phase_scale_factor < 1.0:
+            logger.warning(
+                f"phase_scale_factor = {self.phase_scale_factor} < 1.0 will map eigenvalue phases "
+                f"outside the range [-π, π], which may cause phase wrapping issues. "
+                f"Values >= 1.0 are recommended (default: 1.01).")
     def encode_pauli_lcu(self, **kwargs):
         self._only_once()
         self.method = "pauli lcu"
@@ -149,6 +159,7 @@ class UnitaryConfiguration(ConfigurationBase):
         self.save_if_present(table, "trotter_combine_terms")
         self.save_if_present(table, "ordering_method")
         self.save_if_present(table, "trotter_order")
+        self.save_if_present(table, "phase_scale_factor")
         return table
 
 # -------------------------------------------------------------------------------------------------

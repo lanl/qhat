@@ -344,10 +344,12 @@ class OperatorRepresentation:
         3. Remove energy shift if not desired: λ_shifted → λ_unshifted
 
         The energy shift centers eigenvalues around zero, placing them in the range
-        [-dE, +dE] where dE is the one-norm bound. With tevol_hbar t/ℏ = π/dE, this
-        maps shifted eigenvalues to phases in [-π, +π], which matches np.angle()'s
-        output range directly. This eliminates the need for phase wrapping and correctly
-        handles the logarithm branch cut.
+        [-dE, +dE] where dE is the one-norm bound. With tevol_hbar t/ℏ = π/(s·dE) where
+        s is the phase_scale_factor (default 1.01), this maps shifted eigenvalues to
+        phases in approximately [-π/s, +π/s]. This ensures phases never hit exactly ±π
+        (avoiding aliasing ambiguity) while matching np.angle()'s output range directly.
+        This eliminates the need for phase wrapping and correctly handles the logarithm
+        branch cut.
 
         Parameters
         ----------
@@ -412,8 +414,10 @@ class OperatorRepresentation:
 
         The Hamiltonian is energy-shifted to center eigenvalues around zero, placing
         them in the range [-dE, +dE] where dE is the one-norm bound. With tevol_hbar
-        t/ℏ = π/dE, this maps eigenvalues to phases in [-π, +π], which matches the
-        output range of np.angle() directly - no phase wrapping needed!
+        t/ℏ = π/(s·dE) where s is the phase_scale_factor (default 1.01), this maps
+        eigenvalues to phases in approximately [-π/s, +π/s], ensuring they never hit
+        exactly ±π (avoiding aliasing ambiguity). This matches the output range of
+        np.angle() directly - no phase wrapping needed!
         """
         if self.tevol_hbar is None:
             raise ValueError(

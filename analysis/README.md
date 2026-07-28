@@ -154,6 +154,11 @@ supports
   - `energy_error`: The maximum error allowed from the Trotterization process.  If not provided,
     the script will generate an error.
   - `error_scale`: This option is deprecated.
+  - `phase_scale_factor`: (Optional, default: 1.01) Scales the energy range by this factor when
+    computing the time evolution parameter. This ensures eigenvalue phases never hit exactly ±π,
+    avoiding the aliasing ambiguity at the complex exponential's branch cut. Values slightly larger
+    than 1.0 (e.g., 1.01) are recommended. The default maps phases to approximately [-3.11, 3.11]
+    instead of [-π, π].
   - `trotter_implementation`: (Optional) Choose between two Trotter implementations:
     - `"flattened"` (default, recommended): Flattened QHAT implementation with flat expansion and
       optional term combining. Term combining reduces operation count (benefit varies by
