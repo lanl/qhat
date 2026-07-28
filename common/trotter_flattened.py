@@ -69,6 +69,8 @@ def get_trotterization_coefficients(method):
             s2 = 0.5 / (4.0 - cbrt(4.0))
             k = 0.5 - 4.0 * s2
             return (s2, s2, s2, s2, k, k, s2, s2, s2, s2)
+        elif m in (6, "sixth order"):
+            raise NotImplementedError("Sixth order not yet available.")
         elif m in (8, "eighth order", "morales 2022", "morales 2025"):
             # Eighth-order method from Morales et al. (2022), recommended by Ostmeyer (2023);
             # paper modified and updated on arXiv as Morales et al. (2025)

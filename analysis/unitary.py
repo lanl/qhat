@@ -292,8 +292,15 @@ def encode_ramped_trotter(
         logger.verbose("-- auto selecting order based on unoptimized ramp count")
 
     Nsteps = max(1, math.ceil(Nsteps0))
-    logger.info(f"-- using {method} Trotter formula with {Nsteps} steps ({Nsteps0})")
+    logger.info(f"-- Trotter recommendation: use {method} formula with {Nsteps} steps ({Nsteps0})")
     logger.verbose(f"-- unoptimized ramp count = {Nsteps * ramps_per_step}")
+
+    # Check for manual override of Trotter steps
+    if hasattr(config_unitary, 'trotter_steps') and config_unitary.trotter_steps is not None:
+        Nsteps = config_unitary.trotter_steps
+        logger.warning(f"-- User override for number of Trotter steps: using {Nsteps} steps.")
+    else:
+        logger.info(f"-- Using recommended number of Trotter steps: using {Nsteps} steps.")
 
     pauli_strings = hamiltonian.get_all_pauli_strings(return_as='strings')
     pauli_strings = reorder_paulis(pauli_strings, config_unitary.ordering_method)
