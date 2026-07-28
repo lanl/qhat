@@ -22,15 +22,45 @@ Configuration is broken down by several parts of the processing script.
 
 ### General
 
-"General" configuration governs the behavior of the resource analysis script itself.  Currently the
-only controls under this heading relate to logging progress of the script.
+"General" configuration governs the behavior of the resource analysis script itself, including
+logging and output file organization.
+
+#### Output Directory
+
+You can organize all output files in a dedicated directory by setting **`general.output_directory`**.
+If set, all generated files (logfile, matrices, eigendecompositions, error analysis, numerical
+simulation outputs) will be written to this directory. The directory is created automatically if
+it doesn't exist.
+
+**Examples**:
+```python
+# All outputs go to Be-H/ subdirectory
+general.output_directory = "Be-H/"
+
+# All outputs go to nested results/run1/ subdirectory
+general.output_directory = "results/run1/"
+
+# No output directory (default) - files written to current directory
+general.output_directory = ""
+```
+
+**Path behavior**:
+- Relative paths in filenames are joined with `output_directory`: 
+  - `general.logfile = "logs/debug.log"` → `Be-H/logs/debug.log`
+- Absolute paths override `output_directory`:
+  - `general.logfile = "/tmp/debug.log"` → `/tmp/debug.log`
+- Parent directories are created automatically
+
+#### Logfile
 
 You can configure the log file that the script will write to by setting **`general.logfile`** to
-the name of the logfile you want to use.  The default is `analysis.log`.
+the name of the logfile you want to use.  The default is `analysis.log`. If `output_directory` is
+set, the logfile will be written to that directory.
 
-The other capability under general configuration is to set the log level, which is done by calling
-the following functions.  If you call multiple of these functions, whichever is called last takes
-precedence.
+#### Log Level
+
+The log level is set by calling one of the following functions. If you call multiple of these
+functions, whichever is called last takes precedence.
 
 - **`general.print_verbose()`** -- Calling this function increases the printouts to be more
   verbose, providing additional information as the resource analysis progresses.  This information
@@ -124,6 +154,11 @@ supports
   - `energy_error`: The maximum error allowed from the Trotterization process.  If not provided,
     the script will generate an error.
   - `error_scale`: This option is deprecated.
+  - `phase_scale_factor`: (Optional, default: 1.01) Scales the energy range by this factor when
+    computing the time evolution parameter. This ensures eigenvalue phases never hit exactly ±π,
+    avoiding the aliasing ambiguity at the complex exponential's branch cut. Values slightly larger
+    than 1.0 (e.g., 1.01) are recommended. The default maps phases to approximately [-3.11, 3.11]
+    instead of [-π, π].
   - `trotter_implementation`: (Optional) Choose between two Trotter implementations:
     - `"flattened"` (default, recommended): Flattened QHAT implementation with flat expansion and
       optional term combining. Term combining reduces operation count (benefit varies by
@@ -193,9 +228,6 @@ computed by the script by setting
 There are many details of the algorithm that may be worth analyzing. The available analyses are
 discussed below.
 
-The matrix output, eigendecomposition, error, and numerical simulation analyses are still under
-development are may not be reliable yet.
-
 #### Resource Estimation
 
 - **pyLIQTR Resource Estimation**: Setting `analysis.resource_estimator` to "pyLIQTR" will use the
@@ -204,62 +236,70 @@ development are may not be reliable yet.
 - **Cirq Resource Estimation**: Setting `analysis.resource_estimator` to "Cirq" is available but
   deprecated and may not work correctly.
 
-#### Matrix Output
+#### Matrix and Eigendecomposition Output
 
-- **Full-Algorithm Unitary Matrix Output**: Setting `analysis.algorithm_matrix_output_file` to a
-  filename will compute and save the full unitary matrix representation of the algorithm. Supported
-  formats:
-  - `.npz`: NumPy compressed format
-  - `.h5` or `.hdf5`: HDF5 format with compression
-  - `.txt`, `.dat`, or `.csv`: Human-readable sparse text format
-  
-  The matrix file includes metadata such as git hash, timestamp, unitarity error, and matrix norm.
-  
-  **Example**:
-  ```python
-  analysis.algorithm_matrix_output_file = "unitary_matrix.npz"
-  ```
+**Full-Algorithm Unitary Matrix Output**: Setting `analysis.algorithm_matrix_output_file` to a
+filename will compute and save the unitary matrix representation of the full algorithm. Supported
+formats:
+- `.npz`: NumPy compressed format
+- `.h5` or `.hdf5`: HDF5 format with compression
+- `.txt`, `.dat`, or `.csv`: Human-readable sparse text format
 
-- **Hamiltonian / Time-Evolution Matrix Output**: Use the flexible API
-  `analysis.save_matrix_to_file()` with `operator='exact'` or `operator='approximate'` will compute
-  and save the matrix representation of the Hamiltonian or time-evolution operator.  Supported
-  formats are the same as for full-algorithm matrix output.
-  
-  This is useful for:
-  - Validating approximate algorithms by comparing exact vs approximate eigenvalues
-  - Computing exact ground state energies for small systems
-  - Testing and debugging algorithm implementations
-  
-  **Example**:
-  ```python
-  analysis.save_matrix_to_file(
-      filename='H_approx.npz',
-      operator='approximate',
-      form='Hamiltonian',
-      shift='unshifted'
-  )
-  ```
+The matrix file includes metadata such as git hash, timestamp, unitarity error, and matrix norm.
 
-  Parameters:
-  - `filename`: the name of the file to create, extension defines the file format
-  - `operator`: `'approximate'` or `'exact'`
-  - `form`: `'Hamiltonian'` for H or `'time_evolution'` for U = exp(-iHt/ℏ)
-  - `shift`: `'unshifted'` for the physical energy scale or `'shifted'` to include the energy-shift
-    applied by the Trotterization method to make all eigenvalues non-negative
-  
-  **Note**: For large systems, the exact matrix computation creates a matrix-free LinearOperator
-  that can be used with scipy sparse eigensolvers, but cannot be directly saved to a file. The
-  analysis will skip file output and note this in the results.
+**Example**:
+```python
+analysis.algorithm_matrix_output_file = "unitary_matrix.npz"
+```
 
-#### Eigendecomposition Analysis
+**Flexible Operator Output**: Use `analysis.save_operator_to_file()` to save exact or approximate
+operators in either matrix or eigendecomposition form.
 
-- **Eigendecomposition Analysis**: Use the flexible API
-  `analysis.save_eigendecomposition_to_file()` to compute eigendecompositions.
+This is useful for:
+- Validating approximate algorithms by comparing exact vs approximate eigenvalues
+- Computing exact ground state energies for small systems
+- Testing and debugging algorithm implementations
+- Analyzing the full spectrum of eigenenergies
 
-  **Key features**:
-  - **Always computes full spectrum** (all eigenstates)
-  - **Only feasible for small systems**
-  - **Same parameters** as `save_matrix_to_file()`
+**Parameters**:
+- `filename`: the name of the file to create, extension defines the file format
+- `source`: `'exact'` (computed from the Hamiltonian) or `'approximate'` (computed from the
+  approximate unitary encoding of the Hamiltonian)
+- `operator_type`: `'hamiltonian'` for H or `'time_evolution'` for U = exp(-iHt/ℏ)
+- `energy_shifted`: `False` for the physical energy scale or `True` to include the energy-shift
+  applied to reduce the circuit depth
+- `representation`: `'matrix'` or `'eigendecomposition'`
+
+**Example (matrix output)**:
+```python
+analysis.save_operator_to_file(
+    filename='H_approx.npz',
+    source='approximate',
+    operator_type='hamiltonian',
+    energy_shifted=False,
+    representation='matrix'
+)
+```
+
+**Example (eigendecomposition output)**:
+```python
+analysis.save_operator_to_file(
+    filename='H_exact_eig.npz',
+    source='exact',
+    operator_type='hamiltonian',
+    energy_shifted=False,
+    representation='eigendecomposition'
+)
+```
+
+**Key features of eigendecomposition**:
+- **Always computes full spectrum** (all eigenstates)
+- **Only feasible for small systems**
+- Output contains eigenvalues and eigenvectors
+
+**Note**: For large systems, the exact matrix computation creates a matrix-free LinearOperator
+that can be used with scipy sparse eigensolvers, but cannot be directly saved to a file. The
+analysis will skip file output and note this in the results.
 
 #### Error Analysis
 
@@ -270,8 +310,8 @@ development are may not be reliable yet.
   **Configuration parameters**:
   
   - **`enable_eigenvalue_errors`**: Enable eigenenergy comparison (default: False, disabled)
-    - **Note**: Parameter name uses "eigenvalue" but compares **eigenenergies** (H eigenvalues, not
-      U eigenvalues)
+    - **Note**: Parameter name uses "eigenvalue" but specifically compares **eigenenergies**
+      (unshifted H eigenvalues, not U eigenvalues, not energy-shifted)
     - Set to `True` to compute errors for ALL eigenstates (full spectrum)
     - Compares eigenenergies element-wise after both are sorted by energy
     - Ground state (exact) compared with ground state (approximate), etc.
@@ -287,8 +327,8 @@ development are may not be reliable yet.
     - **Spectral norm**: Worst-case effect on any quantum state, physically meaningful
       - ||H_exact - H_approx||_2 = largest singular value
       - More expensive to compute, especially for large systems
-    - **For large systems (>15 qubits)**: Uses matrix-free computation
-      - Frobenius: Requires 2^N matrix-vector products
+    - **For large systems**: Uses matrix-free computation
+      - Frobenius: Requires 2^Q matrix-vector products
       - Spectral: Uses power iteration (can take longer)
       - Progress warnings displayed during computation
     - **Best for**: Physical bounds on algorithm error
@@ -298,7 +338,7 @@ development are may not be reliable yet.
     - Multiple filenames (list): `["state1.npy", "state2.npy"]`
     - Compares: ||H_exact|ψ⟩ - H_approx|ψ⟩||
     - **Best-scaling error metric** for large systems
-      - Only requires O(2^N) memory (state vectors), not O(2^(2N)) (matrices)
+      - Only requires O(2^Q) memory (state vectors), not O(2^(2Q)) (matrices)
       - Fast: just applies operators to states
     - **Best for**: Error on specific physically relevant states
 
@@ -324,6 +364,10 @@ development are may not be reliable yet.
   analysis.error_matrix_norms = "frobenius"
   analysis.error_state_inputs = ["ground.npy", "excited.npy"]
   ```
+
+  **Note**: Error analysis is currently only available for Trotter-based unitary encodings.
+  If you request error analysis with other encoding methods (e.g., pauli-lcu, double-factorization),
+  the analysis will be automatically disabled with a warning message.
 
   **When to use each error type**:
   - **Eigenvalue errors**: Use when you want to validate eigenvalues computed in the
@@ -357,8 +401,8 @@ development are may not be reliable yet.
   ]
   ```
   
-  **Creating input states**: State vectors must be 1D complex NumPy arrays with dimension 2^n
-  (where n is the number of qubits):
+  **Creating input states**: State vectors must be 1D complex NumPy arrays with dimension 2^Q
+  (where Q is the number of qubits):
   ```python
   import numpy as np
   
@@ -369,74 +413,27 @@ development are may not be reliable yet.
   np.save("initial_state.npy", psi)
   ```
 
-#### Exact Numerical Simulation
-
-- **Exact Numerical Simulation**: Setting `analysis.exact_simulation_inputs` to one or more state
-  vector files will apply the **exact Hamiltonian matrix** (without Trotter or other
-  approximations) to the input state(s), producing output state(s).
-
-  **Purpose**: Compare exact time evolution with approximate algorithm results
-
-  **Input format**: Same as approximate simulation (NumPy `.npy` format). Input can be:
-  - Single filename (string): `"initial_state.npy"`
-  - Multiple filenames (list): `["state1.npy", "state2.npy", "state3.npy"]`
-
-  **Output naming**: Automatic suffix `_exact_final` is added to input filename:
-  - `initial_state.npy` → `initial_state_exact_final.npy`
-  - This distinguishes from approximate simulation output (`_final`)
-
-  **Scaling**: Can reach 25-30 qubits using matrix-free operators from Branch 1
-  - For large systems, uses `PauliStringOperator` (matrix-free)
-  - Memory: O(2^N) for state vectors, not O(2^(2N)) for matrices
-  - Computation time depends on number of Pauli terms in Hamiltonian
-
-  **Example**:
-  ```python
-  # Single state exact simulation
-  analysis.exact_simulation_inputs = "initial_state.npy"
-
-  # Multiple states
-  analysis.exact_simulation_inputs = [
-      "ground_state.npy",
-      "excited_state.npy",
-      "superposition.npy"
-  ]
-  ```
-
-  **Comparing exact vs approximate**:
-  You can run both simulations on the same input states:
-  ```python
-  # Run both approximate and exact simulations
-  analysis.numerical_simulation_inputs = "initial_state.npy"
-  analysis.exact_simulation_inputs = "initial_state.npy"
-  
-  # Produces:
-  #   initial_state_final.npy       (approximate result)
-  #   initial_state_exact_final.npy (exact result)
-  # Then manually compare the output states
-  ```
-
-  **Note**: State vectors must be compatible with Hamiltonian dimension (2^N)
-
 ## Generated Files
 
 The script will print a log both to the screen and to a logfile. It also generates output files
-depending on the analyses requested:
+depending on the analyses requested. If `general.output_directory` is set, all output files are
+written to that directory.
 
 - **Log file**: Default `analysis.log`, configurable via `general.logfile`
 - **TOML summary**: Hash-based filename (e.g., `12345678901234567890.toml`) containing inputs and
   results. Shows final results but not intermediate values.
 - **Matrix file** (if `algorithm_matrix_output_file` specified): Unitary matrix in specified format
   (`.npz`, `.h5`, or `.txt`)
-- **Matrix files** (if `save_matrix_to_file` used): Exact and/or approximate Hamiltonian and/or
-  time-evolution operator as a matrix
-- **Eigendecomposition files** (if `save_eigendecomposition_to_file` used): Eigendecomposition of
-  corresponding matrices
+- **Matrix files** (if `save_operator_to_file` with `representation='matrix'` used): Exact and/or
+  approximate Hamiltonian and/or time-evolution operator as a matrix
+- **Eigendecomposition files** (if `save_operator_to_file` with `representation='eigendecomposition'`
+  used): Eigendecomposition of corresponding matrices
 - **Error analysis file** (if any error analysis enabled): `error_analysis.npz`
 - **Final state files** (if `numerical_simulation_inputs` specified): Evolved quantum states with
   `_final` suffix (e.g., `initial_state.npy` → `initial_state_final.npy`)
-- **Exact final state files** (if `exact_simulation_inputs` specified): Exactly evolved states with
-  `_exact_final` suffix (e.g., `initial_state.npy` → `initial_state_exact_final.npy`)
+
+**Note**: All file paths respect `general.output_directory` if set. This keeps outputs organized
+when running multiple analyses.
 
 The logfile is typically most useful for understanding the analysis process and intermediate
 values.
@@ -499,7 +496,7 @@ Recommended for: New users learning error analysis, anyone needing to validate a
 
 To run either example:
 ```bash
-python3.11 -m qhat.analysis.driver examples/config.py
+python3.11 -m qhat.analysis.driver config.py
 # or
 python3.11 -m qhat.analysis.driver examples/config_full_analysis.py
 ```
