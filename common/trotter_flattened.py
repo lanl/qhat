@@ -26,12 +26,20 @@ def get_trotterization_coefficients(method):
     Args:
         method: Either a string/int naming a method, or a sequence of coefficients.
             Supported names:
-            - 1, "first order": Minimal first-order method (1.0,)
-            - 2, "second order": Minimal second-order method (0.5, 0.5)
-            - 3, "third order", "ruth 1983": Third-order Ruth (1983)
-            - "symmetrized ruth 1983": Fourth-order symmetrized Ruth
-            - 4, "fourth order", "suzuki 1990": Fourth-order Suzuki (1990)
-            - 8, "eighth order", "morales 2022", "morales 2025": Eighth-order Morales et al.
+            - 1, "first order": First-order (1 cycle)
+            - 2, "second order", "verlet", "leapfrog": Second-order Verlet/Leapfrog (1 cycle)
+            - 3, "third order", "ruth 1983": Third-order Ruth (1983) (5 cycles)
+            - "symmetrized ruth 1983": Fourth-order symmetrized Ruth (10 cycles)
+            - 4, "fourth order", "suzuki5", "suzuki 5", "suzuki 1990", "suzuki 1990 5-term":
+              Fourth-order Suzuki (1990) 5-term - DEFAULT (5 cycles)
+            - "bm4", "blanes and moan 2002 fourth order", "blanes moan 4":
+              Fourth-order Blanes & Moan (2002) - recommended by Ostmeyer (6 cycles)
+            - "opt4", "ostmeyer 2023 fourth order", "optimised fourth order":
+              Fourth-order Ostmeyer (2023) - high theoretical efficiency (5 cycles)
+            - 6, "sixth order", "bm6", "blanes and moan 2002 sixth order", "blanes moan 6":
+              Sixth-order Blanes & Moan (2002) (10 cycles)
+            - 8, "eighth order", "morales", "morales 2022", "morales 2025":
+              Eighth-order Morales et al. (2022) (17 cycles)
 
     Returns:
         Tuple of coefficients for the ramped Trotterization
@@ -50,30 +58,129 @@ def get_trotterization_coefficients(method):
             m = method.lower()
 
         if m in (1, "first order"):
-            # Minimal first-order method
+            # First-order method (1 cycle)
             return (1.0,)
-        elif m in (2, "second order"):
-            # Minimal second-order method
+        elif m in (2, "second order", "verlet", "leapfrog"):
+            # Second-order Verlet/Leapfrog method (1 cycle)
             return (0.5, 0.5)
         elif m in (3, "third order", "ruth 1983"):
-            # Third-order Ruth (1983)
+            # Third-order Ruth (1983) (5 cycles)
             return (7./24., 3./8., 3./8., -25./24., 1.0)
         elif m == "symmetrized ruth 1983":
-            # Symmetrized version of Ruth (1983) that raises it to fourth order but uses twice as
-            # many terms; expected to be less optimal than "suzuki 1990"
+            # Symmetrized version of Ruth (1983) that raises it to fourth order (10 cycles)
+            # Less efficient than Suzuki 1990 5-term
             return (7./48., 3./16., 3./16., -25./48., 0.5, 0.5, -25./48., 3./16., 3./16., 7./48.)
-        elif m in (4, "fourth order", "suzuki 1990"):
+        elif m in (4, "fourth order", "suzuki5", "suzuki 5", "suzuki 1990", "suzuki 1990 5-term"):
+            # Fourth-order Suzuki (1990) 5-term recursion (5 cycles) - DEFAULT
             # Apply the recursion relation from Suzuki (1990) to the standard second-order method
             # to get a fourth-order method; also discussed in Hatano and Suzuki (2005) and
-            # Ostmeyer (2023)
+            # Ostmeyer (2023). Ostmeyer 2023 recommends Suzuki 5-term recursion for
+            # low-precision Hamiltonians with more than two terms in the Hamiltonian.
             s2 = 0.5 / (4.0 - cbrt(4.0))
             k = 0.5 - 4.0 * s2
             return (s2, s2, s2, s2, k, k, s2, s2, s2, s2)
-        elif m in (6, "sixth order"):
-            raise NotImplementedError("Sixth order not yet available.")
-        elif m in (8, "eighth order", "morales 2022", "morales 2025"):
-            # Eighth-order method from Morales et al. (2022), recommended by Ostmeyer (2023);
-            # paper modified and updated on arXiv as Morales et al. (2025)
+        elif m in ("bm4", "blanes and moan 2002 fourth order", "blanes moan 4"):
+            # Fourth-order Blanes & Moan (2002) from equation 46 of Ostmeyer (2023) (6 cycles)
+            # Ostmeyer 2023 recommends this as a reasonable default and notes it is optimal when
+            # there are exactly two terms in the Hamiltonian. Has favorable error accumulation.
+            # From paper equation 46:
+            a1 =  0.07920369643119569
+            b1 =  0.209515106613362
+            a2 =  0.353172906049774
+            b2 = -0.143851773179818
+            a3 = -0.04206508035771955
+            b3 =  0.5 - b1 - b2
+            a4 =  1.0 - 2.0 * (a1 + a2 + a3)
+            # By symmetry: a5 = a3, a6 = a2, a7 = a1 and b4 = b3, b5 = b2, b6 = b1
+
+            # Convert (a,b) to (c,d) using equations 4-7:
+            c1 = a1
+            d1 = b1 - c1
+            c2 = a2 - d1
+            d2 = b2 - c2
+            c3 = a3 - d2
+            d3 = b3 - c3
+            c4 = a4 - d3
+            d4 = b3 - c4  # b4 = b3 by symmetry
+            c5 = a3 - d4  # a5 = a3 by symmetry
+            d5 = b2 - c5  # b5 = b2 by symmetry
+            c6 = a2 - d5  # a6 = a2 by symmetry
+            d6 = b1 - c6  # b6 = b1 by symmetry
+
+            return (c1, d1, c2, d2, c3, d3, c4, d4, c5, d5, c6, d6)
+        elif m in ("opt4", "ostmeyer 2023 fourth order", "optimised fourth order"):
+            # Fourth-order Ostmeyer (2023) from equation 40 (5 cycles)
+            # This is the theoretically most efficient q = 5 cycles fourth-order scheme.
+            # However, empirically it has unfavorable error accumulation over time and is
+            # usually outperformed by Blanes & Moan's scheme (46).
+            # From paper equation 40:
+            a1 =  0.09257547473195787
+            b1 =  0.2540996315529392
+            a2 =  0.4627160310210738
+            b2 = -0.1676517240119692
+            a3 =  0.5 - (a1 + a2)
+            b3 =  1.0 - 2.0 * (b1 + b2)
+            # By symmetry: a4 = a2, a5 = a1 and b4 = b2, b5 = b1
+
+            # Convert (a,b) to (c,d) using equations 4-7:
+            c1 = a1
+            d1 = b1 - c1
+            c2 = a2 - d1
+            d2 = b2 - c2
+            c3 = a3 - d2
+            d3 = b3 - c3
+            c4 = a2 - d3  # a4 = a2 by symmetry
+            d4 = b2 - c4  # b4 = b2 by symmetry
+            c5 = a1 - d4  # a5 = a1 by symmetry
+            d5 = b1 - c5  # b5 = b1 by symmetry
+
+            return (c1, d1, c2, d2, c3, d3, c4, d4, c5, d5)
+        elif m in (6, "sixth order", "bm6", "blanes and moan 2002 sixth order", "blanes moan 6"):
+            # Sixth-order Blanes & Moan (2002) from equation 53 of Ostmeyer (2023) (10 cycles)
+            # Ostmeyer 2023 recommends this for high precision (relative error < 10^(-4)).
+            # Most efficient known order n = 6 scheme.
+            # From paper equation 53:
+            a1 =  0.0502627644003922
+            a2 =  0.413514300428344
+            a3 =  0.04507988979439977
+            a4 = -0.188054853819569
+            a5 =  0.54196067845078
+            a6 =  1.0 - 2.0 * (a1 + a2 + a3 + a4 + a5)
+
+            b1 =  0.148816447901042
+            b2 = -0.132385865767784
+            b3 =  0.067307604692185
+            b4 =  0.432666402578175
+            b5 =  0.5 - (b1 + b2 + b3 + b4)
+            # By symmetry: b6 = b5, b7 = b4, b8 = b3, b9 = b2, b10 = b1
+
+            # Convert (a,b) to (c,d) using equations 4-7:
+            c1 = a1
+            d1 = b1 - c1
+            c2 = a2 - d1
+            d2 = b2 - c2
+            c3 = a3 - d2
+            d3 = b3 - c3
+            c4 = a4 - d3
+            d4 = b4 - c4
+            c5 = a5 - d4
+            d5 = b5 - c5
+            c6 = a6 - d5
+            d6 = b5 - c6  # b6 = b5 by symmetry
+            c7 = a5 - d6  # a7 = a5 by symmetry
+            d7 = b4 - c7  # b7 = b4 by symmetry
+            c8 = a4 - d7  # a8 = a4 by symmetry
+            d8 = b3 - c8  # b8 = b3 by symmetry
+            c9 = a3 - d8  # a9 = a3 by symmetry
+            d9 = b2 - c9  # b9 = b2 by symmetry
+            c10 = a2 - d9  # a10 = a2 by symmetry
+            d10 = b1 - c10  # b10 = b1 by symmetry
+
+            return (c1, d1, c2, d2, c3, d3, c4, d4, c5, d5,
+                    c6, d6, c7, d7, c8, d8, c9, d9, c10, d10)
+        elif m in (8, "eighth order", "morales", "morales 2022", "morales 2025"):
+            # Eighth-order Morales et al. (2022) from Ostmeyer (2023) (17 cycles)
+            # Recommended by Ostmeyer (2023); paper modified and updated on arXiv as Morales et al. (2025)
             b1 =  0.12783360986284110837857554950443
             b2 =  0.56148845266356446893590729572808
             b3 = -0.38400573301491401473462588779099
