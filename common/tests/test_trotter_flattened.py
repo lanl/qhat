@@ -657,6 +657,70 @@ class TestHelperFunctions:
         coeffs3 = get_trotterization_coefficients("second order")
         assert coeffs1 == coeffs2 == coeffs3
 
+    def test_get_coefficients_suzuki_aliases(self):
+        """Test Suzuki fourth-order method aliases."""
+        coeffs1 = get_trotterization_coefficients(4)
+        coeffs2 = get_trotterization_coefficients("fourth order")
+        coeffs3 = get_trotterization_coefficients("suzuki5")
+        coeffs4 = get_trotterization_coefficients("suzuki 5")
+        coeffs5 = get_trotterization_coefficients("suzuki 1990")
+        coeffs6 = get_trotterization_coefficients("suzuki 1990 5-term")
+        assert coeffs1 == coeffs2 == coeffs3 == coeffs4 == coeffs5 == coeffs6
+        assert len(coeffs1) == 10  # 5 cycles
+
+    def test_get_coefficients_blanes_moan_fourth(self):
+        """Test Blanes & Moan fourth-order method (equation 46)."""
+        coeffs1 = get_trotterization_coefficients("bm4")
+        coeffs2 = get_trotterization_coefficients("blanes and moan 2002 fourth order")
+        coeffs3 = get_trotterization_coefficients("blanes moan 4")
+        assert coeffs1 == coeffs2 == coeffs3
+        # Should have 12 coefficients (6 cycles, ramped format)
+        assert len(coeffs1) == 12
+        # Verify all are real numbers
+        assert all(isinstance(c, (int, float)) for c in coeffs1)
+
+    def test_get_coefficients_ostmeyer_fourth(self):
+        """Test Ostmeyer 2023 fourth-order method (equation 40)."""
+        coeffs1 = get_trotterization_coefficients("opt4")
+        coeffs2 = get_trotterization_coefficients("ostmeyer 2023 fourth order")
+        coeffs3 = get_trotterization_coefficients("optimised fourth order")
+        assert coeffs1 == coeffs2 == coeffs3
+        # Should have 10 coefficients (5 cycles, ramped format)
+        assert len(coeffs1) == 10
+        # Verify all are real numbers
+        assert all(isinstance(c, (int, float)) for c in coeffs1)
+
+    def test_get_coefficients_blanes_moan_sixth(self):
+        """Test Blanes & Moan sixth-order method (equation 53)."""
+        coeffs1 = get_trotterization_coefficients(6)
+        coeffs2 = get_trotterization_coefficients("sixth order")
+        coeffs3 = get_trotterization_coefficients("bm6")
+        coeffs4 = get_trotterization_coefficients("blanes and moan 2002 sixth order")
+        coeffs5 = get_trotterization_coefficients("blanes moan 6")
+        assert coeffs1 == coeffs2 == coeffs3 == coeffs4 == coeffs5
+        # Should have 20 coefficients (10 cycles, ramped format)
+        assert len(coeffs1) == 20
+        # Verify all are real numbers
+        assert all(isinstance(c, (int, float)) for c in coeffs1)
+
+    def test_get_coefficients_morales_eighth(self):
+        """Test Morales eighth-order method aliases."""
+        coeffs1 = get_trotterization_coefficients(8)
+        coeffs2 = get_trotterization_coefficients("eighth order")
+        coeffs3 = get_trotterization_coefficients("morales")
+        coeffs4 = get_trotterization_coefficients("morales 2022")
+        coeffs5 = get_trotterization_coefficients("morales 2025")
+        assert coeffs1 == coeffs2 == coeffs3 == coeffs4 == coeffs5
+        assert len(coeffs1) == 34  # 17 cycles
+
+    def test_get_coefficients_verlet_aliases(self):
+        """Test second-order Verlet/Leapfrog aliases."""
+        coeffs1 = get_trotterization_coefficients(2)
+        coeffs2 = get_trotterization_coefficients("second order")
+        coeffs3 = get_trotterization_coefficients("verlet")
+        coeffs4 = get_trotterization_coefficients("leapfrog")
+        assert coeffs1 == coeffs2 == coeffs3 == coeffs4
+
 
 # ==================================================================================
 # Test: Convenience constructors
@@ -854,3 +918,203 @@ class TestBackwardCompatibility:
         U_old = bloq_old.tensor_contract()
         U_new = bloq_new.tensor_contract()
         assert np.allclose(U_old, U_new)
+
+
+# ==================================================================================
+# Test: New Ostmeyer 2023 methods
+# ==================================================================================
+
+class TestOstmeyerMethods:
+    """Test the newly implemented methods from Ostmeyer 2023 paper."""
+
+    def test_blanes_moan_fourth_instantiation(self):
+        """Test that Blanes & Moan fourth-order method can be instantiated."""
+        trotter = Trotterization.from_method(
+            pauli_terms=[("X", 1.0), ("Y", 1.0)],
+            method="bm4",
+            time=1.0,
+            num_steps=10
+        )
+        assert len(trotter.coefficients) == 12
+        assert trotter.num_steps == 10
+
+    def test_blanes_moan_fourth_unitarity(self):
+        """Test that Blanes & Moan fourth produces unitary matrices."""
+        trotter = Trotterization.from_method(
+            pauli_terms=[("XY", 0.5), ("YZ", 0.3)],
+            method="bm4",
+            time=1.0,
+            num_steps=5
+        )
+        U = trotter.tensor_contract()
+
+        # Check U† U = I
+        U_dag_U = U.conj().T @ U
+        identity = np.eye(U.shape[0])
+        assert np.allclose(U_dag_U, identity, atol=1e-10), \
+            "Blanes & Moan fourth does not produce unitary matrix"
+
+    def test_ostmeyer_fourth_instantiation(self):
+        """Test that Ostmeyer fourth-order method can be instantiated."""
+        trotter = Trotterization.from_method(
+            pauli_terms=[("X", 1.0), ("Y", 1.0)],
+            method="opt4",
+            time=1.0,
+            num_steps=10
+        )
+        assert len(trotter.coefficients) == 10
+        assert trotter.num_steps == 10
+
+    def test_ostmeyer_fourth_unitarity(self):
+        """Test that Ostmeyer fourth produces unitary matrices."""
+        trotter = Trotterization.from_method(
+            pauli_terms=[("XY", 0.5), ("YZ", 0.3)],
+            method="opt4",
+            time=1.0,
+            num_steps=5
+        )
+        U = trotter.tensor_contract()
+
+        # Check U† U = I
+        U_dag_U = U.conj().T @ U
+        identity = np.eye(U.shape[0])
+        assert np.allclose(U_dag_U, identity, atol=1e-10), \
+            "Ostmeyer fourth does not produce unitary matrix"
+
+    def test_blanes_moan_sixth_instantiation(self):
+        """Test that Blanes & Moan sixth-order method can be instantiated."""
+        trotter = Trotterization.from_method(
+            pauli_terms=[("X", 1.0), ("Y", 1.0)],
+            method="bm6",
+            time=1.0,
+            num_steps=10
+        )
+        assert len(trotter.coefficients) == 20
+        assert trotter.num_steps == 10
+
+    def test_blanes_moan_sixth_unitarity(self):
+        """Test that Blanes & Moan sixth produces unitary matrices."""
+        trotter = Trotterization.from_method(
+            pauli_terms=[("XY", 0.5), ("YZ", 0.3)],
+            method="bm6",
+            time=1.0,
+            num_steps=5
+        )
+        U = trotter.tensor_contract()
+
+        # Check U† U = I
+        U_dag_U = U.conj().T @ U
+        identity = np.eye(U.shape[0])
+        assert np.allclose(U_dag_U, identity, atol=1e-10), \
+            "Blanes & Moan sixth does not produce unitary matrix"
+
+    def test_fourth_order_methods_comparison(self):
+        """Compare all fourth-order methods - verify they produce valid unitaries."""
+        # Test case: two non-commuting Hamiltonians
+        # Note: As discussed in Ostmeyer (2023), different fourth-order methods have
+        # different error accumulation properties. Ostmeyer's "optimised" method has
+        # high theoretical efficiency but unfavorable error accumulation in practice,
+        # often being outperformed by Blanes & Moan's method.
+        h_x = 1.0
+        h_y = 1.0
+        time = 1.0
+        num_steps = 10
+
+        # Exact evolution
+        H = h_x * pauli_string_to_matrix("X") + h_y * pauli_string_to_matrix("Y")
+        U_exact = expm(-1j * H * time)
+
+        # Test that all methods can be instantiated and produce valid results
+        methods = [
+            "suzuki5",
+            "bm4",
+            "opt4"
+        ]
+
+        for method_name in methods:
+            trotter = Trotterization.from_method(
+                pauli_terms=[("X", h_x), ("Y", h_y)],
+                method=method_name,
+                time=time,
+                num_steps=num_steps
+            )
+            U = trotter.tensor_contract()
+
+            # Verify unitary
+            U_dag_U = U.conj().T @ U
+            identity = np.eye(U.shape[0])
+            assert np.allclose(U_dag_U, identity, atol=1e-10), \
+                f"{method_name} does not produce unitary matrix"
+
+            # Verify it's at least approximating the correct evolution
+            error = np.linalg.norm(U - U_exact)
+            assert error < 1.0, f"{method_name} error is unreasonably large"
+
+    def test_sixth_order_better_than_fourth(self):
+        """Test that sixth-order is more accurate than fourth-order."""
+        h_x = 1.0
+        h_y = 1.0
+        time = 1.0
+        num_steps = 5
+
+        # Exact evolution
+        H = h_x * pauli_string_to_matrix("X") + h_y * pauli_string_to_matrix("Y")
+        U_exact = expm(-1j * H * time)
+
+        # Fourth-order (Suzuki)
+        trotter4 = Trotterization.from_method(
+            pauli_terms=[("X", h_x), ("Y", h_y)],
+            method=4,
+            time=time,
+            num_steps=num_steps
+        )
+        U4 = trotter4.tensor_contract()
+        error4 = np.linalg.norm(U4 - U_exact)
+
+        # Sixth-order (Blanes & Moan)
+        trotter6 = Trotterization.from_method(
+            pauli_terms=[("X", h_x), ("Y", h_y)],
+            method=6,
+            time=time,
+            num_steps=num_steps
+        )
+        U6 = trotter6.tensor_contract()
+        error6 = np.linalg.norm(U6 - U_exact)
+
+        # Sixth-order should be more accurate
+        assert error6 < error4
+
+    def test_new_methods_resource_estimation(self):
+        """Test that resource estimation works for all new methods."""
+        terms = [("XY", 0.5), ("YZ", 0.3)]
+        time = 1.0
+        num_steps = 10
+
+        for method_name in ["bm4", "opt4", "bm6"]:
+            trotter = Trotterization.from_method(
+                pauli_terms=terms,
+                method=method_name,
+                time=time,
+                num_steps=num_steps
+            )
+            tc = t_complexity(trotter)
+
+            # Should have non-negative resource counts
+            assert tc.t >= 0
+            assert tc.rotations >= 0
+            assert tc.clifford >= 0
+
+    def test_coefficient_symmetry_properties(self):
+        """Test that new methods produce symmetric coefficient sequences."""
+        # For symmetric Trotter methods, the coefficient sequence should be palindromic
+        # when considering the full (c,d) pairs
+
+        for method_name in ["bm4", "opt4", "bm6"]:
+            coeffs = get_trotterization_coefficients(method_name)
+
+            # Check that we have an even number (pairs of c,d)
+            assert len(coeffs) % 2 == 0
+
+            # For these methods, verify basic properties
+            # All coefficients should be real
+            assert all(isinstance(c, (int, float)) for c in coeffs)

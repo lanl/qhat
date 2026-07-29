@@ -27,10 +27,10 @@ class TestBasicCreation:
             operator_type='hamiltonian',
             energy_shifted=False,
             representation='dense_matrix',
-            timestep=1.0
+            tevol_hbar=1.0
         )
         assert op is not None
-        assert op.timestep == 1.0
+        assert op.tevol_hbar == 1.0
         assert op.energy_shift == 0.0
 
     def test_create_from_eigendecomposition(self):
@@ -44,7 +44,7 @@ class TestBasicCreation:
             operator_type='hamiltonian',
             energy_shifted=False,
             representation='eigendecomposition',
-            timestep=1.0
+            tevol_hbar=1.0
         )
         assert op is not None
 
@@ -56,7 +56,7 @@ class TestBasicCreation:
                 data=H,
                 operator_type='hamiltonian',
                 representation='dense_matrix',
-                timestep=1.0
+                tevol_hbar=1.0
             )
 
     def test_invalid_eigendecomposition_format(self):
@@ -67,7 +67,7 @@ class TestBasicCreation:
                 data=eigendata,
                 operator_type='hamiltonian',
                 representation='eigendecomposition',
-                timestep=1.0
+                tevol_hbar=1.0
             )
 
 
@@ -85,7 +85,7 @@ class TestHamiltonianToTimeEvolution:
             operator_type='hamiltonian',
             energy_shifted=False,
             representation='dense_matrix',
-            timestep=timestep
+            tevol_hbar=timestep
         )
 
         # Get as time-evolution operator
@@ -105,7 +105,7 @@ class TestHamiltonianToTimeEvolution:
             data=H,
             operator_type='hamiltonian',
             representation='dense_matrix',
-            timestep=timestep
+            tevol_hbar=timestep
         )
 
         U = op.get(operator_type='time_evolution', representation='dense_matrix')
@@ -123,10 +123,10 @@ class TestHamiltonianToTimeEvolution:
             data=H,
             operator_type='hamiltonian',
             representation='dense_matrix',
-            timestep=None  # No timestep provided
+            tevol_hbar=None  # No timestep provided
         )
 
-        with pytest.raises(ValueError, match="timestep"):
+        with pytest.raises(ValueError, match="tevol_hbar"):
             op.get(operator_type='time_evolution')
 
 
@@ -145,7 +145,7 @@ class TestTimeEvolutionToHamiltonian:
             operator_type='time_evolution',
             energy_shifted=False,
             representation='dense_matrix',
-            timestep=timestep
+            tevol_hbar=timestep
         )
 
         # Convert back to H
@@ -165,7 +165,7 @@ class TestTimeEvolutionToHamiltonian:
             data=U,
             operator_type='time_evolution',
             representation='dense_matrix',
-            timestep=timestep
+            tevol_hbar=timestep
         )
 
         H_recovered = op.get(operator_type='hamiltonian', representation='dense_matrix')
@@ -189,7 +189,7 @@ class TestEnergyShift:
             operator_type='hamiltonian',
             energy_shifted=False,
             representation='dense_matrix',
-            timestep=timestep,
+            tevol_hbar=timestep,
             energy_shift=energy_shift
         )
 
@@ -215,7 +215,7 @@ class TestEnergyShift:
             operator_type='hamiltonian',
             energy_shifted=True,
             representation='dense_matrix',
-            timestep=timestep,
+            tevol_hbar=timestep,
             energy_shift=energy_shift
         )
 
@@ -243,7 +243,7 @@ class TestEnergyShift:
             operator_type='time_evolution',
             energy_shifted=False,
             representation='dense_matrix',
-            timestep=timestep,
+            tevol_hbar=timestep,
             energy_shift=energy_shift
         )
 
@@ -272,7 +272,7 @@ class TestRepresentationConversion:
             data=H,
             operator_type='hamiltonian',
             representation='dense_matrix',
-            timestep=1.0
+            tevol_hbar=1.0
         )
 
         # Get eigendecomposition
@@ -300,7 +300,7 @@ class TestRepresentationConversion:
             data=eigendata,
             operator_type='hamiltonian',
             representation='eigendecomposition',
-            timestep=1.0
+            tevol_hbar=1.0
         )
 
         # Get dense matrix
@@ -318,7 +318,7 @@ class TestRepresentationConversion:
             data=H,
             operator_type='hamiltonian',
             representation='dense_matrix',
-            timestep=1.0
+            tevol_hbar=1.0
         )
 
         # Convert to eigendecomp and back
@@ -342,7 +342,7 @@ class TestComplexConversions:
             operator_type='hamiltonian',
             energy_shifted=False,
             representation='dense_matrix',
-            timestep=timestep,
+            tevol_hbar=timestep,
             energy_shift=energy_shift
         )
 
@@ -371,7 +371,7 @@ class TestComplexConversions:
             data=H_original,
             operator_type='hamiltonian',
             representation='dense_matrix',
-            timestep=timestep
+            tevol_hbar=timestep
         )
 
         # Convert H → U → H
@@ -382,7 +382,7 @@ class TestComplexConversions:
             data=U,
             operator_type='time_evolution',
             representation='dense_matrix',
-            timestep=timestep
+            tevol_hbar=timestep
         )
 
         H_recovered = op_U.get(operator_type='hamiltonian', representation='dense_matrix')
@@ -401,7 +401,7 @@ class TestComplexConversions:
             operator_type='hamiltonian',
             energy_shifted=False,
             representation='dense_matrix',
-            timestep=timestep,
+            tevol_hbar=timestep,
             energy_shift=energy_shift
         )
 
@@ -437,7 +437,7 @@ class TestCaching:
             data=H,
             operator_type='hamiltonian',
             representation='dense_matrix',
-            timestep=1.0
+            tevol_hbar=1.0
         )
 
         # Get U twice
@@ -457,7 +457,7 @@ class TestCaching:
             data=H,
             operator_type='hamiltonian',
             representation='dense_matrix',
-            timestep=timestep,
+            tevol_hbar=timestep,
             energy_shift=energy_shift
         )
 
@@ -486,7 +486,7 @@ class TestEdgeCases:
             data=H,
             operator_type='hamiltonian',
             representation='dense_matrix',
-            timestep=timestep
+            tevol_hbar=timestep
         )
 
         U = op.get(operator_type='time_evolution')
@@ -504,7 +504,7 @@ class TestEdgeCases:
             data=H,
             operator_type='hamiltonian',
             representation='dense_matrix',
-            timestep=timestep
+            tevol_hbar=timestep
         )
 
         U = op.get(operator_type='time_evolution')
@@ -523,7 +523,7 @@ class TestEdgeCases:
             data=H,
             operator_type='hamiltonian',
             representation='dense_matrix',
-            timestep=timestep,
+            tevol_hbar=timestep,
             energy_shift=energy_shift
         )
 
@@ -541,7 +541,7 @@ class TestEdgeCases:
             data=H,
             operator_type='hamiltonian',
             representation='dense_matrix',
-            timestep=timestep
+            tevol_hbar=timestep
         )
 
         U = op.get(operator_type='time_evolution')

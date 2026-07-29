@@ -22,11 +22,29 @@ class ConfigurationBase:
 # -------------------------------------------------------------------------------------------------
 
 class GeneralConfigurationUser:
+    """
+    User-facing configuration for general analysis settings.
+
+    Attributes
+    ----------
+    logfile : str
+        Name of the log file (default: "analysis.log")
+    output_directory : str
+        Base directory for all output files. If set, all output files (logfile, matrices,
+        eigendecompositions, numerical simulation outputs, error analysis) will be written
+        to this directory. The directory is created automatically if it doesn't exist.
+        If empty or not set, files are written to the current directory.
+        Examples:
+            "Be-H/" - all outputs go to Be-H/
+            "results/run1/" - all outputs go to results/run1/
+    """
     def __init__(self):
         # Logfile name
         self.logfile = "analysis.log"
         # How much information to print as the script runs
         self._loglevel = "info"
+        # Output directory for all generated files (empty string = current directory)
+        self.output_directory = ""
     def print_default(self):
         self._loglevel= "info"
     def print_verbose(self):
@@ -48,7 +66,7 @@ class HamiltonianConfiguration(ConfigurationBase):
         self.max_bosons_per_state = None
     def _only_once(self):
         if self.source is not None:
-            print("Already set Hamiltonian source to {self.source}.")
+            logger.error(f"Already set Hamiltonian source to {self.source}.")
             assert self.source is None
     def load_second_quantization(self,
                                  filename,
@@ -100,7 +118,7 @@ class UnitaryConfiguration(ConfigurationBase):
         self.method = None
     def _only_once(self):
         if self.method is not None:
-            print("Already set unitary method to {self.method}.")
+            logger.error(f"Already set unitary method to {self.method}.")
             assert self.method is None
     def encode_ramped_trotter(self, **kwargs):
         self._only_once()
@@ -113,6 +131,22 @@ class UnitaryConfiguration(ConfigurationBase):
         self.trotter_combine_terms = kwargs.get("trotter_combine_terms", True)
         self.ordering_method = kwargs.get("ordering_method", None)
         self.trotter_order = kwargs.get("trotter_order", None)
+        self.trotter_steps = kwargs.get("trotter_steps", None)
+        self.phase_scale_factor = kwargs.get("phase_scale_factor", 1.01)
+        # Validate trotter_steps
+        if self.trotter_steps is not None:
+            if not isinstance(self.trotter_steps, int) or self.trotter_steps < 1:
+                raise ValueError(
+                    f"trotter_steps must be a positive integer, got {self.trotter_steps}")
+        # Validate phase_scale_factor
+        if self.phase_scale_factor <= 0:
+            raise ValueError(
+                f"phase_scale_factor must be positive, got {self.phase_scale_factor}")
+        if self.phase_scale_factor < 1.0:
+            logger.warning(
+                f"phase_scale_factor = {self.phase_scale_factor} < 1.0 will map eigenvalue phases "
+                f"outside the range [-π, π], which may cause phase wrapping issues. "
+                f"Values >= 1.0 are recommended (default: 1.01).")
     def encode_pauli_lcu(self, **kwargs):
         self._only_once()
         self.method = "pauli lcu"
@@ -131,6 +165,8 @@ class UnitaryConfiguration(ConfigurationBase):
         self.save_if_present(table, "trotter_combine_terms")
         self.save_if_present(table, "ordering_method")
         self.save_if_present(table, "trotter_order")
+        self.save_if_present(table, "trotter_steps")
+        self.save_if_present(table, "phase_scale_factor")
         return table
 
 # -------------------------------------------------------------------------------------------------
@@ -153,150 +189,119 @@ class AlgorithmConfiguration(ConfigurationBase):
 
 class AnalysisConfiguration(ConfigurationBase):
     def __init__(self):
-        self.resource_estimator = None
-        self.algorithm_matrix_output_file = None
-        self.numerical_simulation_inputs = None
-        self.matrix_memory_threshold_gb = 16.0
-        self.enable_eigenvalue_errors = False
-        self.error_matrix_norms = None
-        self.error_state_inputs = None
-        self.exact_simulation_inputs = None
-
+        # Internal (not user-facing) options ______________________________________________________
         # New flexible output API
-        self._matrix_output_requests = []
-        self._eigendecomposition_output_requests = []
-
-    def save_matrix_to_file(self, filename, operator, form, shift):
+        self._operator_output_requests = []
+        # External (user-facing) options __________________________________________________________
+        # Do resource estimation (e.g., qubit and gate counts)
+        # Can be a string ('pyliqtr', 'qualtran', 'cirq') or list (['pyliqtr', 'qualtran'])
+        self.resource_estimator = None
+        # Write unitary matrix of full algorithm to a file
+        self.algorithm_matrix_output_file = None
+        # Do numerical simulation with the provided starting state(s)
+        # -- numerical_simulation_inputs: using the constructed algorithm
+        self.numerical_simulation_inputs = None
+        # Memory threshold above which dense matrices are no longer generated
+        # - Switch to matrix-free representation, which disables some features such as saving
+        #   matrices or eigendecompositions
+        self.matrix_memory_threshold_gb = 16.0
+        # Compute error based on eigenvalues
+        self.enable_eigenvalue_errors = False
+        # Compute error based on matrix norm(s)
+        self.error_matrix_norms = None
+        # Compute error based on reference state(s)
+        self.error_state_inputs = None
+    # Write an operator to a file
+    def save_operator_to_file(self, filename, source, operator_type, energy_shifted, representation):
         """
-        Request saving a matrix to file.
+        Request saving an operator to file.
 
         All parameters are required to ensure explicit specification.
 
         Parameters
         ----------
         filename : str
-            Output filename (e.g., 'H_exact.npz')
-            Supported extensions: .npz, .h5, .hdf5, .txt
-        operator : {'exact', 'approximate'}
+            Output filename (e.g., 'H_exact.npz', 'H_exact_eig.npz')
+            Supported extensions: .npz, .h5, .hdf5, .txt (for matrix representation)
+        source : {'exact', 'approximate'}
             Which operator to save
             'exact' = true Hamiltonian (no approximations)
             'approximate' = algorithm output (Trotter, LCU, etc.)
-        form : {'hamiltonian', 'time_evolution'}
-            Which representation to save
-            'hamiltonian' = Hamiltonian matrix H
-            'time_evolution' = Time-evolution operator U = exp(-i*H*t)
-        shift : {'unshifted', 'shifted'}
+        operator_type : {'hamiltonian', 'time_evolution'}
+            Which operator form to save
+            'hamiltonian' = Hamiltonian matrix H (or its eigenbasis)
+            'time_evolution' = Time-evolution operator U = exp(-i*H*t) (or its eigenbasis)
+        energy_shifted : bool
             Whether to include energy shift
-            'unshifted' = physical energy scale (can have negative eigenvalues)
-            'shifted' = QPE energy scale (all eigenvalues positive)
+            False = physical energy scale (can have negative eigenvalues)
+            True = QPE energy scale (all eigenvalues positive)
+        representation : {'matrix', 'eigendecomposition'}
+            How to store the operator
+            'matrix' = full matrix representation
+            'eigendecomposition' = eigenenergies and eigenvectors
 
-        Examples
-        --------
-        >>> # Save physical Hamiltonian
-        >>> analysis.save_matrix_to_file(
-        ...     filename='H_exact.npz',
-        ...     operator='exact',
-        ...     form='hamiltonian',
-        ...     shift='unshifted'
-        ... )
-
-        >>> # Save approximate time-evolution operator (shifted for QPE)
-        >>> analysis.save_matrix_to_file(
-        ...     filename='U_approx_shifted.npz',
-        ...     operator='approximate',
-        ...     form='time_evolution',
-        ...     shift='shifted'
-        ... )
-        """
-        # Validate inputs
-        self._validate_output_request(filename, operator, form, shift)
-
-        # Store request
-        self._matrix_output_requests.append({
-            'filename': filename,
-            'operator': operator,
-            'form': form,
-            'shift': shift
-        })
-
-    def save_eigendecomposition_to_file(self, filename, operator, form, shift):
-        """
-        Request saving an eigendecomposition to file.
-
-        All parameters are required to ensure explicit specification.
-
-        Parameters
-        ----------
-        filename : str
-            Output filename (e.g., 'H_exact_eig.npz')
-            Supported extensions: .npz, .h5, .hdf5
-        operator : {'exact', 'approximate'}
-            Which operator to eigendecompose
-            'exact' = true Hamiltonian (no approximations)
-            'approximate' = algorithm output (Trotter, LCU, etc.)
-        form : {'hamiltonian', 'time_evolution'}
-            Which representation to eigendecompose
-            'hamiltonian' = diagonalize H to get eigenenergies
-            'time_evolution' = diagonalize U and convert phases to energies
-        shift : {'unshifted', 'shifted'}
-            Whether eigenvalues include energy shift
-            'unshifted' = physical energy scale
-            'shifted' = QPE energy scale (shifted eigenvalues)
-
-        Output file contains:
+        Output for representation='eigendecomposition' contains:
             eigenenergies : ndarray
                 Eigenvalues (sorted ascending)
             eigenvectors : ndarray
                 Eigenvectors (columns correspond to eigenvalues)
             metadata : dict
-                operator, form, shift, timestamp, dimension
+                source, operator_type, energy_shifted, timestamp, dimension
 
         Examples
         --------
-        >>> # Save eigendecomposition of physical Hamiltonian
-        >>> analysis.save_eigendecomposition_to_file(
-        ...     filename='H_exact_eig.npz',
-        ...     operator='exact',
-        ...     form='hamiltonian',
-        ...     shift='unshifted'
+        >>> # Save physical Hamiltonian as a matrix
+        >>> analysis.save_operator_to_file(
+        ...     filename='H_exact.npz',
+        ...     source='exact',
+        ...     operator_type='hamiltonian',
+        ...     energy_shifted=False,
+        ...     representation='matrix'
         ... )
 
-        >>> # Save eigendecomposition of approximate unitary
-        >>> analysis.save_eigendecomposition_to_file(
+        >>> # Save approximate time-evolution operator (shifted for QPE) as eigendecomposition
+        >>> analysis.save_operator_to_file(
         ...     filename='U_approx_eig.npz',
-        ...     operator='approximate',
-        ...     form='time_evolution',
-        ...     shift='unshifted'
+        ...     source='approximate',
+        ...     operator_type='time_evolution',
+        ...     energy_shifted=True,
+        ...     representation='eigendecomposition'
         ... )
         """
         # Validate inputs
-        self._validate_output_request(filename, operator, form, shift)
+        self._validate_output_request(filename, source, operator_type, energy_shifted, representation)
 
         # Store request
-        self._eigendecomposition_output_requests.append({
+        # TODO: Deduplicate
+        self._operator_output_requests.append({
             'filename': filename,
-            'operator': operator,
-            'form': form,
-            'shift': shift
+            'source': source,
+            'operator_type': operator_type,
+            'energy_shifted': energy_shifted,
+            'representation': representation
         })
 
-    def _validate_output_request(self, filename, operator, form, shift):
+    def _validate_output_request(self, filename, source, operator_type, energy_shifted, representation):
         """Validate output request parameters."""
-        valid_operators = ['exact', 'approximate']
-        valid_forms = ['hamiltonian', 'time_evolution']
-        valid_shifts = ['unshifted', 'shifted']
+        valid_sources = ['exact', 'approximate']
+        valid_operator_types = ['hamiltonian', 'time_evolution']
+        valid_representations = ['matrix', 'eigendecomposition']
 
-        if operator not in valid_operators:
+        if source not in valid_sources:
             raise ValueError(
-                f"operator must be one of {valid_operators}, got '{operator}'"
+                f"source must be one of {valid_sources}, got '{source}'"
             )
-        if form not in valid_forms:
+        if operator_type not in valid_operator_types:
             raise ValueError(
-                f"form must be one of {valid_forms}, got '{form}'"
+                f"operator_type must be one of {valid_operator_types}, got '{operator_type}'"
             )
-        if shift not in valid_shifts:
+        if not isinstance(energy_shifted, bool):
+            raise TypeError(
+                f"energy_shifted must be a boolean, got {type(energy_shifted).__name__}"
+            )
+        if representation not in valid_representations:
             raise ValueError(
-                f"shift must be one of {valid_shifts}, got '{shift}'"
+                f"representation must be one of {valid_representations}, got '{representation}'"
             )
 
         # Validate filename
@@ -319,13 +324,8 @@ class AnalysisConfiguration(ConfigurationBase):
         self.save_if_present(table, "enable_eigenvalue_errors")
         self.save_if_present(table, "error_matrix_norms")
         self.save_if_present(table, "error_state_inputs")
-        self.save_if_present(table, "exact_simulation_inputs")
-
-        # Save new output requests
-        if self._matrix_output_requests:
-            table['matrix_output_requests'] = self._matrix_output_requests
-        if self._eigendecomposition_output_requests:
-            table['eigendecomposition_output_requests'] = self._eigendecomposition_output_requests
+        if self._operator_output_requests:
+            table['operator_output_requests'] = self._operator_output_requests
 
         return table
 
@@ -351,12 +351,58 @@ class GeneralConfiguration:
     def __init__(self, user_config: GeneralConfigurationUser):
         self.logfile = user_config.logfile
         self.loglevel = user_config._loglevel
+        self.output_directory = user_config.output_directory
         self.git_hash = _get_git_hash()
+
+    def get_output_path(self, filename):
+        """
+        Get the full output path for a file, respecting output_directory.
+
+        Parameters
+        ----------
+        filename : str
+            The filename or relative path
+
+        Returns
+        -------
+        str
+            Full path with output_directory prepended (if set)
+
+        Notes
+        -----
+        - If output_directory is empty or None, returns filename unchanged
+        - Uses os.path.join() for proper path joining
+        - Absolute paths in filename override output_directory
+        - Creates parent directories automatically
+
+        Examples
+        --------
+        >>> config.output_directory = "Be-H/"
+        >>> config.get_output_path("analysis.log")
+        'Be-H/analysis.log'
+        >>> config.get_output_path("logs/debug.log")
+        'Be-H/logs/debug.log'
+        >>> config.get_output_path("/tmp/file.log")
+        '/tmp/file.log'  # absolute path unchanged
+        """
+        if not self.output_directory:
+            output_path = filename
+        else:
+            output_path = os.path.join(self.output_directory, filename)
+
+        # Create parent directory if it doesn't exist
+        parent_dir = os.path.dirname(output_path)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
+
+        return output_path
 
     def _generate_TOML_table(self):
         table = tomlkit.table()
         table["logfile"] = self.logfile
         table["loglevel"] = self.loglevel
+        if self.output_directory:
+            table["output_directory"] = self.output_directory
         table["git_hash"] = self.git_hash
         return table
 
@@ -499,7 +545,7 @@ class State:
 
     def show_results(self):
         formatted = self._format_results(self.results, indent=0)
-        logger.warning(f"results:\n{formatted}")
+        logger.results(f"results:\n{formatted}")
 
     def _filter_for_toml(self, obj):
         """Recursively filter out numpy arrays and other non-serializable objects from results."""
@@ -543,9 +589,12 @@ class State:
             filtered_value = self._filter_for_toml(self.results[key])
             document.add(key, filtered_value)
         filename = ".".join((str(self.overall_hash), "toml"))
-        tomlfile = TOMLFile(filename)
+        # Apply output directory if configured
+        output_path = self.config_general.get_output_path(filename)
+        tomlfile = TOMLFile(output_path)
+        logger.info(f"Writing TOML summary file \"{output_path}\".")
         tomlfile.write(document)
-        logger.info(f"Summary file saved to \"{filename}\".")
+        logger.verbose("Summary file saved.")
 
 # -------------------------------------------------------------------------------------------------
 

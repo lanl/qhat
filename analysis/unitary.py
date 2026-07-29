@@ -35,17 +35,11 @@ class PauliStringLCU(LCUBlockEncoding):
         n_terms  =  len(pauli_terms)
         n_tot    =  2**(int(np.ceil(np.log2(n_terms))))
         n_pad    =  n_tot - n_terms
-#        print(f"-- n_terms={n_terms}")
-#        print(f"-- n_tot={n_tot}")
-#        for i in range(n_terms):
-#            print(f"-- getTerms[{i}]={pauli_terms[i]}")
 
         alphas = [np.sqrt(np.abs(t.coefficient)) for t in pauli_terms]
         alpha = np.sum([a**2 for a in alphas])
-#        print(f"-- alpha={alpha}")
         alphas_scaled = [a/np.sqrt(alpha) for a in alphas]
         alphas_scaled.extend([0.0 for i in range(n_pad)])
-#        print(f"-- alphas_scaled={alphas_scaled}")
 
         selection_bitsize = int(np.ceil(np.log2(n_tot)))
 
@@ -68,7 +62,9 @@ class PauliStringLCU(LCUBlockEncoding):
             for t in pauli_terms:
                 coeff = np.real(t.coefficient)
                 if coeff < 0:
-                    logger.warning("Alias sampling preparation with negative coefficients is not supported yet. Circuits and estimates will assume positive coefficients.")
+                    logger.warning("Alias sampling preparation with negative coefficients is not "
+                                   "supported yet. Circuits and estimates will assume positive "
+                                   "coefficients.")
                     break
 
             prepare = StatePreparationAliasSampling.from_lcu_probs(
@@ -206,90 +202,122 @@ def encode_ramped_trotter(
     impl_label = f"{trotter_impl} QHAT"
     logger.verbose(f"Encoding with ramped-trotterization method from `common` ({impl_label}).")
 
-    timestep = value(config_unitary.timestep, tevol_hbar)
-    assert timestep >= 0.0
-    logger.info(f"-- timestep = {timestep}")
+    assert tevol_hbar >= 0.0
+    logger.info(f"-- using timestep = {tevol_hbar}")
 
-    # Compute the number of Trotter steps based on the Trotter error from arXiv:1912.08854v3
-    # Using fast implementation for better performance (100-150x more samples per second)
-    from qhat.analysis.trotter_coefficients_fast import trotter_error_estimator_fast
+    # Check if user provided manual step count
+    user_provided_steps = (hasattr(config_unitary, 'trotter_steps') and
+                          config_unitary.trotter_steps is not None)
 
-    # Read error coefficient computation mode from config (with backward-compatible defaults)
-    error_coeff_mode = getattr(config_unitary, 'error_coeff_mode', 'monte_carlo')
-    error_coeff_auto_exact = getattr(config_unitary, 'error_coeff_auto_exact', False)
-    error_coeff_time_limit = getattr(config_unitary, 'error_coeff_time_limit', 60)
-
-    # Validate user configuration
-    if error_coeff_mode not in ['monte_carlo', 'exact']:
-        logger.warning(f"Invalid error_coeff_mode='{error_coeff_mode}', using 'monte_carlo'")
-        error_coeff_mode = 'monte_carlo'
-
-    logger.info(f"-- Error coefficient computation mode: {error_coeff_mode}")
-    if error_coeff_mode == 'monte_carlo' and error_coeff_auto_exact:
-        logger.info(f"-- Auto-switch to exact coefficient computation: enabled")
-    logger.info(f"-- Error coefficient time limit: {error_coeff_time_limit}s")
-
-    # Compute error coefficients with user-specified mode
-    c1, c2 = trotter_error_estimator_fast(
-        hamiltonian.get_grouped_terms(),
-        error_coeff_time_limit,
-        mode=error_coeff_mode,
-        auto_exact=error_coeff_auto_exact
-    )
-    logger.info(f"-- Trotter error coefficients: C1 = {c1}, C2 = {c2}")
-    assert config_unitary.energy_error is not None
-    logger.info(f"-- allowable energy error = {config_unitary.energy_error} Hartrees")
-    logger.info(f"-- effective energy range = {2 * math.pi / timestep} Hartrees")
-    eps_trotter = config_unitary.energy_error * timestep / (2 * math.pi)
-    logger.info(f"-- allowable fractional Trotter error = {eps_trotter}")
-    # use config_unitary.energy_error here instead of eps_trotter, because these equations are
-    # derived in terms of the absolute energy error rather than the fractional energy error
-    s1 = timestep * config_unitary.error_scale * c1 / config_unitary.energy_error
-    s2 = timestep * math.sqrt(config_unitary.error_scale * c2 / config_unitary.energy_error)
-    logger.info(f"-- Trotter step count: s1 = {s1}, s2 = {s2}")
-
-    # Cost factors: r1=1 (single ramp), r2=2 (forward+backward)
-    r1 = 1
-    r2 = 2
-
-    # Check if user explicitly requested a specific Trotter order
+    # Get the requested Trotter order/method
     requested_order = config_unitary.trotter_order
 
-    if requested_order is not None:
-        # User explicitly requested a specific order
-        if requested_order.lower() == "first order":
-            method = "first order"
-            Nsteps0 = s1
-        elif requested_order.lower() == "second order":
+    if user_provided_steps:
+        # User provided step count manually - allow any method from the implementation
+        Nsteps = config_unitary.trotter_steps
+        logger.info(f"-- User provided number of Trotter steps: {Nsteps}")
+
+        if requested_order is None:
+            raise ValueError(
+                "When providing trotter_steps manually, you must also specify trotter_order."
+            )
+
+        # When steps are provided, we use the requested method directly
+        method = requested_order.lower()
+        logger.info(f"-- Using user-specified Trotter method: {method}")
+
+    else:
+        # Auto-calculate optimal step count - only certain methods support this
+        # Compute the number of Trotter steps based on the Trotter error from arXiv:1912.08854v3
+        # Using fast implementation for better performance (100-150x more samples per second)
+        from qhat.analysis.trotter_coefficients_fast import trotter_error_estimator_fast
+
+        # Read error coefficient computation mode from config (with backward-compatible defaults)
+        error_coeff_mode = getattr(config_unitary, 'error_coeff_mode', 'monte_carlo')
+        error_coeff_auto_exact = getattr(config_unitary, 'error_coeff_auto_exact', False)
+        error_coeff_time_limit = getattr(config_unitary, 'error_coeff_time_limit', 60)
+
+        # Validate user configuration
+        if error_coeff_mode not in ['monte_carlo', 'exact']:
+            logger.warning(f"Invalid error_coeff_mode='{error_coeff_mode}', using 'monte_carlo'")
+            error_coeff_mode = 'monte_carlo'
+
+        logger.info(f"-- Error coefficient computation mode: {error_coeff_mode}")
+        if error_coeff_mode == 'monte_carlo' and error_coeff_auto_exact:
+            logger.info(f"-- Auto-switch to exact coefficient computation: enabled")
+        logger.info(f"-- Error coefficient time limit: {error_coeff_time_limit}s")
+
+        # Compute error coefficients with user-specified mode
+        c1, c2 = trotter_error_estimator_fast(
+            hamiltonian.get_grouped_terms(),
+            error_coeff_time_limit,
+            mode=error_coeff_mode,
+            auto_exact=error_coeff_auto_exact
+        )
+        logger.info(f"-- Trotter error coefficients: C1 = {c1}, C2 = {c2}")
+        assert config_unitary.energy_error is not None
+        logger.info(f"-- allowable energy error = {config_unitary.energy_error} Hartrees")
+        logger.info(f"-- effective energy range = {2 * math.pi / tevol_hbar} Hartrees")
+        eps_trotter = config_unitary.energy_error * tevol_hbar / (2 * math.pi)
+        logger.info(f"-- allowable fractional Trotter error = {eps_trotter}")
+        # use config_unitary.energy_error here instead of eps_trotter, because these equations are
+        # derived in terms of the absolute energy error rather than the fractional energy error
+        s1 = tevol_hbar * config_unitary.error_scale * c1 / config_unitary.energy_error
+        s2 = tevol_hbar * math.sqrt(config_unitary.error_scale * c2 / config_unitary.energy_error)
+        logger.info(f"-- Trotter step count: s1 = {s1}, s2 = {s2}")
+
+        # Cost factors: r1=1 (single ramp), r2=2 (forward+backward)
+        r1 = 1
+        r2 = 2
+
+        if requested_order is not None:
+            # User explicitly requested a specific order for auto-calculation
+            if requested_order.lower() == "first order":
+                method = "first order"
+                Nsteps0 = s1
+                ramps_per_step = 1
+            elif requested_order.lower() == "second order":
+                method = "second order"
+                Nsteps0 = s2
+                ramps_per_step = 2
+            elif requested_order.lower() == "fourth order":
+                # Fourth-order step count using C2-based heuristic
+                # NOTE: This is an approximation provided by Claude (not human verified) since we don't
+                #       compute the exact C4 coefficient
+                x = config_unitary.error_scale * c2 / config_unitary.energy_error
+                s4 = tevol_hbar * x ** (1.0/3.0)
+                logger.warning(
+                    "Fourth-order step count (s4) uses an APPROXIMATION based on C2, not an exact C4 "
+                    "coefficient. Unlike first-order (C1) and second-order (C2), this is a heuristic "
+                    "estimate and may be less accurate."
+                )
+                logger.info(f"-- Fourth-order step count: s4 = {s4}")
+                method = "fourth order"
+                Nsteps0 = s4
+                ramps_per_step = 10
+            else:
+                raise ValueError(
+                    f"Invalid trotter_order '{requested_order}' for automatic step calculation. "
+                    f"Only 'first order', 'second order', and 'fourth order' have step auto-calculation. "
+                    f"To use other methods (third, eighth order, etc.), provide trotter_steps manually."
+                )
+            logger.info(f"-- User requested {method}")
+        else:
+            # Auto-select between first and second order based on cost
+            # -- Fourth order is excluded because the step estimate is not as reliable.  It should be
+            #    added here once we have a better calculation of C4 and therefore s4.
             method = "second order"
             Nsteps0 = s2
-        elif requested_order.lower() == "fourth order":
-            # Fourth-order step count using C2-based heuristic
-            # NOTE: This is an approximation since we don't compute the exact C4 coefficient
-            s4 = timestep * (config_unitary.error_scale * c2 / config_unitary.energy_error) ** (1.0/3.0)
-            logger.warning(
-                "Fourth-order step count (s4) uses an APPROXIMATION based on C2, not an exact C4 "
-                "coefficient. Unlike first-order (C1) and second-order (C2), this is a heuristic "
-                "estimate and may be less accurate."
-            )
-            logger.info(f"-- Fourth-order step count: s4 = {s4}")
-            method = "fourth order"
-            Nsteps0 = s4
-        else:
-            raise ValueError(f"Invalid trotter_order '{requested_order}'. Must be 'first order', 'second order', or 'fourth order'.")
-        logger.info(f"-- User requested {method}")
-    else:
-        # Auto-select between first and second order based on cost
-        # -- Fourth order is excluded because the step estimate is not as reliable.  It should be
-        #    added here once we have a better calculation of C4 and therefore s4.
-        method = "second order"
-        Nsteps0 = s2
-        if r1 * s1 < r2 * s2:
-            method = "first order"
-            Nsteps0 = s1
+            ramps_per_step = 2
+            if r1 * s1 < r2 * s2:
+                method = "first order"
+                Nsteps0 = s1
+                ramps_per_step = 1
+            logger.verbose("-- auto selecting order based on unoptimized ramp count")
 
-    Nsteps = max(1, math.ceil(Nsteps0))
-    logger.info(f"-- using {method} Trotter formula with {Nsteps} steps ({Nsteps0})")
+        Nsteps = max(1, math.ceil(Nsteps0))
+        logger.info(f"-- Trotter recommendation: use {method} formula with {Nsteps} steps ({Nsteps0})")
+        logger.verbose(f"-- unoptimized ramp count = {Nsteps * ramps_per_step}")
 
     pauli_strings = hamiltonian.get_all_pauli_strings(return_as='strings')
     pauli_strings = reorder_paulis(pauli_strings, config_unitary.ordering_method)
@@ -301,7 +329,7 @@ def encode_ramped_trotter(
         return build_ramped_trotterized_unitary(
                 pauli_strings.items(),
                 method,
-                timestep,
+                tevol_hbar,
                 Nsteps,
                 combine_terms=config_unitary.trotter_combine_terms)
     else:  # 'original'
@@ -310,7 +338,7 @@ def encode_ramped_trotter(
         return build_ramped_trotterized_unitary(
                 pauli_strings.items(),
                 method,
-                timestep,
+                tevol_hbar,
                 Nsteps)
 
 # -------------------------------------------------------------------------------------------------
