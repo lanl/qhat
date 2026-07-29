@@ -27,6 +27,11 @@ from qhat.hamiltonian_generator.thresholding import (
 
 logger = logging.getLogger(__name__)
 
+# Fixed baseline threshold for Pauli-string coefficients.
+# This is intentionally not user-configurable in this PR.
+# TODO: Consider making the Pauli-string coefficient threshold configurable in a future update.
+PAULI_STRING_COEFFICIENT_THRESHOLD = 1.0e-8
+
 # -------------------------------------------------------------------------------------------------
 
 def load_configuration() -> State:
