@@ -1,10 +1,10 @@
-"""Regression tests for QHAT's configurable coefficient threshold."""
+"""Regression tests for QHAT coefficient thresholds."""
 
 import pickle
 
 import numpy as np
 import pytest
-from openfermion import InteractionOperator, MolecularData
+from openfermion import InteractionOperator, MolecularData, QubitOperator
 from openfermion.chem.molecular_data import (
     spinorb_from_spatial as openfermion_spinorb_from_spatial,
 )
@@ -313,6 +313,105 @@ def test_mapping_and_metadata_record_configured_threshold():
             "spin-orbital coefficient threshold (Hartrees)"
         ]
         == 0.0
+    )
+
+    assert (
+        state.metadata[
+            "Pauli-string coefficient threshold (Hartrees)"
+        ]
+        == hamgen.PAULI_STRING_COEFFICIENT_THRESHOLD
+    )
+
+
+@pytest.mark.parametrize(
+    ("mapping_setting", "mapping_name", "mapper_name"),
+    [
+        (
+            "Jordan-Wigner",
+            "jordan-wigner",
+            "jordan_wigner",
+        ),
+        (
+            "Bravyi-Kitaev",
+            "bravyi-kitaev",
+            "bravyi_kitaev",
+        ),
+    ],
+)
+def test_pauli_string_threshold_applies_to_jw_and_bk(
+    monkeypatch,
+    mapping_setting,
+    mapping_name,
+    mapper_name,
+):
+    threshold = hamgen.PAULI_STRING_COEFFICIENT_THRESHOLD
+
+    # Assign terms directly so OpenFermion does not remove the synthetic
+    # below-threshold coefficient before QHAT receives the mapped operator.
+    mapped_operator = QubitOperator()
+    mapped_operator.terms = {
+        tuple(): 1.0,
+        ((0, "X"),): 0.5 * threshold,
+        ((0, "Y"),): threshold,
+        ((0, "Z"),): 2.0 * threshold,
+    }
+
+    def fake_mapping(active_operator):
+        return mapped_operator
+
+    monkeypatch.setattr(
+        hamgen,
+        mapper_name,
+        fake_mapping,
+    )
+
+    state = _ActiveSpaceState()
+    state.metadata = {}
+    state.config_hamiltonian.f2q_mapping = mapping_setting
+
+    active_operator = _interaction_operator(
+        1.0,
+        threshold=DEFAULT_COEFFICIENT_THRESHOLD,
+    )
+
+    result = hamgen.map_fermions_to_qubits(
+        state,
+        active_operator,
+    )
+
+    # A coefficient strictly below the fixed threshold is removed.
+    assert ((0, "X"),) not in result.terms
+
+    # A coefficient exactly equal to the threshold is retained.
+    assert result.terms[((0, "Y"),)] == threshold
+
+    # A coefficient above the threshold is retained unchanged.
+    assert result.terms[((0, "Z"),)] == 2.0 * threshold
+
+    # The identity term is also retained unchanged.
+    assert result.terms[tuple()] == 1.0
+
+    assert result.f2q_mapping == mapping_name
+    assert result.pauli_coefficient_threshold == threshold
+    assert len(result.terms) == 3
+
+    hamgen.compute_metadata(
+        state,
+        result,
+    )
+
+    assert (
+        state.metadata[
+            "Pauli-string coefficient threshold (Hartrees)"
+        ]
+        == threshold
+    )
+
+    assert (
+        state.metadata[
+            "number of terms in sum of Pauli strings"
+        ]
+        == 3
     )
 
 
