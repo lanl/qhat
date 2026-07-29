@@ -35,17 +35,11 @@ class PauliStringLCU(LCUBlockEncoding):
         n_terms  =  len(pauli_terms)
         n_tot    =  2**(int(np.ceil(np.log2(n_terms))))
         n_pad    =  n_tot - n_terms
-#        print(f"-- n_terms={n_terms}")
-#        print(f"-- n_tot={n_tot}")
-#        for i in range(n_terms):
-#            print(f"-- getTerms[{i}]={pauli_terms[i]}")
 
         alphas = [np.sqrt(np.abs(t.coefficient)) for t in pauli_terms]
         alpha = np.sum([a**2 for a in alphas])
-#        print(f"-- alpha={alpha}")
         alphas_scaled = [a/np.sqrt(alpha) for a in alphas]
         alphas_scaled.extend([0.0 for i in range(n_pad)])
-#        print(f"-- alphas_scaled={alphas_scaled}")
 
         selection_bitsize = int(np.ceil(np.log2(n_tot)))
 

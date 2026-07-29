@@ -66,7 +66,7 @@ class HamiltonianConfiguration(ConfigurationBase):
         self.max_bosons_per_state = None
     def _only_once(self):
         if self.source is not None:
-            print("Already set Hamiltonian source to {self.source}.")
+            logger.error(f"Already set Hamiltonian source to {self.source}.")
             assert self.source is None
     def load_second_quantization(self,
                                  filename,
@@ -118,7 +118,7 @@ class UnitaryConfiguration(ConfigurationBase):
         self.method = None
     def _only_once(self):
         if self.method is not None:
-            print("Already set unitary method to {self.method}.")
+            logger.error(f"Already set unitary method to {self.method}.")
             assert self.method is None
     def encode_ramped_trotter(self, **kwargs):
         self._only_once()
