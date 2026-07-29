@@ -24,16 +24,17 @@ from pathlib import Path
 from typing import Optional
 
 
-# Custom log level between INFO and DEBUG
-VERBOSE = 25  # logging.INFO=20, logging.WARNING=30
+# Custom log level between DEBUG and INFO
+# Lower values = more verbose in Python logging
+VERBOSE = 15  # logging.DEBUG=10, logging.INFO=20
 
 
 def add_verbose_level():
     """
     Add VERBOSE log level to logging module.
 
-    This creates a new log level between INFO and WARNING for
-    moderately detailed logging that's more than INFO but not as
+    This creates a new log level between DEBUG and INFO for
+    moderately detailed logging that's more verbose than INFO but not as
     verbose as DEBUG.
     """
     # Only add if not already present
