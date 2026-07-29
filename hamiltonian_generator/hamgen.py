@@ -285,6 +285,7 @@ def apply_active_space(state, ham1_HartreeFock):
 
 def map_fermions_to_qubits(state, ham2_ActiveSpace):
     # Transform fermionic operators to qubit operators
+    # A fixed coefficient threshold is applied to the final Pauli strings produced by both the Jordan-Wigner and Bravyi-Kitaev mappings.
     tstart = time.time()
     ham3_Fermion2Qubit = None
     mapping_name = state.config_hamiltonian.fermion_to_qubit_name()
@@ -295,6 +296,27 @@ def map_fermions_to_qubits(state, ham2_ActiveSpace):
     else:
         mapping = state.config_hamiltonian.f2q_mapping()
         raise NotImplementedError(f"invalid fermion-to-qubit mapping \"{mapping}\"")
+
+    # Apply the same fixed Pauli-string threshold to JW and BK, removing only coefficients with magnitude strictly below the cutoff.
+    number_of_terms_before = len(ham3_Fermion2Qubit.terms)
+
+    ham3_Fermion2Qubit.terms = {
+        pauli_string: coefficient
+        for pauli_string, coefficient
+        in ham3_Fermion2Qubit.terms.items()
+        if abs(coefficient) >= PAULI_STRING_COEFFICIENT_THRESHOLD
+    }
+
+    number_of_terms_removed = (
+        number_of_terms_before - len(ham3_Fermion2Qubit.terms)
+    )
+
+    state.log(
+        "Applied fixed Pauli-string coefficient threshold "
+        f"{PAULI_STRING_COEFFICIENT_THRESHOLD:.1e} Hartrees; "
+        f"removed {number_of_terms_removed} terms."
+    )
+
     tstop = time.time()
     # Propagate previously-computed metadata that we need to preserve across all run modes
     ham3_Fermion2Qubit.hf_energy = ham2_ActiveSpace.hf_energy
@@ -305,6 +327,12 @@ def map_fermions_to_qubits(state, ham2_ActiveSpace):
     ham3_Fermion2Qubit.hf_time = ham2_ActiveSpace.hf_time
     ham3_Fermion2Qubit.as_time = ham2_ActiveSpace.as_time
     ham3_Fermion2Qubit.f2q_time = tstop - tstart
+
+    # Record the fixed Pauli threshold on the generated operator.
+    ham3_Fermion2Qubit.pauli_coefficient_threshold = (
+        PAULI_STRING_COEFFICIENT_THRESHOLD
+    )
+
     # Return result
     return ham3_Fermion2Qubit
 
