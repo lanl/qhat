@@ -24,37 +24,43 @@ from pathlib import Path
 from typing import Optional
 
 
-# Custom log level between DEBUG and INFO
+# Custom log levels
 # Lower values = more verbose in Python logging
-VERBOSE = 15  # logging.DEBUG=10, logging.INFO=20
+VERBOSE = 15  # Between DEBUG (10) and INFO (20)
+RESULTS = 45  # Between ERROR (40) and CRITICAL (50) - for critical output that should almost always be shown
 
 
-def add_verbose_level():
+def add_custom_levels():
     """
-    Add VERBOSE log level to logging module.
+    Add custom log levels to logging module.
 
-    This creates a new log level between DEBUG and INFO for
-    moderately detailed logging that's more verbose than INFO but not as
-    verbose as DEBUG.
+    VERBOSE: Between DEBUG and INFO for moderately detailed logging.
+    RESULTS: Between ERROR and CRITICAL for critical output (results, completion)
+             that should be shown unless user explicitly sets level to CRITICAL.
     """
-    # Only add if not already present
-    if hasattr(logging, 'VERBOSE'):
-        return
+    # Add VERBOSE level
+    if not hasattr(logging, 'VERBOSE'):
+        logging.addLevelName(VERBOSE, "VERBOSE")
 
-    logging.addLevelName(VERBOSE, "VERBOSE")
+        def verbose(self, message, *args, **kwargs):
+            if self.isEnabledFor(VERBOSE):
+                self._log(VERBOSE, message, args, **kwargs)
 
-    def verbose(self, message, *args, **kwargs):
-        if self.isEnabledFor(VERBOSE):
-            self._log(VERBOSE, message, args, **kwargs)
+        logging.Logger.verbose = verbose
+        logging.verbose = lambda msg, *args, **kwargs: logging.log(VERBOSE, msg, *args, **kwargs)
+        logging.VERBOSE = VERBOSE
 
-    # Add verbose() method to Logger class
-    logging.Logger.verbose = verbose
+    # Add RESULTS level
+    if not hasattr(logging, 'RESULTS'):
+        logging.addLevelName(RESULTS, "RESULTS")
 
-    # Add module-level verbose() function
-    logging.verbose = lambda msg, *args, **kwargs: logging.log(VERBOSE, msg, *args, **kwargs)
+        def results(self, message, *args, **kwargs):
+            if self.isEnabledFor(RESULTS):
+                self._log(RESULTS, message, args, **kwargs)
 
-    # Add VERBOSE constant
-    logging.VERBOSE = VERBOSE
+        logging.Logger.results = results
+        logging.results = lambda msg, *args, **kwargs: logging.log(RESULTS, msg, *args, **kwargs)
+        logging.RESULTS = RESULTS
 
 
 def configure_logging(
@@ -90,8 +96,8 @@ def configure_logging(
         >>> logger = logging.getLogger(__name__)
         >>> logger.info("Application started")
     """
-    # Add custom VERBOSE level
-    add_verbose_level()
+    # Add custom levels (VERBOSE and RESULTS)
+    add_custom_levels()
 
     # Parse level string
     level_map = {

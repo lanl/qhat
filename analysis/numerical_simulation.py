@@ -52,7 +52,7 @@ def numerical_simulation(
         try:
             initial_state = load_state(input_file)
         except Exception as e:
-            logger.info(f"ERROR: Failed to load state from {input_file}: {e}")
+            logger.error(f"Failed to load state from {input_file}: {e}")
             raise
 
         # Validate dimensions
@@ -82,7 +82,7 @@ def numerical_simulation(
         try:
             save_state(output_file, final_state)
         except Exception as e:
-            logger.info(f"ERROR: Failed to save state to {output_file}: {e}")
+            logger.error(f"Failed to save state to {output_file}: {e}")
             raise
 
         logger.info(f"  Simulation complete: {input_file} -> {output_file}")

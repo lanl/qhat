@@ -538,7 +538,7 @@ class State:
 
     def show_results(self):
         formatted = self._format_results(self.results, indent=0)
-        logger.warning(f"results:\n{formatted}")
+        logger.results(f"results:\n{formatted}")
 
     def _filter_for_toml(self, obj):
         """Recursively filter out numpy arrays and other non-serializable objects from results."""

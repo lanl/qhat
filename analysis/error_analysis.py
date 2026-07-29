@@ -139,7 +139,7 @@ def _compute_state_dependent_errors(exact_unitary_matrix, approx_unitary_matrix,
         try:
             initial_state = load_state(state_file)
         except Exception as e:
-            logger.error(f"ERROR: Failed to load state from {state_file}: {e}")
+            logger.error(f"Failed to load state from {state_file}: {e}")
             raise
 
         # Apply exact time evolution operator: U_exact |ψ⟩
