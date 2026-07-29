@@ -514,6 +514,10 @@ def compute_metadata(state, ham3_Fermion2Qubit):
     state.metadata["spin-orbital coefficient threshold (Hartrees)"] = (
         state.config_hamiltonian.coefficient_threshold
     )
+    # Fixed threshold applied after the JW or BK mapping
+    state.metadata["Pauli-string coefficient threshold (Hartrees)"] = (
+        ham3_Fermion2Qubit.pauli_coefficient_threshold
+    )
     # number of terms in sum of Pauli strings
     state.metadata["number of terms in sum of Pauli strings"] = len(ham3_Fermion2Qubit.terms)
     # one-norm of sum of Pauli strings
