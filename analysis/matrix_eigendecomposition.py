@@ -48,8 +48,8 @@ def compute_unitary_matrix(bloq):
     try:
         return bloq.tensor_contract()
     except Exception as e:
-        logger.info(
-            f"ERROR: Failed to compute unitary matrix: {e}\n"
+        logger.error(
+            f"Failed to compute unitary matrix: {e}\n"
             "This may indicate a bug in the bloq's tensor_contract() implementation."
         )
         raise
@@ -114,7 +114,7 @@ def output_unitary_matrix(filename, unitary_matrix) -> dict:
         logger.verbose(f"Matrix Frobenius norm: {matrix_norm:.6e}")
         logger.verbose(f"Unitarity error ||U†U - I||_F: {unitarity_error:.6e}")
     except Exception as e:
-        logger.info(f"WARNING: Could not compute unitarity check: {e}")
+        logger.warning(f"Could not compute unitarity check: {e}")
         matrix_norm = None
         unitarity_error = None
 
