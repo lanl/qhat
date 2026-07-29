@@ -107,7 +107,7 @@ def run():
     state.show_results()
     state.save_summary()
 
-    logger.warning("Analysis complete.")
+    logger.results("Analysis complete.")
 
 # =================================================================================================
 

@@ -443,9 +443,6 @@ class OperatorRepresentation:
             return eigenvalues + self.energy_shift
         else:  # time_evolution
             phase_factor = np.exp(-1j * self.energy_shift * self.tevol_hbar)
-            print(f"phase factor     = {phase_factor}")
-            print(f"energy shift     = {self.energy_shift}")
-            print(f"time step / hbar = {self.tevol_hbar}")
             return phase_factor * eigenvalues
 
     def _remove_energy_shift(self, eigenvalues: np.ndarray, operator_type: str) -> np.ndarray:
@@ -456,7 +453,4 @@ class OperatorRepresentation:
             return eigenvalues - self.energy_shift
         else:  # time_evolution
             phase_factor = np.exp(1j * self.energy_shift * self.tevol_hbar)
-            print(f"phase factor     = {phase_factor}")
-            print(f"energy shift     = {self.energy_shift}")
-            print(f"time step / hbar = {self.tevol_hbar}")
             return phase_factor * eigenvalues

@@ -66,7 +66,7 @@ class HamiltonianConfiguration(ConfigurationBase):
         self.max_bosons_per_state = None
     def _only_once(self):
         if self.source is not None:
-            print("Already set Hamiltonian source to {self.source}.")
+            logger.error(f"Already set Hamiltonian source to {self.source}.")
             assert self.source is None
     def load_second_quantization(self,
                                  filename,
@@ -118,7 +118,7 @@ class UnitaryConfiguration(ConfigurationBase):
         self.method = None
     def _only_once(self):
         if self.method is not None:
-            print("Already set unitary method to {self.method}.")
+            logger.error(f"Already set unitary method to {self.method}.")
             assert self.method is None
     def encode_ramped_trotter(self, **kwargs):
         self._only_once()
@@ -131,7 +131,13 @@ class UnitaryConfiguration(ConfigurationBase):
         self.trotter_combine_terms = kwargs.get("trotter_combine_terms", True)
         self.ordering_method = kwargs.get("ordering_method", None)
         self.trotter_order = kwargs.get("trotter_order", None)
+        self.trotter_steps = kwargs.get("trotter_steps", None)
         self.phase_scale_factor = kwargs.get("phase_scale_factor", 1.01)
+        # Validate trotter_steps
+        if self.trotter_steps is not None:
+            if not isinstance(self.trotter_steps, int) or self.trotter_steps < 1:
+                raise ValueError(
+                    f"trotter_steps must be a positive integer, got {self.trotter_steps}")
         # Validate phase_scale_factor
         if self.phase_scale_factor <= 0:
             raise ValueError(
@@ -159,6 +165,7 @@ class UnitaryConfiguration(ConfigurationBase):
         self.save_if_present(table, "trotter_combine_terms")
         self.save_if_present(table, "ordering_method")
         self.save_if_present(table, "trotter_order")
+        self.save_if_present(table, "trotter_steps")
         self.save_if_present(table, "phase_scale_factor")
         return table
 
@@ -538,7 +545,7 @@ class State:
 
     def show_results(self):
         formatted = self._format_results(self.results, indent=0)
-        logger.warning(f"results:\n{formatted}")
+        logger.results(f"results:\n{formatted}")
 
     def _filter_for_toml(self, obj):
         """Recursively filter out numpy arrays and other non-serializable objects from results."""
