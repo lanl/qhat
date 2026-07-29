@@ -68,7 +68,9 @@ class PauliStringLCU(LCUBlockEncoding):
             for t in pauli_terms:
                 coeff = np.real(t.coefficient)
                 if coeff < 0:
-                    logger.warning("Alias sampling preparation with negative coefficients is not supported yet. Circuits and estimates will assume positive coefficients.")
+                    logger.warning("Alias sampling preparation with negative coefficients is not "
+                                   "supported yet. Circuits and estimates will assume positive "
+                                   "coefficients.")
                     break
 
             prepare = StatePreparationAliasSampling.from_lcu_probs(
@@ -206,9 +208,8 @@ def encode_ramped_trotter(
     impl_label = f"{trotter_impl} QHAT"
     logger.verbose(f"Encoding with ramped-trotterization method from `common` ({impl_label}).")
 
-    timestep = value(config_unitary.timestep, tevol_hbar)
-    assert timestep >= 0.0
-    logger.info(f"-- timestep = {timestep}")
+    assert tevol_hbar >= 0.0
+    logger.info(f"-- using timestep = {tevol_hbar}")
 
     # Compute the number of Trotter steps based on the Trotter error from arXiv:1912.08854v3
     # Using fast implementation for better performance (100-150x more samples per second)
@@ -239,13 +240,13 @@ def encode_ramped_trotter(
     logger.info(f"-- Trotter error coefficients: C1 = {c1}, C2 = {c2}")
     assert config_unitary.energy_error is not None
     logger.info(f"-- allowable energy error = {config_unitary.energy_error} Hartrees")
-    logger.info(f"-- effective energy range = {2 * math.pi / timestep} Hartrees")
-    eps_trotter = config_unitary.energy_error * timestep / (2 * math.pi)
+    logger.info(f"-- effective energy range = {2 * math.pi / tevol_hbar} Hartrees")
+    eps_trotter = config_unitary.energy_error * tevol_hbar / (2 * math.pi)
     logger.info(f"-- allowable fractional Trotter error = {eps_trotter}")
     # use config_unitary.energy_error here instead of eps_trotter, because these equations are
     # derived in terms of the absolute energy error rather than the fractional energy error
-    s1 = timestep * config_unitary.error_scale * c1 / config_unitary.energy_error
-    s2 = timestep * math.sqrt(config_unitary.error_scale * c2 / config_unitary.energy_error)
+    s1 = tevol_hbar * config_unitary.error_scale * c1 / config_unitary.energy_error
+    s2 = tevol_hbar * math.sqrt(config_unitary.error_scale * c2 / config_unitary.energy_error)
     logger.info(f"-- Trotter step count: s1 = {s1}, s2 = {s2}")
 
     # Cost factors: r1=1 (single ramp), r2=2 (forward+backward)
@@ -260,13 +261,17 @@ def encode_ramped_trotter(
         if requested_order.lower() == "first order":
             method = "first order"
             Nsteps0 = s1
+            ramps_per_step = 1
         elif requested_order.lower() == "second order":
             method = "second order"
             Nsteps0 = s2
+            ramps_per_step = 2
         elif requested_order.lower() == "fourth order":
             # Fourth-order step count using C2-based heuristic
-            # NOTE: This is an approximation since we don't compute the exact C4 coefficient
-            s4 = timestep * (config_unitary.error_scale * c2 / config_unitary.energy_error) ** (1.0/3.0)
+            # NOTE: This is an approximation provided by Claude (not human verified) since we don't
+            #       compute the exact C4 coefficient
+            x = config_unitary.error_scale * c2 / config_unitary.energy_error
+            s4 = tevol_hbar * x ** (1.0/3.0)
             logger.warning(
                 "Fourth-order step count (s4) uses an APPROXIMATION based on C2, not an exact C4 "
                 "coefficient. Unlike first-order (C1) and second-order (C2), this is a heuristic "
@@ -275,6 +280,7 @@ def encode_ramped_trotter(
             logger.info(f"-- Fourth-order step count: s4 = {s4}")
             method = "fourth order"
             Nsteps0 = s4
+            ramps_per_step = 10
         else:
             raise ValueError(f"Invalid trotter_order '{requested_order}'. Must be 'first order', 'second order', or 'fourth order'.")
         logger.info(f"-- User requested {method}")
@@ -284,12 +290,16 @@ def encode_ramped_trotter(
         #    added here once we have a better calculation of C4 and therefore s4.
         method = "second order"
         Nsteps0 = s2
+        ramps_per_step = 2
         if r1 * s1 < r2 * s2:
             method = "first order"
             Nsteps0 = s1
+            ramps_per_step = 1
+        logger.verbose("-- auto selecting order based on unoptimized ramp count")
 
     Nsteps = max(1, math.ceil(Nsteps0))
     logger.info(f"-- using {method} Trotter formula with {Nsteps} steps ({Nsteps0})")
+    logger.verbose(f"-- unoptimized ramp count = {Nsteps * ramps_per_step}")
 
     pauli_strings = hamiltonian.get_all_pauli_strings(return_as='strings')
     pauli_strings = reorder_paulis(pauli_strings, config_unitary.ordering_method)
@@ -301,7 +311,7 @@ def encode_ramped_trotter(
         return build_ramped_trotterized_unitary(
                 pauli_strings.items(),
                 method,
-                timestep,
+                tevol_hbar,
                 Nsteps,
                 combine_terms=config_unitary.trotter_combine_terms)
     else:  # 'original'
@@ -310,7 +320,7 @@ def encode_ramped_trotter(
         return build_ramped_trotterized_unitary(
                 pauli_strings.items(),
                 method,
-                timestep,
+                tevol_hbar,
                 Nsteps)
 
 # -------------------------------------------------------------------------------------------------

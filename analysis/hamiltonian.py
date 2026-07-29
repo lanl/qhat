@@ -241,7 +241,7 @@ class Hamiltonian:
             self._H.energy_shift(dE)
         else:
             raise TypeError(
-                    f"Unable to shift a fermionic Hamiltonian of type \"{type(self._H)}\".")
+                f"Unable to shift a fermionic Hamiltonian of type \"{type(self._H)}\".")
 
     def get_energy_shift(self) -> float:
         """

@@ -21,6 +21,12 @@ energy_error = meV_to_Hartree(1e4) # 0.01 keV
 # general
 
 general.print_verbose()
+
+# Set output directory for all generated files (logfiles, matrices, eigendecompositions, etc.)
+# If not set or empty, files are written to the current directory
+# Example: "Be-H/" will create a Be-H/ subdirectory for all outputs
+general.output_directory = "Be-H/"
+
 general.logfile = "Be-H.log"
 
 # _________________________________________________________________________________________________

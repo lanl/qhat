@@ -10,7 +10,7 @@ import math
 
 from qhat.common.logging_utils import configure_logging
 from qhat.analysis.algorithm import build_algorithm, compute_initial_phase_qubits
-from qhat.analysis.analysis import analyze_algorithm, validate_and_autocomplete_analysis_config
+from qhat.analysis.analysis import analyze_algorithm
 from qhat.analysis.configuration import load_configuration
 from qhat.analysis.hamiltonian import get_physical_hamiltonian
 from qhat.analysis.unitary import encode_as_unitary
@@ -26,22 +26,14 @@ def run():
     state = load_configuration()
 
     # Configure logging based on user settings
-    configure_logging(
-        level=state.config_general.loglevel,
-        logfile=state.config_general.logfile
-    )
+    logfile_path = state.config_general.get_output_path(state.config_general.logfile)
+    configure_logging(level=state.config_general.loglevel, logfile=logfile_path)
 
     logger.info("=" * 99)
     logger.info("ANALYSIS DRIVER START")
     logger.info("=" * 99)
-    logger.info(f"Logfile: {state.config_general.logfile}")
+    logger.info(f"Logfile: {logfile_path}")
     logger.info(f"Git hash: {state.config_general.git_hash}")
-
-    # Validate analysis configuration _____________________________________________________________
-
-    logger.info("Validating analysis configuration...")
-    validate_and_autocomplete_analysis_config(state.config_analysis)
-    logger.info("Configuration validated successfully.")
 
     # Hamiltonian _________________________________________________________________________________
 
@@ -57,18 +49,31 @@ def run():
         # first-pass computation of energy bounds
         Elo1, Ehi1 = physical_hamiltonian.compute_initial_energy_bounds(state.config_hamiltonian)
 
-        # energy-shift Hamiltonian
-        physical_hamiltonian.energy_shift(-1 * Elo1)
-        Elo2 = Elo1 - Elo1
-        Ehi2 = Ehi1 - Elo1
+        # energy-shift Hamiltonian to center at zero
+        # This maps eigenvalues from [Elo1, Ehi1] to [-(Ehi1-Elo1)/2, +(Ehi1-Elo1)/2]
+        # With phase_scale_factor > 1, this enables phase angles in approximately [-π/s, +π/s]
+        # where s is the scale factor. This ensures phases never hit exactly ±π, avoiding
+        # aliasing ambiguity, while matching np.angle output range directly.
+        E0 = (Elo1 + Ehi1) / 2
+        physical_hamiltonian.energy_shift(-E0)
+        Elo2 = Elo1 - E0
+        Ehi2 = Ehi1 - E0
         logger.verbose(f"-- shifted bounds = [{Elo2}, {Ehi2})")
-        tevol_hbar = 2 * math.pi / (Ehi2 - Elo2)
+        # Apply phase scale factor to avoid ambiguity at ±π
+        phase_scale = getattr(state.config_unitary, 'phase_scale_factor', 1.0)
+        tevol_hbar = 2 * math.pi / (phase_scale * (Ehi2 - Elo2))
+        logger.verbose(f"-- phase scale factor = {phase_scale}")
         logger.verbose(f"-- preliminary evolution time = {tevol_hbar} * hbar")
 
         # preliminiary number of phase qubits, with upper bound correction
         P0, Elo3, Ehi3 = compute_initial_phase_qubits(state.config_algorithm, Elo2, Ehi2)
-        tevol_hbar = 2 * math.pi / (Ehi3 - Elo3)
+        tevol_hbar = 2 * math.pi / (phase_scale * (Ehi3 - Elo3))
         logger.verbose(f"-- optimized evolution time = {tevol_hbar} * hbar")
+
+        # check for user-defined timestep
+        if getattr(state.config_unitary, 'timestep', None) is not None:
+            tevol_hbar = state.config_unitary.timestep
+            logger.verbose(f"-- user timestep override = {tevol_hbar} * hbar")
 
     # Unitary _____________________________________________________________________________________
 
@@ -86,25 +91,23 @@ def run():
 
     # Analysis ____________________________________________________________________________________
 
-    # Extract timestep for eigendecomposition analysis (if available)
-    # For ramped trotter, use tevol_hbar; otherwise check config_unitary.timestep
-    timestep = tevol_hbar if tevol_hbar is not None else getattr(state.config_unitary, 'timestep', None)
-
-    # Extract energy shift for correcting eigenvalue comparisons
-    energy_shift = physical_hamiltonian.get_energy_shift()
-
     state.store_results(analyze_algorithm(
         state.config_analysis,
         algorithm,
-        hamiltonian=physical_hamiltonian,
-        timestep=timestep,
-        energy_shift=energy_shift
+        state.config_unitary.method,
+        approximate_time_evolution=unitary_hamiltonian,
+        exact_hamiltonian=physical_hamiltonian,
+        timestep=tevol_hbar,
+        energy_shift=physical_hamiltonian.get_energy_shift(),
+        config_general=state.config_general
     ))
 
     # Save Results ________________________________________________________________________________
 
     state.show_results()
     state.save_summary()
+
+    logger.warning("Analysis complete.")
 
 # =================================================================================================
 
