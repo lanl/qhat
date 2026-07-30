@@ -1,0 +1,2651 @@
+{
+  "case_id": "B-B_1.70_sto-6g_as-004-008",
+  "tensor_path": "hamiltonian_generator/b2_active_space_library/B-B/1.70/sto-6g/B-B_1.70_sto-6g_as-004-008.tensors.npz",
+  "n_qubits": 12,
+  "active_occupied": 4,
+  "active_vacant": 8,
+  "jw_coloring": [
+    {
+      "color": 0,
+      "size": 38,
+      "nodes": [
+        13,
+        14,
+        15,
+        16,
+        33,
+        35,
+        36,
+        37,
+        38,
+        61,
+        62,
+        63,
+        64,
+        88,
+        90,
+        91,
+        92,
+        93,
+        100,
+        101,
+        102,
+        103,
+        199,
+        200,
+        201,
+        202,
+        209,
+        216,
+        219,
+        224,
+        225,
+        226,
+        227,
+        230,
+        231,
+        234,
+        235,
+        245
+      ],
+      "terms": [
+        {
+          "node": 13,
+          "pauli": "Y0 X1 X2 Y3",
+          "coefficient": 0.010687992755518018
+        },
+        {
+          "node": 14,
+          "pauli": "X0 X1 Y2 Y3",
+          "coefficient": -0.010687992755518018
+        },
+        {
+          "node": 15,
+          "pauli": "Y0 Y1 X2 X3",
+          "coefficient": -0.010687992755518018
+        },
+        {
+          "node": 16,
+          "pauli": "X0 Y1 Y2 X3",
+          "coefficient": 0.010687992755518018
+        },
+        {
+          "node": 33,
+          "pauli": "Z0 Z2",
+          "coefficient": 0.08493921193513007
+        },
+        {
+          "node": 35,
+          "pauli": "X0 Z1 X2 X4 Z5 Z6 Z7 X8",
+          "coefficient": 0.0010361147255260172
+        },
+        {
+          "node": 36,
+          "pauli": "X0 Z1 X2 Y4 Z5 Z6 Z7 Y8",
+          "coefficient": -0.021180704174823324
+        },
+        {
+          "node": 37,
+          "pauli": "Y0 Z1 Y2 X4 Z5 Z6 Z7 X8",
+          "coefficient": -0.021180704174823324
+        },
+        {
+          "node": 38,
+          "pauli": "Y0 Z1 Y2 Y4 Z5 Z6 Z7 Y8",
+          "coefficient": 0.0010361147255260172
+        },
+        {
+          "node": 61,
+          "pauli": "Y0 Z1 Y2 Y5 Z6 Z7 Z8 Y9",
+          "coefficient": 0.00589416981210608
+        },
+        {
+          "node": 62,
+          "pauli": "X0 Z1 X2 Y5 Z6 Z7 Z8 Y9",
+          "coefficient": 0.00589416981210608
+        },
+        {
+          "node": 63,
+          "pauli": "Y0 Z1 Y2 X5 Z6 Z7 Z8 X9",
+          "coefficient": 0.00589416981210608
+        },
+        {
+          "node": 64,
+          "pauli": "X0 Z1 X2 X5 Z6 Z7 Z8 X9",
+          "coefficient": 0.00589416981210608
+        },
+        {
+          "node": 88,
+          "pauli": "Z1 Z3",
+          "coefficient": 0.08493921193513007
+        },
+        {
+          "node": 90,
+          "pauli": "X1 Z2 X3 X5 Z6 Z7 Z8 X9",
+          "coefficient": 0.0010361147255260172
+        },
+        {
+          "node": 91,
+          "pauli": "X1 Z2 X3 Y5 Z6 Z7 Z8 Y9",
+          "coefficient": -0.021180704174823324
+        },
+        {
+          "node": 92,
+          "pauli": "Y1 Z2 Y3 X5 Z6 Z7 Z8 X9",
+          "coefficient": -0.021180704174823324
+        },
+        {
+          "node": 93,
+          "pauli": "Y1 Z2 Y3 Y5 Z6 Z7 Z8 Y9",
+          "coefficient": 0.0010361147255260172
+        },
+        {
+          "node": 100,
+          "pauli": "Y1 Z2 Y3 Y4 Z5 Z6 Z7 Y8",
+          "coefficient": 0.00589416981210608
+        },
+        {
+          "node": 101,
+          "pauli": "X1 Z2 X3 Y4 Z5 Z6 Z7 Y8",
+          "coefficient": 0.00589416981210608
+        },
+        {
+          "node": 102,
+          "pauli": "Y1 Z2 Y3 X4 Z5 Z6 Z7 X8",
+          "coefficient": 0.00589416981210608
+        },
+        {
+          "node": 103,
+          "pauli": "X1 Z2 X3 X4 Z5 Z6 Z7 X8",
+          "coefficient": 0.00589416981210608
+        },
+        {
+          "node": 199,
+          "pauli": "Y4 X5 X8 Y9",
+          "coefficient": 0.005493782867640101
+        },
+        {
+          "node": 200,
+          "pauli": "X4 X5 Y8 Y9",
+          "coefficient": -0.005493782867640101
+        },
+        {
+          "node": 201,
+          "pauli": "Y4 Y5 X8 X9",
+          "coefficient": -0.005493782867640101
+        },
+        {
+          "node": 202,
+          "pauli": "X4 Y5 Y8 X9",
+          "coefficient": 0.005493782867640101
+        },
+        {
+          "node": 209,
+          "pauli": "Z4 Z8",
+          "coefficient": 0.09526226856915458
+        },
+        {
+          "node": 216,
+          "pauli": "Z5 Z9",
+          "coefficient": 0.09526226856915458
+        },
+        {
+          "node": 219,
+          "pauli": "Z6 Z7",
+          "coefficient": 0.10744068573465287
+        },
+        {
+          "node": 224,
+          "pauli": "Y6 X7 X10 Y11",
+          "coefficient": 0.03969135794627321
+        },
+        {
+          "node": 225,
+          "pauli": "X6 X7 Y10 Y11",
+          "coefficient": -0.03969135794627321
+        },
+        {
+          "node": 226,
+          "pauli": "Y6 Y7 X10 X11",
+          "coefficient": -0.03969135794627321
+        },
+        {
+          "node": 227,
+          "pauli": "X6 Y7 Y10 X11",
+          "coefficient": 0.03969135794627321
+        },
+        {
+          "node": 230,
+          "pauli": "Z6 Z10",
+          "coefficient": 0.06851250040734186
+        },
+        {
+          "node": 231,
+          "pauli": "Z6 Z11",
+          "coefficient": 0.10820385835361507
+        },
+        {
+          "node": 234,
+          "pauli": "Z7 Z10",
+          "coefficient": 0.10820385835361507
+        },
+        {
+          "node": 235,
+          "pauli": "Z7 Z11",
+          "coefficient": 0.06851250040734186
+        },
+        {
+          "node": 245,
+          "pauli": "Z10 Z11",
+          "coefficient": 0.1109986869830437
+        }
+      ]
+    },
+    {
+      "color": 1,
+      "size": 38,
+      "nodes": [
+        21,
+        22,
+        23,
+        24,
+        50,
+        52,
+        53,
+        55,
+        65,
+        66,
+        67,
+        68,
+        69,
+        104,
+        105,
+        106,
+        107,
+        109,
+        111,
+        112,
+        114,
+        120,
+        125,
+        134,
+        135,
+        136,
+        137,
+        160,
+        161,
+        186,
+        191,
+        203,
+        204,
+        205,
+        206,
+        211,
+        218,
+        236
+      ],
+      "terms": [
+        {
+          "node": 21,
+          "pauli": "Y0 X1 X6 Y7",
+          "coefficient": 0.010687992755518023
+        },
+        {
+          "node": 22,
+          "pauli": "X0 X1 Y6 Y7",
+          "coefficient": -0.010687992755518023
+        },
+        {
+          "node": 23,
+          "pauli": "Y0 Y1 X6 X7",
+          "coefficient": -0.010687992755518023
+        },
+        {
+          "node": 24,
+          "pauli": "X0 Y1 Y6 X7",
+          "coefficient": 0.010687992755518023
+        },
+        {
+          "node": 50,
+          "pauli": "Y0 Z1 Z2 Z3 X4 X6 Z7 Z8 Z9 Y10",
+          "coefficient": 0.0010361147255260157
+        },
+        {
+          "node": 52,
+          "pauli": "X0 Z1 Z2 Z3 X4 Y6 Z7 Z8 Z9 Y10",
+          "coefficient": 0.021180704174823307
+        },
+        {
+          "node": 53,
+          "pauli": "Y0 Z1 Z2 Z3 Y4 X6 Z7 Z8 Z9 X10",
+          "coefficient": 0.021180704174823307
+        },
+        {
+          "node": 55,
+          "pauli": "X0 Z1 Z2 Z3 Y4 Y6 Z7 Z8 Z9 X10",
+          "coefficient": 0.0010361147255260157
+        },
+        {
+          "node": 65,
+          "pauli": "Y0 Z1 Z2 Z3 Z4 X5 X6 Z7 Z8 Z9 Z10 Y11",
+          "coefficient": 0.005894169812106076
+        },
+        {
+          "node": 66,
+          "pauli": "X0 Z1 Z2 Z3 Z4 X5 Y6 Z7 Z8 Z9 Z10 Y11",
+          "coefficient": -0.005894169812106076
+        },
+        {
+          "node": 67,
+          "pauli": "Y0 Z1 Z2 Z3 Z4 Y5 X6 Z7 Z8 Z9 Z10 X11",
+          "coefficient": -0.005894169812106076
+        },
+        {
+          "node": 68,
+          "pauli": "X0 Z1 Z2 Z3 Z4 Y5 Y6 Z7 Z8 Z9 Z10 X11",
+          "coefficient": 0.005894169812106076
+        },
+        {
+          "node": 69,
+          "pauli": "Z0 Z6",
+          "coefficient": 0.08493921193513011
+        },
+        {
+          "node": 104,
+          "pauli": "Y1 Z2 Z3 X4 X7 Z8 Z9 Y10",
+          "coefficient": 0.005894169812106076
+        },
+        {
+          "node": 105,
+          "pauli": "X1 Z2 Z3 X4 Y7 Z8 Z9 Y10",
+          "coefficient": -0.005894169812106076
+        },
+        {
+          "node": 106,
+          "pauli": "Y1 Z2 Z3 Y4 X7 Z8 Z9 X10",
+          "coefficient": -0.005894169812106076
+        },
+        {
+          "node": 107,
+          "pauli": "X1 Z2 Z3 Y4 Y7 Z8 Z9 X10",
+          "coefficient": 0.005894169812106076
+        },
+        {
+          "node": 109,
+          "pauli": "Y1 Z2 Z3 Z4 X5 X7 Z8 Z9 Z10 Y11",
+          "coefficient": 0.0010361147255260157
+        },
+        {
+          "node": 111,
+          "pauli": "X1 Z2 Z3 Z4 X5 Y7 Z8 Z9 Z10 Y11",
+          "coefficient": 0.021180704174823307
+        },
+        {
+          "node": 112,
+          "pauli": "Y1 Z2 Z3 Z4 Y5 X7 Z8 Z9 Z10 X11",
+          "coefficient": 0.021180704174823307
+        },
+        {
+          "node": 114,
+          "pauli": "X1 Z2 Z3 Z4 Y5 Y7 Z8 Z9 Z10 X11",
+          "coefficient": 0.0010361147255260157
+        },
+        {
+          "node": 120,
+          "pauli": "Z1 Z7",
+          "coefficient": 0.08493921193513011
+        },
+        {
+          "node": 125,
+          "pauli": "Z2 Z3",
+          "coefficient": 0.10744068573465275
+        },
+        {
+          "node": 134,
+          "pauli": "Y2 X3 X8 Y9",
+          "coefficient": 0.039691357946273244
+        },
+        {
+          "node": 135,
+          "pauli": "X2 X3 Y8 Y9",
+          "coefficient": -0.039691357946273244
+        },
+        {
+          "node": 136,
+          "pauli": "Y2 Y3 X8 X9",
+          "coefficient": -0.039691357946273244
+        },
+        {
+          "node": 137,
+          "pauli": "X2 Y3 Y8 X9",
+          "coefficient": 0.039691357946273244
+        },
+        {
+          "node": 160,
+          "pauli": "Z2 Z8",
+          "coefficient": 0.06851250040734194
+        },
+        {
+          "node": 161,
+          "pauli": "Z2 Z9",
+          "coefficient": 0.10820385835361518
+        },
+        {
+          "node": 186,
+          "pauli": "Z3 Z8",
+          "coefficient": 0.10820385835361518
+        },
+        {
+          "node": 191,
+          "pauli": "Z3 Z9",
+          "coefficient": 0.06851250040734194
+        },
+        {
+          "node": 203,
+          "pauli": "Y4 X5 X10 Y11",
+          "coefficient": 0.0054937828676400935
+        },
+        {
+          "node": 204,
+          "pauli": "X4 X5 Y10 Y11",
+          "coefficient": -0.0054937828676400935
+        },
+        {
+          "node": 205,
+          "pauli": "Y4 Y5 X10 X11",
+          "coefficient": -0.0054937828676400935
+        },
+        {
+          "node": 206,
+          "pauli": "X4 Y5 Y10 X11",
+          "coefficient": 0.0054937828676400935
+        },
+        {
+          "node": 211,
+          "pauli": "Z4 Z10",
+          "coefficient": 0.09526226856915444
+        },
+        {
+          "node": 218,
+          "pauli": "Z5 Z11",
+          "coefficient": 0.09526226856915444
+        },
+        {
+          "node": 236,
+          "pauli": "Z8 Z9",
+          "coefficient": 0.11099868698304402
+        }
+      ]
+    },
+    {
+      "color": 2,
+      "size": 28,
+      "nodes": [
+        6,
+        7,
+        10,
+        11,
+        25,
+        26,
+        27,
+        28,
+        34,
+        39,
+        41,
+        42,
+        43,
+        44,
+        75,
+        80,
+        81,
+        82,
+        83,
+        89,
+        94,
+        122,
+        126,
+        127,
+        128,
+        129,
+        142,
+        169
+      ],
+      "terms": [
+        {
+          "node": 6,
+          "pauli": "Z6",
+          "coefficient": -0.3907198822561002
+        },
+        {
+          "node": 7,
+          "pauli": "Z7",
+          "coefficient": -0.3907198822561002
+        },
+        {
+          "node": 10,
+          "pauli": "Z10",
+          "coefficient": -0.5001377556609578
+        },
+        {
+          "node": 11,
+          "pauli": "Z11",
+          "coefficient": -0.5001377556609579
+        },
+        {
+          "node": 25,
+          "pauli": "Y0 X1 X8 Y9",
+          "coefficient": 0.015382366658115681
+        },
+        {
+          "node": 26,
+          "pauli": "X0 X1 Y8 Y9",
+          "coefficient": -0.015382366658115681
+        },
+        {
+          "node": 27,
+          "pauli": "Y0 Y1 X8 X9",
+          "coefficient": -0.015382366658115681
+        },
+        {
+          "node": 28,
+          "pauli": "X0 Y1 Y8 X9",
+          "coefficient": 0.015382366658115681
+        },
+        {
+          "node": 34,
+          "pauli": "Y0 Z1 X2 X4 Z5 Z6 Z7 Y8",
+          "coefficient": 0.022216818900349343
+        },
+        {
+          "node": 39,
+          "pauli": "X0 Z1 Y2 Y4 Z5 Z6 Z7 X8",
+          "coefficient": 0.022216818900349343
+        },
+        {
+          "node": 41,
+          "pauli": "Y0 Z1 Z2 X3 X5 Z6 Z7 Y8",
+          "coefficient": -0.004858055086580063
+        },
+        {
+          "node": 42,
+          "pauli": "X0 Z1 Z2 X3 X5 Z6 Z7 X8",
+          "coefficient": -0.004858055086580063
+        },
+        {
+          "node": 43,
+          "pauli": "Y0 Z1 Z2 Y3 Y5 Z6 Z7 Y8",
+          "coefficient": -0.004858055086580063
+        },
+        {
+          "node": 44,
+          "pauli": "X0 Z1 Z2 Y3 Y5 Z6 Z7 X8",
+          "coefficient": -0.004858055086580063
+        },
+        {
+          "node": 75,
+          "pauli": "Z0 Z8",
+          "coefficient": 0.083998012250852
+        },
+        {
+          "node": 80,
+          "pauli": "Y1 X2 X4 Z5 Z6 Z7 Z8 Y9",
+          "coefficient": -0.004858055086580063
+        },
+        {
+          "node": 81,
+          "pauli": "X1 X2 X4 Z5 Z6 Z7 Z8 X9",
+          "coefficient": -0.004858055086580063
+        },
+        {
+          "node": 82,
+          "pauli": "Y1 Y2 Y4 Z5 Z6 Z7 Z8 Y9",
+          "coefficient": -0.004858055086580063
+        },
+        {
+          "node": 83,
+          "pauli": "X1 Y2 Y4 Z5 Z6 Z7 Z8 X9",
+          "coefficient": -0.004858055086580063
+        },
+        {
+          "node": 89,
+          "pauli": "Y1 Z2 X3 X5 Z6 Z7 Z8 Y9",
+          "coefficient": 0.022216818900349343
+        },
+        {
+          "node": 94,
+          "pauli": "X1 Z2 Y3 Y5 Z6 Z7 Z8 X9",
+          "coefficient": 0.022216818900349343
+        },
+        {
+          "node": 122,
+          "pauli": "Z1 Z9",
+          "coefficient": 0.083998012250852
+        },
+        {
+          "node": 126,
+          "pauli": "Y2 X3 X4 Y5",
+          "coefficient": 0.004919162001922396
+        },
+        {
+          "node": 127,
+          "pauli": "X2 X3 Y4 Y5",
+          "coefficient": -0.004919162001922396
+        },
+        {
+          "node": 128,
+          "pauli": "Y2 Y3 X4 X5",
+          "coefficient": -0.004919162001922396
+        },
+        {
+          "node": 129,
+          "pauli": "X2 Y3 Y4 X5",
+          "coefficient": 0.004919162001922396
+        },
+        {
+          "node": 142,
+          "pauli": "Z2 Z4",
+          "coefficient": 0.09345537008538685
+        },
+        {
+          "node": 169,
+          "pauli": "Z3 Z5",
+          "coefficient": 0.09345537008538685
+        }
+      ]
+    },
+    {
+      "color": 3,
+      "size": 28,
+      "nodes": [
+        2,
+        3,
+        8,
+        9,
+        29,
+        30,
+        31,
+        32,
+        51,
+        54,
+        57,
+        58,
+        59,
+        60,
+        77,
+        96,
+        97,
+        98,
+        99,
+        110,
+        113,
+        124,
+        195,
+        196,
+        197,
+        198,
+        207,
+        214
+      ],
+      "terms": [
+        {
+          "node": 2,
+          "pauli": "Z2",
+          "coefficient": -0.39071988225610077
+        },
+        {
+          "node": 3,
+          "pauli": "Z3",
+          "coefficient": -0.39071988225610077
+        },
+        {
+          "node": 8,
+          "pauli": "Z8",
+          "coefficient": -0.5001377556609584
+        },
+        {
+          "node": 9,
+          "pauli": "Z9",
+          "coefficient": -0.5001377556609584
+        },
+        {
+          "node": 29,
+          "pauli": "Y0 X1 X10 Y11",
+          "coefficient": 0.01538236665811566
+        },
+        {
+          "node": 30,
+          "pauli": "X0 X1 Y10 Y11",
+          "coefficient": -0.01538236665811566
+        },
+        {
+          "node": 31,
+          "pauli": "Y0 Y1 X10 X11",
+          "coefficient": -0.01538236665811566
+        },
+        {
+          "node": 32,
+          "pauli": "X0 Y1 Y10 X11",
+          "coefficient": 0.01538236665811566
+        },
+        {
+          "node": 51,
+          "pauli": "X0 Z1 Z2 Z3 X4 X6 Z7 Z8 Z9 X10",
+          "coefficient": 0.022216818900349322
+        },
+        {
+          "node": 54,
+          "pauli": "Y0 Z1 Z2 Z3 Y4 Y6 Z7 Z8 Z9 Y10",
+          "coefficient": 0.022216818900349322
+        },
+        {
+          "node": 57,
+          "pauli": "Y0 Z1 Z2 Z3 Z4 X5 X7 Z8 Z9 Y10",
+          "coefficient": -0.004858055086580061
+        },
+        {
+          "node": 58,
+          "pauli": "X0 Z1 Z2 Z3 Z4 X5 X7 Z8 Z9 X10",
+          "coefficient": -0.004858055086580061
+        },
+        {
+          "node": 59,
+          "pauli": "Y0 Z1 Z2 Z3 Z4 Y5 Y7 Z8 Z9 Y10",
+          "coefficient": -0.004858055086580061
+        },
+        {
+          "node": 60,
+          "pauli": "X0 Z1 Z2 Z3 Z4 Y5 Y7 Z8 Z9 X10",
+          "coefficient": -0.004858055086580061
+        },
+        {
+          "node": 77,
+          "pauli": "Z0 Z10",
+          "coefficient": 0.08399801225085188
+        },
+        {
+          "node": 96,
+          "pauli": "Y1 Z2 Z3 X4 X6 Z7 Z8 Z9 Z10 Y11",
+          "coefficient": -0.004858055086580061
+        },
+        {
+          "node": 97,
+          "pauli": "X1 Z2 Z3 X4 X6 Z7 Z8 Z9 Z10 X11",
+          "coefficient": -0.004858055086580061
+        },
+        {
+          "node": 98,
+          "pauli": "Y1 Z2 Z3 Y4 Y6 Z7 Z8 Z9 Z10 Y11",
+          "coefficient": -0.004858055086580061
+        },
+        {
+          "node": 99,
+          "pauli": "X1 Z2 Z3 Y4 Y6 Z7 Z8 Z9 Z10 X11",
+          "coefficient": -0.004858055086580061
+        },
+        {
+          "node": 110,
+          "pauli": "X1 Z2 Z3 Z4 X5 X7 Z8 Z9 Z10 X11",
+          "coefficient": 0.022216818900349322
+        },
+        {
+          "node": 113,
+          "pauli": "Y1 Z2 Z3 Z4 Y5 Y7 Z8 Z9 Z10 Y11",
+          "coefficient": 0.022216818900349322
+        },
+        {
+          "node": 124,
+          "pauli": "Z1 Z11",
+          "coefficient": 0.08399801225085188
+        },
+        {
+          "node": 195,
+          "pauli": "Y4 X5 X6 Y7",
+          "coefficient": 0.0049191620019223975
+        },
+        {
+          "node": 196,
+          "pauli": "X4 X5 Y6 Y7",
+          "coefficient": -0.0049191620019223975
+        },
+        {
+          "node": 197,
+          "pauli": "Y4 Y5 X6 X7",
+          "coefficient": -0.0049191620019223975
+        },
+        {
+          "node": 198,
+          "pauli": "X4 Y5 Y6 X7",
+          "coefficient": 0.0049191620019223975
+        },
+        {
+          "node": 207,
+          "pauli": "Z4 Z6",
+          "coefficient": 0.0934553700853869
+        },
+        {
+          "node": 214,
+          "pauli": "Z5 Z7",
+          "coefficient": 0.0934553700853869
+        }
+      ]
+    },
+    {
+      "color": 4,
+      "size": 38,
+      "nodes": [
+        12,
+        17,
+        18,
+        19,
+        20,
+        49,
+        56,
+        95,
+        108,
+        130,
+        131,
+        132,
+        133,
+        144,
+        146,
+        147,
+        148,
+        149,
+        162,
+        163,
+        164,
+        165,
+        179,
+        181,
+        182,
+        183,
+        184,
+        187,
+        188,
+        189,
+        190,
+        194,
+        237,
+        238,
+        239,
+        240,
+        241,
+        244
+      ],
+      "terms": [
+        {
+          "node": 12,
+          "pauli": "Z0 Z1",
+          "coefficient": 0.100992598784068
+        },
+        {
+          "node": 17,
+          "pauli": "Y0 X1 X4 Y5",
+          "coefficient": 0.03405791740374927
+        },
+        {
+          "node": 18,
+          "pauli": "X0 X1 Y4 Y5",
+          "coefficient": -0.03405791740374927
+        },
+        {
+          "node": 19,
+          "pauli": "Y0 Y1 X4 X5",
+          "coefficient": -0.03405791740374927
+        },
+        {
+          "node": 20,
+          "pauli": "X0 Y1 Y4 X5",
+          "coefficient": 0.03405791740374927
+        },
+        {
+          "node": 49,
+          "pauli": "Z0 Z4",
+          "coefficient": 0.06836178005619996
+        },
+        {
+          "node": 56,
+          "pauli": "Z0 Z5",
+          "coefficient": 0.10241969745994922
+        },
+        {
+          "node": 95,
+          "pauli": "Z1 Z4",
+          "coefficient": 0.10241969745994922
+        },
+        {
+          "node": 108,
+          "pauli": "Z1 Z5",
+          "coefficient": 0.06836178005619996
+        },
+        {
+          "node": 130,
+          "pauli": "Y2 X3 X6 Y7",
+          "coefficient": 0.004225278407677333
+        },
+        {
+          "node": 131,
+          "pauli": "X2 X3 Y6 Y7",
+          "coefficient": -0.004225278407677333
+        },
+        {
+          "node": 132,
+          "pauli": "Y2 Y3 X6 X7",
+          "coefficient": -0.004225278407677333
+        },
+        {
+          "node": 133,
+          "pauli": "X2 Y3 Y6 X7",
+          "coefficient": 0.004225278407677333
+        },
+        {
+          "node": 144,
+          "pauli": "Z2 Z6",
+          "coefficient": 0.09476485051162098
+        },
+        {
+          "node": 146,
+          "pauli": "X2 Z3 Z4 Z5 X6 X8 Z9 X10",
+          "coefficient": 0.0004915597161415175
+        },
+        {
+          "node": 147,
+          "pauli": "X2 Z3 Z4 Z5 X6 Y8 Z9 Y10",
+          "coefficient": -0.027968580661885217
+        },
+        {
+          "node": 148,
+          "pauli": "Y2 Z3 Z4 Z5 Y6 X8 Z9 X10",
+          "coefficient": -0.027968580661885217
+        },
+        {
+          "node": 149,
+          "pauli": "Y2 Z3 Z4 Z5 Y6 Y8 Z9 Y10",
+          "coefficient": 0.0004915597161415175
+        },
+        {
+          "node": 162,
+          "pauli": "Y2 Z3 Z4 Z5 Y6 Y9 Z10 Y11",
+          "coefficient": 0.004235298905557013
+        },
+        {
+          "node": 163,
+          "pauli": "X2 Z3 Z4 Z5 X6 Y9 Z10 Y11",
+          "coefficient": 0.004235298905557013
+        },
+        {
+          "node": 164,
+          "pauli": "Y2 Z3 Z4 Z5 Y6 X9 Z10 X11",
+          "coefficient": 0.004235298905557013
+        },
+        {
+          "node": 165,
+          "pauli": "X2 Z3 Z4 Z5 X6 X9 Z10 X11",
+          "coefficient": 0.004235298905557013
+        },
+        {
+          "node": 179,
+          "pauli": "Z3 Z7",
+          "coefficient": 0.09476485051162098
+        },
+        {
+          "node": 181,
+          "pauli": "X3 Z4 Z5 Z6 X7 X9 Z10 X11",
+          "coefficient": 0.0004915597161415175
+        },
+        {
+          "node": 182,
+          "pauli": "X3 Z4 Z5 Z6 X7 Y9 Z10 Y11",
+          "coefficient": -0.027968580661885217
+        },
+        {
+          "node": 183,
+          "pauli": "Y3 Z4 Z5 Z6 Y7 X9 Z10 X11",
+          "coefficient": -0.027968580661885217
+        },
+        {
+          "node": 184,
+          "pauli": "Y3 Z4 Z5 Z6 Y7 Y9 Z10 Y11",
+          "coefficient": 0.0004915597161415175
+        },
+        {
+          "node": 187,
+          "pauli": "Y3 Z4 Z5 Z6 Y7 Y8 Z9 Y10",
+          "coefficient": 0.004235298905557013
+        },
+        {
+          "node": 188,
+          "pauli": "X3 Z4 Z5 Z6 X7 Y8 Z9 Y10",
+          "coefficient": 0.004235298905557013
+        },
+        {
+          "node": 189,
+          "pauli": "Y3 Z4 Z5 Z6 Y7 X8 Z9 X10",
+          "coefficient": 0.004235298905557013
+        },
+        {
+          "node": 190,
+          "pauli": "X3 Z4 Z5 Z6 X7 X8 Z9 X10",
+          "coefficient": 0.004235298905557013
+        },
+        {
+          "node": 194,
+          "pauli": "Z4 Z5",
+          "coefficient": 0.10976142583288805
+        },
+        {
+          "node": 237,
+          "pauli": "Y8 X9 X10 Y11",
+          "coefficient": 0.004588374704512903
+        },
+        {
+          "node": 238,
+          "pauli": "X8 X9 Y10 Y11",
+          "coefficient": -0.004588374704512903
+        },
+        {
+          "node": 239,
+          "pauli": "Y8 Y9 X10 X11",
+          "coefficient": -0.004588374704512903
+        },
+        {
+          "node": 240,
+          "pauli": "X8 Y9 Y10 X11",
+          "coefficient": 0.004588374704512903
+        },
+        {
+          "node": 241,
+          "pauli": "Z8 Z10",
+          "coefficient": 0.09723356286950566
+        },
+        {
+          "node": 244,
+          "pauli": "Z9 Z11",
+          "coefficient": 0.09723356286950566
+        }
+      ]
+    },
+    {
+      "color": 5,
+      "size": 28,
+      "nodes": [
+        0,
+        1,
+        4,
+        5,
+        138,
+        139,
+        140,
+        141,
+        145,
+        150,
+        152,
+        153,
+        154,
+        155,
+        166,
+        171,
+        172,
+        173,
+        174,
+        180,
+        185,
+        193,
+        220,
+        221,
+        222,
+        223,
+        228,
+        233
+      ],
+      "terms": [
+        {
+          "node": 0,
+          "pauli": "Z0",
+          "coefficient": -0.3135988473586243
+        },
+        {
+          "node": 1,
+          "pauli": "Z1",
+          "coefficient": -0.3135988473586243
+        },
+        {
+          "node": 4,
+          "pauli": "Z4",
+          "coefficient": -0.4069014298464967
+        },
+        {
+          "node": 5,
+          "pauli": "Z5",
+          "coefficient": -0.4069014298464966
+        },
+        {
+          "node": 138,
+          "pauli": "Y2 X3 X10 Y11",
+          "coefficient": 0.0037437391894154927
+        },
+        {
+          "node": 139,
+          "pauli": "X2 X3 Y10 Y11",
+          "coefficient": -0.0037437391894154927
+        },
+        {
+          "node": 140,
+          "pauli": "Y2 Y3 X10 X11",
+          "coefficient": -0.0037437391894154927
+        },
+        {
+          "node": 141,
+          "pauli": "X2 Y3 Y10 X11",
+          "coefficient": 0.0037437391894154927
+        },
+        {
+          "node": 145,
+          "pauli": "Y2 Z3 Z4 Z5 X6 X8 Z9 Y10",
+          "coefficient": 0.028460140378026737
+        },
+        {
+          "node": 150,
+          "pauli": "X2 Z3 Z4 Z5 Y6 Y8 Z9 X10",
+          "coefficient": 0.028460140378026737
+        },
+        {
+          "node": 152,
+          "pauli": "Y2 Z3 Z4 Z5 Z6 X7 X9 Y10",
+          "coefficient": -0.0037437391894154966
+        },
+        {
+          "node": 153,
+          "pauli": "X2 Z3 Z4 Z5 Z6 X7 X9 X10",
+          "coefficient": -0.0037437391894154966
+        },
+        {
+          "node": 154,
+          "pauli": "Y2 Z3 Z4 Z5 Z6 Y7 Y9 Y10",
+          "coefficient": -0.0037437391894154966
+        },
+        {
+          "node": 155,
+          "pauli": "X2 Z3 Z4 Z5 Z6 Y7 Y9 X10",
+          "coefficient": -0.0037437391894154966
+        },
+        {
+          "node": 166,
+          "pauli": "Z2 Z10",
+          "coefficient": 0.09598952135308579
+        },
+        {
+          "node": 171,
+          "pauli": "Y3 Z4 Z5 X6 X8 Z9 Z10 Y11",
+          "coefficient": -0.0037437391894154966
+        },
+        {
+          "node": 172,
+          "pauli": "X3 Z4 Z5 X6 X8 Z9 Z10 X11",
+          "coefficient": -0.0037437391894154966
+        },
+        {
+          "node": 173,
+          "pauli": "Y3 Z4 Z5 Y6 Y8 Z9 Z10 Y11",
+          "coefficient": -0.0037437391894154966
+        },
+        {
+          "node": 174,
+          "pauli": "X3 Z4 Z5 Y6 Y8 Z9 Z10 X11",
+          "coefficient": -0.0037437391894154966
+        },
+        {
+          "node": 180,
+          "pauli": "Y3 Z4 Z5 Z6 X7 X9 Z10 Y11",
+          "coefficient": 0.028460140378026737
+        },
+        {
+          "node": 185,
+          "pauli": "X3 Z4 Z5 Z6 Y7 Y9 Z10 X11",
+          "coefficient": 0.028460140378026737
+        },
+        {
+          "node": 193,
+          "pauli": "Z3 Z11",
+          "coefficient": 0.09598952135308579
+        },
+        {
+          "node": 220,
+          "pauli": "Y6 X7 X8 Y9",
+          "coefficient": 0.0037437391894155005
+        },
+        {
+          "node": 221,
+          "pauli": "X6 X7 Y8 Y9",
+          "coefficient": -0.0037437391894155005
+        },
+        {
+          "node": 222,
+          "pauli": "Y6 Y7 X8 X9",
+          "coefficient": -0.0037437391894155005
+        },
+        {
+          "node": 223,
+          "pauli": "X6 Y7 Y8 X9",
+          "coefficient": 0.0037437391894155005
+        },
+        {
+          "node": 228,
+          "pauli": "Z6 Z8",
+          "coefficient": 0.095989521353086
+        },
+        {
+          "node": 233,
+          "pauli": "Z7 Z9",
+          "coefficient": 0.095989521353086
+        }
+      ]
+    },
+    {
+      "color": 6,
+      "size": 24,
+      "nodes": [
+        45,
+        46,
+        47,
+        48,
+        71,
+        72,
+        73,
+        74,
+        84,
+        85,
+        86,
+        87,
+        116,
+        117,
+        118,
+        119,
+        156,
+        157,
+        158,
+        159,
+        175,
+        176,
+        177,
+        178
+      ],
+      "terms": [
+        {
+          "node": 45,
+          "pauli": "Y0 Z1 Z2 X3 X4 Z5 Z6 Z7 Z8 Y9",
+          "coefficient": 0.027074873986929406
+        },
+        {
+          "node": 46,
+          "pauli": "X0 Z1 Z2 X3 Y4 Z5 Z6 Z7 Z8 Y9",
+          "coefficient": -0.027074873986929406
+        },
+        {
+          "node": 47,
+          "pauli": "Y0 Z1 Z2 Y3 X4 Z5 Z6 Z7 Z8 X9",
+          "coefficient": -0.027074873986929406
+        },
+        {
+          "node": 48,
+          "pauli": "X0 Z1 Z2 Y3 Y4 Z5 Z6 Z7 Z8 X9",
+          "coefficient": 0.027074873986929406
+        },
+        {
+          "node": 71,
+          "pauli": "Y0 Z1 Z2 Z3 Y4 Y7 Z8 Z9 Z10 Y11",
+          "coefficient": 0.027074873986929385
+        },
+        {
+          "node": 72,
+          "pauli": "X0 Z1 Z2 Z3 X4 Y7 Z8 Z9 Z10 Y11",
+          "coefficient": 0.027074873986929385
+        },
+        {
+          "node": 73,
+          "pauli": "Y0 Z1 Z2 Z3 Y4 X7 Z8 Z9 Z10 X11",
+          "coefficient": 0.027074873986929385
+        },
+        {
+          "node": 74,
+          "pauli": "X0 Z1 Z2 Z3 X4 X7 Z8 Z9 Z10 X11",
+          "coefficient": 0.027074873986929385
+        },
+        {
+          "node": 84,
+          "pauli": "Y1 X2 X5 Z6 Z7 Y8",
+          "coefficient": 0.027074873986929406
+        },
+        {
+          "node": 85,
+          "pauli": "X1 X2 Y5 Z6 Z7 Y8",
+          "coefficient": -0.027074873986929406
+        },
+        {
+          "node": 86,
+          "pauli": "Y1 Y2 X5 Z6 Z7 X8",
+          "coefficient": -0.027074873986929406
+        },
+        {
+          "node": 87,
+          "pauli": "X1 Y2 Y5 Z6 Z7 X8",
+          "coefficient": 0.027074873986929406
+        },
+        {
+          "node": 116,
+          "pauli": "Y1 Z2 Z3 Z4 Y5 Y6 Z7 Z8 Z9 Y10",
+          "coefficient": 0.027074873986929385
+        },
+        {
+          "node": 117,
+          "pauli": "X1 Z2 Z3 Z4 X5 Y6 Z7 Z8 Z9 Y10",
+          "coefficient": 0.027074873986929385
+        },
+        {
+          "node": 118,
+          "pauli": "Y1 Z2 Z3 Z4 Y5 X6 Z7 Z8 Z9 X10",
+          "coefficient": 0.027074873986929385
+        },
+        {
+          "node": 119,
+          "pauli": "X1 Z2 Z3 Z4 X5 X6 Z7 Z8 Z9 X10",
+          "coefficient": 0.027074873986929385
+        },
+        {
+          "node": 156,
+          "pauli": "Y2 Z3 Z4 Z5 Z6 X7 X8 Z9 Z10 Y11",
+          "coefficient": 0.03220387956744223
+        },
+        {
+          "node": 157,
+          "pauli": "X2 Z3 Z4 Z5 Z6 X7 Y8 Z9 Z10 Y11",
+          "coefficient": -0.03220387956744223
+        },
+        {
+          "node": 158,
+          "pauli": "Y2 Z3 Z4 Z5 Z6 Y7 X8 Z9 Z10 X11",
+          "coefficient": -0.03220387956744223
+        },
+        {
+          "node": 159,
+          "pauli": "X2 Z3 Z4 Z5 Z6 Y7 Y8 Z9 Z10 X11",
+          "coefficient": 0.03220387956744223
+        },
+        {
+          "node": 175,
+          "pauli": "Y3 Z4 Z5 X6 X9 Y10",
+          "coefficient": 0.03220387956744223
+        },
+        {
+          "node": 176,
+          "pauli": "X3 Z4 Z5 X6 Y9 Y10",
+          "coefficient": -0.03220387956744223
+        },
+        {
+          "node": 177,
+          "pauli": "Y3 Z4 Z5 Y6 X9 X10",
+          "coefficient": -0.03220387956744223
+        },
+        {
+          "node": 178,
+          "pauli": "X3 Z4 Z5 Y6 Y9 X10",
+          "coefficient": 0.03220387956744223
+        }
+      ]
+    },
+    {
+      "color": 7,
+      "size": 24,
+      "nodes": [
+        40,
+        70,
+        76,
+        78,
+        79,
+        115,
+        121,
+        123,
+        143,
+        151,
+        167,
+        168,
+        170,
+        192,
+        208,
+        210,
+        212,
+        213,
+        215,
+        217,
+        229,
+        232,
+        242,
+        243
+      ],
+      "terms": [
+        {
+          "node": 40,
+          "pauli": "Z0 Z3",
+          "coefficient": 0.09562720469064809
+        },
+        {
+          "node": 70,
+          "pauli": "Z0 Z7",
+          "coefficient": 0.09562720469064813
+        },
+        {
+          "node": 76,
+          "pauli": "Z0 Z9",
+          "coefficient": 0.0993803789089677
+        },
+        {
+          "node": 78,
+          "pauli": "Z0 Z11",
+          "coefficient": 0.09938037890896753
+        },
+        {
+          "node": 79,
+          "pauli": "Z1 Z2",
+          "coefficient": 0.09562720469064809
+        },
+        {
+          "node": 115,
+          "pauli": "Z1 Z6",
+          "coefficient": 0.09562720469064813
+        },
+        {
+          "node": 121,
+          "pauli": "Z1 Z8",
+          "coefficient": 0.0993803789089677
+        },
+        {
+          "node": 123,
+          "pauli": "Z1 Z10",
+          "coefficient": 0.09938037890896753
+        },
+        {
+          "node": 143,
+          "pauli": "Z2 Z5",
+          "coefficient": 0.09837453208730923
+        },
+        {
+          "node": 151,
+          "pauli": "Z2 Z7",
+          "coefficient": 0.09899012891929831
+        },
+        {
+          "node": 167,
+          "pauli": "Z2 Z11",
+          "coefficient": 0.09973326054250128
+        },
+        {
+          "node": 168,
+          "pauli": "Z3 Z4",
+          "coefficient": 0.09837453208730923
+        },
+        {
+          "node": 170,
+          "pauli": "Z3 Z6",
+          "coefficient": 0.09899012891929831
+        },
+        {
+          "node": 192,
+          "pauli": "Z3 Z10",
+          "coefficient": 0.09973326054250128
+        },
+        {
+          "node": 208,
+          "pauli": "Z4 Z7",
+          "coefficient": 0.09837453208730929
+        },
+        {
+          "node": 210,
+          "pauli": "Z4 Z9",
+          "coefficient": 0.10075605143679468
+        },
+        {
+          "node": 212,
+          "pauli": "Z4 Z11",
+          "coefficient": 0.10075605143679453
+        },
+        {
+          "node": 213,
+          "pauli": "Z5 Z6",
+          "coefficient": 0.09837453208730929
+        },
+        {
+          "node": 215,
+          "pauli": "Z5 Z8",
+          "coefficient": 0.10075605143679468
+        },
+        {
+          "node": 217,
+          "pauli": "Z5 Z10",
+          "coefficient": 0.10075605143679453
+        },
+        {
+          "node": 229,
+          "pauli": "Z6 Z9",
+          "coefficient": 0.0997332605425015
+        },
+        {
+          "node": 232,
+          "pauli": "Z7 Z8",
+          "coefficient": 0.0997332605425015
+        },
+        {
+          "node": 242,
+          "pauli": "Z8 Z11",
+          "coefficient": 0.10182193757401856
+        },
+        {
+          "node": 243,
+          "pauli": "Z9 Z10",
+          "coefficient": 0.10182193757401856
+        }
+      ]
+    }
+  ],
+  "fermionic_coloring": [
+    {
+      "color": 0,
+      "size": 10,
+      "nodes": [
+        13,
+        19,
+        20,
+        55,
+        124,
+        130,
+        143,
+        147,
+        148,
+        153
+      ],
+      "terms": [
+        {
+          "node": 13,
+          "first_raw_index": 14,
+          "operator": "-0.04275197102207207 [1^ 0^ 3 2] +\n-0.04275197102207207 [3^ 2^ 1 0]"
+        },
+        {
+          "node": 19,
+          "first_raw_index": 20,
+          "operator": "-0.08886727560139737 [2^ 0^ 8 4] +\n-0.08886727560139737 [8^ 4^ 2 0]"
+        },
+        {
+          "node": 20,
+          "first_raw_index": 21,
+          "operator": "0.04275197102207207 [2^ 1^ 3 0] +\n0.04275197102207207 [3^ 0^ 2 1]"
+        },
+        {
+          "node": 55,
+          "first_raw_index": 57,
+          "operator": "-0.08886727560139737 [3^ 1^ 9 5] +\n-0.08886727560139737 [9^ 5^ 3 1]"
+        },
+        {
+          "node": 124,
+          "first_raw_index": 149,
+          "operator": "-0.021975131470560405 [5^ 4^ 9 8] +\n-0.021975131470560405 [9^ 8^ 5 4]"
+        },
+        {
+          "node": 130,
+          "first_raw_index": 161,
+          "operator": "0.021975131470560405 [8^ 5^ 9 4] +\n0.021975131470560405 [9^ 4^ 8 5]"
+        },
+        {
+          "node": 143,
+          "first_raw_index": 192,
+          "operator": "-0.15876543178509284 [7^ 6^ 11 10] +\n-0.15876543178509284 [11^ 10^ 7 6]"
+        },
+        {
+          "node": 147,
+          "first_raw_index": 201,
+          "operator": "-0.27405000162936743 [10^ 6^ 10 6]"
+        },
+        {
+          "node": 148,
+          "first_raw_index": 205,
+          "operator": "0.15876543178509284 [10^ 7^ 11 6] +\n0.15876543178509284 [11^ 6^ 10 7]"
+        },
+        {
+          "node": 153,
+          "first_raw_index": 222,
+          "operator": "-0.27405000162936743 [11^ 7^ 11 7]"
+        }
+      ]
+    },
+    {
+      "color": 1,
+      "size": 10,
+      "nodes": [
+        15,
+        34,
+        35,
+        68,
+        82,
+        93,
+        95,
+        115,
+        125,
+        133
+      ],
+      "terms": [
+        {
+          "node": 15,
+          "first_raw_index": 16,
+          "operator": "-0.042751971022072094 [1^ 0^ 7 6] +\n-0.042751971022072094 [7^ 6^ 1 0]"
+        },
+        {
+          "node": 34,
+          "first_raw_index": 35,
+          "operator": "-0.08886727560139729 [6^ 0^ 10 4] +\n-0.0888672756013973 [10^ 4^ 6 0]"
+        },
+        {
+          "node": 35,
+          "first_raw_index": 36,
+          "operator": "0.042751971022072094 [6^ 1^ 7 0] +\n0.042751971022072094 [7^ 0^ 6 1]"
+        },
+        {
+          "node": 68,
+          "first_raw_index": 72,
+          "operator": "-0.08886727560139729 [7^ 1^ 11 5] +\n-0.0888672756013973 [11^ 5^ 7 1]"
+        },
+        {
+          "node": 82,
+          "first_raw_index": 89,
+          "operator": "-0.15876543178509298 [3^ 2^ 9 8] +\n-0.15876543178509298 [9^ 8^ 3 2]"
+        },
+        {
+          "node": 93,
+          "first_raw_index": 104,
+          "operator": "-0.27405000162936777 [8^ 2^ 8 2]"
+        },
+        {
+          "node": 95,
+          "first_raw_index": 107,
+          "operator": "0.15876543178509298 [8^ 3^ 9 2] +\n0.15876543178509298 [9^ 2^ 8 3]"
+        },
+        {
+          "node": 115,
+          "first_raw_index": 137,
+          "operator": "-0.27405000162936777 [9^ 3^ 9 3]"
+        },
+        {
+          "node": 125,
+          "first_raw_index": 150,
+          "operator": "-0.021975131470560374 [5^ 4^ 11 10] +\n-0.021975131470560374 [11^ 10^ 5 4]"
+        },
+        {
+          "node": 133,
+          "first_raw_index": 166,
+          "operator": "0.021975131470560374 [10^ 5^ 11 4] +\n0.021975131470560374 [11^ 4^ 10 5]"
+        }
+      ]
+    },
+    {
+      "color": 2,
+      "size": 14,
+      "nodes": [
+        6,
+        7,
+        10,
+        11,
+        16,
+        40,
+        41,
+        73,
+        80,
+        85,
+        141,
+        149,
+        152,
+        161
+      ],
+      "terms": [
+        {
+          "node": 6,
+          "first_raw_index": 7,
+          "operator": "-1.3106224847289816 [6^ 6]"
+        },
+        {
+          "node": 7,
+          "first_raw_index": 8,
+          "operator": "-1.3106224847289816 [7^ 7]"
+        },
+        {
+          "node": 10,
+          "first_raw_index": 11,
+          "operator": "-1.1235045671758452 [10^ 10]"
+        },
+        {
+          "node": 11,
+          "first_raw_index": 12,
+          "operator": "-1.1235045671758452 [11^ 11]"
+        },
+        {
+          "node": 16,
+          "first_raw_index": 17,
+          "operator": "-0.061529466632462726 [1^ 0^ 9 8] +\n-0.061529466632462726 [9^ 8^ 1 0]"
+        },
+        {
+          "node": 40,
+          "first_raw_index": 41,
+          "operator": "0.08472281669929331 [4^ 2^ 8 0] +\n0.08472281669929331 [8^ 0^ 4 2]"
+        },
+        {
+          "node": 41,
+          "first_raw_index": 42,
+          "operator": "0.061529466632462726 [8^ 1^ 9 0] +\n0.061529466632462726 [9^ 0^ 8 1]"
+        },
+        {
+          "node": 73,
+          "first_raw_index": 78,
+          "operator": "0.08472281669929331 [5^ 3^ 9 1] +\n0.08472281669929331 [9^ 1^ 5 3]"
+        },
+        {
+          "node": 80,
+          "first_raw_index": 87,
+          "operator": "-0.019676648007689583 [3^ 2^ 5 4] +\n-0.019676648007689583 [5^ 4^ 3 2]"
+        },
+        {
+          "node": 85,
+          "first_raw_index": 94,
+          "operator": "0.019676648007689583 [4^ 3^ 5 2] +\n0.019676648007689583 [5^ 2^ 4 3]"
+        },
+        {
+          "node": 141,
+          "first_raw_index": 190,
+          "operator": "-0.4297627429386115 [7^ 6^ 7 6]"
+        },
+        {
+          "node": 149,
+          "first_raw_index": 207,
+          "operator": "-0.43281543341446027 [11^ 6^ 11 6]"
+        },
+        {
+          "node": 152,
+          "first_raw_index": 219,
+          "operator": "-0.43281543341446027 [10^ 7^ 10 7]"
+        },
+        {
+          "node": 161,
+          "first_raw_index": 246,
+          "operator": "-0.4439947479321748 [11^ 10^ 11 10]"
+        }
+      ]
+    },
+    {
+      "color": 3,
+      "size": 14,
+      "nodes": [
+        2,
+        3,
+        8,
+        9,
+        17,
+        46,
+        47,
+        78,
+        79,
+        97,
+        113,
+        123,
+        127,
+        154
+      ],
+      "terms": [
+        {
+          "node": 2,
+          "first_raw_index": 3,
+          "operator": "-1.3106224847289796 [2^ 2]"
+        },
+        {
+          "node": 3,
+          "first_raw_index": 4,
+          "operator": "-1.3106224847289796 [3^ 3]"
+        },
+        {
+          "node": 8,
+          "first_raw_index": 9,
+          "operator": "-1.1235045671758468 [8^ 8]"
+        },
+        {
+          "node": 9,
+          "first_raw_index": 10,
+          "operator": "-1.1235045671758468 [9^ 9]"
+        },
+        {
+          "node": 17,
+          "first_raw_index": 18,
+          "operator": "-0.06152946663246264 [1^ 0^ 11 10] +\n-0.06152946663246264 [11^ 10^ 1 0]"
+        },
+        {
+          "node": 46,
+          "first_raw_index": 47,
+          "operator": "-0.08472281669929323 [6^ 4^ 10 0] +\n-0.08472281669929324 [10^ 0^ 6 4]"
+        },
+        {
+          "node": 47,
+          "first_raw_index": 48,
+          "operator": "0.06152946663246264 [10^ 1^ 11 0] +\n0.06152946663246264 [11^ 0^ 10 1]"
+        },
+        {
+          "node": 78,
+          "first_raw_index": 84,
+          "operator": "-0.08472281669929323 [7^ 5^ 11 1] +\n-0.08472281669929324 [11^ 1^ 7 5]"
+        },
+        {
+          "node": 79,
+          "first_raw_index": 86,
+          "operator": "-0.429762742938611 [3^ 2^ 3 2]"
+        },
+        {
+          "node": 97,
+          "first_raw_index": 110,
+          "operator": "-0.4328154334144607 [9^ 2^ 9 2]"
+        },
+        {
+          "node": 113,
+          "first_raw_index": 134,
+          "operator": "-0.4328154334144607 [8^ 3^ 8 3]"
+        },
+        {
+          "node": 123,
+          "first_raw_index": 148,
+          "operator": "-0.01967664800768959 [5^ 4^ 7 6] +\n-0.01967664800768959 [7^ 6^ 5 4]"
+        },
+        {
+          "node": 127,
+          "first_raw_index": 154,
+          "operator": "0.01967664800768959 [6^ 5^ 7 4] +\n0.01967664800768959 [7^ 4^ 6 5]"
+        },
+        {
+          "node": 154,
+          "first_raw_index": 227,
+          "operator": "-0.4439947479321761 [9^ 8^ 9 8]"
+        }
+      ]
+    },
+    {
+      "color": 4,
+      "size": 8,
+      "nodes": [
+        22,
+        28,
+        39,
+        52,
+        56,
+        72,
+        84,
+        106
+      ],
+      "terms": [
+        {
+          "node": 22,
+          "first_raw_index": 23,
+          "operator": "0.01943222034632025 [3^ 0^ 8 5] +\n0.01943222034632025 [8^ 5^ 3 0]"
+        },
+        {
+          "node": 28,
+          "first_raw_index": 29,
+          "operator": "0.01943222034632025 [5^ 0^ 8 3] +\n0.01943222034632025 [8^ 3^ 5 0]"
+        },
+        {
+          "node": 39,
+          "first_raw_index": 40,
+          "operator": "-0.335992049003408 [8^ 0^ 8 0]"
+        },
+        {
+          "node": 52,
+          "first_raw_index": 54,
+          "operator": "0.01943222034632025 [2^ 1^ 9 4] +\n0.01943222034632025 [9^ 4^ 2 1]"
+        },
+        {
+          "node": 56,
+          "first_raw_index": 59,
+          "operator": "0.01943222034632025 [4^ 1^ 9 2] +\n0.01943222034632025 [9^ 2^ 4 1]"
+        },
+        {
+          "node": 72,
+          "first_raw_index": 77,
+          "operator": "-0.335992049003408 [9^ 1^ 9 1]"
+        },
+        {
+          "node": 84,
+          "first_raw_index": 92,
+          "operator": "-0.3738214803415474 [4^ 2^ 4 2]"
+        },
+        {
+          "node": 106,
+          "first_raw_index": 123,
+          "operator": "-0.3738214803415474 [5^ 3^ 5 3]"
+        }
+      ]
+    },
+    {
+      "color": 5,
+      "size": 6,
+      "nodes": [
+        23,
+        25,
+        42,
+        53,
+        62,
+        69
+      ],
+      "terms": [
+        {
+          "node": 23,
+          "first_raw_index": 24,
+          "operator": "-0.10829949594771762 [3^ 0^ 9 4] +\n-0.10829949594771762 [9^ 4^ 3 0]"
+        },
+        {
+          "node": 25,
+          "first_raw_index": 26,
+          "operator": "-0.004144458902104069 [4^ 0^ 8 2] +\n-0.004144458902104069 [8^ 2^ 4 0]"
+        },
+        {
+          "node": 42,
+          "first_raw_index": 43,
+          "operator": "0.10829949594771762 [4^ 3^ 9 0] +\n0.10829949594771762 [9^ 0^ 4 3]"
+        },
+        {
+          "node": 53,
+          "first_raw_index": 55,
+          "operator": "-0.10829949594771762 [2^ 1^ 8 5] +\n-0.10829949594771762 [8^ 5^ 2 1]"
+        },
+        {
+          "node": 62,
+          "first_raw_index": 65,
+          "operator": "-0.004144458902104069 [5^ 1^ 9 3] +\n-0.004144458902104069 [9^ 3^ 5 1]"
+        },
+        {
+          "node": 69,
+          "first_raw_index": 74,
+          "operator": "0.10829949594771762 [5^ 2^ 8 1] +\n0.10829949594771762 [8^ 1^ 5 2]"
+        }
+      ]
+    },
+    {
+      "color": 6,
+      "size": 8,
+      "nodes": [
+        30,
+        36,
+        45,
+        58,
+        64,
+        77,
+        126,
+        136
+      ],
+      "terms": [
+        {
+          "node": 30,
+          "first_raw_index": 31,
+          "operator": "0.019432220346320243 [5^ 0^ 10 7] +\n0.019432220346320243 [10^ 7^ 5 0]"
+        },
+        {
+          "node": 36,
+          "first_raw_index": 37,
+          "operator": "0.019432220346320243 [7^ 0^ 10 5] +\n0.019432220346320243 [10^ 5^ 7 0]"
+        },
+        {
+          "node": 45,
+          "first_raw_index": 46,
+          "operator": "-0.3359920490034075 [10^ 0^ 10 0]"
+        },
+        {
+          "node": 58,
+          "first_raw_index": 61,
+          "operator": "0.019432220346320243 [4^ 1^ 11 6] +\n0.019432220346320243 [11^ 6^ 4 1]"
+        },
+        {
+          "node": 64,
+          "first_raw_index": 68,
+          "operator": "0.019432220346320243 [6^ 1^ 11 4] +\n0.019432220346320243 [11^ 4^ 6 1]"
+        },
+        {
+          "node": 77,
+          "first_raw_index": 83,
+          "operator": "-0.3359920490034075 [11^ 1^ 11 1]"
+        },
+        {
+          "node": 126,
+          "first_raw_index": 152,
+          "operator": "-0.3738214803415476 [6^ 4^ 6 4]"
+        },
+        {
+          "node": 136,
+          "first_raw_index": 174,
+          "operator": "-0.3738214803415476 [7^ 5^ 7 5]"
+        }
+      ]
+    },
+    {
+      "color": 7,
+      "size": 8,
+      "nodes": [
+        18,
+        31,
+        43,
+        54,
+        59,
+        70,
+        129,
+        138
+      ],
+      "terms": [
+        {
+          "node": 18,
+          "first_raw_index": 19,
+          "operator": "-0.3397568477405203 [2^ 0^ 2 0]"
+        },
+        {
+          "node": 31,
+          "first_raw_index": 32,
+          "operator": "-0.02357667924842432 [5^ 0^ 9 2] +\n-0.02357667924842432 [9^ 2^ 5 0]"
+        },
+        {
+          "node": 43,
+          "first_raw_index": 44,
+          "operator": "-0.02357667924842432 [5^ 2^ 9 0] +\n-0.02357667924842432 [9^ 0^ 5 2]"
+        },
+        {
+          "node": 54,
+          "first_raw_index": 56,
+          "operator": "-0.3397568477405203 [3^ 1^ 3 1]"
+        },
+        {
+          "node": 59,
+          "first_raw_index": 62,
+          "operator": "-0.02357667924842432 [4^ 1^ 8 3] +\n-0.02357667924842432 [8^ 3^ 4 1]"
+        },
+        {
+          "node": 70,
+          "first_raw_index": 75,
+          "operator": "-0.02357667924842432 [4^ 3^ 8 1] +\n-0.02357667924842432 [8^ 1^ 4 3]"
+        },
+        {
+          "node": 129,
+          "first_raw_index": 158,
+          "operator": "-0.3810490742766183 [8^ 4^ 8 4]"
+        },
+        {
+          "node": 138,
+          "first_raw_index": 180,
+          "operator": "-0.3810490742766183 [9^ 5^ 9 5]"
+        }
+      ]
+    },
+    {
+      "color": 8,
+      "size": 8,
+      "nodes": [
+        32,
+        33,
+        48,
+        60,
+        67,
+        74,
+        132,
+        140
+      ],
+      "terms": [
+        {
+          "node": 32,
+          "first_raw_index": 33,
+          "operator": "-0.023576679248424305 [5^ 0^ 11 6] +\n-0.023576679248424305 [11^ 6^ 5 0]"
+        },
+        {
+          "node": 33,
+          "first_raw_index": 34,
+          "operator": "-0.33975684774052045 [6^ 0^ 6 0]"
+        },
+        {
+          "node": 48,
+          "first_raw_index": 49,
+          "operator": "0.023576679248424305 [6^ 5^ 11 0] +\n0.023576679248424305 [11^ 0^ 6 5]"
+        },
+        {
+          "node": 60,
+          "first_raw_index": 63,
+          "operator": "-0.023576679248424305 [4^ 1^ 10 7] +\n-0.023576679248424305 [10^ 7^ 4 1]"
+        },
+        {
+          "node": 67,
+          "first_raw_index": 71,
+          "operator": "-0.33975684774052045 [7^ 1^ 7 1]"
+        },
+        {
+          "node": 74,
+          "first_raw_index": 80,
+          "operator": "0.023576679248424305 [7^ 4^ 10 1] +\n0.023576679248424305 [10^ 1^ 7 4]"
+        },
+        {
+          "node": 132,
+          "first_raw_index": 164,
+          "operator": "-0.38104907427661777 [10^ 4^ 10 4]"
+        },
+        {
+          "node": 140,
+          "first_raw_index": 186,
+          "operator": "-0.38104907427661777 [11^ 5^ 11 5]"
+        }
+      ]
+    },
+    {
+      "color": 9,
+      "size": 6,
+      "nodes": [
+        26,
+        38,
+        49,
+        63,
+        66,
+        75
+      ],
+      "terms": [
+        {
+          "node": 26,
+          "first_raw_index": 27,
+          "operator": "-0.004144458902104065 [4^ 0^ 10 6] +\n-0.004144458902104065 [10^ 6^ 4 0]"
+        },
+        {
+          "node": 38,
+          "first_raw_index": 39,
+          "operator": "-0.10829949594771754 [7^ 0^ 11 4] +\n-0.10829949594771754 [11^ 4^ 7 0]"
+        },
+        {
+          "node": 49,
+          "first_raw_index": 50,
+          "operator": "-0.10829949594771754 [7^ 4^ 11 0] +\n-0.10829949594771754 [11^ 0^ 7 4]"
+        },
+        {
+          "node": 63,
+          "first_raw_index": 66,
+          "operator": "-0.004144458902104065 [5^ 1^ 11 7] +\n-0.004144458902104065 [11^ 7^ 5 1]"
+        },
+        {
+          "node": 66,
+          "first_raw_index": 70,
+          "operator": "-0.10829949594771754 [6^ 1^ 10 5] +\n-0.10829949594771754 [10^ 5^ 6 1]"
+        },
+        {
+          "node": 75,
+          "first_raw_index": 81,
+          "operator": "-0.10829949594771754 [6^ 5^ 10 1] +\n-0.10829949594771754 [10^ 1^ 6 5]"
+        }
+      ]
+    },
+    {
+      "color": 10,
+      "size": 10,
+      "nodes": [
+        14,
+        24,
+        27,
+        61,
+        81,
+        88,
+        89,
+        111,
+        155,
+        157
+      ],
+      "terms": [
+        {
+          "node": 14,
+          "first_raw_index": 15,
+          "operator": "-0.13623166961499708 [1^ 0^ 5 4] +\n-0.13623166961499708 [5^ 4^ 1 0]"
+        },
+        {
+          "node": 24,
+          "first_raw_index": 25,
+          "operator": "-0.27344712022479983 [4^ 0^ 4 0]"
+        },
+        {
+          "node": 27,
+          "first_raw_index": 28,
+          "operator": "0.13623166961499708 [4^ 1^ 5 0] +\n0.13623166961499708 [5^ 0^ 4 1]"
+        },
+        {
+          "node": 61,
+          "first_raw_index": 64,
+          "operator": "-0.27344712022479983 [5^ 1^ 5 1]"
+        },
+        {
+          "node": 81,
+          "first_raw_index": 88,
+          "operator": "-0.01690111363070933 [3^ 2^ 7 6] +\n-0.01690111363070933 [7^ 6^ 3 2]"
+        },
+        {
+          "node": 88,
+          "first_raw_index": 98,
+          "operator": "-0.11384056151210695 [6^ 2^ 10 8] +\n-0.11384056151210693 [10^ 8^ 6 2]"
+        },
+        {
+          "node": 89,
+          "first_raw_index": 99,
+          "operator": "0.01690111363070933 [6^ 3^ 7 2] +\n0.01690111363070933 [7^ 2^ 6 3]"
+        },
+        {
+          "node": 111,
+          "first_raw_index": 129,
+          "operator": "-0.11384056151210695 [7^ 3^ 11 9] +\n-0.11384056151210693 [11^ 9^ 7 3]"
+        },
+        {
+          "node": 155,
+          "first_raw_index": 228,
+          "operator": "-0.018353498818051612 [9^ 8^ 11 10] +\n-0.018353498818051612 [11^ 10^ 9 8]"
+        },
+        {
+          "node": 157,
+          "first_raw_index": 233,
+          "operator": "0.018353498818051612 [10^ 9^ 11 8] +\n0.018353498818051612 [11^ 8^ 10 9]"
+        }
+      ]
+    },
+    {
+      "color": 11,
+      "size": 14,
+      "nodes": [
+        0,
+        1,
+        4,
+        5,
+        12,
+        29,
+        57,
+        83,
+        100,
+        101,
+        121,
+        122,
+        142,
+        145
+      ],
+      "terms": [
+        {
+          "node": 0,
+          "first_raw_index": 1,
+          "operator": "-1.3721296890255767 [0^ 0]"
+        },
+        {
+          "node": 1,
+          "first_raw_index": 2,
+          "operator": "-1.3721296890255767 [1^ 1]"
+        },
+        {
+          "node": 4,
+          "first_raw_index": 5,
+          "operator": "-1.2986758357196622 [4^ 4]"
+        },
+        {
+          "node": 5,
+          "first_raw_index": 6,
+          "operator": "-1.2986758357196622 [5^ 5]"
+        },
+        {
+          "node": 12,
+          "first_raw_index": 13,
+          "operator": "-0.403970395136272 [1^ 0^ 1 0]"
+        },
+        {
+          "node": 29,
+          "first_raw_index": 30,
+          "operator": "-0.4096787898397969 [5^ 0^ 5 0]"
+        },
+        {
+          "node": 57,
+          "first_raw_index": 60,
+          "operator": "-0.4096787898397969 [4^ 1^ 4 1]"
+        },
+        {
+          "node": 83,
+          "first_raw_index": 90,
+          "operator": "-0.01497495675766197 [3^ 2^ 11 10] +\n-0.01497495675766197 [11^ 10^ 3 2]"
+        },
+        {
+          "node": 100,
+          "first_raw_index": 113,
+          "operator": "0.11187432264754087 [8^ 6^ 10 2] +\n0.11187432264754087 [10^ 2^ 8 6]"
+        },
+        {
+          "node": 101,
+          "first_raw_index": 114,
+          "operator": "0.01497495675766197 [10^ 3^ 11 2] +\n0.01497495675766197 [11^ 2^ 10 3]"
+        },
+        {
+          "node": 121,
+          "first_raw_index": 144,
+          "operator": "0.11187432264754087 [9^ 7^ 11 3] +\n0.11187432264754087 [11^ 3^ 9 7]"
+        },
+        {
+          "node": 122,
+          "first_raw_index": 147,
+          "operator": "-0.4390457033315522 [5^ 4^ 5 4]"
+        },
+        {
+          "node": 142,
+          "first_raw_index": 191,
+          "operator": "-0.014974956757662002 [7^ 6^ 9 8] +\n-0.014974956757662002 [9^ 8^ 7 6]"
+        },
+        {
+          "node": 145,
+          "first_raw_index": 196,
+          "operator": "0.014974956757662002 [8^ 7^ 9 6] +\n0.014974956757662002 [9^ 6^ 8 7]"
+        }
+      ]
+    },
+    {
+      "color": 12,
+      "size": 8,
+      "nodes": [
+        91,
+        96,
+        99,
+        108,
+        112,
+        120,
+        144,
+        151
+      ],
+      "terms": [
+        {
+          "node": 91,
+          "first_raw_index": 101,
+          "operator": "0.014974956757661986 [7^ 2^ 10 9] +\n0.014974956757661986 [10^ 9^ 7 2]"
+        },
+        {
+          "node": 96,
+          "first_raw_index": 109,
+          "operator": "0.014974956757661986 [9^ 2^ 10 7] +\n0.014974956757661986 [10^ 7^ 9 2]"
+        },
+        {
+          "node": 99,
+          "first_raw_index": 112,
+          "operator": "-0.38395808541234316 [10^ 2^ 10 2]"
+        },
+        {
+          "node": 108,
+          "first_raw_index": 126,
+          "operator": "0.014974956757661986 [6^ 3^ 11 8] +\n0.014974956757661986 [11^ 8^ 6 3]"
+        },
+        {
+          "node": 112,
+          "first_raw_index": 133,
+          "operator": "0.014974956757661986 [8^ 3^ 11 6] +\n0.014974956757661986 [11^ 6^ 8 3]"
+        },
+        {
+          "node": 120,
+          "first_raw_index": 143,
+          "operator": "-0.38395808541234316 [11^ 3^ 11 3]"
+        },
+        {
+          "node": 144,
+          "first_raw_index": 194,
+          "operator": "-0.383958085412344 [8^ 6^ 8 6]"
+        },
+        {
+          "node": 151,
+          "first_raw_index": 213,
+          "operator": "-0.383958085412344 [9^ 7^ 9 7]"
+        }
+      ]
+    },
+    {
+      "color": 13,
+      "size": 6,
+      "nodes": [
+        92,
+        94,
+        102,
+        109,
+        116,
+        117
+      ],
+      "terms": [
+        {
+          "node": 92,
+          "first_raw_index": 102,
+          "operator": "-0.12881551826976892 [7^ 2^ 11 8] +\n-0.12881551826976892 [11^ 8^ 7 2]"
+        },
+        {
+          "node": 94,
+          "first_raw_index": 105,
+          "operator": "-0.0019662388645660667 [8^ 2^ 10 6] +\n-0.0019662388645660675 [10^ 6^ 8 2]"
+        },
+        {
+          "node": 102,
+          "first_raw_index": 115,
+          "operator": "0.12881551826976892 [8^ 7^ 11 2] +\n0.12881551826976892 [11^ 2^ 8 7]"
+        },
+        {
+          "node": 109,
+          "first_raw_index": 127,
+          "operator": "-0.12881551826976892 [6^ 3^ 10 9] +\n-0.12881551826976892 [10^ 9^ 6 3]"
+        },
+        {
+          "node": 116,
+          "first_raw_index": 138,
+          "operator": "-0.0019662388645660667 [9^ 3^ 11 7] +\n-0.0019662388645660675 [11^ 7^ 9 3]"
+        },
+        {
+          "node": 117,
+          "first_raw_index": 140,
+          "operator": "0.12881551826976892 [9^ 6^ 10 3] +\n0.12881551826976892 [10^ 3^ 9 6]"
+        }
+      ]
+    },
+    {
+      "color": 14,
+      "size": 8,
+      "nodes": [
+        87,
+        98,
+        103,
+        110,
+        114,
+        118,
+        156,
+        160
+      ],
+      "terms": [
+        {
+          "node": 87,
+          "first_raw_index": 97,
+          "operator": "-0.3790594020464839 [6^ 2^ 6 2]"
+        },
+        {
+          "node": 98,
+          "first_raw_index": 111,
+          "operator": "-0.016941195622228053 [9^ 2^ 11 6] +\n-0.016941195622228053 [11^ 6^ 9 2]"
+        },
+        {
+          "node": 103,
+          "first_raw_index": 116,
+          "operator": "-0.016941195622228053 [9^ 6^ 11 2] +\n-0.016941195622228053 [11^ 2^ 9 6]"
+        },
+        {
+          "node": 110,
+          "first_raw_index": 128,
+          "operator": "-0.3790594020464839 [7^ 3^ 7 3]"
+        },
+        {
+          "node": 114,
+          "first_raw_index": 135,
+          "operator": "-0.016941195622228053 [8^ 3^ 10 7] +\n-0.016941195622228053 [10^ 7^ 8 3]"
+        },
+        {
+          "node": 118,
+          "first_raw_index": 141,
+          "operator": "-0.016941195622228053 [8^ 7^ 10 3] +\n-0.016941195622228053 [10^ 3^ 8 7]"
+        },
+        {
+          "node": 156,
+          "first_raw_index": 230,
+          "operator": "-0.38893425147802263 [10^ 8^ 10 8]"
+        },
+        {
+          "node": 160,
+          "first_raw_index": 240,
+          "operator": "-0.38893425147802263 [11^ 9^ 11 9]"
+        }
+      ]
+    },
+    {
+      "color": 15,
+      "size": 24,
+      "nodes": [
+        21,
+        37,
+        44,
+        50,
+        51,
+        65,
+        71,
+        76,
+        86,
+        90,
+        104,
+        105,
+        107,
+        119,
+        128,
+        131,
+        134,
+        135,
+        137,
+        139,
+        146,
+        150,
+        158,
+        159
+      ],
+      "terms": [
+        {
+          "node": 21,
+          "first_raw_index": 22,
+          "operator": "-0.38250881876259235 [3^ 0^ 3 0]"
+        },
+        {
+          "node": 37,
+          "first_raw_index": 38,
+          "operator": "-0.3825088187625925 [7^ 0^ 7 0]"
+        },
+        {
+          "node": 44,
+          "first_raw_index": 45,
+          "operator": "-0.3975215156358708 [9^ 0^ 9 0]"
+        },
+        {
+          "node": 50,
+          "first_raw_index": 51,
+          "operator": "-0.3975215156358701 [11^ 0^ 11 0]"
+        },
+        {
+          "node": 51,
+          "first_raw_index": 53,
+          "operator": "-0.38250881876259235 [2^ 1^ 2 1]"
+        },
+        {
+          "node": 65,
+          "first_raw_index": 69,
+          "operator": "-0.3825088187625925 [6^ 1^ 6 1]"
+        },
+        {
+          "node": 71,
+          "first_raw_index": 76,
+          "operator": "-0.3975215156358708 [8^ 1^ 8 1]"
+        },
+        {
+          "node": 76,
+          "first_raw_index": 82,
+          "operator": "-0.3975215156358701 [10^ 1^ 10 1]"
+        },
+        {
+          "node": 86,
+          "first_raw_index": 95,
+          "operator": "-0.3934981283492369 [5^ 2^ 5 2]"
+        },
+        {
+          "node": 90,
+          "first_raw_index": 100,
+          "operator": "-0.39596051567719326 [7^ 2^ 7 2]"
+        },
+        {
+          "node": 104,
+          "first_raw_index": 117,
+          "operator": "-0.39893304217000514 [11^ 2^ 11 2]"
+        },
+        {
+          "node": 105,
+          "first_raw_index": 120,
+          "operator": "-0.3934981283492369 [4^ 3^ 4 3]"
+        },
+        {
+          "node": 107,
+          "first_raw_index": 125,
+          "operator": "-0.39596051567719326 [6^ 3^ 6 3]"
+        },
+        {
+          "node": 119,
+          "first_raw_index": 142,
+          "operator": "-0.39893304217000514 [10^ 3^ 10 3]"
+        },
+        {
+          "node": 128,
+          "first_raw_index": 155,
+          "operator": "-0.39349812834923714 [7^ 4^ 7 4]"
+        },
+        {
+          "node": 131,
+          "first_raw_index": 162,
+          "operator": "-0.40302420574717873 [9^ 4^ 9 4]"
+        },
+        {
+          "node": 134,
+          "first_raw_index": 168,
+          "operator": "-0.4030242057471781 [11^ 4^ 11 4]"
+        },
+        {
+          "node": 135,
+          "first_raw_index": 171,
+          "operator": "-0.39349812834923714 [6^ 5^ 6 5]"
+        },
+        {
+          "node": 137,
+          "first_raw_index": 178,
+          "operator": "-0.40302420574717873 [8^ 5^ 8 5]"
+        },
+        {
+          "node": 139,
+          "first_raw_index": 184,
+          "operator": "-0.4030242057471781 [10^ 5^ 10 5]"
+        },
+        {
+          "node": 146,
+          "first_raw_index": 197,
+          "operator": "-0.398933042170006 [9^ 6^ 9 6]"
+        },
+        {
+          "node": 150,
+          "first_raw_index": 210,
+          "operator": "-0.398933042170006 [8^ 7^ 8 7]"
+        },
+        {
+          "node": 158,
+          "first_raw_index": 234,
+          "operator": "-0.4072877502960742 [11^ 8^ 11 8]"
+        },
+        {
+          "node": 159,
+          "first_raw_index": 238,
+          "operator": "-0.4072877502960742 [10^ 9^ 10 9]"
+        }
+      ]
+    }
+  ]
+}
