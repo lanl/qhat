@@ -83,8 +83,12 @@ retained.  Its default is `1e-8`; set it to `0.0` to disable filtering at this s
 hamiltonian.coefficient_threshold = 0.0
 ```
 
-The value must be finite and non-negative.  This setting affects only tensor construction; it does
-not change OpenFermion's standard JW/BK mapping, which can still discard small coefficients.
+The value must be finite and non-negative.  This setting affects only tensor construction.  After
+OpenFermion's standard JW/BK mapping, QHAT also removes final Pauli strings whose coefficient
+magnitude is strictly less than a fixed `1e-8` Hartree cutoff.  This second cutoff is currently not
+configurable, so setting `hamiltonian.coefficient_threshold = 0.0` preserves small spin-orbital
+tensor entries but does not disable filtering of the final Pauli Hamiltonian.  Both thresholds are
+recorded separately in the generated `.dat` file metadata.
 Active-space pickles record the threshold used to construct their tensors.  If the configured value
 does not match `[filestub]_[astag].pickle`, QHAT stops rather than silently reusing incompatible
 tensors.  Remove that active-space pickle and rerun; QHAT will rebuild it and overwrite
