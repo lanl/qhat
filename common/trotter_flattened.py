@@ -499,6 +499,222 @@ class Trotterization(Bloq):
 
         return total_complexity
 
+    def tensor_contract(self) -> np.ndarray:
+        """
+        Optimized tensor contraction exploiting repeating structure.
+
+        Phase 2 optimization: For multi-step Trotter, the expanded_sequence
+        has a repeating pattern due to term combining across step boundaries:
+            [start_block] + [repeating_block]^(n_repeats) + [end_block]
+
+        We exploit this by:
+        1. Detecting the repeating pattern
+        2. Building matrices for start, repeating, and end blocks
+        3. Using matrix exponentiation for the repeating part: O(log n)
+        4. Combining: U_total = U_end @ U_repeat^n @ U_start
+
+        Falls back to O(n) incremental approach if:
+        - num_steps is small (< 10) - overhead not worth it
+        - No clear repeating pattern detected
+
+        Returns:
+            The full unitary matrix as a numpy array with shape (2^n_qubits, 2^n_qubits)
+
+        Example:
+            >>> trotter = Trotterization.from_method(
+            ...     pauli_terms=[("X", 1.0), ("Y", 1.0)],
+            ...     method="second order",
+            ...     time=1.0,
+            ...     num_steps=1000
+            ... )
+            >>> U = trotter.tensor_contract()  # Uses O(log n) optimization
+            >>> U.shape
+            (2, 2)
+        """
+        # For small num_steps, incremental is faster (less overhead)
+        if self.num_steps < 10:
+            return self._incremental_contraction()
+
+        # Try to detect repeating pattern
+        pattern_info = self._detect_repeating_pattern()
+
+        # If pattern detected, use O(log n) structured approach
+        if pattern_info['has_pattern'] and pattern_info['num_repeats'] >= 2:
+            return self._structured_contraction(pattern_info)
+        else:
+            # Fall back to O(n) incremental approach
+            return self._incremental_contraction()
+
+    def _detect_repeating_pattern(self) -> dict:
+        """
+        Detect repeating pattern in expanded_sequence.
+
+        For symmetric Trotter methods with term combining, the sequence has structure:
+            [start_block] + [repeating_block] * n_repeats + [end_block]
+
+        The repeating block typically has length equal to the number of terms
+        in one ramped cycle after combining at step boundaries.
+
+        Returns:
+            Dictionary with:
+            - has_pattern: bool - whether a pattern was detected
+            - start_terms: list - terms before the repeating section
+            - repeating_terms: list - the repeating unit
+            - end_terms: list - terms after the repeating section
+            - num_repeats: int - how many times the pattern repeats
+            - pattern_length: int - length of repeating unit
+        """
+        seq = self.expanded_sequence
+
+        # Need at least 2 steps for a repeating pattern
+        if self.num_steps < 2:
+            return {'has_pattern': False}
+
+        # For symmetric methods, the repeating pattern length is typically
+        # related to the number of terms and ramping coefficients
+        n_terms = len(self.pauli_terms)
+        n_coeffs = len(self.coefficients)
+
+        # Estimate pattern length based on structure analysis
+        # For symmetric Trotter methods with term combining:
+        # - Simple cases (few terms): pattern ≈ n_terms
+        # - Complex cases (many terms): pattern ≈ 2 * n_terms (observed for 61-term Hamiltonian)
+        # Use a wider search range to handle both cases
+        estimated_pattern_len = max(n_terms, (n_terms * n_coeffs))
+
+        # Try different pattern lengths around the estimate with a wider search window
+        # Search from ~50% to ~150% of estimate to handle various Hamiltonian structures
+        search_min = max(1, estimated_pattern_len // 2)
+        search_max = min(len(seq) // 2, int(estimated_pattern_len * 1.5) + 20)
+
+        for pattern_len in range(search_min, search_max):
+
+            # Check if this could be a valid pattern
+            if pattern_len < 1 or len(seq) < 2 * pattern_len:
+                continue
+
+            # Try treating seq[0:pattern_len] as start block
+            # and seq[pattern_len:2*pattern_len] as first repeating unit
+            start_block = seq[:pattern_len]
+            candidate_pattern = seq[pattern_len:2*pattern_len]
+
+            # Check if this pattern actually repeats
+            num_repeats = 0
+            idx = pattern_len
+
+            while idx + pattern_len <= len(seq):
+                if seq[idx:idx + pattern_len] == candidate_pattern:
+                    num_repeats += 1
+                    idx += pattern_len
+                else:
+                    break
+
+            # Need at least 2 repetitions to be worth using matrix power
+            if num_repeats >= 2:
+                # Found a valid pattern!
+                end_block = seq[idx:] if idx < len(seq) else []
+
+                return {
+                    'has_pattern': True,
+                    'start_terms': start_block,
+                    'repeating_terms': candidate_pattern,
+                    'end_terms': end_block,
+                    'num_repeats': num_repeats,
+                    'pattern_length': pattern_len
+                }
+
+        # No repeating pattern found
+        return {'has_pattern': False}
+
+    def _structured_contraction(self, pattern_info: dict) -> np.ndarray:
+        """
+        Perform O(log n) contraction using detected pattern structure.
+
+        Builds matrices for start, repeating, and end blocks, then uses
+        matrix exponentiation for the repeating part.
+
+        Args:
+            pattern_info: Dictionary from _detect_repeating_pattern()
+
+        Returns:
+            Full unitary matrix
+        """
+        # Build component matrices
+        U_start = self._build_matrix_from_terms(pattern_info['start_terms'])
+        U_repeat = self._build_matrix_from_terms(pattern_info['repeating_terms'])
+        U_end = self._build_matrix_from_terms(pattern_info['end_terms'])
+
+        # Use matrix power for the repeating part (O(log n))
+        num_repeats = pattern_info['num_repeats']
+        if num_repeats > 1:
+            U_repeat_total = np.linalg.matrix_power(U_repeat, num_repeats)
+        else:
+            U_repeat_total = U_repeat
+
+        # Combine: U_total = U_end @ U_repeat^n @ U_start
+        # Right-to-left order maintains proper time ordering
+        U_total = U_end @ U_repeat_total @ U_start
+
+        return U_total
+
+    def _build_matrix_from_terms(self, terms: List[Tuple[int, float]]) -> np.ndarray:
+        """
+        Build unitary matrix from a sequence of (term_index, coefficient) pairs.
+
+        Args:
+            terms: List of (term_idx, coeff) tuples from expanded_sequence
+
+        Returns:
+            Unitary matrix for this sequence of terms
+        """
+        dim = 2 ** self.num_qubits
+        U = np.eye(dim, dtype=np.complex128)
+
+        dt = self.time / self.num_steps
+
+        for term_idx, coeff in terms:
+            pauli_string, h_i = self.pauli_terms[term_idx]
+
+            cpse = CommutingPauliStringEvolution(
+                pauli_terms=((pauli_string, h_i * coeff),),
+                time=dt,
+                hbar=self.hbar
+            )
+
+            U_term = cpse.tensor_contract()
+            U = U_term @ U
+
+        return U
+
+    def _incremental_contraction(self) -> np.ndarray:
+        """
+        Fallback O(n) incremental contraction (Phase 1 implementation).
+
+        Iterates through expanded_sequence and multiplies matrices one at a time.
+        Used when pattern detection fails or for small num_steps.
+
+        Returns:
+            Full unitary matrix
+        """
+        dim = 2 ** self.num_qubits
+        U_total = np.eye(dim, dtype=np.complex128)
+
+        dt = self.time / self.num_steps
+
+        for term_idx, coeff in self.expanded_sequence:
+            pauli_string, h_i = self.pauli_terms[term_idx]
+
+            cpse = CommutingPauliStringEvolution(
+                pauli_terms=((pauli_string, h_i * coeff),),
+                time=dt,
+                hbar=self.hbar
+            )
+
+            U_term = cpse.tensor_contract()
+            U_total = U_term @ U_total
+
+        return U_total
+
     @property
     def num_terms(self) -> int:
         """Number of Pauli string terms in the Hamiltonian."""
