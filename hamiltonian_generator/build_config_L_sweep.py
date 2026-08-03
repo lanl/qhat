@@ -11,15 +11,16 @@
 #   - L_min = L_min_frac * L_eq, L_max = L_max_frac * L_eq
 #   - file_stub uses absolute path so outputs save alongside config files
 #   - active_space_loop() adds hard break at max_active qubits
-#   - Molecule filter: defaults to the 9 library molecules; pass a
-#     positional argument to override, e.g. "Li-Li,Be-Be"
+#   - System filter: defaults to the 9 library molecules plus atoms H--Ne;
+#     pass a positional argument to override, e.g. "Li-Li,Be-Be" or "C,O"
+#   - Monatomic systems use one atom at the origin and have no L sweep
 #   - --run flag to call hamgen.py on all configs after writing
 #
 # Everything else (element_loop, basis_loop, configuration_loop,
 # active_space_loop, mapping_loop, write_config) mirrors build_config.py.
 #
 # Usage:
-#   # all 9 library molecules, 50 L steps, max 12 qubits
+#   # all 9 library molecules plus atoms H--Ne
 #   python build_config_L_sweep.py --L-steps 50 --max-active 12 --run
 #
 #   # specific molecules
@@ -39,15 +40,19 @@ from pathlib import Path
 
 
 # =================================================================================================
-# Default molecule list — mirrors the existing library
+# Default system list: existing molecules plus atoms H through Ne
 # =================================================================================================
 
 LIBRARY_MOLECULES = {
+    ("H",), ("He",), ("Li",), ("Be",), ("B",),
+    ("C",), ("N",), ("O",), ("F",), ("Ne",),
     ("H",  "H" ), ("He", "H" ), ("He", "He"),
     ("Li", "H" ), ("Li", "Li"),
     ("Be", "H" ), ("Be", "Be"),
     ("B",  "H" ), ("B",  "B" ),
 }
+
+MAX_ATOMIC_NUMBER = 10
 
 
 # =================================================================================================
@@ -61,9 +66,13 @@ class Count:
 
 def write_config(basis, Z1, atom1, Z2, atom2, L, occupied, vacant, mapping,
                  library_root="library"):
-    stub     = f"{atom1}-{atom2}_{L:4.2f}_{basis}"
+    if atom2 is None:
+        stub = f"{atom1}_atom_{basis}"
+        path = Path(library_root) / "atoms" / atom1 / basis
+    else:
+        stub = f"{atom1}-{atom2}_{L:4.2f}_{basis}"
+        path = Path(library_root) / f"{atom1}-{atom2}" / f"{L:.2f}" / basis
     extended = f"{stub}_as-{occupied:03d}-{vacant:03d}_{mapping}"
-    path     = Path(library_root) / f"{atom1}-{atom2}" / f"{L:.2f}" / basis
     path.mkdir(parents=True, exist_ok=True)
     abs_stub = str(path.resolve() / stub)
 
@@ -73,9 +82,12 @@ def write_config(basis, Z1, atom1, Z2, atom2, L, occupied, vacant, mapping,
         print(f'general.logfile = "{abs_stub}_as-{occupied:03d}-{vacant:03d}_{mapping}.log"', file=fout)
         print(f'general.file_stub = "{abs_stub}"',                                    file=fout)
         print(f'general.file_format = "default"',                                     file=fout)
-        print(f'L = {L}',                                                              file=fout)
-        print(f'hamiltonian.add_atom("{atom1}", -0.5 * L, 0.0, 0.0)',                 file=fout)
-        print(f'hamiltonian.add_atom("{atom2}",  0.5 * L, 0.0, 0.0)',                 file=fout)
+        if atom2 is None:
+            print(f'hamiltonian.add_atom("{atom1}", 0.0, 0.0, 0.0)',                  file=fout)
+        else:
+            print(f'L = {L}',                                                          file=fout)
+            print(f'hamiltonian.add_atom("{atom1}", -0.5 * L, 0.0, 0.0)',             file=fout)
+            print(f'hamiltonian.add_atom("{atom2}",  0.5 * L, 0.0, 0.0)',             file=fout)
         print(f'hamiltonian.basis = "{basis}"',                                        file=fout)
         print(f'hamiltonian.num_active_occupied = {occupied}',                         file=fout)
         print(f'hamiltonian.num_active_vacant = {vacant}',                             file=fout)
@@ -140,15 +152,17 @@ def do_the_thing(elements, element1, basis, configuration, element2, L,
                  library_root, config_files):
     count.count[basis] += 1
     sym1 = element1["symbol"]
-    sym2 = element2["symbol"]
+    sym2 = element2["symbol"] if element2 is not None else None
     Z1   = element1["atomic number"]
-    Z2   = element2["atomic number"]
+    Z2   = element2["atomic number"] if element2 is not None else None
+    system = f"{sym1:>2s}-{sym2:<2s}" if sym2 is not None else f"{sym1:>2s} atom"
+    spacing = f"L={L:5.2f}Å" if L is not None else " " * 8
     print('  ' * indent + '  '.join([
         f"{count.count['sto-6g']:07d}",
         f"{count.count['hgbs-5']:07d}",
         f"{configuration[:7]:7s}",
-        f"{sym1:>2s}-{sym2:<2s}",
-        f"L={L:5.2f}Å",
+        system,
+        spacing,
         f"{basis:6s}",
         f"{mapping:2s}",
         f"{total_orbitals:3}",
@@ -176,11 +190,21 @@ def mapping_loop(elements, element1, basis, configuration, element2, L,
 def active_space_loop(elements, element1, basis, configuration, element2, L,
                       count, indent, library_root, config_files, max_active):
     ratio_ideal     = 0.4
-    total_electrons = element1["atomic number"] + element2["atomic number"]
-    total_orbitals  = element1[basis] + element2[basis]
+    total_electrons = element1["atomic number"]
+    total_orbitals  = element1[basis]
+    if element2 is not None:
+        total_electrons += element2["atomic number"]
+        total_orbitals  += element2[basis]
     total_vacancies = total_orbitals - total_electrons
     n_act_occ       = 2 - total_electrons % 2
     n_act_vac       = n_act_occ
+    if total_vacancies < n_act_vac:
+        system = element1["symbol"] if element2 is None else \
+                 f"{element1['symbol']}-{element2['symbol']}"
+        print('  ' * indent +
+              f"SKIP: {system} {basis} has {total_vacancies} vacant spin "
+              f"orbitals; the first active space requires {n_act_vac}.")
+        return
     active_lo       = n_act_occ + n_act_vac
     active_hi       = total_orbitals + 1
 
@@ -307,6 +331,27 @@ def element_loop(elements, count, indent, max_period,
 
 # =================================================================================================
 
+def atom_loop(elements, count, indent, max_period, library_root, config_files,
+              max_active, molecules=None):
+    for element in elements:
+        if element["atomic number"] > MAX_ATOMIC_NUMBER:
+            continue
+        if element["period"] > max_period:
+            continue
+        if molecules is not None and (element["symbol"],) not in molecules:
+            continue
+        print('  ' * indent + f"ATOM: {element['name']}")
+        for basis in ["sto-6g", "hgbs-5"]:
+            if element[basis] is None:
+                continue
+            active_space_loop(
+                elements, element, basis, "atom", None, None,
+                count, indent + 1, library_root, config_files, max_active
+            )
+
+
+# =================================================================================================
+
 def run_hamgen(config_files, hamgen_dir):
     hamgen_path = Path(hamgen_dir) / "hamgen.py"
     if not hamgen_path.exists():
@@ -333,8 +378,8 @@ def parse_args():
                     "Companion script to build_config.py."
     )
     ap.add_argument("molecules",       type=str, nargs="?", default=None,
-                    help="Comma-separated molecule list e.g. Li-Li,Be-Be "
-                         "(default: all 9 library molecules)")
+                    help="Comma-separated systems, e.g. Li-Li,Be-Be or C,O "
+                         "(default: 9 molecules plus atoms H through Ne)")
     ap.add_argument("--all-molecules", action="store_true", dest="all_molecules",
                     help="Generate for all elements up to --max-period (no filter)")
     ap.add_argument("--L-steps",       type=int,   default=10,  dest="L_steps",
@@ -368,17 +413,29 @@ def main():
     elif args.molecules:
         molecules = set()
         for m in args.molecules.split(","):
-            parts = m.strip().split("-")
-            molecules.add((parts[0], parts[1]))
+            parts = tuple(p for p in m.strip().split("-") if p)
+            if len(parts) not in {1, 2}:
+                print(f"ERROR: invalid system specification {m!r}.")
+                sys.exit(1)
+            molecules.add(parts)
     else:
         molecules = LIBRARY_MOLECULES
 
+    count = Count()
     element_loop(
-        elements, Count(), indent=0,
+        elements, count, indent=0,
         max_period   = args.max_period,
         L_steps      = args.L_steps,
         L_min_frac   = args.L_min_frac,
         L_max_frac   = args.L_max_frac,
+        library_root = args.library,
+        config_files = config_files,
+        max_active   = args.max_active,
+        molecules    = molecules,
+    )
+    atom_loop(
+        elements, count, indent=0,
+        max_period   = args.max_period,
         library_root = args.library,
         config_files = config_files,
         max_active   = args.max_active,
