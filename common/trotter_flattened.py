@@ -499,6 +499,62 @@ class Trotterization(Bloq):
 
         return total_complexity
 
+    def tensor_contract(self) -> np.ndarray:
+        """
+        Optimized tensor contraction using incremental matrix multiplication.
+
+        Instead of contracting the full tensor network (which scales as O(n³)
+        or worse), we iterate through the expanded_sequence and multiply
+        matrices incrementally, giving O(n) scaling where n is the length
+        of the expanded sequence.
+
+        The expanded_sequence already has adjacent identical terms combined
+        for efficiency, so we simply process it term by term.
+
+        Returns:
+            The full unitary matrix as a numpy array with shape (2^n_qubits, 2^n_qubits)
+
+        Example:
+            >>> trotter = Trotterization.from_method(
+            ...     pauli_terms=[("X", 1.0), ("Y", 1.0)],
+            ...     method="second order",
+            ...     time=1.0,
+            ...     num_steps=100
+            ... )
+            >>> U = trotter.tensor_contract()
+            >>> U.shape
+            (2, 2)
+        """
+        # Initialize to identity matrix
+        dim = 2 ** self.num_qubits
+        U_total = np.eye(dim, dtype=np.complex128)
+
+        # Time step for each Trotter step
+        dt = self.time / self.num_steps
+
+        # Process each term in the expanded sequence
+        # Each term is a (term_index, coefficient) pair where coefficient
+        # accounts for both the ramped Trotter coefficient and term combining
+        for term_idx, coeff in self.expanded_sequence:
+            pauli_string, h_i = self.pauli_terms[term_idx]
+
+            # Create single-term evolution operator:
+            # exp(-i * h_i * coeff * P * dt / hbar)
+            cpse = CommutingPauliStringEvolution(
+                pauli_terms=((pauli_string, h_i * coeff),),
+                time=dt,
+                hbar=self.hbar
+            )
+
+            # Contract this single term (fast - just one Pauli exponential)
+            U_term = cpse.tensor_contract()
+
+            # Multiply into total: U_total = U_term @ U_total
+            # Right-to-left multiplication maintains time-ordering
+            U_total = U_term @ U_total
+
+        return U_total
+
     @property
     def num_terms(self) -> int:
         """Number of Pauli string terms in the Hamiltonian."""
