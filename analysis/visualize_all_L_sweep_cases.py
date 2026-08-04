@@ -151,6 +151,9 @@ def main() -> None:
         int(value) for value in data["trotter_steps"].dropna().unique()
     )
     global_orderings = sorted(data["ordering"].dropna().unique())
+    global_factorization_levels = sorted(
+        data["factorization_level"].dropna().unique()
+    )
 
     expected_rows_per_case = (
         len(global_times)
@@ -218,6 +221,12 @@ def main() -> None:
             "orderings": json.dumps(
                 sorted(str(value) for value in subset["ordering"].dropna().unique())
             ),
+            "factorization_levels": json.dumps(
+                sorted(
+                    str(value)
+                    for value in subset["factorization_level"].dropna().unique()
+                )
+            ),
             "observed_rows": observed_rows,
             "unique_grid_rows": unique_rows,
             "expected_rows_from_global_grid": expected_rows_per_case,
@@ -265,6 +274,10 @@ def main() -> None:
     print()
     print("=" * 72)
     print(f"Cases discovered:       {number_of_cases}")
+    print(
+        "Factorization levels:   "
+        + ", ".join(str(value) for value in global_factorization_levels)
+    )
     print(f"Figures generated:      {generated}")
     print(f"Existing figures kept:  {skipped}")
     print(f"Failures:               {failed}")
