@@ -34,6 +34,8 @@ from openfermion import get_fermion_operator, jordan_wigner
 try:
     from qhat.analysis.benchmark_L_sweep_trotter import (
         DEFAULT_TOLERANCE,
+        HermitianFermionTerm,
+        build_hermitian_fermion_terms,
         build_pauli_noncommutation_graph,
         clean_fermion_operator,
         discover_tensor_paths,
@@ -45,6 +47,8 @@ try:
 except ImportError:
     from benchmark_L_sweep_trotter import (
         DEFAULT_TOLERANCE,
+        HermitianFermionTerm,
+        build_hermitian_fermion_terms,
         build_pauli_noncommutation_graph,
         clean_fermion_operator,
         discover_tensor_paths,
@@ -598,6 +602,53 @@ def main() -> None:
     print(f"Results:         {args.output}")
     print("=" * 96)
 
+def fermionic_term_order_indices(
+    hermitian_terms,
+    ordering_method: str,
+    tolerance: float,
+) -> list[int]:
+    """
+    Return indices of complete Hermitian fermionic terms.
+
+    Supported methods:
+      - signed_ascending:
+          increasing signed coefficient, then fermionic lexicographic order
+      - magnitude_descending:
+          decreasing absolute coefficient, then fermionic lexicographic order
+    """
+
+    def canonical_component_key(term):
+        # One deterministic representative of the Hermitian pair.
+        return min(term.component_keys)
+
+    def signed_weight(term):
+        key = canonical_component_key(term)
+        return real_coefficient(
+            term.operator.terms[key],
+            tolerance,
+        )
+
+    if ordering_method == "signed_ascending":
+        return sorted(
+            range(len(hermitian_terms)),
+            key=lambda index: (
+                signed_weight(hermitian_terms[index]),
+                canonical_component_key(hermitian_terms[index]),
+            ),
+        )
+
+    if ordering_method == "magnitude_descending":
+        return sorted(
+            range(len(hermitian_terms)),
+            key=lambda index: (
+                -abs(signed_weight(hermitian_terms[index])),
+                canonical_component_key(hermitian_terms[index]),
+            ),
+        )
+
+    raise ValueError(
+        f"Unsupported fermionic ordering method: {ordering_method}"
+    )
 
 if __name__ == "__main__":
     main()
