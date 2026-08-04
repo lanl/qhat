@@ -499,6 +499,107 @@ class Trotterization(Bloq):
 
         return total_complexity
 
+    def tensor_contract(self) -> np.ndarray:
+        """Contract the flattened sequence while exploiting repeated steps.
+
+        Multi-step Trotter sequences contain a repeated block after adjacent
+        identical terms have been combined.  Contract that block once and use
+        matrix powering when possible; otherwise use incremental contraction.
+        """
+        if self.num_steps < 10:
+            return self._incremental_contraction()
+
+        pattern_info = self._detect_repeating_pattern()
+        if pattern_info["has_pattern"] and pattern_info["num_repeats"] >= 2:
+            return self._structured_contraction(pattern_info)
+        return self._incremental_contraction()
+
+    def _detect_repeating_pattern(self) -> dict:
+        """Detect a repeated block in ``expanded_sequence``."""
+        sequence = self.expanded_sequence
+        if self.num_steps < 2:
+            return {"has_pattern": False}
+
+        number_of_terms = len(self.pauli_terms)
+        number_of_coefficients = len(self.coefficients)
+        estimated_length = max(
+            number_of_terms,
+            number_of_terms * number_of_coefficients,
+        )
+        search_minimum = max(1, estimated_length // 2)
+        search_maximum = min(
+            len(sequence) // 2,
+            int(estimated_length * 1.5) + 20,
+        )
+
+        for pattern_length in range(search_minimum, search_maximum):
+            if len(sequence) < 2 * pattern_length:
+                continue
+
+            start_terms = sequence[:pattern_length]
+            repeating_terms = sequence[
+                pattern_length : 2 * pattern_length
+            ]
+            number_of_repeats = 0
+            index = pattern_length
+            while index + pattern_length <= len(sequence):
+                if (
+                    sequence[index : index + pattern_length]
+                    != repeating_terms
+                ):
+                    break
+                number_of_repeats += 1
+                index += pattern_length
+
+            if number_of_repeats >= 2:
+                return {
+                    "has_pattern": True,
+                    "start_terms": start_terms,
+                    "repeating_terms": repeating_terms,
+                    "end_terms": sequence[index:],
+                    "num_repeats": number_of_repeats,
+                    "pattern_length": pattern_length,
+                }
+
+        return {"has_pattern": False}
+
+    def _structured_contraction(self, pattern_info: dict) -> np.ndarray:
+        """Contract start, repeated, and end blocks in chronological order."""
+        start = self._build_matrix_from_terms(pattern_info["start_terms"])
+        repeated = self._build_matrix_from_terms(
+            pattern_info["repeating_terms"]
+        )
+        end = self._build_matrix_from_terms(pattern_info["end_terms"])
+        repeated_power = np.linalg.matrix_power(
+            repeated,
+            pattern_info["num_repeats"],
+        )
+        return end @ repeated_power @ start
+
+    def _build_matrix_from_terms(
+        self,
+        terms: List[Tuple[int, float]],
+    ) -> np.ndarray:
+        """Build a unitary for expanded ``(term_index, scale)`` entries."""
+        dimension = 2 ** self.num_qubits
+        unitary = np.eye(dimension, dtype=np.complex128)
+        timestep = self.time / self.num_steps
+
+        for term_index, scale in terms:
+            pauli_string, coefficient = self.pauli_terms[term_index]
+            term_unitary = CommutingPauliStringEvolution(
+                pauli_terms=((pauli_string, coefficient * scale),),
+                time=timestep,
+                hbar=self.hbar,
+            ).tensor_contract()
+            unitary = term_unitary @ unitary
+
+        return unitary
+
+    def _incremental_contraction(self) -> np.ndarray:
+        """Contract the flattened sequence from first-applied to last."""
+        return self._build_matrix_from_terms(self.expanded_sequence)
+
     @property
     def num_terms(self) -> int:
         """Number of Pauli string terms in the Hamiltonian."""
