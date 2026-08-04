@@ -4,7 +4,7 @@
 
 Reference measurements of Trotterization error for the QHAT molecular Hamiltonian library.
 
-Results currently cover hgbs-5 for the 9 diatomics; sto-6g and the single atoms will be added soon.
+Results cover all 9 molecules and 10 atoms in both basis sets (sto-6g and hgbs-5) and both fermion-to-qubit mappings (JW and BK).
 
 For each Hamiltonian, **state error** is the distance between Trotterized and exact evolution under that Hamiltonian, starting from the Hartree-Fock (HF) initial state:
 
