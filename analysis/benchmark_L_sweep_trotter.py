@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""
-Benchmark Trotter orderings for the valid L-sweep tensor Hamiltonians.
+"""Benchmark Pauli- and fermionic-factor L-sweep product formulas.
 
-The benchmark compares these orderings of the same final, combined
-Jordan-Wigner Hamiltonian:
+The benchmark compares four methods reconstructing the same identity-free
+Jordan--Wigner Hamiltonian:
 
     jw_raw
         Raw OpenFermion Jordan-Wigner insertion order.
@@ -13,7 +12,13 @@ Jordan-Wigner Hamiltonian:
 
     fermionic_coloring
         Greedy coloring of Hermitian fermionic terms, followed by an
-        induced ordering of the final combined JW Pauli strings.
+        induced ordering of final combined JW Pauli-string factors.  This is
+        the legacy fermionic-informed Pauli ordering.
+
+    fermionic_term_coloring
+        Greedy coloring of complete Hermitian fermionic terms.  Each ordered
+        term is JW-mapped and retained as one dense Hermitian matrix factor;
+        it is never flattened into separately exponentiated Pauli strings.
 
 The tensor input must be a QHAT ``*.tensors.npz`` file containing:
 
@@ -34,7 +39,7 @@ import csv
 import math
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
@@ -53,11 +58,32 @@ from openfermion.utils import commutator, hermitian_conjugated
 
 
 DEFAULT_TOLERANCE = 1.0e-12
+SCHEMA_VERSION = "2"
 SUPPORTED_ORDERINGS = (
     "jw_raw",
     "jw_coloring",
     "fermionic_coloring",
+    "fermionic_term_coloring",
 )
+
+METHOD_SEMANTICS = {
+    "jw_raw": ("pauli_string", "raw", "analytic_pauli"),
+    "jw_coloring": (
+        "pauli_string",
+        "greedy_coloring",
+        "analytic_pauli",
+    ),
+    "fermionic_coloring": (
+        "pauli_string",
+        "fermionic_induced_greedy_coloring",
+        "analytic_pauli",
+    ),
+    "fermionic_term_coloring": (
+        "fermionic_term",
+        "greedy_coloring",
+        "dense_hermitian_expm",
+    ),
+}
 
 CASE_PATTERN = re.compile(
     r"^(?P<prefix>.+)_as-(?P<active_occupied>\d{3})-"
@@ -86,15 +112,50 @@ class HermitianFermionTerm:
 
 
 @dataclass
+class HamiltonianFactor:
+    """One unflattened Hamiltonian factor in chronological schedule order."""
+
+    matrix: np.ndarray
+    exponential_type: str
+    coefficient: float = 1.0
+    pauli_key: tuple[tuple[int, str], ...] | None = None
+    fermionic_term_index: int | None = None
+
+    @property
+    def hamiltonian_matrix(self) -> np.ndarray:
+        if self.exponential_type == "analytic_pauli":
+            return self.coefficient * self.matrix
+        return self.matrix
+
+
+@dataclass
 class OrderingResult:
+    """Explicit factorization and ordering schedule for one method."""
+
     name: str
-    pauli_keys: list[tuple[tuple[int, str], ...]]
+    factorization_level: str
+    ordering_method: str
+    mapping: str = "jordan_wigner"
+    factor_exponential_type: str = "analytic_pauli"
+    pauli_keys: list[tuple[tuple[int, str], ...]] = field(
+        default_factory=list
+    )
+    fermionic_terms: list[HermitianFermionTerm] = field(
+        default_factory=list
+    )
+    ordered_factors: list[HamiltonianFactor] = field(default_factory=list)
+    factor_reconstruction_error: float | None = None
+    graph_level: str | None = None
     graph_vertices: int | None = None
     graph_edges: int | None = None
     number_of_colors: int | None = None
     graph_time_seconds: float | None = None
     coloring_time_seconds: float | None = None
     build_time_seconds: float | None = None
+
+    @property
+    def number_of_factors(self) -> int:
+        return len(self.ordered_factors)
 
 
 # -----------------------------------------------------------------------------
@@ -322,12 +383,35 @@ def build_hermitian_fermion_terms(
             f"fermionic Hamiltonian:\n{reconstruction_error}"
         )
 
-    # The identity contributes only a global phase and has no graph edges.
-    return [
+    # The fermionic identity contributes only a global phase and has no graph
+    # edges.  Validate the returned non-identity list independently so a future
+    # identity-handling change cannot silently lose a physical term.
+    non_identity_terms = [
         term
         for term in hermitian_terms
         if term.component_keys != ((),)
     ]
+    non_identity_hamiltonian = FermionOperator()
+    for term_key, coefficient in fermion_hamiltonian.terms.items():
+        if term_key:
+            non_identity_hamiltonian += FermionOperator(
+                term_key,
+                coefficient,
+            )
+    non_identity_reconstruction = FermionOperator()
+    for term in non_identity_terms:
+        non_identity_reconstruction += term.operator
+    non_identity_error = clean_fermion_operator(
+        non_identity_hamiltonian - non_identity_reconstruction,
+        tolerance,
+    )
+    if non_identity_error.terms:
+        raise ValueError(
+            "Hermitian terms did not reconstruct the non-identity "
+            f"fermionic Hamiltonian:\n{non_identity_error}"
+        )
+
+    return non_identity_terms
 
 
 def fermionic_terms_noncommute(
@@ -450,6 +534,7 @@ def build_orderings(
     full_jw_hamiltonian: Any,
     requested_orderings: Sequence[str],
     tolerance: float,
+    n_qubits: int,
 ) -> tuple[
     dict[str, OrderingResult],
     list[HermitianFermionTerm],
@@ -462,10 +547,51 @@ def build_orderings(
     }
     raw_pauli_keys = list(final_coefficients)
 
+    matrix_cache = {
+        key: pauli_matrix_from_key(key, n_qubits)
+        for key in raw_pauli_keys
+    }
+    exact_hamiltonian = np.zeros((2**n_qubits, 2**n_qubits), dtype=complex)
+    for pauli_key, coefficient in final_coefficients.items():
+        exact_hamiltonian += real_coefficient(
+            coefficient,
+            tolerance,
+        ) * matrix_cache[pauli_key]
+
+    def pauli_factors(
+        keys: Sequence[tuple[tuple[int, str], ...]],
+    ) -> list[HamiltonianFactor]:
+        return [
+            HamiltonianFactor(
+                matrix=matrix_cache[key],
+                coefficient=real_coefficient(
+                    final_coefficients[key],
+                    tolerance,
+                ),
+                exponential_type="analytic_pauli",
+                pauli_key=key,
+            )
+            for key in keys
+        ]
+
+    def reconstruction_error(
+        factors: Sequence[HamiltonianFactor],
+    ) -> float:
+        reconstructed = np.zeros_like(exact_hamiltonian)
+        for factor in factors:
+            reconstructed += factor.hamiltonian_matrix
+        return float(np.linalg.norm(reconstructed - exact_hamiltonian, ord=2))
+
     results: dict[str, OrderingResult] = {}
+    raw_factors = pauli_factors(raw_pauli_keys)
     results["jw_raw"] = OrderingResult(
         name="jw_raw",
+        factorization_level="pauli_string",
+        ordering_method="raw",
+        factor_exponential_type="analytic_pauli",
         pauli_keys=list(raw_pauli_keys),
+        ordered_factors=raw_factors,
+        factor_reconstruction_error=reconstruction_error(raw_factors),
         build_time_seconds=0.0,
     )
 
@@ -480,9 +606,16 @@ def build_orderings(
             deterministic_coloring_order(jw_graph)
         )
         pauli_order = [raw_pauli_keys[node] for node in node_order]
+        factors = pauli_factors(pauli_order)
         results["jw_coloring"] = OrderingResult(
             name="jw_coloring",
+            factorization_level="pauli_string",
+            ordering_method="greedy_coloring",
+            factor_exponential_type="analytic_pauli",
             pauli_keys=pauli_order,
+            ordered_factors=factors,
+            factor_reconstruction_error=reconstruction_error(factors),
+            graph_level="pauli_string",
             graph_vertices=jw_graph.number_of_nodes(),
             graph_edges=jw_graph.number_of_edges(),
             number_of_colors=number_of_colors,
@@ -491,7 +624,11 @@ def build_orderings(
             build_time_seconds=time.perf_counter() - build_start,
         )
 
-    if "fermionic_coloring" in requested_orderings:
+    fermionic_methods = {
+        "fermionic_coloring",
+        "fermionic_term_coloring",
+    }.intersection(requested_orderings)
+    if fermionic_methods:
         build_start = time.perf_counter()
         hermitian_terms = build_hermitian_fermion_terms(
             fermion_hamiltonian,
@@ -510,50 +647,129 @@ def build_orderings(
         ordered_fermionic_terms = [
             hermitian_terms[node] for node in node_order
         ]
+        shared_build_time = time.perf_counter() - build_start
 
-        induced_pauli_order: list[tuple[tuple[int, str], ...]] = []
-        seen: set[tuple[tuple[int, str], ...]] = set()
+        if "fermionic_coloring" in requested_orderings:
+            legacy_start = time.perf_counter()
+            induced_pauli_order: list[tuple[tuple[int, str], ...]] = []
+            seen: set[tuple[tuple[int, str], ...]] = set()
 
-        for fermionic_term in ordered_fermionic_terms:
-            mapped_term = jordan_wigner(fermionic_term.operator)
-            mapped_term.compress(abs_tol=tolerance)
+            for fermionic_term in ordered_fermionic_terms:
+                mapped_term = jordan_wigner(fermionic_term.operator)
+                mapped_term.compress(abs_tol=tolerance)
 
-            for pauli_key, coefficient in mapped_term.terms.items():
-                if pauli_key == () or abs(coefficient) <= tolerance:
-                    continue
-                if pauli_key not in final_coefficients:
-                    # This Pauli key cancels in the fully combined Hamiltonian.
-                    continue
+                for pauli_key, coefficient in mapped_term.terms.items():
+                    if pauli_key == () or abs(coefficient) <= tolerance:
+                        continue
+                    if pauli_key not in final_coefficients:
+                        # This key cancels in the fully combined Hamiltonian.
+                        continue
+                    if pauli_key not in seen:
+                        seen.add(pauli_key)
+                        induced_pauli_order.append(pauli_key)
+
+            # Normally this adds nothing, but it guarantees a full
+            # permutation if tolerance removed a mapped component.
+            for pauli_key in raw_pauli_keys:
                 if pauli_key not in seen:
                     seen.add(pauli_key)
                     induced_pauli_order.append(pauli_key)
 
-        # This should normally add nothing, but it makes the behavior explicit
-        # and guarantees a full permutation if a term was removed by tolerance.
-        for pauli_key in raw_pauli_keys:
-            if pauli_key not in seen:
-                seen.add(pauli_key)
-                induced_pauli_order.append(pauli_key)
+            factors = pauli_factors(induced_pauli_order)
+            results["fermionic_coloring"] = OrderingResult(
+                name="fermionic_coloring",
+                factorization_level="pauli_string",
+                ordering_method="fermionic_induced_greedy_coloring",
+                factor_exponential_type="analytic_pauli",
+                pauli_keys=induced_pauli_order,
+                fermionic_terms=ordered_fermionic_terms,
+                ordered_factors=factors,
+                factor_reconstruction_error=reconstruction_error(factors),
+                graph_level="fermionic_term",
+                graph_vertices=fermionic_graph.number_of_nodes(),
+                graph_edges=fermionic_graph.number_of_edges(),
+                number_of_colors=number_of_colors,
+                graph_time_seconds=graph_time,
+                coloring_time_seconds=coloring_time,
+                build_time_seconds=(
+                    shared_build_time
+                    + time.perf_counter() - legacy_start
+                ),
+            )
 
-        results["fermionic_coloring"] = OrderingResult(
-            name="fermionic_coloring",
-            pauli_keys=induced_pauli_order,
-            graph_vertices=fermionic_graph.number_of_nodes(),
-            graph_edges=fermionic_graph.number_of_edges(),
-            number_of_colors=number_of_colors,
-            graph_time_seconds=graph_time,
-            coloring_time_seconds=coloring_time,
-            build_time_seconds=time.perf_counter() - build_start,
-        )
+        if "fermionic_term_coloring" in requested_orderings:
+            dense_start = time.perf_counter()
+            dense_factors: list[HamiltonianFactor] = []
+            for term in ordered_fermionic_terms:
+                mapped_term = jordan_wigner(term.operator)
+                mapped_term.compress(abs_tol=tolerance)
+                factor_matrix = qubit_operator_matrix(
+                    mapped_term,
+                    n_qubits,
+                    tolerance,
+                    include_identity=False,
+                )
+                hermiticity_error = float(
+                    np.linalg.norm(
+                        factor_matrix - factor_matrix.conjugate().T,
+                        ord=2,
+                    )
+                )
+                if hermiticity_error > 100.0 * tolerance:
+                    raise ValueError(
+                        "JW-mapped complete fermionic factor is not "
+                        f"Hermitian; term={term.index}, "
+                        f"error={hermiticity_error}."
+                    )
+                dense_factors.append(
+                    HamiltonianFactor(
+                        matrix=factor_matrix,
+                        exponential_type="dense_hermitian_expm",
+                        fermionic_term_index=term.index,
+                    )
+                )
+
+            factor_error = reconstruction_error(dense_factors)
+            if factor_error > 100.0 * tolerance:
+                raise ValueError(
+                    "JW matrices of complete fermionic factors did not "
+                    "reconstruct the identity-free JW Hamiltonian; "
+                    f"error={factor_error}."
+                )
+            results["fermionic_term_coloring"] = OrderingResult(
+                name="fermionic_term_coloring",
+                factorization_level="fermionic_term",
+                ordering_method="greedy_coloring",
+                factor_exponential_type="dense_hermitian_expm",
+                fermionic_terms=ordered_fermionic_terms,
+                ordered_factors=dense_factors,
+                factor_reconstruction_error=factor_error,
+                graph_level="fermionic_term",
+                graph_vertices=fermionic_graph.number_of_nodes(),
+                graph_edges=fermionic_graph.number_of_edges(),
+                number_of_colors=number_of_colors,
+                graph_time_seconds=graph_time,
+                coloring_time_seconds=coloring_time,
+                build_time_seconds=(
+                    shared_build_time
+                    + time.perf_counter() - dense_start
+                ),
+            )
 
     for ordering_name in requested_orderings:
         if ordering_name not in results:
             raise ValueError(f"Failed to build ordering {ordering_name!r}.")
-        validate_pauli_order(
-            ordering_name,
-            results[ordering_name].pauli_keys,
-            raw_pauli_keys,
-        )
+        result = results[ordering_name]
+        if result.factorization_level == "pauli_string":
+            validate_pauli_order(
+                ordering_name,
+                result.pauli_keys,
+                raw_pauli_keys,
+            )
+        elif result.number_of_factors != len(hermitian_terms):
+            raise ValueError(
+                f"Ordering {ordering_name!r} lost complete fermionic terms."
+            )
 
     return results, hermitian_terms, final_coefficients
 
@@ -588,6 +804,32 @@ def pauli_matrix_from_key(
     return result
 
 
+def qubit_operator_matrix(
+    qubit_operator: Any,
+    n_qubits: int,
+    tolerance: float,
+    *,
+    include_identity: bool,
+) -> np.ndarray:
+    """Convert a complete mapped operator to one dense matrix factor.
+
+    Identity Pauli components are omitted for the benchmark's global-phase
+    convention.  All remaining Pauli components stay summed inside this one
+    matrix; they are not separate product-formula factors.
+    """
+    dimension = 2**n_qubits
+    matrix = np.zeros((dimension, dimension), dtype=complex)
+    for pauli_key, coefficient in qubit_operator.terms.items():
+        if abs(coefficient) <= tolerance:
+            continue
+        if pauli_key == ():
+            if include_identity:
+                matrix += coefficient * np.eye(dimension, dtype=complex)
+            continue
+        matrix += coefficient * pauli_matrix_from_key(pauli_key, n_qubits)
+    return matrix
+
+
 def real_coefficient(
     coefficient: complex,
     tolerance: float,
@@ -614,17 +856,46 @@ def pauli_exponential(
     )
 
 
+def factor_exponential(
+    factor: HamiltonianFactor | tuple[float, np.ndarray],
+    duration: float,
+    identity: np.ndarray,
+) -> np.ndarray:
+    """Exponentiate either an analytic Pauli or general Hermitian factor."""
+    if not isinstance(factor, HamiltonianFactor):
+        coefficient, pauli_matrix = factor
+        return pauli_exponential(
+            coefficient,
+            pauli_matrix,
+            duration,
+            identity,
+        )
+    if factor.exponential_type == "analytic_pauli":
+        return pauli_exponential(
+            factor.coefficient,
+            factor.matrix,
+            duration,
+            identity,
+        )
+    if factor.exponential_type == "dense_hermitian_expm":
+        return expm(-1j * duration * factor.matrix)
+    raise ValueError(
+        f"Unsupported factor exponential type {factor.exponential_type!r}."
+    )
+
+
 def first_order_slice(
-    ordered_terms: Sequence[tuple[float, np.ndarray]],
+    ordered_terms: Sequence[
+        HamiltonianFactor | tuple[float, np.ndarray]
+    ],
     dt: float,
     identity: np.ndarray,
 ) -> np.ndarray:
     unitary = identity.copy()
-    for coefficient, pauli_matrix in ordered_terms:
+    for factor in ordered_terms:
         # The list order is the chronological application order.
-        unitary = pauli_exponential(
-            coefficient,
-            pauli_matrix,
+        unitary = factor_exponential(
+            factor,
             dt,
             identity,
         ) @ unitary
@@ -632,7 +903,9 @@ def first_order_slice(
 
 
 def second_order_slice(
-    ordered_terms: Sequence[tuple[float, np.ndarray]],
+    ordered_terms: Sequence[
+        HamiltonianFactor | tuple[float, np.ndarray]
+    ],
     dt: float,
     identity: np.ndarray,
 ) -> np.ndarray:
@@ -642,26 +915,22 @@ def second_order_slice(
 
     unitary = identity.copy()
 
-    for coefficient, pauli_matrix in ordered_terms[:-1]:
-        unitary = pauli_exponential(
-            coefficient,
-            pauli_matrix,
+    for factor in ordered_terms[:-1]:
+        unitary = factor_exponential(
+            factor,
             dt / 2.0,
             identity,
         ) @ unitary
 
-    center_coefficient, center_matrix = ordered_terms[-1]
-    unitary = pauli_exponential(
-        center_coefficient,
-        center_matrix,
+    unitary = factor_exponential(
+        ordered_terms[-1],
         dt,
         identity,
     ) @ unitary
 
-    for coefficient, pauli_matrix in reversed(ordered_terms[:-1]):
-        unitary = pauli_exponential(
-            coefficient,
-            pauli_matrix,
+    for factor in reversed(ordered_terms[:-1]):
+        unitary = factor_exponential(
+            factor,
             dt / 2.0,
             identity,
         ) @ unitary
@@ -670,7 +939,9 @@ def second_order_slice(
 
 
 def fourth_order_slice(
-    ordered_terms: Sequence[tuple[float, np.ndarray]],
+    ordered_terms: Sequence[
+        HamiltonianFactor | tuple[float, np.ndarray]
+    ],
     dt: float,
     identity: np.ndarray,
 ) -> np.ndarray:
@@ -705,6 +976,25 @@ def fourth_order_slice(
         unitary = stage @ unitary
 
     return unitary
+
+
+def nominal_exponential_count(
+    number_of_factors: int,
+    formula_order: int,
+    trotter_steps: int,
+) -> int:
+    """Return unfused factor exponential count for the selected schedule."""
+    if number_of_factors == 0:
+        return 0
+    if formula_order == 1:
+        per_step = number_of_factors
+    elif formula_order == 2:
+        per_step = 2 * number_of_factors - 1
+    elif formula_order == 4:
+        per_step = 5 * (2 * number_of_factors - 1)
+    else:
+        raise ValueError(f"Unsupported formula order {formula_order}.")
+    return trotter_steps * per_step
 
 
 def build_hartree_fock_state(
@@ -743,7 +1033,7 @@ def state_infidelity(
 # -----------------------------------------------------------------------------
 
 
-FIELDNAMES = [
+LEGACY_FIELDNAMES = [
     "status",
     "error_message",
     "case_id",
@@ -780,18 +1070,37 @@ FIELDNAMES = [
     "coefficient_tolerance",
 ]
 
+FIELDNAMES = LEGACY_FIELDNAMES + [
+    "factorization_level",
+    "ordering_method",
+    "mapping",
+    "number_of_factors",
+    "factor_exponential_type",
+    "factor_reconstruction_error",
+    "graph_level",
+    "schema_version",
+    "operator_error_ratio_to_jw_coloring",
+    "state_infidelity_ratio_to_jw_coloring",
+    "operator_error_ratio_to_fermionic_coloring",
+    "state_infidelity_ratio_to_fermionic_coloring",
+]
+
+ResumeKey = tuple[str, str, int, int, float]
+ErrorCache = dict[ResumeKey, tuple[float, float]]
+
 
 def load_resume_data(
     output_path: Path,
 ) -> tuple[
-    set[tuple[str, str, int, int, float]],
-    dict[tuple[str, int, int, float], tuple[float, float]],
+    set[ResumeKey],
+    ErrorCache,
 ]:
-    completed: set[tuple[str, str, int, int, float]] = set()
-    raw_errors: dict[tuple[str, int, int, float], tuple[float, float]] = {}
+    """Read completion/error caches from either legacy or schema-v2 CSV."""
+    completed: set[ResumeKey] = set()
+    errors: ErrorCache = {}
 
     if not output_path.exists():
-        return completed, raw_errors
+        return completed, errors
 
     with output_path.open("r", newline="", encoding="utf-8") as input_file:
         reader = csv.DictReader(input_file)
@@ -811,21 +1120,96 @@ def load_resume_data(
 
             completed.add(key)
 
-            if row["ordering"] == "jw_raw":
-                operator_text = row.get("operator_norm_error", "").strip()
-                operator_error = (
-                    float(operator_text)
-                    if operator_text
-                    else math.nan
+            operator_text = row.get("operator_norm_error", "").strip()
+            state_text = row.get("state_infidelity", "").strip()
+            try:
+                errors[key] = (
+                    float(operator_text) if operator_text else math.nan,
+                    float(state_text) if state_text else math.nan,
                 )
-                raw_errors[
-                    (key[0], key[2], key[3], key[4])
-                ] = (
-                    operator_error,
-                    float(row["state_infidelity"]),
-                )
+            except ValueError:
+                continue
 
-    return completed, raw_errors
+    return completed, errors
+
+
+def legacy_semantic_values(row: dict[str, Any]) -> dict[str, Any]:
+    """Infer unambiguous semantic fields without changing old meanings."""
+    ordering = str(row.get("ordering", ""))
+    semantics = METHOD_SEMANTICS.get(ordering)
+    if semantics is None:
+        return {"schema_version": "1"}
+    factorization_level, ordering_method, exponential_type = semantics
+    return {
+        "factorization_level": factorization_level,
+        "ordering_method": ordering_method,
+        "mapping": "jordan_wigner",
+        "number_of_factors": row.get("number_of_pauli_terms", ""),
+        "factor_exponential_type": exponential_type,
+        "factor_reconstruction_error": "",
+        "graph_level": (
+            "pauli_string"
+            if ordering == "jw_coloring"
+            else "fermionic_term"
+            if ordering == "fermionic_coloring"
+            else ""
+        ),
+        "schema_version": "1",
+    }
+
+
+def migrate_legacy_csv(output_path: Path) -> None:
+    """Rewrite the known legacy header to v2 while preserving every row."""
+    temporary_path = output_path.with_suffix(
+        output_path.suffix + ".schema2.tmp"
+    )
+    if temporary_path.exists():
+        raise FileExistsError(
+            f"Refusing to overwrite migration temporary file {temporary_path}."
+        )
+
+    with output_path.open("r", newline="", encoding="utf-8") as source:
+        reader = csv.DictReader(source)
+        rows = list(reader)
+
+    with temporary_path.open(
+        "x",
+        newline="",
+        encoding="utf-8",
+    ) as destination:
+        writer = csv.DictWriter(destination, fieldnames=FIELDNAMES)
+        writer.writeheader()
+        for old_row in rows:
+            new_row = blank_row()
+            new_row.update(old_row)
+            new_row.update(legacy_semantic_values(old_row))
+            writer.writerow(new_row)
+
+    temporary_path.replace(output_path)
+
+
+def prepare_resume_output(output_path: Path) -> tuple[str, bool]:
+    """Validate/migrate a resume target and return file mode/header flag."""
+    if not output_path.exists() or output_path.stat().st_size == 0:
+        return "w", True
+
+    with output_path.open("r", newline="", encoding="utf-8") as stream:
+        header = next(csv.reader(stream), [])
+
+    if header == FIELDNAMES:
+        return "a", False
+    if header == LEGACY_FIELDNAMES:
+        migrate_legacy_csv(output_path)
+        return "a", False
+    if set(header) == set(FIELDNAMES):
+        raise ValueError(
+            "Resume CSV contains the schema-v2 columns in a reordered "
+            "header; refusing to append."
+        )
+    raise ValueError(
+        "Resume CSV header is incompatible with the known legacy and "
+        "schema-v2 headers; refusing to append."
+    )
 
 
 def blank_row() -> dict[str, Any]:
@@ -863,11 +1247,8 @@ def benchmark_case(
     evolution_time: float,
     tolerance: float,
     compute_operator_norm: bool,
-    completed: set[tuple[str, str, int, int, float]],
-    raw_error_cache: dict[
-        tuple[str, int, int, float],
-        tuple[float, float],
-    ],
+    completed: set[ResumeKey],
+    error_cache: ErrorCache,
     writer: csv.DictWriter,
     output_file: Any,
 ) -> None:
@@ -891,6 +1272,7 @@ def benchmark_case(
         full_jw_hamiltonian=full_jw_hamiltonian,
         requested_orderings=requested_orderings,
         tolerance=tolerance,
+        n_qubits=n_qubits,
     )
 
     raw_pauli_keys = orderings["jw_raw"].pauli_keys
@@ -931,9 +1313,11 @@ def benchmark_case(
     )
     exact_state = exact_unitary @ initial_state
 
-    # Always process jw_raw first so ratios are available immediately.
-    processing_order = ["jw_raw"] + [
-        name for name in requested_orderings if name != "jw_raw"
+    # Canonical processing order guarantees every selected baseline is cached
+    # before the new fermionic-term method's comparison columns are emitted.
+    processing_order = [
+        name for name in SUPPORTED_ORDERINGS
+        if name in requested_orderings
     ]
 
     number_of_fermionic_terms = (
@@ -967,16 +1351,7 @@ def benchmark_case(
                     continue
 
                 ordering = orderings[ordering_name]
-                ordered_terms = [
-                    (
-                        real_coefficient(
-                            final_coefficients[pauli_key],
-                            tolerance,
-                        ),
-                        matrix_cache[pauli_key],
-                    )
-                    for pauli_key in ordering.pauli_keys
-                ]
+                ordered_terms = ordering.ordered_factors
 
                 trotter_start = time.perf_counter()
 
@@ -986,17 +1361,11 @@ def benchmark_case(
                         dt,
                         identity,
                     )
-                    nominal_exponential_count = (
-                        trotter_steps * number_of_pauli_terms
-                    )
                 elif formula_order == 2:
                     one_slice = second_order_slice(
                         ordered_terms,
                         dt,
                         identity,
-                    )
-                    nominal_exponential_count = trotter_steps * (
-                        2 * number_of_pauli_terms - 1
                     )
                 elif formula_order == 4:
                     one_slice = fourth_order_slice(
@@ -1004,13 +1373,15 @@ def benchmark_case(
                         dt,
                         identity,
                     )
-                    nominal_exponential_count = trotter_steps * (
-                        5 * (2 * number_of_pauli_terms - 1)
-                    )
                 else:
                     raise ValueError(
                         f"Unsupported formula order {formula_order}."
                     )
+                exponential_count = nominal_exponential_count(
+                    ordering.number_of_factors,
+                    formula_order,
+                    trotter_steps,
+                )
 
                 trotter_unitary = np.linalg.matrix_power(
                     one_slice,
@@ -1037,45 +1408,54 @@ def benchmark_case(
                 else:
                     operator_error = ""
 
-                raw_key = (
-                    metadata.case_id,
-                    formula_order,
-                    trotter_steps,
-                    evolution_time,
+                current_errors = (
+                    float(operator_error)
+                    if operator_error != ""
+                    else math.nan,
+                    infidelity,
                 )
+                error_cache[result_key] = current_errors
 
-                if ordering_name == "jw_raw":
-                    raw_operator_error = (
-                        float(operator_error)
-                        if operator_error != ""
-                        else math.nan
+                def ratios_to(
+                    baseline_ordering: str,
+                ) -> tuple[float | str, float | str]:
+                    if baseline_ordering == ordering_name:
+                        return 1.0, 1.0
+                    baseline_key: ResumeKey = (
+                        metadata.case_id,
+                        baseline_ordering,
+                        formula_order,
+                        trotter_steps,
+                        evolution_time,
                     )
-                    raw_error_cache[raw_key] = (
-                        raw_operator_error,
-                        infidelity,
-                    )
-                    operator_ratio: float | str = 1.0
-                    infidelity_ratio: float | str = 1.0
-                else:
-                    raw_operator_error, raw_infidelity = raw_error_cache[
-                        raw_key
-                    ]
-
+                    baseline = error_cache.get(baseline_key)
+                    if baseline is None:
+                        return "", ""
+                    baseline_operator, baseline_infidelity = baseline
                     if (
                         operator_error == ""
-                        or not math.isfinite(raw_operator_error)
-                        or raw_operator_error <= tolerance
+                        or not math.isfinite(baseline_operator)
+                        or baseline_operator <= tolerance
                     ):
-                        operator_ratio = ""
+                        operator_ratio: float | str = ""
                     else:
                         operator_ratio = (
-                            float(operator_error) / raw_operator_error
+                            float(operator_error) / baseline_operator
                         )
-
-                    if raw_infidelity <= tolerance:
-                        infidelity_ratio = ""
+                    if (
+                        not math.isfinite(baseline_infidelity)
+                        or baseline_infidelity <= tolerance
+                    ):
+                        infidelity_ratio: float | str = ""
                     else:
-                        infidelity_ratio = infidelity / raw_infidelity
+                        infidelity_ratio = infidelity / baseline_infidelity
+                    return operator_ratio, infidelity_ratio
+
+                operator_ratio, infidelity_ratio = ratios_to("jw_raw")
+                jw_coloring_ratios = ratios_to("jw_coloring")
+                fermionic_coloring_ratios = ratios_to(
+                    "fermionic_coloring"
+                )
 
                 row = blank_row()
                 add_case_metadata(row, metadata)
@@ -1098,7 +1478,7 @@ def benchmark_case(
                         "trotter_dt": dt,
                         "evolution_time": evolution_time,
                         "nominal_exponential_count": (
-                            nominal_exponential_count
+                            exponential_count
                         ),
                         "ordering_build_time_seconds": (
                             ordering.build_time_seconds
@@ -1128,6 +1508,32 @@ def benchmark_case(
                             infidelity_ratio
                         ),
                         "coefficient_tolerance": tolerance,
+                        "factorization_level": (
+                            ordering.factorization_level
+                        ),
+                        "ordering_method": ordering.ordering_method,
+                        "mapping": ordering.mapping,
+                        "number_of_factors": ordering.number_of_factors,
+                        "factor_exponential_type": (
+                            ordering.factor_exponential_type
+                        ),
+                        "factor_reconstruction_error": (
+                            ordering.factor_reconstruction_error
+                        ),
+                        "graph_level": ordering.graph_level,
+                        "schema_version": SCHEMA_VERSION,
+                        "operator_error_ratio_to_jw_coloring": (
+                            jw_coloring_ratios[0]
+                        ),
+                        "state_infidelity_ratio_to_jw_coloring": (
+                            jw_coloring_ratios[1]
+                        ),
+                        "operator_error_ratio_to_fermionic_coloring": (
+                            fermionic_coloring_ratios[0]
+                        ),
+                        "state_infidelity_ratio_to_fermionic_coloring": (
+                            fermionic_coloring_ratios[1]
+                        ),
                     }
                 )
 
@@ -1152,10 +1558,19 @@ def benchmark_case(
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
         description=(
-            "Compare raw JW, JW coloring, and fermionic-color-induced "
-            "JW Trotter orderings for QHAT L-sweep tensor files."
-        )
+            "Compare Pauli-string and complete-fermionic-term product "
+            "formulas for QHAT L-sweep tensors."
+        ),
+        epilog="""Method semantics:
+  jw_raw                    final combined JW Pauli factors, insertion order
+  jw_coloring               final combined JW Pauli factors, Pauli-graph coloring
+  fermionic_coloring        legacy fermionic-induced JW ordering; factors are
+                            still individual final JW Pauli strings
+  fermionic_term_coloring   fermionic-graph coloring; each complete Hermitian
+                            fermionic term maps to one dense JW matrix factor
+""",
     )
 
     parser.add_argument(
@@ -1184,7 +1599,12 @@ def parse_arguments() -> argparse.Namespace:
         nargs="+",
         choices=SUPPORTED_ORDERINGS,
         default=list(SUPPORTED_ORDERINGS),
-        help="Ordering methods to benchmark.",
+        help=(
+            "Methods to benchmark. The legacy fermionic_coloring method "
+            "orders Pauli factors; fermionic_term_coloring exponentiates "
+            "complete mapped fermionic terms. jw_raw is added when omitted "
+            "because legacy baseline-ratio columns require it."
+        ),
     )
     parser.add_argument(
         "--time",
@@ -1247,13 +1667,22 @@ def validate_arguments(args: argparse.Namespace) -> None:
         raise ValueError("--tolerance must be positive.")
 
 
+def normalize_requested_orderings(
+    orderings: Sequence[str],
+) -> list[str]:
+    """Deduplicate methods and retain the legacy raw-JW ratio baseline."""
+    requested = list(dict.fromkeys(orderings))
+    if "jw_raw" not in requested:
+        requested.insert(0, "jw_raw")
+    return requested
+
+
 def main() -> None:
     args = parse_arguments()
     validate_arguments(args)
 
-    requested_orderings = list(dict.fromkeys(args.orderings))
-    if "jw_raw" not in requested_orderings:
-        requested_orderings.insert(0, "jw_raw")
+    requested_orderings = normalize_requested_orderings(args.orderings)
+    if "jw_raw" not in args.orderings:
         print(
             "Added jw_raw automatically because it is required for "
             "baseline error ratios."
@@ -1280,13 +1709,12 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
     if args.resume:
-        completed, raw_error_cache = load_resume_data(args.output)
-        file_mode = "a"
-        write_header = not args.output.exists() or args.output.stat().st_size == 0
+        completed, error_cache = load_resume_data(args.output)
+        file_mode, write_header = prepare_resume_output(args.output)
         print(f"Resume rows already completed: {len(completed)}")
     else:
         completed = set()
-        raw_error_cache = {}
+        error_cache = {}
         file_mode = "w"
         write_header = True
 
@@ -1318,7 +1746,7 @@ def main() -> None:
                     tolerance=args.tolerance,
                     compute_operator_norm=not args.skip_operator_norm,
                     completed=completed,
-                    raw_error_cache=raw_error_cache,
+                    error_cache=error_cache,
                     writer=writer,
                     output_file=output_file,
                 )
@@ -1341,6 +1769,7 @@ def main() -> None:
                         ),
                         "tensor_path": str(tensor_path),
                         "coefficient_tolerance": args.tolerance,
+                        "schema_version": SCHEMA_VERSION,
                     }
                 )
                 writer.writerow(failure_row)
