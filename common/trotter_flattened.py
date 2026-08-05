@@ -6,6 +6,7 @@ ramps into a single flat sequence of Pauli string evolutions. Adjacent terms wit
 same Pauli string are combined for efficiency.
 """
 
+import logging
 from functools import cached_property
 from math import cbrt
 from typing import List, Sequence, Tuple, Union
@@ -18,6 +19,9 @@ from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexit
 
 from qhat.common.commuting_pauli_string_evolution import CommutingPauliStringEvolution
 from qhat.common.pauli_utils import validate_pauli_string
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 
 def get_trotterization_coefficients(method):
@@ -533,18 +537,36 @@ class Trotterization(Bloq):
             >>> U.shape
             (2, 2)
         """
+        logger.verbose(f"Computing unitary matrix via tensor contraction...")
+        logger.debug(f"-- num_qubits = {self.num_qubits}")
+        logger.debug(f"-- num_steps = {self.num_steps}")
+        logger.debug(f"-- num_terms = {len(self.pauli_terms)}")
+        logger.debug(f"-- expanded_sequence length = {len(self.expanded_sequence)}")
+
         # For small num_steps, incremental is faster (less overhead)
         if self.num_steps < 10:
+            logger.verbose(f"Using O(n) incremental contraction (num_steps < 10)")
             return self._incremental_contraction()
 
         # Try to detect repeating pattern
+        logger.debug(f"Attempting to detect repeating pattern...")
         pattern_info = self._detect_repeating_pattern()
 
         # If pattern detected, use O(log n) structured approach
         if pattern_info['has_pattern'] and pattern_info['num_repeats'] >= 2:
+            logger.verbose(f"Pattern detected! Using O(log n) structured contraction")
+            logger.debug(f"-- pattern_length = {pattern_info['pattern_length']}")
+            logger.debug(f"-- num_repeats = {pattern_info['num_repeats']}")
+            logger.debug(f"-- start_block length = {len(pattern_info['start_terms'])}")
+            logger.debug(f"-- repeating_block length = {len(pattern_info['repeating_terms'])}")
+            logger.debug(f"-- end_block length = {len(pattern_info['end_terms'])}")
             return self._structured_contraction(pattern_info)
         else:
             # Fall back to O(n) incremental approach
+            if pattern_info.get('has_pattern', False):
+                logger.verbose(f"Pattern detected but num_repeats < 2, using O(n) incremental contraction")
+            else:
+                logger.verbose(f"No repeating pattern detected, using O(n) incremental contraction")
             return self._incremental_contraction()
 
     def _detect_repeating_pattern(self) -> dict:
@@ -641,13 +663,20 @@ class Trotterization(Bloq):
         Returns:
             Full unitary matrix
         """
+        logger.debug(f"Building component matrices...")
         # Build component matrices
         U_start = self._build_matrix_from_terms(pattern_info['start_terms'])
+        logger.debug(f"  Built start block matrix")
+
         U_repeat = self._build_matrix_from_terms(pattern_info['repeating_terms'])
+        logger.debug(f"  Built repeating block matrix")
+
         U_end = self._build_matrix_from_terms(pattern_info['end_terms'])
+        logger.debug(f"  Built end block matrix")
 
         # Use matrix power for the repeating part (O(log n))
         num_repeats = pattern_info['num_repeats']
+        logger.verbose(f"Computing matrix power: U_repeat^{num_repeats} [O(log n) operation]")
         if num_repeats > 1:
             U_repeat_total = np.linalg.matrix_power(U_repeat, num_repeats)
         else:
@@ -655,6 +684,7 @@ class Trotterization(Bloq):
 
         # Combine: U_total = U_end @ U_repeat^n @ U_start
         # Right-to-left order maintains proper time ordering
+        logger.debug(f"Combining blocks: U_total = U_end @ U_repeat^{num_repeats} @ U_start")
         U_total = U_end @ U_repeat_total @ U_start
 
         return U_total
@@ -669,6 +699,12 @@ class Trotterization(Bloq):
         Returns:
             Unitary matrix for this sequence of terms
         """
+        if len(terms) == 0:
+            logger.debug(f"    Building identity matrix (empty term list)")
+            dim = 2 ** self.num_qubits
+            return np.eye(dim, dtype=np.complex128)
+
+        logger.debug(f"    Building matrix from {len(terms)} terms")
         dim = 2 ** self.num_qubits
         U = np.eye(dim, dtype=np.complex128)
 
@@ -698,6 +734,7 @@ class Trotterization(Bloq):
         Returns:
             Full unitary matrix
         """
+        logger.debug(f"Performing incremental contraction over {len(self.expanded_sequence)} operations")
         dim = 2 ** self.num_qubits
         U_total = np.eye(dim, dtype=np.complex128)
 
