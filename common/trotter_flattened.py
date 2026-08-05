@@ -594,22 +594,20 @@ class Trotterization(Bloq):
         if self.num_steps < 2:
             return {'has_pattern': False}
 
-        # For symmetric methods, the repeating pattern length is typically
-        # related to the number of terms and ramping coefficients
-        n_terms = len(self.pauli_terms)
-        n_coeffs = len(self.coefficients)
+        # For P Pauli strings and C coefficients per step:
+        # With term combining at boundaries, the repeating pattern length is:
+        #   P × C - C - 1 = C(P - 1) - 1
+        # This pattern repeats for each Trotter step (N times)
+        n_terms = len(self.pauli_terms)  # P
+        n_coeffs = len(self.coefficients)  # C
 
-        # Estimate pattern length based on structure analysis
-        # For symmetric Trotter methods with term combining:
-        # - Simple cases (few terms): pattern ≈ n_terms
-        # - Complex cases (many terms): pattern ≈ 2 * n_terms (observed for 61-term Hamiltonian)
-        # Use a wider search range to handle both cases
-        estimated_pattern_len = max(n_terms, (n_terms * n_coeffs))
+        # Expected repeating pattern length: C(P - 1) - 1
+        expected_pattern_len = n_coeffs * (n_terms - 1) - 1
 
-        # Try different pattern lengths around the estimate with a wider search window
-        # Search from ~50% to ~150% of estimate to handle various Hamiltonian structures
-        search_min = max(1, estimated_pattern_len // 2)
-        search_max = min(len(seq) // 2, int(estimated_pattern_len * 1.5) + 20)
+        # Search around the expected length with margin for implementation variations
+        # Use ±30% to handle edge cases and different boundary combining behavior
+        search_min = max(1, int(expected_pattern_len * 0.7))
+        search_max = min(len(seq) // 2, int(expected_pattern_len * 1.3) + 10)
 
         for pattern_len in range(search_min, search_max):
 
