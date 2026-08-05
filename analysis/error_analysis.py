@@ -14,9 +14,16 @@ def _compute_eigenvalue_errors(exact_op, approx_op) -> dict:
     """
     Compute eigenenergy errors between exact and approximate Hamiltonians.
 
+    Strategy: Convert H_exact → U_exact, then compare U eigenvalues directly.
+    This avoids the ill-conditioned inverse problem (U → H via logarithm) which
+    amplifies numerical errors by 1/t.
+
+    The ratio λ_U_approx / λ_U_exact = exp(-i*ΔE*t/ℏ) directly encodes the
+    energy error ΔE, which we recover via: ΔE = -angle(ratio) * ℏ/t
+
     Parameters:
         exact_op: OperatorRepresentation for exact Hamiltonian
-        approx_op: OperatorRepresentation for approximate Hamiltonian
+        approx_op: OperatorRepresentation for approximate time evolution operator
 
     Returns:
         Dictionary with eigenenergy error metrics
@@ -28,38 +35,83 @@ def _compute_eigenvalue_errors(exact_op, approx_op) -> dict:
     if approx_op is None:
         raise ValueError("missing approximate operator")
 
-    # Get eigenenergies from both decompositions (both already sorted by energy)
-    def get_eigenvalues(op):
-        return np.sort(op.get(operator_type="Hamiltonian",
-                      energy_shifted=False,
-                      representation="eigendecomposition")["eigenvalues"])
-    exact_eigenenergies = get_eigenvalues(exact_op)
-    approx_eigenenergies = get_eigenvalues(approx_op)
+    # Get exact H eigendecomposition first (native form for exact_op)
+    exact_H_data = exact_op.get(operator_type="Hamiltonian",
+                                 energy_shifted=False,
+                                 representation="eigendecomposition")
+    exact_H_eigenvalues = exact_H_data["eigenvalues"]
+    exact_H_eigenvectors = exact_H_data["eigenvectors"]
 
-    # Verify same dimension (should have all eigenvalues since full decomposition)
-    if len(exact_eigenenergies) != len(approx_eigenenergies):
+    # Get exact U eigendecomposition (converted from H, but well-conditioned H→U)
+    # H and U share the same eigenvectors (they commute)
+    exact_U_data = exact_op.get(operator_type="time_evolution",
+                                 energy_shifted=False,
+                                 representation="eigendecomposition")
+    exact_U_eigenvalues = exact_U_data["eigenvalues"]
+    exact_U_eigenvectors = exact_U_data["eigenvectors"]
+
+    # Get approximate U eigendecomposition (native form for approx_op - NO conversion!)
+    approx_U_data = approx_op.get(operator_type="time_evolution",
+                                   energy_shifted=False,
+                                   representation="eigendecomposition")
+    approx_U_eigenvalues = approx_U_data["eigenvalues"]
+    approx_U_eigenvectors = approx_U_data["eigenvectors"]
+
+    # Match approximate U eigenvectors to exact U eigenvectors by overlap
+    # For each exact eigenvector, find the best matching approximate eigenvector
+    overlaps = np.abs(exact_U_eigenvectors.conj().T @ approx_U_eigenvectors)  # [n_exact, n_approx]
+    approx_indices = np.argmax(overlaps, axis=1)  # Best match for each exact state
+
+    # Reorder approximate U eigenvalues to match exact ordering
+    approx_U_eigenvalues = approx_U_eigenvalues[approx_indices]
+
+    logger.debug(f"Eigenvector matching: min overlap = {overlaps.max(axis=1).min():.6f}, "
+                 f"mean overlap = {overlaps.max(axis=1).mean():.6f}")
+
+    # Sort everything by exact H eigenvalue for nice reporting
+    energy_sort_indices = np.argsort(exact_H_eigenvalues)
+    exact_H_eigenvalues = exact_H_eigenvalues[energy_sort_indices]
+    exact_U_eigenvalues = exact_U_eigenvalues[energy_sort_indices]
+    approx_U_eigenvalues = approx_U_eigenvalues[energy_sort_indices]
+
+    # Verify same dimension
+    if len(exact_U_eigenvalues) != len(approx_U_eigenvalues):
         raise ValueError(
-            f"Dimension mismatch: exact operator has {len(exact_eigenenergies)} eigenstates, "
-            f"approximate operator has {len(approx_eigenenergies)} eigenstates."
+            f"Dimension mismatch: exact operator has {len(exact_U_eigenvalues)} eigenstates, "
+            f"approximate operator has {len(approx_U_eigenvalues)} eigenstates."
         )
 
-    # Element-wise comparison (both already sorted by energy)
-    absolute_errors = exact_eigenenergies - approx_eigenenergies
-    relative_errors = absolute_errors / np.abs(exact_eigenenergies)
+    # Compute energy errors from U eigenvalue ratios
+    # ratio = λ_U_approx / λ_U_exact = exp(-i*ΔE*t/ℏ)
+    # Therefore: ΔE = -angle(ratio) * ℏ/t
+    ratio = approx_U_eigenvalues / exact_U_eigenvalues
+    phase_error = np.angle(ratio)  # ∈ (-π, π]
 
-    num_eigenstates = len(exact_eigenenergies)
+    # Convert phase error to energy error
+    if exact_op.tevol_hbar is None:
+        raise ValueError("tevol_hbar is required for eigenvalue error calculation")
+    energy_errors = -phase_error / exact_op.tevol_hbar
+
+    # Relative errors (use exact H eigenvalues as reference)
+    relative_errors = energy_errors / np.abs(exact_H_eigenvalues)
+
+    num_eigenstates = len(exact_H_eigenvalues)
     logger.info(f"Computed errors for {num_eigenstates} eigenstates (sorted by energy)")
-    logger.verbose(f"  Ground state: exact={exact_eigenenergies[0]:.6e}, approx={approx_eigenenergies[0]:.6e}, error={absolute_errors[0]:.6e}")
-    logger.verbose(f"  Highest state: exact={exact_eigenenergies[-1]:.6e}, approx={approx_eigenenergies[-1]:.6e}, error={absolute_errors[-1]:.6e}")
-    logger.verbose(f"  Max absolute error: {np.abs(absolute_errors).max():.6e}")
-    logger.verbose(f"  Max relative error: {np.abs(relative_errors).max():.6e}")
+    logger.verbose(f"  Ground state: exact={exact_H_eigenvalues[0]:.6e}, error={energy_errors[0]:.6e}, rel_err={relative_errors[0]:.6e}")
+    logger.verbose(f"  Highest state: exact={exact_H_eigenvalues[-1]:.6e}, error={energy_errors[-1]:.6e}, rel_err={relative_errors[-1]:.6e}")
+    logger.info(f"  Max absolute energy error: {np.abs(energy_errors).max():.6e}")
+    logger.info(f"  Max relative energy error: {np.abs(relative_errors).max():.6e}")
+
+    # Also log phase errors for comparison with matrix norms
+    max_phase_error = np.abs(phase_error).max()
+    logger.info(f"  Max phase error (for comparison with matrix norm): {max_phase_error:.6e}")
 
     return {
         'eigenenergy_errors': {
             'num_eigenstates': num_eigenstates,
-            'absolute_errors': absolute_errors.tolist(),
+            'absolute_errors': energy_errors.tolist(),
             'relative_errors': relative_errors.tolist(),
-            'max_absolute_error': float(np.abs(absolute_errors).max()),
+            'max_absolute_error': float(np.abs(energy_errors).max()),
             'max_relative_error': float(np.abs(relative_errors).max())
         }
     }
