@@ -257,9 +257,11 @@ def expand_ramped_trotterization(
         raise ValueError("Must have at least one coefficient")
 
     result = []
-    ascending = True  # Start with ascending direction
 
     for step in range(num_steps):
+        # Reset direction at start of each step for consistent pattern
+        ascending = True  # Start with ascending direction
+
         for coeff in coefficients:
             # Generate indices for this ramp
             if ascending:
