@@ -150,7 +150,7 @@ class UnitaryConfiguration(ConfigurationBase):
                 f"Values >= 1.0 are recommended (default: 1.01).")
         # Validate tensor_contraction_method
         if self.tensor_contraction_method is not None:
-            valid_methods = ["auto", "incremental", "structured"]
+            valid_methods = ["auto", "incremental", "structured", "qualtran"]
             if self.tensor_contraction_method not in valid_methods:
                 raise ValueError(
                     f"tensor_contraction_method must be one of {valid_methods}, "

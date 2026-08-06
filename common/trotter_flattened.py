@@ -328,6 +328,7 @@ class Trotterization(Bloq):
             None or "auto" = auto-select based on step count
             "incremental" = force O(n) incremental contraction
             "structured" = force O(log n) structured contraction (raises error if pattern not detected)
+            "qualtran" = use Qualtran's inherited Bloq.tensor_contract() method
 
     Example:
         >>> # Second-order Trotterization using named method
@@ -538,6 +539,7 @@ class Trotterization(Bloq):
         - None or "auto": use auto-selection logic (default behavior)
         - "incremental": force O(n) incremental contraction
         - "structured": force O(log n) structured contraction (raises error if pattern not detected)
+        - "qualtran": use Qualtran's inherited Bloq.tensor_contract() method
 
         Returns:
             The full unitary matrix as a numpy array with shape (2^n_qubits, 2^n_qubits)
@@ -562,7 +564,10 @@ class Trotterization(Bloq):
         # Check if a specific method is forced via configuration
         forced_method = self.tensor_contraction_method
         if forced_method is not None and forced_method != "auto":
-            if forced_method == "incremental":
+            if forced_method == "qualtran":
+                logger.verbose(f"Using Qualtran Bloq.tensor_contract() method")
+                return super().tensor_contract()
+            elif forced_method == "incremental":
                 logger.verbose(f"Using FORCED O(n) incremental contraction")
                 return self._incremental_contraction()
             elif forced_method == "structured":
@@ -591,7 +596,7 @@ class Trotterization(Bloq):
             else:
                 raise ValueError(
                     f"Invalid tensor_contraction_method '{forced_method}'. "
-                    f"Must be None, 'auto', 'incremental', or 'structured'."
+                    f"Must be None, 'auto', 'incremental', 'structured', or 'qualtran'."
                 )
 
         # Auto-selection logic (original behavior)
@@ -882,6 +887,7 @@ def build_ramped_trotterized_unitary(
             None or "auto" = auto-select based on step count
             "incremental" = force O(n) incremental contraction
             "structured" = force O(log n) structured contraction (raises error if pattern not detected)
+            "qualtran" = use Qualtran's inherited Bloq.tensor_contract() method
 
     Returns:
         Trotterization instance
