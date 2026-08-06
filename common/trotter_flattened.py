@@ -9,7 +9,7 @@ same Pauli string are combined for efficiency.
 import logging
 from functools import cached_property
 from math import cbrt
-from typing import List, Sequence, Tuple, Union
+from typing import List, Optional, Sequence, Tuple, Union
 
 import attrs
 import numpy as np
@@ -324,6 +324,11 @@ class Trotterization(Bloq):
         num_steps: Number of Trotterization steps (time is divided by this).
         hbar: Reduced Planck constant (default 1.0).
         combine_terms: If True (default), combine adjacent identical terms. If False, keep all terms separate.
+        tensor_contraction_method: Optional method to force for tensor contraction.
+            None or "auto" = auto-select based on step count
+            "incremental" = force O(n) incremental contraction
+            "structured" = force O(log n) structured contraction (raises error if pattern not detected)
+            "qualtran" = use Qualtran's inherited Bloq.tensor_contract() method
 
     Example:
         >>> # Second-order Trotterization using named method
@@ -353,6 +358,7 @@ class Trotterization(Bloq):
     num_steps: int
     hbar: float = 1.0
     combine_terms: bool = True
+    tensor_contraction_method: Optional[str] = None
 
     def __attrs_post_init__(self):
         """Validate inputs."""
@@ -383,7 +389,8 @@ class Trotterization(Bloq):
         time: float,
         num_steps: int,
         hbar: float = 1.0,
-        combine_terms: bool = True
+        combine_terms: bool = True,
+        tensor_contraction_method: Optional[str] = None
     ):
         """Create Trotterization using a named method.
 
@@ -394,6 +401,10 @@ class Trotterization(Bloq):
             num_steps: Number of Trotterization steps
             hbar: Reduced Planck constant (default 1.0)
             combine_terms: If True (default), combine adjacent identical terms. If False, keep all terms separate.
+            tensor_contraction_method: Optional method to force for tensor contraction.
+                None or "auto" = auto-select based on step count
+                "incremental" = force O(n) incremental contraction
+                "structured" = force O(log n) structured contraction (raises error if pattern not detected)
 
         Returns:
             Trotterization instance
@@ -413,7 +424,8 @@ class Trotterization(Bloq):
             time=time,
             num_steps=num_steps,
             hbar=hbar,
-            combine_terms=combine_terms
+            combine_terms=combine_terms,
+            tensor_contraction_method=tensor_contraction_method
         )
 
     @cached_property
@@ -507,21 +519,13 @@ class Trotterization(Bloq):
 
     def tensor_contract(self) -> np.ndarray:
         """
-        Optimized tensor contraction exploiting repeating structure.
+        Optimized tensor contraction
 
-        Phase 2 optimization: For multi-step Trotter, the expanded_sequence
-        has a repeating pattern due to term combining across step boundaries:
-            [start_block] + [repeating_block]^(n_repeats) + [end_block]
-
-        We exploit this by:
-        1. Detecting the repeating pattern
-        2. Building matrices for start, repeating, and end blocks
-        3. Using matrix exponentiation for the repeating part: O(log n)
-        4. Combining: U_total = U_end @ U_repeat^n @ U_start
-
-        Falls back to O(n) incremental approach if:
-        - num_steps is small (< 10) - overhead not worth it
-        - No clear repeating pattern detected
+        The tensor_contraction_method attribute can force a specific method:
+        - None or "auto": use auto-selection logic (default behavior)
+        - "incremental": force O(n) incremental contraction
+        - "structured": force O(log n) structured contraction (raises error if pattern not detected)
+        - "qualtran": use Qualtran's inherited Bloq.tensor_contract() method
 
         Returns:
             The full unitary matrix as a numpy array with shape (2^n_qubits, 2^n_qubits)
@@ -543,31 +547,56 @@ class Trotterization(Bloq):
         logger.debug(f"-- num_terms = {len(self.pauli_terms)}")
         logger.debug(f"-- expanded_sequence length = {len(self.expanded_sequence)}")
 
+        # Check if a specific method is forced via configuration
+        forced_method = self.tensor_contraction_method
+        if forced_method is not None and forced_method != "auto":
+            if forced_method == "qualtran":
+                logger.verbose(f"Using Qualtran Bloq.tensor_contract() method")
+                return super().tensor_contract()
+            elif forced_method == "incremental":
+                logger.verbose(f"Using FORCED O(n) incremental contraction")
+                return self._incremental_contraction()
+            elif forced_method == "structured":
+                logger.verbose(f"Using FORCED O(log n) structured contraction")
+                # Must detect pattern - do not fall back
+                logger.debug(f"Attempting to detect repeating pattern...")
+                pattern_info = self._detect_repeating_pattern()
+                if pattern_info['num_repeats'] < 1:
+                    raise RuntimeError(
+                        f"Forced structured tensor contraction but num_repeats={pattern_info['num_repeats']} < 1. "
+                        f"Invalid pattern structure. "
+                        f"Either use auto-selection or force incremental method."
+                    )
+                logger.debug(f"-- pattern_length = {pattern_info['pattern_length']}")
+                logger.debug(f"-- num_repeats = {pattern_info['num_repeats']}")
+                logger.debug(f"-- start_block length = {len(pattern_info['start_terms'])}")
+                logger.debug(f"-- repeating_block length = {len(pattern_info['repeating_terms'])}")
+                logger.debug(f"-- end_block length = {len(pattern_info['end_terms'])}")
+                return self._structured_contraction(pattern_info)
+            else:
+                raise ValueError(
+                    f"Invalid tensor_contraction_method '{forced_method}'. "
+                    f"Must be None, 'auto', 'incremental', 'structured', or 'qualtran'."
+                )
+
+        # Auto-selection logic (original behavior)
         # For small num_steps, incremental is faster (less overhead)
         if self.num_steps < 10:
             logger.verbose(f"Using O(n) incremental contraction (num_steps < 10)")
             return self._incremental_contraction()
 
         # Try to detect repeating pattern
-        logger.debug(f"Attempting to detect repeating pattern...")
+        logger.debug(f"Searching for repeating pattern...")
         pattern_info = self._detect_repeating_pattern()
 
         # If pattern detected, use O(log n) structured approach
-        if pattern_info['has_pattern'] and pattern_info['num_repeats'] >= 2:
-            logger.verbose(f"Pattern detected! Using O(log n) structured contraction")
-            logger.debug(f"-- pattern_length = {pattern_info['pattern_length']}")
-            logger.debug(f"-- num_repeats = {pattern_info['num_repeats']}")
-            logger.debug(f"-- start_block length = {len(pattern_info['start_terms'])}")
-            logger.debug(f"-- repeating_block length = {len(pattern_info['repeating_terms'])}")
-            logger.debug(f"-- end_block length = {len(pattern_info['end_terms'])}")
-            return self._structured_contraction(pattern_info)
-        else:
-            # Fall back to O(n) incremental approach
-            if pattern_info.get('has_pattern', False):
-                logger.verbose(f"Pattern detected but num_repeats < 2, using O(n) incremental contraction")
-            else:
-                logger.verbose(f"No repeating pattern detected, using O(n) incremental contraction")
-            return self._incremental_contraction()
+        logger.debug(f"Pattern for O(log n) structured contraction:")
+        logger.debug(f"-- pattern_length = {pattern_info['pattern_length']}")
+        logger.debug(f"-- num_repeats = {pattern_info['num_repeats']}")
+        logger.debug(f"-- start_block length = {len(pattern_info['start_terms'])}")
+        logger.debug(f"-- repeating_block length = {len(pattern_info['repeating_terms'])}")
+        logger.debug(f"-- end_block length = {len(pattern_info['end_terms'])}")
+        return self._structured_contraction(pattern_info)
 
     def _detect_repeating_pattern(self) -> dict:
         """
@@ -581,7 +610,6 @@ class Trotterization(Bloq):
 
         Returns:
             Dictionary with:
-            - has_pattern: bool - whether a pattern was detected
             - start_terms: list - terms before the repeating section
             - repeating_terms: list - the repeating unit
             - end_terms: list - terms after the repeating section
@@ -589,10 +617,6 @@ class Trotterization(Bloq):
             - pattern_length: int - length of repeating unit
         """
         seq = self.expanded_sequence
-
-        # Need at least 2 steps for a repeating pattern
-        if self.num_steps < 2:
-            return {'has_pattern': False}
 
         # For P Pauli strings and C coefficients per step:
         # With term combining at boundaries, the repeating pattern length is:
@@ -631,13 +655,14 @@ class Trotterization(Bloq):
                 else:
                     break
 
-            # Need at least 2 repetitions to be worth using matrix power
-            if num_repeats >= 2:
+            # Accept patterns with at least 1 repetition
+            # Note: num_repeats=1 provides no performance benefit over incremental,
+            # but allows structured method to work for edge cases (e.g., num_steps=2)
+            if num_repeats >= 1:
                 # Found a valid pattern!
                 end_block = seq[idx:] if idx < len(seq) else []
 
                 return {
-                    'has_pattern': True,
                     'start_terms': start_block,
                     'repeating_terms': candidate_pattern,
                     'end_terms': end_block,
@@ -646,7 +671,15 @@ class Trotterization(Bloq):
                 }
 
         # No repeating pattern found
-        return {'has_pattern': False}
+        # - repeating block is entire sequence with single repetition
+        # - start and end terms are empty
+        return {
+            'start_terms': [],
+            'repeating_terms': seq,
+            'end_terms': [],
+            'num_repeats': 1,
+            'pattern_length': len(seq)
+            }
 
     def _structured_contraction(self, pattern_info: dict) -> np.ndarray:
         """
@@ -724,10 +757,10 @@ class Trotterization(Bloq):
 
     def _incremental_contraction(self) -> np.ndarray:
         """
-        Fallback O(n) incremental contraction (Phase 1 implementation).
+        O(n) incremental contraction
 
         Iterates through expanded_sequence and multiplies matrices one at a time.
-        Used when pattern detection fails or for small num_steps.
+        Used for small num_steps.
 
         Returns:
             Full unitary matrix
@@ -811,7 +844,8 @@ def build_ramped_trotterized_unitary(
     method,
     timestep: float,
     numsteps: int,
-    combine_terms: bool = True
+    combine_terms: bool = True,
+    tensor_contraction_method: Optional[str] = None
 ):
     """Build a Trotterization using the old interface for backward compatibility.
 
@@ -825,6 +859,11 @@ def build_ramped_trotterized_unitary(
         timestep: Time step for evolution
         numsteps: Number of Trotterization steps
         combine_terms: If True (default), combine adjacent identical terms. If False, keep all terms separate.
+        tensor_contraction_method: Optional method to force for tensor contraction.
+            None or "auto" = auto-select based on step count
+            "incremental" = force O(n) incremental contraction
+            "structured" = force O(log n) structured contraction (raises error if pattern not detected)
+            "qualtran" = use Qualtran's inherited Bloq.tensor_contract() method
 
     Returns:
         Trotterization instance
@@ -845,5 +884,6 @@ def build_ramped_trotterized_unitary(
         time=timestep,
         num_steps=numsteps,
         hbar=1.0,
-        combine_terms=combine_terms
+        combine_terms=combine_terms,
+        tensor_contraction_method=tensor_contraction_method
     )

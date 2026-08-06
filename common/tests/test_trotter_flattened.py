@@ -1118,3 +1118,171 @@ class TestOstmeyerMethods:
             # For these methods, verify basic properties
             # All coefficients should be real
             assert all(isinstance(c, (int, float)) for c in coeffs)
+
+
+# ==================================================================================
+# Test: Tensor contraction method selection
+# ==================================================================================
+
+class TestTensorContractionMethods:
+    """Test that different tensor contraction methods work correctly and produce identical results."""
+
+    @pytest.mark.parametrize("num_steps", [1, 2, 3, 10, 50])
+    @pytest.mark.parametrize("method", ["qualtran", "incremental", "structured", None])
+    def test_all_methods_produce_unitary(self, num_steps, method):
+        """Test that all tensor contraction methods produce valid unitary matrices."""
+        pauli_terms = [('X', 1.0), ('Z', 0.5), ('Y', 0.3)]
+
+        trotter = Trotterization.from_method(
+            pauli_terms=pauli_terms,
+            method='second order',
+            time=0.1,
+            num_steps=num_steps,
+            tensor_contraction_method=method
+        )
+
+        U = trotter.tensor_contract()
+
+        # Verify unitarity: U† U = I
+        U_dag_U = U.conj().T @ U
+        identity = np.eye(U.shape[0])
+        assert np.allclose(U_dag_U, identity, atol=1e-10), \
+            f"Method {method} with num_steps={num_steps} does not produce unitary matrix"
+
+    @pytest.mark.parametrize("num_steps", [1, 2, 3, 10, 50])
+    def test_all_methods_agree(self, num_steps):
+        """Test that all tensor contraction methods produce identical results."""
+        pauli_terms = [('X', 1.0), ('Z', 0.5), ('Y', 0.3)]
+        methods = ['qualtran', 'incremental', 'structured', None]
+
+        # Compute matrices for all methods
+        results = {}
+        for method in methods:
+            trotter = Trotterization.from_method(
+                pauli_terms=pauli_terms,
+                method='second order',
+                time=0.1,
+                num_steps=num_steps,
+                tensor_contraction_method=method
+            )
+            results[str(method)] = trotter.tensor_contract()
+
+        # Use incremental as reference
+        U_ref = results['incremental']
+
+        # Check that all methods produce the same matrix (within numerical precision)
+        for method_name, U in results.items():
+            if method_name == 'incremental':
+                continue
+            max_diff = np.max(np.abs(U - U_ref))
+            assert max_diff < 1e-14, \
+                f"Method {method_name} differs from incremental by {max_diff:.2e} at num_steps={num_steps}"
+
+    @pytest.mark.parametrize("num_steps", [1, 2, 3])
+    def test_structured_works_for_small_num_steps(self, num_steps):
+        """Test that structured method now works for num_steps = 1, 2, 3 (after Option 1+2)."""
+        pauli_terms = [('X', 1.0), ('Z', 0.5)]
+
+        # This should not raise an error anymore
+        trotter = Trotterization.from_method(
+            pauli_terms=pauli_terms,
+            method='second order',
+            time=0.1,
+            num_steps=num_steps,
+            tensor_contraction_method='structured'
+        )
+
+        U = trotter.tensor_contract()
+
+        # Verify it's unitary
+        U_dag_U = U.conj().T @ U
+        identity = np.eye(U.shape[0])
+        assert np.allclose(U_dag_U, identity, atol=1e-10)
+
+    def test_pattern_detection_degenerate_case(self):
+        """Test that pattern detection handles num_steps=1 correctly."""
+        pauli_terms = [('X', 1.0), ('Z', 0.5)]
+
+        trotter = Trotterization.from_method(
+            pauli_terms=pauli_terms,
+            method='second order',
+            time=0.1,
+            num_steps=1
+        )
+
+        pattern_info = trotter._detect_repeating_pattern()
+
+        # Should return a pattern with the entire sequence
+        assert 'num_repeats' in pattern_info
+        assert pattern_info['num_repeats'] == 1
+        assert 'repeating_terms' in pattern_info
+        assert len(pattern_info['repeating_terms']) == len(trotter.expanded_sequence)
+        assert len(pattern_info['start_terms']) == 0
+        assert len(pattern_info['end_terms']) == 0
+
+    def test_auto_selection_behavior(self):
+        """Test that auto-selection chooses the right method based on num_steps."""
+        pauli_terms = [('X', 1.0), ('Z', 0.5)]
+
+        # For num_steps < 10, should use incremental
+        # For num_steps >= 10, should use structured (if pattern detected)
+
+        # Small num_steps: verify it doesn't crash (auto selects incremental)
+        for num_steps in [1, 2, 5, 9]:
+            trotter = Trotterization.from_method(
+                pauli_terms=pauli_terms,
+                method='second order',
+                time=0.1,
+                num_steps=num_steps,
+                tensor_contraction_method=None  # Auto
+            )
+            U = trotter.tensor_contract()
+            assert U.shape == (2, 2)
+
+        # Large num_steps: verify it doesn't crash (auto may select structured)
+        for num_steps in [10, 50]:
+            trotter = Trotterization.from_method(
+                pauli_terms=pauli_terms,
+                method='second order',
+                time=0.1,
+                num_steps=num_steps,
+                tensor_contraction_method=None  # Auto
+            )
+            U = trotter.tensor_contract()
+            assert U.shape == (2, 2)
+
+    def test_qualtran_method_accessible(self):
+        """Test that the 'qualtran' method successfully calls Bloq.tensor_contract()."""
+        pauli_terms = [('X', 1.0), ('Z', 0.5)]
+
+        trotter = Trotterization.from_method(
+            pauli_terms=pauli_terms,
+            method='second order',
+            time=0.1,
+            num_steps=5,
+            tensor_contraction_method='qualtran'
+        )
+
+        U = trotter.tensor_contract()
+
+        # Should produce a valid unitary
+        U_dag_U = U.conj().T @ U
+        identity = np.eye(U.shape[0])
+        assert np.allclose(U_dag_U, identity, atol=1e-10)
+
+    def test_invalid_method_raises_error(self):
+        """Test that an invalid tensor_contraction_method is handled correctly."""
+        # Note: Validation happens in analysis/config_types.py when used through the config system
+        # Here we test that an invalid method in tensor_contract() raises an error
+        pauli_terms = [('X', 1.0)]
+
+        trotter = Trotterization(
+            pauli_terms=tuple(pauli_terms),
+            coefficients=(0.5, 0.5),
+            time=0.1,
+            num_steps=5,
+            tensor_contraction_method='invalid_method'  # Invalid method
+        )
+
+        with pytest.raises(ValueError, match="Invalid tensor_contraction_method"):
+            trotter.tensor_contract()
