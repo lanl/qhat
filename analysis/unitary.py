@@ -36,10 +36,9 @@ class PauliStringLCU(LCUBlockEncoding):
         n_tot    =  2**(int(np.ceil(np.log2(n_terms))))
         n_pad    =  n_tot - n_terms
 
-        alphas = [np.sqrt(np.abs(t.coefficient)) for t in pauli_terms]
-        alpha = np.sum([a**2 for a in alphas])
-        alphas_scaled = [a/np.sqrt(alpha) for a in alphas]
-        alphas_scaled.extend([0.0 for i in range(n_pad)])
+        weights = [np.sqrt(np.abs(t.coefficient)) for t in pauli_terms]
+        weights.extend([0.0 for _ in range(n_pad)])
+        alpha = np.sum([np.abs(t.coefficient) for t in pauli_terms])
 
         selection_bitsize = int(np.ceil(np.log2(n_tot)))
 
@@ -54,7 +53,7 @@ class PauliStringLCU(LCUBlockEncoding):
             # see https://github.com/quantumlib/Qualtran/issues/1045
             #prepare = StatePreparationViaRotations(
             #              phase_bitsize = 4,
-            #              state_coefficients = alphas_scaled,
+            #              state_coefficients = weights,
             #          )
             raise NotImplementedError("PauliStringLCU")
 
@@ -68,9 +67,7 @@ class PauliStringLCU(LCUBlockEncoding):
                     break
 
             prepare = StatePreparationAliasSampling.from_lcu_probs(
-                          lcu_probabilities=[
-                              np.abs(np.real(t.coefficient)) for t in pauli_terms
-                          ],
+                          lcu_probabilities=weights,
                           probability_epsilon=probability_eps,
                       )
 
