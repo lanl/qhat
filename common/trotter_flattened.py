@@ -9,7 +9,7 @@ same Pauli string are combined for efficiency.
 import logging
 from functools import cached_property
 from math import cbrt
-from typing import List, Sequence, Tuple, Union
+from typing import List, Optional, Sequence, Tuple, Union
 
 import attrs
 import numpy as np
@@ -324,6 +324,10 @@ class Trotterization(Bloq):
         num_steps: Number of Trotterization steps (time is divided by this).
         hbar: Reduced Planck constant (default 1.0).
         combine_terms: If True (default), combine adjacent identical terms. If False, keep all terms separate.
+        tensor_contraction_method: Optional method to force for tensor contraction.
+            None or "auto" = auto-select based on step count
+            "incremental" = force O(n) incremental contraction
+            "structured" = force O(log n) structured contraction (raises error if pattern not detected)
 
     Example:
         >>> # Second-order Trotterization using named method
@@ -353,6 +357,7 @@ class Trotterization(Bloq):
     num_steps: int
     hbar: float = 1.0
     combine_terms: bool = True
+    tensor_contraction_method: Optional[str] = None
 
     def __attrs_post_init__(self):
         """Validate inputs."""
@@ -383,7 +388,8 @@ class Trotterization(Bloq):
         time: float,
         num_steps: int,
         hbar: float = 1.0,
-        combine_terms: bool = True
+        combine_terms: bool = True,
+        tensor_contraction_method: Optional[str] = None
     ):
         """Create Trotterization using a named method.
 
@@ -394,6 +400,10 @@ class Trotterization(Bloq):
             num_steps: Number of Trotterization steps
             hbar: Reduced Planck constant (default 1.0)
             combine_terms: If True (default), combine adjacent identical terms. If False, keep all terms separate.
+            tensor_contraction_method: Optional method to force for tensor contraction.
+                None or "auto" = auto-select based on step count
+                "incremental" = force O(n) incremental contraction
+                "structured" = force O(log n) structured contraction (raises error if pattern not detected)
 
         Returns:
             Trotterization instance
@@ -413,7 +423,8 @@ class Trotterization(Bloq):
             time=time,
             num_steps=num_steps,
             hbar=hbar,
-            combine_terms=combine_terms
+            combine_terms=combine_terms,
+            tensor_contraction_method=tensor_contraction_method
         )
 
     @cached_property
@@ -523,6 +534,11 @@ class Trotterization(Bloq):
         - num_steps is small (< 10) - overhead not worth it
         - No clear repeating pattern detected
 
+        The tensor_contraction_method attribute can force a specific method:
+        - None or "auto": use auto-selection logic (default behavior)
+        - "incremental": force O(n) incremental contraction
+        - "structured": force O(log n) structured contraction (raises error if pattern not detected)
+
         Returns:
             The full unitary matrix as a numpy array with shape (2^n_qubits, 2^n_qubits)
 
@@ -543,6 +559,42 @@ class Trotterization(Bloq):
         logger.debug(f"-- num_terms = {len(self.pauli_terms)}")
         logger.debug(f"-- expanded_sequence length = {len(self.expanded_sequence)}")
 
+        # Check if a specific method is forced via configuration
+        forced_method = self.tensor_contraction_method
+        if forced_method is not None and forced_method != "auto":
+            if forced_method == "incremental":
+                logger.verbose(f"Using FORCED O(n) incremental contraction")
+                return self._incremental_contraction()
+            elif forced_method == "structured":
+                logger.verbose(f"Using FORCED O(log n) structured contraction")
+                # Must detect pattern - do not fall back
+                logger.debug(f"Attempting to detect repeating pattern...")
+                pattern_info = self._detect_repeating_pattern()
+                if not pattern_info['has_pattern']:
+                    raise RuntimeError(
+                        f"Forced structured tensor contraction but no repeating pattern detected. "
+                        f"Cannot use O(log n) method with num_steps={self.num_steps}. "
+                        f"Either use auto-selection or force incremental method."
+                    )
+                if pattern_info['num_repeats'] < 2:
+                    raise RuntimeError(
+                        f"Forced structured tensor contraction but num_repeats={pattern_info['num_repeats']} < 2. "
+                        f"Pattern too short for matrix exponentiation. "
+                        f"Either use auto-selection or force incremental method."
+                    )
+                logger.debug(f"-- pattern_length = {pattern_info['pattern_length']}")
+                logger.debug(f"-- num_repeats = {pattern_info['num_repeats']}")
+                logger.debug(f"-- start_block length = {len(pattern_info['start_terms'])}")
+                logger.debug(f"-- repeating_block length = {len(pattern_info['repeating_terms'])}")
+                logger.debug(f"-- end_block length = {len(pattern_info['end_terms'])}")
+                return self._structured_contraction(pattern_info)
+            else:
+                raise ValueError(
+                    f"Invalid tensor_contraction_method '{forced_method}'. "
+                    f"Must be None, 'auto', 'incremental', or 'structured'."
+                )
+
+        # Auto-selection logic (original behavior)
         # For small num_steps, incremental is faster (less overhead)
         if self.num_steps < 10:
             logger.verbose(f"Using O(n) incremental contraction (num_steps < 10)")
@@ -811,7 +863,8 @@ def build_ramped_trotterized_unitary(
     method,
     timestep: float,
     numsteps: int,
-    combine_terms: bool = True
+    combine_terms: bool = True,
+    tensor_contraction_method: Optional[str] = None
 ):
     """Build a Trotterization using the old interface for backward compatibility.
 
@@ -825,6 +878,10 @@ def build_ramped_trotterized_unitary(
         timestep: Time step for evolution
         numsteps: Number of Trotterization steps
         combine_terms: If True (default), combine adjacent identical terms. If False, keep all terms separate.
+        tensor_contraction_method: Optional method to force for tensor contraction.
+            None or "auto" = auto-select based on step count
+            "incremental" = force O(n) incremental contraction
+            "structured" = force O(log n) structured contraction (raises error if pattern not detected)
 
     Returns:
         Trotterization instance
@@ -845,5 +902,6 @@ def build_ramped_trotterized_unitary(
         time=timestep,
         num_steps=numsteps,
         hbar=1.0,
-        combine_terms=combine_terms
+        combine_terms=combine_terms,
+        tensor_contraction_method=tensor_contraction_method
     )
