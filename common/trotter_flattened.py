@@ -519,21 +519,7 @@ class Trotterization(Bloq):
 
     def tensor_contract(self) -> np.ndarray:
         """
-        Optimized tensor contraction exploiting repeating structure.
-
-        Phase 2 optimization: For multi-step Trotter, the expanded_sequence
-        has a repeating pattern due to term combining across step boundaries:
-            [start_block] + [repeating_block]^(n_repeats) + [end_block]
-
-        We exploit this by:
-        1. Detecting the repeating pattern
-        2. Building matrices for start, repeating, and end blocks
-        3. Using matrix exponentiation for the repeating part: O(log n)
-        4. Combining: U_total = U_end @ U_repeat^n @ U_start
-
-        Falls back to O(n) incremental approach if:
-        - num_steps is small (< 10) - overhead not worth it
-        - No clear repeating pattern detected
+        Optimized tensor contraction
 
         The tensor_contraction_method attribute can force a specific method:
         - None or "auto": use auto-selection logic (default behavior)
