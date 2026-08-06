@@ -575,16 +575,10 @@ class Trotterization(Bloq):
                 # Must detect pattern - do not fall back
                 logger.debug(f"Attempting to detect repeating pattern...")
                 pattern_info = self._detect_repeating_pattern()
-                if not pattern_info['has_pattern']:
+                if pattern_info['num_repeats'] < 1:
                     raise RuntimeError(
-                        f"Forced structured tensor contraction but no repeating pattern detected. "
-                        f"Cannot use O(log n) method with num_steps={self.num_steps}. "
-                        f"Either use auto-selection or force incremental method."
-                    )
-                if pattern_info['num_repeats'] < 2:
-                    raise RuntimeError(
-                        f"Forced structured tensor contraction but num_repeats={pattern_info['num_repeats']} < 2. "
-                        f"Pattern too short for matrix exponentiation. "
+                        f"Forced structured tensor contraction but num_repeats={pattern_info['num_repeats']} < 1. "
+                        f"Invalid pattern structure. "
                         f"Either use auto-selection or force incremental method."
                     )
                 logger.debug(f"-- pattern_length = {pattern_info['pattern_length']}")
@@ -606,25 +600,17 @@ class Trotterization(Bloq):
             return self._incremental_contraction()
 
         # Try to detect repeating pattern
-        logger.debug(f"Attempting to detect repeating pattern...")
+        logger.debug(f"Searching for repeating pattern...")
         pattern_info = self._detect_repeating_pattern()
 
         # If pattern detected, use O(log n) structured approach
-        if pattern_info['has_pattern'] and pattern_info['num_repeats'] >= 2:
-            logger.verbose(f"Pattern detected! Using O(log n) structured contraction")
-            logger.debug(f"-- pattern_length = {pattern_info['pattern_length']}")
-            logger.debug(f"-- num_repeats = {pattern_info['num_repeats']}")
-            logger.debug(f"-- start_block length = {len(pattern_info['start_terms'])}")
-            logger.debug(f"-- repeating_block length = {len(pattern_info['repeating_terms'])}")
-            logger.debug(f"-- end_block length = {len(pattern_info['end_terms'])}")
-            return self._structured_contraction(pattern_info)
-        else:
-            # Fall back to O(n) incremental approach
-            if pattern_info.get('has_pattern', False):
-                logger.verbose(f"Pattern detected but num_repeats < 2, using O(n) incremental contraction")
-            else:
-                logger.verbose(f"No repeating pattern detected, using O(n) incremental contraction")
-            return self._incremental_contraction()
+        logger.debug(f"Pattern for O(log n) structured contraction:")
+        logger.debug(f"-- pattern_length = {pattern_info['pattern_length']}")
+        logger.debug(f"-- num_repeats = {pattern_info['num_repeats']}")
+        logger.debug(f"-- start_block length = {len(pattern_info['start_terms'])}")
+        logger.debug(f"-- repeating_block length = {len(pattern_info['repeating_terms'])}")
+        logger.debug(f"-- end_block length = {len(pattern_info['end_terms'])}")
+        return self._structured_contraction(pattern_info)
 
     def _detect_repeating_pattern(self) -> dict:
         """
@@ -638,7 +624,6 @@ class Trotterization(Bloq):
 
         Returns:
             Dictionary with:
-            - has_pattern: bool - whether a pattern was detected
             - start_terms: list - terms before the repeating section
             - repeating_terms: list - the repeating unit
             - end_terms: list - terms after the repeating section
@@ -646,10 +631,6 @@ class Trotterization(Bloq):
             - pattern_length: int - length of repeating unit
         """
         seq = self.expanded_sequence
-
-        # Need at least 2 steps for a repeating pattern
-        if self.num_steps < 2:
-            return {'has_pattern': False}
 
         # For P Pauli strings and C coefficients per step:
         # With term combining at boundaries, the repeating pattern length is:
@@ -688,13 +669,14 @@ class Trotterization(Bloq):
                 else:
                     break
 
-            # Need at least 2 repetitions to be worth using matrix power
-            if num_repeats >= 2:
+            # Accept patterns with at least 1 repetition
+            # Note: num_repeats=1 provides no performance benefit over incremental,
+            # but allows structured method to work for edge cases (e.g., num_steps=2)
+            if num_repeats >= 1:
                 # Found a valid pattern!
                 end_block = seq[idx:] if idx < len(seq) else []
 
                 return {
-                    'has_pattern': True,
                     'start_terms': start_block,
                     'repeating_terms': candidate_pattern,
                     'end_terms': end_block,
@@ -703,7 +685,15 @@ class Trotterization(Bloq):
                 }
 
         # No repeating pattern found
-        return {'has_pattern': False}
+        # - repeating block is entire sequence with single repetition
+        # - start and end terms are empty
+        return {
+            'start_terms': [],
+            'repeating_terms': seq,
+            'end_terms': [],
+            'num_repeats': 1,
+            'pattern_length': len(seq)
+            }
 
     def _structured_contraction(self, pattern_info: dict) -> np.ndarray:
         """
@@ -781,10 +771,10 @@ class Trotterization(Bloq):
 
     def _incremental_contraction(self) -> np.ndarray:
         """
-        Fallback O(n) incremental contraction (Phase 1 implementation).
+        O(n) incremental contraction
 
         Iterates through expanded_sequence and multiplies matrices one at a time.
-        Used when pattern detection fails or for small num_steps.
+        Used for small num_steps.
 
         Returns:
             Full unitary matrix
