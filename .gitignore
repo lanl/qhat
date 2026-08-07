@@ -9,3 +9,4 @@ qhat.egg-info
 *.npz
 *~
 .*.sw?
+*.sh
