@@ -1,8 +1,14 @@
 import logging
 import math
+from typing import Dict
 import cirq
 import numpy as np
 
+from qualtran import (
+    Bloq,
+    BloqBuilder,
+    SoquetT,
+)
 from qualtran.bloqs.block_encoding import LCUBlockEncoding
 from qualtran.bloqs.multiplexers.select_pauli_lcu import SelectPauliLCU
 from qualtran.bloqs.state_preparation import StatePreparationAliasSampling
@@ -84,6 +90,16 @@ class PauliStringLCU(LCUBlockEncoding):
     @property
     def _prepare_gate(self):
         return self.prepare
+
+    # Backport corrected LCUBlockEncoding method from v0.5.0
+    def build_composite_bloq(self, bb: 'BloqBuilder', **soqs: SoquetT) -> Dict[str, 'SoquetT']:
+        def _extract_soqs(bloq: Bloq) -> Dict[str, 'SoquetT']:
+            return {reg.name: soqs.pop(reg.name) for reg in bloq.signature.lefts()}
+
+        soqs |= bb.add_d(self.prepare, **_extract_soqs(self.prepare))
+        soqs |= bb.add_d(self.select, **_extract_soqs(self.select))
+        soqs |= bb.add_d(self.prepare.adjoint(), **_extract_soqs(self.prepare.adjoint()))
+        return soqs
 
 # -------------------------------------------------------------------------------------------------
 

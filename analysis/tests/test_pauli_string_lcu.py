@@ -34,20 +34,13 @@ def test_pauli_string_lcu_simple():
     unitaryop = PauliStringLCU(H, 'AS', probability_eps=0.25)
     unitarymx = unitaryop.tensor_contract()
 
-    # Contract unitary tensor in the selection register
-    # (highest-order bit)
-    h = len(unitarymx) // 2
-    unitarytc = 0.5 * (
-            unitarymx[0:h,0:h] + unitarymx[0:h,h:] + 
-            unitarymx[h:,0:h] + unitarymx[h:,h:]
-            )
-
     # Verify that the upper corner of our unitary is equal to the
     # original Hamiltonian matrix, scaled
-    np.testing.assert_array_almost_equal(unitarytc[0:4,0:4], 0.5 * H_matrix)
+    np.testing.assert_array_almost_equal(unitarymx[0:4,0:4], 0.5 * H_matrix)
 
 
 def test_pauli_string_lcu_harder():
+#def dummy():
     """Test converting a small, slightly more complex Hamiltonian to
        Pauli String LCU block encoding."""
     # Create a more complex 2-qubit Hamiltonian
@@ -72,17 +65,8 @@ def test_pauli_string_lcu_harder():
     unitaryop = PauliStringLCU(H, 'AS', probability_eps=0.25)
     unitarymx = unitaryop.tensor_contract()
 
-    # Contract unitary tensor in the selection register
-    # (highest-order 2 bits)
-    q = len(unitarymx) // 4
-    unitarytc = np.array(q * [q * [0.+0.j]])
-    for r in range(4):
-        for c in range(4):
-            unitarytc[:,:] += unitarymx[r*q:(r+1)*q,c*q:(c+1)*q]
-    unitarytc = 0.25 * unitarytc
-
     # Verify that the upper corner of our unitary is equal to the
     # original Hamiltonian matrix, scaled
-    np.testing.assert_array_almost_equal(unitarytc[0:4,0:4], 0.25 * H_matrix)
+    np.testing.assert_array_almost_equal(unitarymx[0:4,0:4], 0.25 * H_matrix)
 
 
