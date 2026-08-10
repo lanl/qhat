@@ -31,7 +31,7 @@ def test_pauli_string_lcu_simple():
     H_matrix = H.to_matrix(memory_threshold_gb=1.0)
 
     # Create unitary operator and convert to matrix
-    unitaryop = PauliStringLCU(H, 'AS', probability_eps=0.25)
+    unitaryop = PauliStringLCU(H, 'AS', probability_eps=0.5)
     unitarymx = unitaryop.tensor_contract()
 
     # Verify that the upper corner of our unitary is equal to the
@@ -40,7 +40,6 @@ def test_pauli_string_lcu_simple():
 
 
 def test_pauli_string_lcu_harder():
-#def dummy():
     """Test converting a small, slightly more complex Hamiltonian to
        Pauli String LCU block encoding."""
     # Create a more complex 2-qubit Hamiltonian
@@ -62,7 +61,7 @@ def test_pauli_string_lcu_harder():
     H_matrix = H.to_matrix(memory_threshold_gb=1.0)
 
     # Create unitary operator and convert to matrix
-    unitaryop = PauliStringLCU(H, 'AS', probability_eps=0.25)
+    unitaryop = PauliStringLCU(H, 'AS', probability_eps=0.5)
     unitarymx = unitaryop.tensor_contract()
 
     # Verify that the upper corner of our unitary is equal to the
