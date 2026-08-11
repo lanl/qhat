@@ -1,0 +1,15 @@
+# Core numerical dependency
+numpy
+
+# PySCF provides the direct_spin1 FCI Davidson solver used by qhat_low_energies_fci.py
+pyscf
+
+# OpenFermion defines the InteractionOperator objects stored in the input pickles
+# and is also used by the optional --validate-small check.
+openfermion
+
+# Used by the optional OpenFermion sparse validation path (scipy.sparse.linalg.eigsh).
+scipy
+
+# NOTE: hamgen.py was not included with the supplied files. If hamgen.py imports
+# additional project-specific or chemistry packages, add them here as needed.
