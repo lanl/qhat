@@ -325,16 +325,18 @@ def encode_ramped_trotter(
     # Import the appropriate implementation
     if trotter_impl == 'flattened':
         from qhat.common.trotter_flattened import build_ramped_trotterized_unitary
-        # Pass combine_terms parameter only for flattened implementation
+        # Pass combine_terms and tensor_contraction_method parameters only for flattened implementation
+        tensor_contraction_method = getattr(config_unitary, 'tensor_contraction_method', None)
         return build_ramped_trotterized_unitary(
                 pauli_strings.items(),
                 method,
                 tevol_hbar,
                 Nsteps,
-                combine_terms=config_unitary.trotter_combine_terms)
+                combine_terms=config_unitary.trotter_combine_terms,
+                tensor_contraction_method=tensor_contraction_method)
     else:  # 'original'
         from qhat.common.trotter_original import build_ramped_trotterized_unitary
-        # Original implementation doesn't support combine_terms parameter
+        # Original implementation doesn't support combine_terms or tensor_contraction_method parameters
         return build_ramped_trotterized_unitary(
                 pauli_strings.items(),
                 method,

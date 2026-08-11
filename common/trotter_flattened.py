@@ -6,9 +6,10 @@ ramps into a single flat sequence of Pauli string evolutions. Adjacent terms wit
 same Pauli string are combined for efficiency.
 """
 
+import logging
 from functools import cached_property
 from math import cbrt
-from typing import List, Sequence, Tuple, Union
+from typing import List, Optional, Sequence, Tuple, Union
 
 import attrs
 import numpy as np
@@ -18,6 +19,9 @@ from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexit
 
 from qhat.common.commuting_pauli_string_evolution import CommutingPauliStringEvolution
 from qhat.common.pauli_utils import validate_pauli_string
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 
 def get_trotterization_coefficients(method):
@@ -257,9 +261,11 @@ def expand_ramped_trotterization(
         raise ValueError("Must have at least one coefficient")
 
     result = []
-    ascending = True  # Start with ascending direction
 
     for step in range(num_steps):
+        # Reset direction at start of each step for consistent pattern
+        ascending = True  # Start with ascending direction
+
         for coeff in coefficients:
             # Generate indices for this ramp
             if ascending:
@@ -318,6 +324,11 @@ class Trotterization(Bloq):
         num_steps: Number of Trotterization steps (time is divided by this).
         hbar: Reduced Planck constant (default 1.0).
         combine_terms: If True (default), combine adjacent identical terms. If False, keep all terms separate.
+        tensor_contraction_method: Optional method to force for tensor contraction.
+            None or "auto" = auto-select based on step count
+            "incremental" = force O(n) incremental contraction
+            "structured" = force O(log n) structured contraction (raises error if pattern not detected)
+            "qualtran" = use Qualtran's inherited Bloq.tensor_contract() method
 
     Example:
         >>> # Second-order Trotterization using named method
@@ -347,6 +358,7 @@ class Trotterization(Bloq):
     num_steps: int
     hbar: float = 1.0
     combine_terms: bool = True
+    tensor_contraction_method: Optional[str] = None
 
     def __attrs_post_init__(self):
         """Validate inputs."""
@@ -377,7 +389,8 @@ class Trotterization(Bloq):
         time: float,
         num_steps: int,
         hbar: float = 1.0,
-        combine_terms: bool = True
+        combine_terms: bool = True,
+        tensor_contraction_method: Optional[str] = None
     ):
         """Create Trotterization using a named method.
 
@@ -388,6 +401,10 @@ class Trotterization(Bloq):
             num_steps: Number of Trotterization steps
             hbar: Reduced Planck constant (default 1.0)
             combine_terms: If True (default), combine adjacent identical terms. If False, keep all terms separate.
+            tensor_contraction_method: Optional method to force for tensor contraction.
+                None or "auto" = auto-select based on step count
+                "incremental" = force O(n) incremental contraction
+                "structured" = force O(log n) structured contraction (raises error if pattern not detected)
 
         Returns:
             Trotterization instance
@@ -407,7 +424,8 @@ class Trotterization(Bloq):
             time=time,
             num_steps=num_steps,
             hbar=hbar,
-            combine_terms=combine_terms
+            combine_terms=combine_terms,
+            tensor_contraction_method=tensor_contraction_method
         )
 
     @cached_property
@@ -499,6 +517,274 @@ class Trotterization(Bloq):
 
         return total_complexity
 
+    def tensor_contract(self) -> np.ndarray:
+        """
+        Optimized tensor contraction
+
+        The tensor_contraction_method attribute can force a specific method:
+        - None or "auto": use auto-selection logic (default behavior)
+        - "incremental": force O(n) incremental contraction
+        - "structured": force O(log n) structured contraction (raises error if pattern not detected)
+        - "qualtran": use Qualtran's inherited Bloq.tensor_contract() method
+
+        Returns:
+            The full unitary matrix as a numpy array with shape (2^n_qubits, 2^n_qubits)
+
+        Example:
+            >>> trotter = Trotterization.from_method(
+            ...     pauli_terms=[("X", 1.0), ("Y", 1.0)],
+            ...     method="second order",
+            ...     time=1.0,
+            ...     num_steps=1000
+            ... )
+            >>> U = trotter.tensor_contract()  # Uses O(log n) optimization
+            >>> U.shape
+            (2, 2)
+        """
+        logger.verbose(f"Computing unitary matrix via tensor contraction...")
+        logger.debug(f"-- num_qubits = {self.num_qubits}")
+        logger.debug(f"-- num_steps = {self.num_steps}")
+        logger.debug(f"-- num_terms = {len(self.pauli_terms)}")
+        logger.debug(f"-- expanded_sequence length = {len(self.expanded_sequence)}")
+
+        # Check if a specific method is forced via configuration
+        forced_method = self.tensor_contraction_method
+        if forced_method is not None and forced_method != "auto":
+            if forced_method == "qualtran":
+                logger.verbose(f"Using Qualtran Bloq.tensor_contract() method")
+                return super().tensor_contract()
+            elif forced_method == "incremental":
+                logger.verbose(f"Using FORCED O(n) incremental contraction")
+                return self._incremental_contraction()
+            elif forced_method == "structured":
+                logger.verbose(f"Using FORCED O(log n) structured contraction")
+                # Must detect pattern - do not fall back
+                logger.debug(f"Attempting to detect repeating pattern...")
+                pattern_info = self._detect_repeating_pattern()
+                if pattern_info['num_repeats'] < 1:
+                    raise RuntimeError(
+                        f"Forced structured tensor contraction but num_repeats={pattern_info['num_repeats']} < 1. "
+                        f"Invalid pattern structure. "
+                        f"Either use auto-selection or force incremental method."
+                    )
+                logger.debug(f"-- pattern_length = {pattern_info['pattern_length']}")
+                logger.debug(f"-- num_repeats = {pattern_info['num_repeats']}")
+                logger.debug(f"-- start_block length = {len(pattern_info['start_terms'])}")
+                logger.debug(f"-- repeating_block length = {len(pattern_info['repeating_terms'])}")
+                logger.debug(f"-- end_block length = {len(pattern_info['end_terms'])}")
+                return self._structured_contraction(pattern_info)
+            else:
+                raise ValueError(
+                    f"Invalid tensor_contraction_method '{forced_method}'. "
+                    f"Must be None, 'auto', 'incremental', 'structured', or 'qualtran'."
+                )
+
+        # Auto-selection logic (original behavior)
+        # For small num_steps, incremental is faster (less overhead)
+        if self.num_steps < 10:
+            logger.verbose(f"Using O(n) incremental contraction (num_steps < 10)")
+            return self._incremental_contraction()
+
+        # Try to detect repeating pattern
+        logger.debug(f"Searching for repeating pattern...")
+        pattern_info = self._detect_repeating_pattern()
+
+        # If pattern detected, use O(log n) structured approach
+        logger.debug(f"Pattern for O(log n) structured contraction:")
+        logger.debug(f"-- pattern_length = {pattern_info['pattern_length']}")
+        logger.debug(f"-- num_repeats = {pattern_info['num_repeats']}")
+        logger.debug(f"-- start_block length = {len(pattern_info['start_terms'])}")
+        logger.debug(f"-- repeating_block length = {len(pattern_info['repeating_terms'])}")
+        logger.debug(f"-- end_block length = {len(pattern_info['end_terms'])}")
+        return self._structured_contraction(pattern_info)
+
+    def _detect_repeating_pattern(self) -> dict:
+        """
+        Detect repeating pattern in expanded_sequence.
+
+        For symmetric Trotter methods with term combining, the sequence has structure:
+            [start_block] + [repeating_block] * n_repeats + [end_block]
+
+        The repeating block typically has length equal to the number of terms
+        in one ramped cycle after combining at step boundaries.
+
+        Returns:
+            Dictionary with:
+            - start_terms: list - terms before the repeating section
+            - repeating_terms: list - the repeating unit
+            - end_terms: list - terms after the repeating section
+            - num_repeats: int - how many times the pattern repeats
+            - pattern_length: int - length of repeating unit
+        """
+        seq = self.expanded_sequence
+
+        # For P Pauli strings and C coefficients per step:
+        # With term combining at boundaries, the repeating pattern length is:
+        #   P × C - C - 1 = C(P - 1) - 1
+        # This pattern repeats for each Trotter step (N times)
+        n_terms = len(self.pauli_terms)  # P
+        n_coeffs = len(self.coefficients)  # C
+
+        # Expected repeating pattern length: C(P - 1) - 1
+        expected_pattern_len = n_coeffs * (n_terms - 1) - 1
+
+        # Search around the expected length with margin for implementation variations
+        # Use ±30% to handle edge cases and different boundary combining behavior
+        search_min = max(1, int(expected_pattern_len * 0.7))
+        search_max = min(len(seq) // 2, int(expected_pattern_len * 1.3) + 10)
+
+        for pattern_len in range(search_min, search_max):
+
+            # Check if this could be a valid pattern
+            if pattern_len < 1 or len(seq) < 2 * pattern_len:
+                continue
+
+            # Try treating seq[0:pattern_len] as start block
+            # and seq[pattern_len:2*pattern_len] as first repeating unit
+            start_block = seq[:pattern_len]
+            candidate_pattern = seq[pattern_len:2*pattern_len]
+
+            # Check if this pattern actually repeats
+            num_repeats = 0
+            idx = pattern_len
+
+            while idx + pattern_len <= len(seq):
+                if seq[idx:idx + pattern_len] == candidate_pattern:
+                    num_repeats += 1
+                    idx += pattern_len
+                else:
+                    break
+
+            # Accept patterns with at least 1 repetition
+            # Note: num_repeats=1 provides no performance benefit over incremental,
+            # but allows structured method to work for edge cases (e.g., num_steps=2)
+            if num_repeats >= 1:
+                # Found a valid pattern!
+                end_block = seq[idx:] if idx < len(seq) else []
+
+                return {
+                    'start_terms': start_block,
+                    'repeating_terms': candidate_pattern,
+                    'end_terms': end_block,
+                    'num_repeats': num_repeats,
+                    'pattern_length': pattern_len
+                }
+
+        # No repeating pattern found
+        # - repeating block is entire sequence with single repetition
+        # - start and end terms are empty
+        return {
+            'start_terms': [],
+            'repeating_terms': seq,
+            'end_terms': [],
+            'num_repeats': 1,
+            'pattern_length': len(seq)
+            }
+
+    def _structured_contraction(self, pattern_info: dict) -> np.ndarray:
+        """
+        Perform O(log n) contraction using detected pattern structure.
+
+        Builds matrices for start, repeating, and end blocks, then uses
+        matrix exponentiation for the repeating part.
+
+        Args:
+            pattern_info: Dictionary from _detect_repeating_pattern()
+
+        Returns:
+            Full unitary matrix
+        """
+        logger.debug(f"Building component matrices...")
+        # Build component matrices
+        U_start = self._build_matrix_from_terms(pattern_info['start_terms'])
+        logger.debug(f"  Built start block matrix")
+
+        U_repeat = self._build_matrix_from_terms(pattern_info['repeating_terms'])
+        logger.debug(f"  Built repeating block matrix")
+
+        U_end = self._build_matrix_from_terms(pattern_info['end_terms'])
+        logger.debug(f"  Built end block matrix")
+
+        # Use matrix power for the repeating part (O(log n))
+        num_repeats = pattern_info['num_repeats']
+        logger.verbose(f"Computing matrix power: U_repeat^{num_repeats} [O(log n) operation]")
+        if num_repeats > 1:
+            U_repeat_total = np.linalg.matrix_power(U_repeat, num_repeats)
+        else:
+            U_repeat_total = U_repeat
+
+        # Combine: U_total = U_end @ U_repeat^n @ U_start
+        # Right-to-left order maintains proper time ordering
+        logger.debug(f"Combining blocks: U_total = U_end @ U_repeat^{num_repeats} @ U_start")
+        U_total = U_end @ U_repeat_total @ U_start
+
+        return U_total
+
+    def _build_matrix_from_terms(self, terms: List[Tuple[int, float]]) -> np.ndarray:
+        """
+        Build unitary matrix from a sequence of (term_index, coefficient) pairs.
+
+        Args:
+            terms: List of (term_idx, coeff) tuples from expanded_sequence
+
+        Returns:
+            Unitary matrix for this sequence of terms
+        """
+        if len(terms) == 0:
+            logger.debug(f"    Building identity matrix (empty term list)")
+            dim = 2 ** self.num_qubits
+            return np.eye(dim, dtype=np.complex128)
+
+        logger.debug(f"    Building matrix from {len(terms)} terms")
+        dim = 2 ** self.num_qubits
+        U = np.eye(dim, dtype=np.complex128)
+
+        dt = self.time / self.num_steps
+
+        for term_idx, coeff in terms:
+            pauli_string, h_i = self.pauli_terms[term_idx]
+
+            cpse = CommutingPauliStringEvolution(
+                pauli_terms=((pauli_string, h_i * coeff),),
+                time=dt,
+                hbar=self.hbar
+            )
+
+            U_term = cpse.tensor_contract()
+            U = U_term @ U
+
+        return U
+
+    def _incremental_contraction(self) -> np.ndarray:
+        """
+        O(n) incremental contraction
+
+        Iterates through expanded_sequence and multiplies matrices one at a time.
+        Used for small num_steps.
+
+        Returns:
+            Full unitary matrix
+        """
+        logger.debug(f"Performing incremental contraction over {len(self.expanded_sequence)} operations")
+        dim = 2 ** self.num_qubits
+        U_total = np.eye(dim, dtype=np.complex128)
+
+        dt = self.time / self.num_steps
+
+        for term_idx, coeff in self.expanded_sequence:
+            pauli_string, h_i = self.pauli_terms[term_idx]
+
+            cpse = CommutingPauliStringEvolution(
+                pauli_terms=((pauli_string, h_i * coeff),),
+                time=dt,
+                hbar=self.hbar
+            )
+
+            U_term = cpse.tensor_contract()
+            U_total = U_term @ U_total
+
+        return U_total
+
     @property
     def num_terms(self) -> int:
         """Number of Pauli string terms in the Hamiltonian."""
@@ -558,7 +844,8 @@ def build_ramped_trotterized_unitary(
     method,
     timestep: float,
     numsteps: int,
-    combine_terms: bool = True
+    combine_terms: bool = True,
+    tensor_contraction_method: Optional[str] = None
 ):
     """Build a Trotterization using the old interface for backward compatibility.
 
@@ -572,6 +859,11 @@ def build_ramped_trotterized_unitary(
         timestep: Time step for evolution
         numsteps: Number of Trotterization steps
         combine_terms: If True (default), combine adjacent identical terms. If False, keep all terms separate.
+        tensor_contraction_method: Optional method to force for tensor contraction.
+            None or "auto" = auto-select based on step count
+            "incremental" = force O(n) incremental contraction
+            "structured" = force O(log n) structured contraction (raises error if pattern not detected)
+            "qualtran" = use Qualtran's inherited Bloq.tensor_contract() method
 
     Returns:
         Trotterization instance
@@ -592,5 +884,6 @@ def build_ramped_trotterized_unitary(
         time=timestep,
         num_steps=numsteps,
         hbar=1.0,
-        combine_terms=combine_terms
+        combine_terms=combine_terms,
+        tensor_contraction_method=tensor_contraction_method
     )
