@@ -43,7 +43,6 @@ class PauliStringLCU(LCUBlockEncoding):
         n_pad    =  n_tot - n_terms
 
         weights = [np.sqrt(np.abs(t.coefficient)) for t in pauli_terms]
-        weights.extend([0.0 for _ in range(n_pad)])
         alpha = np.sum([np.abs(t.coefficient) for t in pauli_terms])
 
         selection_bitsize = int(np.ceil(np.log2(n_tot)))
