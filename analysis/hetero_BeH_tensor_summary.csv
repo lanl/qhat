@@ -1,0 +1,9 @@
+config_path,tensor_path,molecule,bond_length,basis,active_occupied,active_vacant,n_qubits,status,error
+hamiltonian_generator/library/Be-H/1.47/hgbs-5/Be-H_1.47_hgbs-5_as-001-001_JW.config,/Users/a_lee/Repos/qhat/hamiltonian_generator/library/Be-H/1.47/hgbs-5/Be-H_1.47_hgbs-5_as-001-001.tensors.npz,Be-H,1.474,hgbs-5,1,1,2,success,
+hamiltonian_generator/library/Be-H/1.47/hgbs-5/Be-H_1.47_hgbs-5_as-001-003_JW.config,/Users/a_lee/Repos/qhat/hamiltonian_generator/library/Be-H/1.47/hgbs-5/Be-H_1.47_hgbs-5_as-001-003.tensors.npz,Be-H,1.474,hgbs-5,1,3,4,success,
+hamiltonian_generator/library/Be-H/1.47/hgbs-5/Be-H_1.47_hgbs-5_as-003-003_JW.config,/Users/a_lee/Repos/qhat/hamiltonian_generator/library/Be-H/1.47/hgbs-5/Be-H_1.47_hgbs-5_as-003-003.tensors.npz,Be-H,1.474,hgbs-5,3,3,6,success,
+hamiltonian_generator/library/Be-H/1.47/hgbs-5/Be-H_1.47_hgbs-5_as-003-005_JW.config,/Users/a_lee/Repos/qhat/hamiltonian_generator/library/Be-H/1.47/hgbs-5/Be-H_1.47_hgbs-5_as-003-005.tensors.npz,Be-H,1.474,hgbs-5,3,5,8,success,
+hamiltonian_generator/library/Be-H/1.47/sto-6g/Be-H_1.47_sto-6g_as-001-001_JW.config,/Users/a_lee/Repos/qhat/hamiltonian_generator/library/Be-H/1.47/sto-6g/Be-H_1.47_sto-6g_as-001-001.tensors.npz,Be-H,1.474,sto-6g,1,1,2,success,
+hamiltonian_generator/library/Be-H/1.47/sto-6g/Be-H_1.47_sto-6g_as-001-003_JW.config,/Users/a_lee/Repos/qhat/hamiltonian_generator/library/Be-H/1.47/sto-6g/Be-H_1.47_sto-6g_as-001-003.tensors.npz,Be-H,1.474,sto-6g,1,3,4,success,
+hamiltonian_generator/library/Be-H/1.47/sto-6g/Be-H_1.47_sto-6g_as-003-003_JW.config,/Users/a_lee/Repos/qhat/hamiltonian_generator/library/Be-H/1.47/sto-6g/Be-H_1.47_sto-6g_as-003-003.tensors.npz,Be-H,1.474,sto-6g,3,3,6,success,
+hamiltonian_generator/library/Be-H/1.47/sto-6g/Be-H_1.47_sto-6g_as-003-005_JW.config,/Users/a_lee/Repos/qhat/hamiltonian_generator/library/Be-H/1.47/sto-6g/Be-H_1.47_sto-6g_as-003-005.tensors.npz,Be-H,1.474,sto-6g,3,5,8,success,

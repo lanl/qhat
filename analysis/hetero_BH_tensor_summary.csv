@@ -1,0 +1,7 @@
+config_path,tensor_path,molecule,bond_length,basis,active_occupied,active_vacant,n_qubits,status,error
+hamiltonian_generator/library/B-H/1.29/hgbs-5/B-H_1.29_hgbs-5_as-002-002_JW.config,/Users/a_lee/Repos/qhat/hamiltonian_generator/library/B-H/1.29/hgbs-5/B-H_1.29_hgbs-5_as-002-002.tensors.npz,B-H,1.287,hgbs-5,2,2,4,success,
+hamiltonian_generator/library/B-H/1.29/hgbs-5/B-H_1.29_hgbs-5_as-002-004_JW.config,/Users/a_lee/Repos/qhat/hamiltonian_generator/library/B-H/1.29/hgbs-5/B-H_1.29_hgbs-5_as-002-004.tensors.npz,B-H,1.287,hgbs-5,2,4,6,success,
+hamiltonian_generator/library/B-H/1.29/hgbs-5/B-H_1.29_hgbs-5_as-004-004_JW.config,/Users/a_lee/Repos/qhat/hamiltonian_generator/library/B-H/1.29/hgbs-5/B-H_1.29_hgbs-5_as-004-004.tensors.npz,B-H,1.287,hgbs-5,4,4,8,success,
+hamiltonian_generator/library/B-H/1.29/sto-6g/B-H_1.29_sto-6g_as-002-002_JW.config,/Users/a_lee/Repos/qhat/hamiltonian_generator/library/B-H/1.29/sto-6g/B-H_1.29_sto-6g_as-002-002.tensors.npz,B-H,1.287,sto-6g,2,2,4,success,
+hamiltonian_generator/library/B-H/1.29/sto-6g/B-H_1.29_sto-6g_as-002-004_JW.config,/Users/a_lee/Repos/qhat/hamiltonian_generator/library/B-H/1.29/sto-6g/B-H_1.29_sto-6g_as-002-004.tensors.npz,B-H,1.287,sto-6g,2,4,6,success,
+hamiltonian_generator/library/B-H/1.29/sto-6g/B-H_1.29_sto-6g_as-004-004_JW.config,/Users/a_lee/Repos/qhat/hamiltonian_generator/library/B-H/1.29/sto-6g/B-H_1.29_sto-6g_as-004-004.tensors.npz,B-H,1.287,sto-6g,4,4,8,success,
