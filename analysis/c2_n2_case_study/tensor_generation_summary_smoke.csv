@@ -1,0 +1,3 @@
+molecule,bond_length,basis,total_electrons,total_spin_orbitals,active_occupied,active_vacant,n_qubits,config_path,tensor_path,config_status,tensor_status,error
+C-C,1.50000000,sto-6g,12,20,2,2,4,hamiltonian_generator/comparable_diatomic_library/C-C/1.50/sto-6g/C-C_1.50_sto-6g_as-002-002_JW.config,/Users/a_lee/Repos/qhat/hamiltonian_generator/comparable_diatomic_library/C-C/1.50/sto-6g/C-C_1.50_sto-6g_as-002-002.tensors.npz,existing,written,
+N-N,1.42000000,sto-6g,14,20,2,2,4,hamiltonian_generator/comparable_diatomic_library/N-N/1.42/sto-6g/N-N_1.42_sto-6g_as-002-002_JW.config,/Users/a_lee/Repos/qhat/hamiltonian_generator/comparable_diatomic_library/N-N/1.42/sto-6g/N-N_1.42_sto-6g_as-002-002.tensors.npz,existing,written,
