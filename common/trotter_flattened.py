@@ -344,16 +344,31 @@ class Trotterization(Bloq):
             object.__setattr__(self, "_repeat_core", tuple(combined))
 
             # Combine across steps
-            head_idx, head_coeff = self._repeat_core[0]
-            tail_idx, tail_coeff = self._repeat_core[-1]
-            if head_idx == tail_idx:
-                merged_idx = head_idx
-                merged_coeff = head_coeff + tail_coeff
-                object.__setattr__(self, "_repeat_core", self._repeat_core[1:-1])
-                object.__setattr__(self, "_repeat_bridge", ((merged_idx, merged_coeff),))
-                object.__setattr__(self, "_prologue", ((head_idx, head_coeff),))
-                object.__setattr__(self, "_epilogue", ((tail_idx, tail_coeff),))
-                object.__setattr__(self, "_symmetric_bookends", head_coeff == tail_coeff)
+            if len(self._repeat_core) == 1:
+                # The point of taking multiple Trotter steps is to lower the error that comes from
+                # the Trotterization process.  That error arises from having multiple terms in the
+                # Hamiltonian that do not commute with each other.  If you only have a single term
+                # in your Hamiltonian, then no error can arise from non-commutation.  This is a
+                # silly application of multi-step Trotterization, so something odd is already
+                # happening.  But the best resolution is to combine all the steps together.
+                idx = self._repeat_core[0][0]
+                coeff = self._repeat_core[0][1] * self.num_steps
+                object.__setattr__(self, "_repeat_core", ((idx, coeff),))
+                object.__setattr__(self, "num_steps", 1)
+            else:
+                # Two terms will never combine across steps, because they would have already been
+                # combined within a step.  At this point you have at least three terms, or you have
+                # two terms that are different and therefore cannot combine across steps.
+                head_idx, head_coeff = self._repeat_core[0]
+                tail_idx, tail_coeff = self._repeat_core[-1]
+                if head_idx == tail_idx:
+                    merged_idx = head_idx
+                    merged_coeff = head_coeff + tail_coeff
+                    object.__setattr__(self, "_repeat_core", self._repeat_core[1:-1])
+                    object.__setattr__(self, "_repeat_bridge", ((merged_idx, merged_coeff),))
+                    object.__setattr__(self, "_prologue", ((head_idx, head_coeff),))
+                    object.__setattr__(self, "_epilogue", ((tail_idx, tail_coeff),))
+                    object.__setattr__(self, "_symmetric_bookends", head_coeff == tail_coeff)
 
         def trm_str(sequence):
             n = len(sequence)
