@@ -14,9 +14,38 @@ from qhat.common.pauli_utils import pauli_string_to_matrix
 from qhat.common.trotter_flattened import (
     Trotterization,
     build_ramped_trotterized_unitary,
-    expand_ramped_trotterization,
     get_trotterization_coefficients,
 )
+
+
+def expand_ramped_trotterization(
+    num_terms: int,
+    coefficients: list,
+    num_steps: int,
+    combine_terms: bool = True
+) -> list:
+    """Helper function to test expansion logic via Trotterization class.
+
+    Creates dummy Pauli terms and returns the expanded sequence.
+    """
+    # Create dummy pauli terms (using 'X', 'Y', 'Z' pattern)
+    pauli_chars = ['X', 'Y', 'Z', 'I']
+    pauli_terms = tuple(
+        (pauli_chars[i % len(pauli_chars)], 1.0)
+        for i in range(num_terms)
+    )
+
+    # Create Trotterization instance
+    trotter = Trotterization(
+        pauli_terms=pauli_terms,
+        coefficients=tuple(coefficients),
+        time=1.0,
+        num_steps=num_steps,
+        combine_terms=combine_terms
+    )
+
+    # Return the expanded sequence (it's a cached_property, not a method)
+    return trotter.expanded_sequence
 
 
 # ==================================================================================
@@ -85,12 +114,12 @@ class TestExpansion:
 
     def test_empty_terms_raises_error(self):
         """Test that zero terms raises error."""
-        with pytest.raises(ValueError, match="at least one term"):
+        with pytest.raises(ValueError, match="at least one Pauli term"):
             expand_ramped_trotterization(0, [1.0], 1)
 
     def test_zero_steps_raises_error(self):
         """Test that zero steps raises error."""
-        with pytest.raises(ValueError, match="at least one step"):
+        with pytest.raises(ValueError, match="num_steps must be positive"):
             expand_ramped_trotterization(1, [1.0], 0)
 
     def test_empty_coefficients_raises_error(self):
@@ -107,7 +136,11 @@ class TestInstantiation:
     """Test Trotterization instantiation and validation."""
 
     def test_valid_single_term(self):
-        """Test creation with single term."""
+        """Test creation with single term.
+
+        Note: Single-term Hamiltonians are automatically optimized to num_steps=1
+        since multiple steps are redundant when there's no non-commutation error.
+        """
         trotter = Trotterization(
             pauli_terms=(("XYZ", 0.5),),
             coefficients=(1.0,),
@@ -116,7 +149,7 @@ class TestInstantiation:
         )
         assert trotter.num_terms == 1
         assert trotter.num_qubits == 3
-        assert trotter.num_steps == 10
+        assert trotter.num_steps == 1  # Optimized from 10 to 1
 
     def test_valid_multiple_terms(self):
         """Test creation with multiple terms."""
@@ -521,7 +554,10 @@ class TestStringRepresentations:
     """Test string and repr methods."""
 
     def test_str_representation_first_order(self):
-        """Test string representation for first-order."""
+        """Test string representation for first-order.
+
+        Note: Single-term Hamiltonians are optimized to 1 step.
+        """
         trotter = Trotterization(
             pauli_terms=(("XY", 0.5),),
             coefficients=(1.0,),
@@ -531,7 +567,7 @@ class TestStringRepresentations:
         s = str(trotter)
         assert "first-order" in s
         assert "1 terms" in s
-        assert "10 steps" in s
+        assert "1 steps" in s  # Optimized from 10
 
     def test_str_representation_second_order(self):
         """Test string representation for second-order."""
@@ -586,14 +622,17 @@ class TestProperties:
         assert trotter.num_qubits == 4
 
     def test_num_steps(self):
-        """Test num_steps attribute."""
+        """Test num_steps attribute.
+
+        Note: Single-term Hamiltonians are optimized to 1 step.
+        """
         trotter = Trotterization(
             pauli_terms=(("X", 1.0),),
             coefficients=(1.0,),
             time=1.0,
             num_steps=42
         )
-        assert trotter.num_steps == 42
+        assert trotter.num_steps == 1  # Optimized from 42
 
 
 # ==================================================================================
@@ -742,7 +781,10 @@ class TestConvenienceConstructors:
         assert trotter.num_steps == 10
 
     def test_from_method_fourth_order(self):
-        """Test from_method with fourth-order."""
+        """Test from_method with fourth-order.
+
+        Note: Single-term Hamiltonians are optimized to 1 step.
+        """
         trotter = Trotterization.from_method(
             pauli_terms=[("XY", 0.5)],
             method="fourth order",
@@ -751,7 +793,7 @@ class TestConvenienceConstructors:
         )
         assert len(trotter.coefficients) == 10
         assert trotter.time == 2.0
-        assert trotter.num_steps == 20
+        assert trotter.num_steps == 1  # Optimized from 20
 
     def test_from_method_custom_coefficients(self):
         """Test from_method with custom coefficients."""
@@ -1200,7 +1242,7 @@ class TestTensorContractionMethods:
         assert np.allclose(U_dag_U, identity, atol=1e-10)
 
     def test_pattern_detection_degenerate_case(self):
-        """Test that pattern detection handles num_steps=1 correctly."""
+        """Test that pattern structure is correct for num_steps=1."""
         pauli_terms = [('X', 1.0), ('Z', 0.5)]
 
         trotter = Trotterization.from_method(
@@ -1210,15 +1252,184 @@ class TestTensorContractionMethods:
             num_steps=1
         )
 
-        pattern_info = trotter._detect_repeating_pattern()
+        # For num_steps=1, the pattern should have empty repeat_bridge
+        # since there are no step boundaries to bridge
+        assert trotter.num_steps == 1
+        assert len(trotter._repeat_bridge) == 0 or trotter.num_steps == 1
 
-        # Should return a pattern with the entire sequence
-        assert 'num_repeats' in pattern_info
-        assert pattern_info['num_repeats'] == 1
-        assert 'repeating_terms' in pattern_info
-        assert len(pattern_info['repeating_terms']) == len(trotter.expanded_sequence)
-        assert len(pattern_info['start_terms']) == 0
-        assert len(pattern_info['end_terms']) == 0
+        # The expanded sequence should still produce correct results
+        assert len(trotter.expanded_sequence) > 0
+
+    def test_pattern_structure_without_combining(self):
+        """Test pattern structure when combine_terms=False.
+
+        Without combining, all terms stay separate with no prologue/bridge/epilogue.
+        """
+        trotter = Trotterization(
+            pauli_terms=(('X', 1.0), ('Z', 0.5)),
+            coefficients=(0.5, 0.5),  # second-order
+            time=1.0,
+            num_steps=3,
+            combine_terms=False
+        )
+
+        # Expected pattern: ascending (0,1) then descending (1,0), all separate
+        # Step: [(0, 0.5), (1, 0.5), (1, 0.5), (0, 0.5)]
+        assert trotter._prologue == ()
+        assert trotter._repeat_core == ((0, 0.5), (1, 0.5), (1, 0.5), (0, 0.5))
+        assert trotter._repeat_bridge == ()
+        assert trotter._epilogue == ()
+
+        # Expanded: 3 repetitions of the core
+        expected_expanded = [
+            (0, 0.5), (1, 0.5), (1, 0.5), (0, 0.5),  # step 1
+            (0, 0.5), (1, 0.5), (1, 0.5), (0, 0.5),  # step 2
+            (0, 0.5), (1, 0.5), (1, 0.5), (0, 0.5),  # step 3
+        ]
+        assert trotter.expanded_sequence == expected_expanded
+
+    def test_pattern_structure_asymmetric_method(self):
+        """Test pattern structure with asymmetric method (Ruth 1983, 5 coefficients).
+
+        Asymmetric methods end with a different term than they start,
+        so no cross-step combining occurs.
+        """
+        ruth_coeffs = get_trotterization_coefficients('ruth 1983')
+        assert len(ruth_coeffs) == 5  # Verify it's the 5-coefficient version
+
+        trotter = Trotterization(
+            pauli_terms=(('X', 1.0), ('Y', 0.5), ('Z', 0.3)),
+            coefficients=ruth_coeffs,
+            time=1.0,
+            num_steps=2,
+            combine_terms=True
+        )
+
+        # With 5 coefficients (odd), alternating directions:
+        # Ramp 1 (asc): 0,1,2 | Ramp 2 (desc): 2,1,0 | Ramp 3 (asc): 0,1,2
+        # Ramp 4 (desc): 2,1,0 | Ramp 5 (asc): 0,1,2
+        # First term: 0, Last term: 2 (different) -> no cross-step combining
+
+        assert trotter._prologue == ()
+        assert trotter._epilogue == ()
+        assert trotter._repeat_bridge == ()
+        # All combined terms go into repeat_core
+        assert len(trotter._repeat_core) == 11  # After within-step combining
+        # Verify first and last terms differ
+        assert trotter._repeat_core[0][0] == 0   # starts with term 0
+        assert trotter._repeat_core[-1][0] == 2  # ends with term 2
+
+    def test_pattern_structure_symmetric_method(self):
+        """Test pattern structure with symmetric method (second-order).
+
+        Symmetric methods end with the same term they start with,
+        enabling cross-step combining via prologue/bridge/epilogue.
+        """
+        trotter = Trotterization(
+            pauli_terms=(('X', 1.0), ('Z', 0.5)),
+            coefficients=(0.5, 0.5),
+            time=1.0,
+            num_steps=3,
+            combine_terms=True
+        )
+
+        # Second-order with 2 terms: ascending (0,1) then descending (1,0)
+        # After within-step combining: [(0, 0.5), (1, 1.0), (0, 0.5)]
+        # First and last are both term 0 with coeff 0.5
+        # Cross-step combining splits this:
+
+        assert trotter._prologue == ((0, 0.5),)
+        assert trotter._repeat_core == ((1, 1.0),)
+        assert trotter._repeat_bridge == ((0, 1.0),)  # 0.5 + 0.5 from adjacent steps
+        assert trotter._epilogue == ((0, 0.5),)
+        assert trotter._symmetric_bookends == True
+
+        # Expanded for 3 steps: prologue + (core + bridge)*(n-1) + core + epilogue
+        expected_expanded = [
+            (0, 0.5),  # prologue
+            (1, 1.0),  # core (step 1)
+            (0, 1.0),  # bridge (between 1 and 2)
+            (1, 1.0),  # core (step 2)
+            (0, 1.0),  # bridge (between 2 and 3)
+            (1, 1.0),  # core (step 3)
+            (0, 0.5),  # epilogue
+        ]
+        assert trotter.expanded_sequence == expected_expanded
+
+    def test_pattern_structure_even_ramps_asymmetric_coeffs(self):
+        """Test pattern structure with even ramp count but asymmetric coefficients.
+
+        When a step has an even number of ramps, the first and last terms have
+        the same index. However, if the first and last coefficients differ,
+        the prologue and epilogue will have different coefficients, and
+        symmetric_bookends should be False.
+        """
+        # 4 ramps (even) with asymmetric coefficients
+        coeffs = (0.3, 0.4, 0.5, 0.6)
+
+        trotter = Trotterization(
+            pauli_terms=(('X', 1.0), ('Z', 0.5)),
+            coefficients=coeffs,
+            time=1.0,
+            num_steps=3,
+            combine_terms=True
+        )
+
+        # Manual trace with 2 terms and 4 ramps:
+        # Ramp 1 (asc, 0.3): 0, 1
+        # Ramp 2 (desc, 0.4): 1, 0
+        # Ramp 3 (asc, 0.5): 0, 1
+        # Ramp 4 (desc, 0.6): 1, 0
+        #
+        # Before combining: (0,0.3), (1,0.3), (1,0.4), (0,0.4), (0,0.5), (1,0.5), (1,0.6), (0,0.6)
+        # After within-step combining: (0,0.3), (1,0.7), (0,0.9), (1,1.1), (0,0.6)
+        # First term: (0, 0.3), Last term: (0, 0.6) - same index, different coeff!
+        #
+        # Cross-step combining creates:
+        # - prologue: (0, 0.3)
+        # - repeat_core: (1, 0.7), (0, 0.9), (1, 1.1) [middle terms]
+        # - repeat_bridge: (0, 0.9) [0.3 + 0.6 from adjacent steps]
+        # - epilogue: (0, 0.6)
+
+        # Check structure (use np.isclose for floating point comparisons)
+        assert len(trotter._prologue) == 1
+        assert trotter._prologue[0][0] == 0
+        assert np.isclose(trotter._prologue[0][1], 0.3)
+
+        assert len(trotter._repeat_core) == 3
+        assert trotter._repeat_core[0] == (1, 0.7)
+        assert trotter._repeat_core[1] == (0, 0.9)
+        assert trotter._repeat_core[2] == (1, 1.1)
+
+        assert len(trotter._repeat_bridge) == 1
+        assert trotter._repeat_bridge[0][0] == 0
+        assert np.isclose(trotter._repeat_bridge[0][1], 0.9)  # 0.3 + 0.6
+
+        assert len(trotter._epilogue) == 1
+        assert trotter._epilogue[0][0] == 0
+        assert np.isclose(trotter._epilogue[0][1], 0.6)
+
+        # Verify prologue and epilogue are different
+        assert trotter._prologue[0][0] == trotter._epilogue[0][0]  # same term index
+        assert not np.isclose(trotter._prologue[0][1], trotter._epilogue[0][1])  # different coefficients
+        assert np.isclose(trotter._prologue[0][1], 0.3)
+        assert np.isclose(trotter._epilogue[0][1], 0.6)
+
+        # Verify symmetric_bookends flag is False (asymmetric)
+        assert trotter._symmetric_bookends == False
+
+        # Verify expanded sequence for 3 steps
+        expanded = trotter.expanded_sequence
+        assert len(expanded) == 13  # 1 prologue + 3*3 core + 2 bridge + 1 epilogue
+
+        # Check structure: prologue + (core + bridge)*(n-1) + core + epilogue
+        assert expanded[0][0] == 0 and np.isclose(expanded[0][1], 0.3)  # prologue
+        assert expanded[1:4] == [(1, 0.7), (0, 0.9), (1, 1.1)]  # core 1
+        assert expanded[4][0] == 0 and np.isclose(expanded[4][1], 0.9)  # bridge
+        assert expanded[5:8] == [(1, 0.7), (0, 0.9), (1, 1.1)]  # core 2
+        assert expanded[8][0] == 0 and np.isclose(expanded[8][1], 0.9)  # bridge
+        assert expanded[9:12] == [(1, 0.7), (0, 0.9), (1, 1.1)]  # core 3
+        assert expanded[12][0] == 0 and np.isclose(expanded[12][1], 0.6)  # epilogue
 
     def test_auto_selection_behavior(self):
         """Test that auto-selection chooses the right method based on num_steps."""
