@@ -315,12 +315,7 @@ def test_mapping_and_metadata_record_configured_threshold():
         == 0.0
     )
 
-    assert (
-        state.metadata[
-            "Pauli-string coefficient threshold (Hartrees)"
-        ]
-        == hamgen.PAULI_STRING_COEFFICIENT_THRESHOLD
-    )
+    assert "Pauli-string coefficient threshold (Hartrees)" not in state.metadata
 
 
 @pytest.mark.parametrize(
@@ -338,13 +333,13 @@ def test_mapping_and_metadata_record_configured_threshold():
         ),
     ],
 )
-def test_pauli_string_threshold_applies_to_jw_and_bk(
+def test_mapping_does_not_apply_additional_pauli_string_threshold(
     monkeypatch,
     mapping_setting,
     mapping_name,
     mapper_name,
 ):
-    threshold = hamgen.PAULI_STRING_COEFFICIENT_THRESHOLD
+    threshold = DEFAULT_COEFFICIENT_THRESHOLD
 
     # Assign terms directly so OpenFermion does not remove the synthetic
     # below-threshold coefficient before QHAT receives the mapped operator.
@@ -379,8 +374,9 @@ def test_pauli_string_threshold_applies_to_jw_and_bk(
         active_operator,
     )
 
-    # A coefficient strictly below the fixed threshold is removed.
-    assert ((0, "X"),) not in result.terms
+    # QHAT preserves all terms returned by OpenFermion, including coefficients
+    # below the tensor-construction threshold.
+    assert result.terms[((0, "X"),)] == 0.5 * threshold
 
     # A coefficient exactly equal to the threshold is retained.
     assert result.terms[((0, "Y"),)] == threshold
@@ -392,26 +388,21 @@ def test_pauli_string_threshold_applies_to_jw_and_bk(
     assert result.terms[tuple()] == 1.0
 
     assert result.f2q_mapping == mapping_name
-    assert result.pauli_coefficient_threshold == threshold
-    assert len(result.terms) == 3
+    assert not hasattr(result, "pauli_coefficient_threshold")
+    assert len(result.terms) == 4
 
     hamgen.compute_metadata(
         state,
         result,
     )
 
-    assert (
-        state.metadata[
-            "Pauli-string coefficient threshold (Hartrees)"
-        ]
-        == threshold
-    )
+    assert "Pauli-string coefficient threshold (Hartrees)" not in state.metadata
 
     assert (
         state.metadata[
             "number of terms in sum of Pauli strings"
         ]
-        == 3
+        == 4
     )
 
 
