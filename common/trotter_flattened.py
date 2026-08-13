@@ -323,20 +323,6 @@ class Trotterization(Bloq):
             ascending = not ascending
         object.__setattr__(self, "_repeat_core", tuple(repeat_core))
 
-        logger.debug("Basic Pattern:")
-        logger.debug(f"-- prologue ({len(self._prologue)} terms)")
-        for idx, coeff in self._prologue:
-            logger.debug(f"   -- {coeff:13.6e} {idx:>9}")
-        logger.debug(f"-- repeat core ({len(self._repeat_core)} terms x {self.num_steps} repetitions)")
-        for idx, coeff in self._repeat_core:
-            logger.debug(f"   -- {coeff:13.6e} {idx:>9}")
-        logger.debug(f"-- repeat bridge ({len(self._repeat_bridge)} terms x {self.num_steps-1} repetitions)")
-        for idx, coeff in self._repeat_bridge:
-            logger.debug(f"   -- {coeff:13.6e} {idx:>9}")
-        logger.debug(f"-- epilogue ({len(self._epilogue)} terms)")
-        for idx, coeff in self._epilogue:
-            logger.debug(f"   -- {coeff:13.6e} {idx:>9}")
-
         # Combine terms
         if self.combine_terms:
 
@@ -357,20 +343,6 @@ class Trotterization(Bloq):
             # Overwrite repeat core with combined version
             object.__setattr__(self, "_repeat_core", tuple(combined))
 
-            logger.debug("Deduplicated Pattern:")
-            logger.debug(f"-- prologue ({len(self._prologue)} terms)")
-            for idx, coeff in self._prologue:
-                logger.debug(f"   -- {coeff:13.6e} {idx:>9}")
-            logger.debug(f"-- repeat core ({len(self._repeat_core)} terms x {self.num_steps} repetitions)")
-            for idx, coeff in self._repeat_core:
-                logger.debug(f"   -- {coeff:13.6e} {idx:>9}")
-            logger.debug(f"-- repeat bridge ({len(self._repeat_bridge)} terms x {self.num_steps-1} repetitions)")
-            for idx, coeff in self._repeat_bridge:
-                logger.debug(f"   -- {coeff:13.6e} {idx:>9}")
-            logger.debug(f"-- epilogue ({len(self._epilogue)} terms)")
-            for idx, coeff in self._epilogue:
-                logger.debug(f"   -- {coeff:13.6e} {idx:>9}")
-
             # Combine across steps
             head_idx, head_coeff = self._repeat_core[0]
             tail_idx, tail_coeff = self._repeat_core[-1]
@@ -383,19 +355,18 @@ class Trotterization(Bloq):
                 object.__setattr__(self, "_epilogue", ((tail_idx, tail_coeff),))
                 object.__setattr__(self, "_symmetric_bookends", head_coeff == tail_coeff)
 
-            logger.debug("Restructured Pattern:")
-            logger.debug(f"-- prologue ({len(self._prologue)} terms)")
-            for idx, coeff in self._prologue:
-                logger.debug(f"   -- {coeff:13.6e} {idx:>9}")
-            logger.debug(f"-- repeat core ({len(self._repeat_core)} terms x {self.num_steps} repetitions)")
-            for idx, coeff in self._repeat_core:
-                logger.debug(f"   -- {coeff:13.6e} {idx:>9}")
-            logger.debug(f"-- repeat bridge ({len(self._repeat_bridge)} terms x {self.num_steps-1} repetitions)")
-            for idx, coeff in self._repeat_bridge:
-                logger.debug(f"   -- {coeff:13.6e} {idx:>9}")
-            logger.debug(f"-- epilogue ({len(self._epilogue)} terms)")
-            for idx, coeff in self._epilogue:
-                logger.debug(f"   -- {coeff:13.6e} {idx:>9}")
+        def trm_str(sequence):
+            n = len(sequence)
+            return f"{n} {'term' if n == 1 else 'terms'}"
+        def rpt_str(n):
+            return f"{n} {'repetition' if n == 1 else 'repetitions'}"
+        logger.debug("\n".join(["",
+            "Trotter reptition pattern:",
+            f"-- prologue ({trm_str(self._prologue)})",
+            f"-- repeat core ({trm_str(self._repeat_core)} x {rpt_str(self.num_steps)})",
+            f"-- repeat bridge ({trm_str(self._repeat_bridge)} x {rpt_str(self.num_steps-1)})",
+            f"-- epilogue ({trm_str(self._epilogue)})",
+            ]))
 
 
     @classmethod
@@ -470,9 +441,6 @@ class Trotterization(Bloq):
             sequence.extend(self._repeat_bridge)
         sequence.extend(self._repeat_core)
         sequence.extend(self._epilogue)
-        logger.debug("New Full Sequence ({len(sequence)} terms)")
-        for idx, coeff in sequence:
-            logger.debug(f"-- {coeff:13.6e} {idx:>9}")
         return sequence
 
     def build_composite_bloq(self, bb: BloqBuilder, **soqs: SoquetT) -> dict[str, SoquetT]:
@@ -602,12 +570,19 @@ class Trotterization(Bloq):
         return self._structured_contraction()
 
     def _structured_contraction(self) -> np.ndarray:
+        def trm_str(sequence):
+            n = len(sequence)
+            return f"{n} {'term' if n == 1 else 'terms'}"
+        def tms_str(n):
+            return f"{n} {'time' if n == 1 else 'times'}"
         logger.debug("Performing tensor contraction with structured method.")
-        logger.debug(f"-- prologue contains {len(self._prologue)} terms")
+        logger.debug(f"-- prologue contains {trm_str(self._prologue)}")
         logger.debug("-- repeating pattern: core bridge core bridge ... core bridge core")
-        logger.debug(f"   -- core contains {len(self._repeat_core)} terms and repeats {self.num_steps} times")
-        logger.debug(f"   -- bridge contains {len(self._repeat_bridge)} terms and repeats {self.num_steps-1} times")
-        logger.debug(f"-- epilogue contains {len(self._epilogue)} terms")
+        logger.debug(f"   -- core contains {trm_str(self._repeat_core)} "
+                     f"and repeats {tms_str(self.num_steps)}")
+        logger.debug(f"   -- bridge contains {trm_str(self._repeat_bridge)} "
+                     f"and repeats {tms_str(self.num_steps-1)}")
+        logger.debug(f"-- epilogue contains {trm_str(self._epilogue)}")
         # Repeat section
         result = self._build_matrix_from_terms(self._repeat_core)
         if self.num_steps > 1:
@@ -648,7 +623,7 @@ class Trotterization(Bloq):
             dim = 2 ** self.num_qubits
             return np.eye(dim, dtype=np.complex128)
 
-        logger.debug(f"    Building matrix from {len(terms)} terms")
+        logger.debug(f"Building matrix from {len(terms)} terms")
         dim = 2 ** self.num_qubits
         U = np.eye(dim, dtype=np.complex128)
 
