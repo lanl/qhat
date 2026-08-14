@@ -9,13 +9,14 @@ from qualtran import (
     BloqBuilder,
     SoquetT,
 )
+from qualtran._infra.registers import Signature
 from qualtran.bloqs.block_encoding import LCUBlockEncoding
 from qualtran.bloqs.multiplexers.select_pauli_lcu import SelectPauliLCU
 from qualtran.bloqs.state_preparation import StatePreparationAliasSampling
 
 from pyLIQTR.BlockEncodings.DoubleFactorized import DoubleFactorized
 from pyLIQTR.BlockEncodings.LinearT import Fermionic_LinearT
-from pyLIQTR.BlockEncodings.PauliStringLCU import PauliStringLCU as PyLIQTRPauliStringLCU
+from pyLIQTR.BlockEncodings.PauliStringLCU import PauliStringLCU as PyLIQTRPauliStringLCU_orig
 from pyLIQTR.ProblemInstances.ChemicalHamiltonian import ChemicalHamiltonian
 
 from qhat.analysis.config_types import UnitaryConfiguration
@@ -99,6 +100,16 @@ class PauliStringLCU(LCUBlockEncoding):
         soqs |= bb.add_d(self.select, **_extract_soqs(self.select))
         soqs |= bb.add_d(self.prepare.adjoint(), **_extract_soqs(self.prepare.adjoint()))
         return soqs
+
+# -------------------------------------------------------------------------------------------------
+
+# add bugfix:  correct ordering of Signature registers
+class PyLIQTRPauliStringLCU(PyLIQTRPauliStringLCU_orig):
+    @property
+    def signature(self):
+        return Signature(
+            [*self.control_registers, *self.selection_registers,
+             *self.junk_registers, *self.target_registers] )
 
 # -------------------------------------------------------------------------------------------------
 
