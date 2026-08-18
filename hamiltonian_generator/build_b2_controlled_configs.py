@@ -72,8 +72,8 @@ def write_config(
     contents = "\n".join(
         [
             "general.print_verbose()",
-            f"general.logfile = {str(logfile.resolve())!r}",
-            f"general.file_stub = {str(file_stub.resolve())!r}",
+            f"general.logfile = {str(logfile.relative_to(REPO_ROOT))!r}",
+            f"general.file_stub = {str(file_stub.relative_to(REPO_ROOT))!r}",
             'general.file_format = "default"',
             f"L = {BOND_LENGTH}",
             (

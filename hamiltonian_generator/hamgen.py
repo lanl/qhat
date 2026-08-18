@@ -211,6 +211,7 @@ def compute_Hartree_Fock(state):
             state.config_hamiltonian.basis,
             1 + electron_count % 2,
             0, # TODO: is the charge really always 0?
+            filename=state.filename_ham1().removesuffix(".pickle"),
             )
 
     # Generate a PyscfMolecularData

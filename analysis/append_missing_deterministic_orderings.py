@@ -191,7 +191,11 @@ def write_rows_atomic(path: Path, rows: Sequence[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
     with temporary.open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.DictWriter(stream, fieldnames=baseline.FIELDNAMES)
+        writer = csv.DictWriter(
+            stream,
+            fieldnames=baseline.FIELDNAMES,
+            lineterminator="\n",
+        )
         writer.writeheader()
         writer.writerows(rows)
     os.replace(temporary, path)
@@ -451,7 +455,7 @@ def main() -> None:
 
     write_rows_atomic(args.output, output_rows)
     print()
-    print(f"Done. Existing plots and reference CSVs were not modified.")
+    print("Done. Existing plots and reference CSVs were not modified.")
     print(f"Add-on CSV: {args.output}")
 
 
