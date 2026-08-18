@@ -14,6 +14,10 @@ The script uses the existing final-validation CSVs and produces two figures:
    observed error advantage across active spaces.  The right panel performs
    the same comparison for the parent-structure ablation schedules.
 
+3. ``random_order_comparison``
+   For the four extension cases, deterministic schedules are overlaid on the
+   two random-ablation error distributions.
+
 By default, extension CSVs from ``instruction.md`` are included automatically
 when they exist and ignored when they do not.  The script never modifies its
 input CSVs.
@@ -780,6 +784,127 @@ def plot_bch_mechanism(
     return fit_summary, output_paths
 
 
+def plot_random_order_comparison(
+    ablation: pd.DataFrame,
+    *,
+    outdir: Path,
+    formats: Iterable[str],
+    dpi: int,
+) -> list[Path]:
+    target_molecules = ("BeH2", "H2O", "NH3", "O-O")
+    data = ablation[ablation["molecule"].isin(target_molecules)].copy()
+    if data.empty:
+        print("INFO: no extension cases found; random-order plot skipped.")
+        return []
+
+    random_schedules = (RANDOM_BLOCKS, WITHIN_PARENT)
+    deterministic_schedules = (
+        REFERENCE,
+        FERMIONIC_MAGNITUDE,
+        JW_SIGNED,
+        ROUND_ROBIN,
+    )
+    fig, axes = plt.subplots(2, 2, figsize=(11.5, 8.5), squeeze=False)
+
+    for panel_index, molecule in enumerate(target_molecules):
+        ax = axes.flat[panel_index]
+        group = data[data["molecule"] == molecule]
+        if group.empty:
+            ax.set_visible(False)
+            continue
+
+        for position, schedule in enumerate(random_schedules, start=1):
+            values = group.loc[
+                group["schedule"] == schedule, "observed_error_ratio"
+            ].to_numpy(dtype=float)
+            if values.size == 0:
+                continue
+            box = ax.boxplot(
+                [values],
+                positions=[position],
+                widths=0.36,
+                showfliers=False,
+                patch_artist=True,
+                medianprops={"color": "0.2", "linewidth": 1.2},
+                whiskerprops={"color": "0.45"},
+                capprops={"color": "0.45"},
+            )
+            box["boxes"][0].set_facecolor(
+                SCHEDULE_STYLES[schedule]["color"]
+            )
+            box["boxes"][0].set_alpha(0.18)
+            offsets = np.linspace(-0.10, 0.10, values.size)
+            ax.scatter(
+                position + offsets,
+                np.sort(values),
+                s=26,
+                color=SCHEDULE_STYLES[schedule]["color"],
+                marker=SCHEDULE_STYLES[schedule]["marker"],
+                alpha=0.72,
+                edgecolor="none",
+                zorder=3,
+            )
+
+        offsets = np.linspace(-0.18, 0.18, len(deterministic_schedules))
+        for offset, schedule in zip(offsets, deterministic_schedules):
+            values = group.loc[
+                group["schedule"] == schedule, "observed_error_ratio"
+            ].to_numpy(dtype=float)
+            if values.size == 0:
+                continue
+            style = SCHEDULE_STYLES[schedule]
+            ax.scatter(
+                3.0 + offset,
+                float(values[0]),
+                s=64,
+                color=style["color"],
+                marker=style["marker"],
+                edgecolor="white",
+                linewidth=0.6,
+                zorder=4,
+            )
+
+        ax.axhline(1.0, color="0.35", linestyle="--", linewidth=1.0)
+        ax.set_yscale("log")
+        ax.set_xticks((1, 2, 3))
+        ax.set_xticklabels(("Random parent\nblocks", "Within-parent\nshuffle", "Deterministic"))
+        ax.set_title(molecule_label(molecule))
+        ax.set_ylabel(r"Error ratio, $\epsilon/\epsilon_{\rm F}$")
+        ax.grid(axis="x", visible=False)
+
+    handles = [
+        Line2D(
+            [0],
+            [0],
+            color="none",
+            marker=SCHEDULE_STYLES[schedule]["marker"],
+            markerfacecolor=SCHEDULE_STYLES[schedule]["color"],
+            markeredgecolor="white",
+            markersize=7,
+            label=SCHEDULE_LABELS[schedule],
+        )
+        for schedule in deterministic_schedules
+    ]
+    fig.legend(
+        handles=handles,
+        frameon=False,
+        ncol=4,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.955),
+    )
+    fig.suptitle(
+        "Deterministic schedules within random-order error distributions",
+        fontsize=14,
+        y=1.01,
+    )
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.93))
+    output_paths = save_figure(
+        fig, outdir, "random_order_comparison", formats=formats, dpi=dpi
+    )
+    plt.close(fig)
+    return output_paths
+
+
 def main() -> None:
     args = parse_args()
     if args.error_floor <= 0.0:
@@ -820,6 +945,12 @@ def main() -> None:
         formats=args.formats,
         dpi=args.dpi,
     )
+    random_paths = plot_random_order_comparison(
+        ablation,
+        outdir=args.outdir,
+        formats=args.formats,
+        dpi=args.dpi,
+    )
 
     print()
     print("Scaling fits:")
@@ -839,7 +970,7 @@ def main() -> None:
     print(mechanism_summary.to_string(index=False))
     print()
     print("Created figures:")
-    for path in scaling_paths + mechanism_paths:
+    for path in scaling_paths + mechanism_paths + random_paths:
         print(f"  {path}")
     print()
     print(f"Plot data and fit summaries: {args.outdir}")
