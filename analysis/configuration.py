@@ -24,7 +24,30 @@ def load_configuration() -> State:
             nargs='?',
             default=default_config,
             help=f"Name of the configuration file; defaults to \"{default_config}\"")
+
+    # Add support for arbitrary key=value arguments
+    parser.add_argument(
+            '--param', '-p',
+            action='append',
+            dest='params',
+            default=[],
+            metavar='KEY=VALUE',
+            help='Parameters to pass to the configuration file (e.g., -p distance=1.5)')
+
     args = parser.parse_args()
+
+    # Parse the key=value parameters
+    config_params = {}
+    for param in args.params:
+        if '=' not in param:
+            raise ValueError(f"Parameter must be in KEY=VALUE format, got: {param}")
+        key, value = param.split('=', 1)
+        # Try to evaluate as Python literal (numbers, lists, etc.)
+        try:
+            config_params[key] = eval(value)
+        except:
+            # If evaluation fails, treat as string
+            config_params[key] = value
 
     # Read the configuration file
     with open(args.configuration_file, 'r') as fin:
@@ -40,15 +63,32 @@ def load_configuration() -> State:
     analysis = AnalysisConfiguration()
     def meV_to_Hartree(meV):
         return 3.67493221757e-5 * meV
-    exec(config_script)
+
+    # Create namespace with config objects and injected parameters
+    exec_namespace = {
+        'general': general,
+        'hamiltonian': hamiltonian,
+        'unitary': unitary,
+        'algorithm': algorithm,
+        'analysis': analysis,
+        'meV_to_Hartree': meV_to_Hartree,
+        'params': config_params,  # All params available as a dict
+        **config_params  # Individual params available as variables
+    }
+    exec(config_script, exec_namespace)
 
     # Build the state (does some post-processing of user configuration)
     state = State(config_script, general, hamiltonian, unitary, algorithm, analysis)
 
-    logger.info("\n".join([
-        f"Contents of configuration file \"{args.configuration_file}\":",
-        config_script
-        ]))
+    # Log configuration file contents and any parameters passed
+    log_messages = [f"Contents of configuration file \"{args.configuration_file}\":"]
+    log_messages.append(config_script)
+    if config_params:
+        log_messages.append("\nCommand-line parameters:")
+        for key, value in config_params.items():
+            log_messages.append(f"  {key} = {value!r}")
+
+    logger.info("\n".join(log_messages))
 
     return state
 
