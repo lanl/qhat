@@ -6,6 +6,8 @@ import pprint
 import subprocess
 import sys
 
+from qhat.common.git_utils import get_git_hash
+
 logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------------------------------
@@ -20,6 +22,8 @@ class GeneralConfigurationUser:
         self.logfile = "hamgen.log"
         # How much information to print as the script runs
         self._loglevel = "info"
+        # Output directory for all generated files (empty string = current directory)
+        self.output_directory = ""
     def print_default(self):
         self._loglevel= "info"
     def print_verbose(self):
@@ -82,25 +86,12 @@ class HamiltonianConfiguration:
 # internal types and support functions
 # -------------------------------------------------------------------------------------------------
 
-def _get_git_hash():
-    file_path = os.path.realpath(__file__)
-    dirpath = os.path.dirname(file_path)
-    commands = ";".join([
-            f"pushd {dirpath} > /dev/null",
-            "if [[ $(git diff --stat) != '' ]]",
-            "then echo $(git rev-parse HEAD)-dirty",
-            "else git rev-parse HEAD",
-            "fi",
-            "popd > /dev/null"
-        ])
-    output = subprocess.run(commands, shell=True, capture_output=True)
-    return output.stdout.decode("utf-8")[:-1]
-
 class GeneralConfiguration:
     def __init__(self, user_config: GeneralConfigurationUser):
         self.logfile = user_config.logfile
         self.loglevel = user_config._loglevel
-        self.git_hash = _get_git_hash()
+        self.output_directory = user_config.output_directory
+        self.git_hash = get_git_hash(reference_file=__file__)
         logger.info(f"Running script with git hash {self.git_hash}")
         assert user_config.file_stub is not None
         self.file_stub = user_config.file_stub
@@ -109,6 +100,42 @@ class GeneralConfiguration:
         else:
             self.file_format = "default"
         logger.info(f"Writing to file stub \"{self.file_stub}\" in format \"{self.file_format}\".")
+
+    def get_output_path(self, filename):
+        """
+        Get the full output path for a file, respecting output_directory.
+
+        Mirrors the implementation in analysis/config_types.py for consistency.
+
+        Parameters
+        ----------
+        filename : str
+            The filename or relative path
+
+        Returns
+        -------
+        str
+            Full path with output_directory prepended (if set)
+
+        Notes
+        -----
+        - If output_directory is empty or None, returns filename unchanged
+        - Uses os.path.join() for proper path joining
+        - Absolute paths in filename override output_directory
+        - Creates parent directories automatically
+        """
+        if not self.output_directory:
+            output_path = filename
+        else:
+            output_path = os.path.join(self.output_directory, filename)
+
+        # Create parent directory if it doesn't exist
+        parent_dir = os.path.dirname(output_path)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
+
+        return output_path
+
     def ham3_ext(self):
         if self.file_format == "hamlib":
             return "dat" # TODO: return "hdf5"
