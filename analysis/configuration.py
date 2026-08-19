@@ -63,16 +63,28 @@ def load_configuration() -> tuple[State, str]:
     analysis = AnalysisConfiguration()
     def meV_to_Hartree(meV):
         return 3.67493221757e-5 * meV
+    def string_to_seed(s):
+        import hashlib
+        """Convert a string to a deterministic integer seed."""
+        # Use SHA-256 hash and convert to integer
+        hash_bytes = hashlib.sha256(s.encode('utf-8')).digest()
+        # Take first 8 bytes and convert to integer (fits in 64-bit)
+        seed = int.from_bytes(hash_bytes[:8], byteorder='big')
+        return seed
 
     # Create namespace with config objects and params dictionary
     exec_namespace = {
+        # configuration objects
         'general': general,
         'hamiltonian': hamiltonian,
         'unitary': unitary,
         'algorithm': algorithm,
         'analysis': analysis,
-        'meV_to_Hartree': meV_to_Hartree,
+        # command-line parameters
         'params': config_params,
+        # utility functions
+        'meV_to_Hartree': meV_to_Hartree,
+        'string_to_seed': string_to_seed,
     }
     exec(config_script, exec_namespace)
 
