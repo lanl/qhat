@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------------------------------
 
-def load_configuration() -> State:
+def load_configuration() -> tuple[State, str]:
 
     # Set up and read command-line arguments
     parser = argparse.ArgumentParser()
@@ -79,15 +79,16 @@ def load_configuration() -> State:
     # Build the state (does some post-processing of user configuration)
     state = State(config_script, general, hamiltonian, unitary, algorithm, analysis)
 
-    # Log configuration file contents and any parameters passed
-    log_messages = [f"Contents of configuration file \"{args.configuration_file}\":"]
-    log_messages.append(config_script)
+    # Prepare log messages with configuration file contents and any parameters passed
+    # These will be logged after logging is configured
+    config_file_message = f"Contents of configuration file \"{args.configuration_file}\":\n{config_script}"
+
+    params_message = None
     if config_params:
-        log_messages.append("\nCommand-line parameters:")
+        params_lines = ["Command-line parameters:"]
         for key, value in config_params.items():
-            log_messages.append(f"  {key} = {value!r}")
+            params_lines.append(f"  {key} = {value!r}")
+        params_message = "\n".join(params_lines)
 
-    logger.info("\n".join(log_messages))
-
-    return state
+    return state, config_file_message, params_message
 

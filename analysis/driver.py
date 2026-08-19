@@ -15,7 +15,7 @@ from qhat.analysis.configuration import load_configuration
 from qhat.analysis.hamiltonian import get_physical_hamiltonian
 from qhat.analysis.unitary import encode_as_unitary
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("qhat.analysis.driver")
 
 # =================================================================================================
 
@@ -23,7 +23,7 @@ def run():
 
     # Configuration _______________________________________________________________________________
 
-    state = load_configuration()
+    state, config_file_message, params_message = load_configuration()
 
     # Configure logging based on user settings
     logfile_path = state.config_general.get_output_path(state.config_general.logfile)
@@ -34,6 +34,9 @@ def run():
     logger.info("=" * 99)
     logger.info(f"Logfile: {logfile_path}")
     logger.info(f"Git hash: {state.config_general.git_hash}")
+    logger.info(config_file_message)
+    if params_message:
+        logger.info(params_message)
 
     # Hamiltonian _________________________________________________________________________________
 
