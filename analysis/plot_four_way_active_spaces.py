@@ -75,7 +75,7 @@ LABELS = {
     JW_RAW: "JW raw",
     JW_MAG: "JW descending |c| baseline",
     FERM_AWARE: "Fermionic-aware signed",
-    FERM_COLOR: "Fermionic coloring",
+    FERM_COLOR: "Fermionic coloring (deterministic largest-first)",
 }
 
 # Match the simple marker/line vocabulary of plot_ordering_study.py.
@@ -415,7 +415,8 @@ def plot_one_molecule(dmol: pd.DataFrame, args: argparse.Namespace, out_dir: Pat
     ax.grid(True, axis="y", which="major", alpha=0.3, ls="--", lw=0.7)
     ax.set_title(
         f"{mol}: Trotter ordering across active spaces\n"
-        f"{args.basis}, T={args.evolution_time:g}, r={args.steps}, first-order"
+        f"{args.basis}, T={args.evolution_time:g}, r={args.steps}, "
+        f"order={args.formula_order}"
     )
     ax.legend(loc="best", frameon=True)
 
@@ -466,7 +467,10 @@ def write_summary(df: pd.DataFrame, args: argparse.Namespace, out_dir: Path) -> 
         "case_id_std", "molecule_std", "basis_std", "active_occupied_std",
         "active_vacant_std", "n_qubits_std", "bond_length_std",
     ]
-    wide = df.pivot_table(index=keys, columns="method", values="error", aggfunc="first").reset_index()
+    # ``pivot_table`` drops index rows containing NaN. Polyatomic geometry
+    # labels (for example ``s-1.00``) intentionally normalize to a nonnumeric
+    # bond length, so use ``pivot`` to retain those cases.
+    wide = df.pivot(index=keys, columns="method", values="error").reset_index()
     for method in METHOD_ORDER:
         if method not in wide.columns:
             wide[method] = np.nan

@@ -41,7 +41,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Sequence
 
 import networkx as nx
 import numpy as np
@@ -535,6 +535,7 @@ def build_orderings(
     requested_orderings: Sequence[str],
     tolerance: float,
     n_qubits: int,
+    build_dense_factors: bool = True,
 ) -> tuple[
     dict[str, OrderingResult],
     list[HermitianFermionTerm],
@@ -547,20 +548,37 @@ def build_orderings(
     }
     raw_pauli_keys = list(final_coefficients)
 
-    matrix_cache = {
-        key: pauli_matrix_from_key(key, n_qubits)
-        for key in raw_pauli_keys
-    }
-    exact_hamiltonian = np.zeros((2**n_qubits, 2**n_qubits), dtype=complex)
-    for pauli_key, coefficient in final_coefficients.items():
-        exact_hamiltonian += real_coefficient(
-            coefficient,
-            tolerance,
-        ) * matrix_cache[pauli_key]
+    if not build_dense_factors and "fermionic_term_coloring" in requested_orderings:
+        raise ValueError(
+            "fermionic_term_coloring requires dense factors; "
+            "set build_dense_factors=True"
+        )
+
+    matrix_cache = (
+        {
+            key: pauli_matrix_from_key(key, n_qubits)
+            for key in raw_pauli_keys
+        }
+        if build_dense_factors
+        else {}
+    )
+    exact_hamiltonian: np.ndarray | None = None
+    if build_dense_factors:
+        exact_hamiltonian = np.zeros(
+            (2**n_qubits, 2**n_qubits),
+            dtype=complex,
+        )
+        for pauli_key, coefficient in final_coefficients.items():
+            exact_hamiltonian += real_coefficient(
+                coefficient,
+                tolerance,
+            ) * matrix_cache[pauli_key]
 
     def pauli_factors(
         keys: Sequence[tuple[tuple[int, str], ...]],
     ) -> list[HamiltonianFactor]:
+        if not build_dense_factors:
+            return []
         return [
             HamiltonianFactor(
                 matrix=matrix_cache[key],
@@ -576,7 +594,9 @@ def build_orderings(
 
     def reconstruction_error(
         factors: Sequence[HamiltonianFactor],
-    ) -> float:
+    ) -> float | None:
+        if exact_hamiltonian is None:
+            return None
         reconstructed = np.zeros_like(exact_hamiltonian)
         for factor in factors:
             reconstructed += factor.hamiltonian_matrix

@@ -456,6 +456,7 @@ def analyze_case(
         full_jw_hamiltonian=full_jw_hamiltonian,
         requested_orderings=ORDERING_NAMES,
         tolerance=tolerance,
+        n_qubits=n_qubits,
     )
     if not hermitian_terms:
         hermitian_terms = build_hermitian_fermion_terms(

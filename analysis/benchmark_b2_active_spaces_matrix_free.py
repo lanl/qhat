@@ -27,7 +27,7 @@ import math
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Sequence
 
 import numpy as np
 from numba import njit, prange
@@ -1051,6 +1051,8 @@ def benchmark_case(
         full_jw_hamiltonian=full_jw_hamiltonian,
         requested_orderings=requested_orderings,
         tolerance=tolerance,
+        n_qubits=n_qubits,
+        build_dense_factors=False,
     )
 
     if not hermitian_terms:
