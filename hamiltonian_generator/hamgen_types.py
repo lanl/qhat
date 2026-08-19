@@ -24,6 +24,8 @@ class GeneralConfigurationUser:
         self._loglevel = "info"
         # Output directory for all generated files (empty string = current directory)
         self.output_directory = ""
+        # Cache directory for reusable intermediate files (empty string = use output_directory)
+        self.cache_directory = ""
     def print_default(self):
         self._loglevel= "info"
     def print_verbose(self):
@@ -91,6 +93,7 @@ class GeneralConfiguration:
         self.logfile = user_config.logfile
         self.loglevel = user_config._loglevel
         self.output_directory = user_config.output_directory
+        self.cache_directory = user_config.cache_directory
         self.git_hash = get_git_hash(reference_file=__file__)
         logger.info(f"Running script with git hash {self.git_hash}")
         assert user_config.file_stub is not None
@@ -135,6 +138,36 @@ class GeneralConfiguration:
             os.makedirs(parent_dir, exist_ok=True)
 
         return output_path
+
+    def get_cache_path(self, filename):
+        """
+        Get the full cache path for a file, respecting cache_directory.
+
+        Used when looking for reusable intermediate files (ham1, ham2).
+
+        Parameters
+        ----------
+        filename : str
+            The filename or relative path
+
+        Returns
+        -------
+        str
+            Full path with cache_directory or output_directory prepended (if set)
+
+        Notes
+        -----
+        - If cache_directory is set, uses cache_directory
+        - Otherwise falls back to output_directory (if set)
+        - If both are empty, returns filename unchanged (current directory)
+        - Does NOT create directories (cache is read-only)
+        """
+        if self.cache_directory:
+            return os.path.join(self.cache_directory, filename)
+        elif self.output_directory:
+            return os.path.join(self.output_directory, filename)
+        else:
+            return filename
 
     def ham3_ext(self):
         if self.file_format == "hamlib":

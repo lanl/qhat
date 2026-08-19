@@ -10,6 +10,11 @@ general.file_format = "default"                   # Default Pauli string style (
 # Defaults to current directory (old behavior)
 general.output_directory = params.get("output_directory", "")
 
+# Cache directory - where to look for reusable intermediate files (ham1, ham2)
+# If not set, falls back to output_directory
+# Override with: -p cache_directory=previous_run
+general.cache_directory = params.get("cache_directory", "")
+
 # _________________________________________________________________________________________________
 # Describe the Hamiltonian
 

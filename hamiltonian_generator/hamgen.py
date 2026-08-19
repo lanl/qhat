@@ -397,26 +397,27 @@ def write_initial_state(vec, path, n_qubits):
 
 def get_ham1(state):
     ham1_filename = state.filename_ham1()
-    ham1_filepath = state.config_general.get_output_path(ham1_filename)
+    ham1_cache_path = state.config_general.get_cache_path(ham1_filename)
     try:
-        with open(ham1_filepath, 'rb') as file:
+        with open(ham1_cache_path, 'rb') as file:
             ham1_HartreeFock = pickle.load(file)
     # TODO: Python errors get a little weird if you have an exception inside an exception.  So
     #       instead the exception clause should _only_ flag that we're going to recompute versus
     #       load, and the actual recomputing should be outside of the except clause.
     except FileNotFoundError as err:
-        state.log(f"Could not load \"{ham1_filepath}\".  Recomputing from the beginning.")
+        state.log(f"Could not load \"{ham1_cache_path}\".  Recomputing from the beginning.")
         # Compute ham1_HartreeFock from scratch
         state.log("Perform Hartree-Fock calculation.")
         ham1_HartreeFock = compute_Hartree_Fock(state)
-        state.log(f"Pickle to \"{ham1_filepath}\" file.")
+        ham1_output_path = state.config_general.get_output_path(ham1_filename)
+        state.log(f"Pickle to \"{ham1_output_path}\" file.")
         # Save ham1_HartreeFock for later re-use
-        with open(ham1_filepath, 'wb') as ham1_file:
+        with open(ham1_output_path, 'wb') as ham1_file:
             pickle.dump(ham1_HartreeFock, ham1_file)
         return ham1_HartreeFock
     else:
         state.log(' '.join([
-            f"Loaded \"{ham1_filepath}\".",
+            f"Loaded \"{ham1_cache_path}\".",
             "Continuing from after the Hartree-Fock calculation."]))
         return ham1_HartreeFock
 
@@ -424,26 +425,27 @@ def get_ham1(state):
 
 def get_ham2(state):
     ham2_filename = state.filename_ham2()
-    ham2_filepath = state.config_general.get_output_path(ham2_filename)
-    state.log(f"Trying to load \"{ham2_filepath}\".")
+    ham2_cache_path = state.config_general.get_cache_path(ham2_filename)
+    state.log(f"Trying to load \"{ham2_cache_path}\".")
     try:
-        with open(ham2_filepath, 'rb') as file:
+        with open(ham2_cache_path, 'rb') as file:
             ham2_ActiveSpace = pickle.load(file)
     # TODO: Python errors get a little weird if you have an exception inside an exception.  So
     #       instead the exception clause should _only_ flag that we're going to recompute versus
     #       load, and the actual recomputing should be outside of the except clause.
     except FileNotFoundError as err:
         state.log(' '.join([
-            f"Could not load \"{ham2_filepath}\".",
+            f"Could not load \"{ham2_cache_path}\".",
             f"Trying to load \"{state.filename_ham1()}\"."]))
         # Get ham1_HartreeFock (by loading or by recomputing, depending on data availability)
         ham1_HartreeFock = get_ham1(state)
         # Recompute ham2_ActiveSpace from ham1_HartreeFock
         state.log("Apply active space.")
         ham2_ActiveSpace = apply_active_space(state, ham1_HartreeFock)
-        state.log(f"Pickle to \"{ham2_filepath}\" file.")
+        ham2_output_path = state.config_general.get_output_path(ham2_filename)
+        state.log(f"Pickle to \"{ham2_output_path}\" file.")
         # Save ham2_ActiveSpace for later re-use
-        with open(ham2_filepath, 'wb') as ham2_file:
+        with open(ham2_output_path, 'wb') as ham2_file:
             pickle.dump(ham2_ActiveSpace, ham2_file)
         # Save the one-body and two-body tensors using numpy's `save` function.  These files can be
         # loaded using numpy's `load` function.
@@ -456,7 +458,7 @@ def get_ham2(state):
         return ham2_ActiveSpace
     else:
         state.log(' '.join([
-            f"Loaded \"{ham2_filepath}\".",
+            f"Loaded \"{ham2_cache_path}\".",
             "Continuing from after the active space is applied."]))
         return ham2_ActiveSpace
 
