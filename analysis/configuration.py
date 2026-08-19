@@ -64,7 +64,7 @@ def load_configuration() -> State:
     def meV_to_Hartree(meV):
         return 3.67493221757e-5 * meV
 
-    # Create namespace with config objects and injected parameters
+    # Create namespace with config objects and params dictionary
     exec_namespace = {
         'general': general,
         'hamiltonian': hamiltonian,
@@ -72,8 +72,7 @@ def load_configuration() -> State:
         'algorithm': algorithm,
         'analysis': analysis,
         'meV_to_Hartree': meV_to_Hartree,
-        'params': config_params,  # All params available as a dict
-        **config_params  # Individual params available as variables
+        'params': config_params,
     }
     exec(config_script, exec_namespace)
 

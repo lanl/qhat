@@ -43,12 +43,20 @@ def test_cmdline_params_type_conversion(monkeypatch, tmp_path):
     """Test that parameters are properly converted to Python types."""
     config_file = tmp_path / "test_config.py"
     config_file.write_text("""
-# Access parameters directly if they're provided
-float_val = float_param
-int_val = int_param
-list_val = list_param
+# Access parameters from params dict
+float_val = params['float_param']
+int_val = params['int_param']
+list_val = params['list_param']
 
-general.file_stub = f"test"
+# Verify types
+assert isinstance(float_val, float)
+assert isinstance(int_val, int)
+assert isinstance(list_val, list)
+assert float_val == 3.14
+assert int_val == 42
+assert list_val == [1, 2, 3]
+
+general.output_directory = "test"
 """)
 
     test_args = [
@@ -142,3 +150,28 @@ general.output_directory = f"test_{a}_{b}_{c}"
 
     state = load_configuration()
     assert state.config_general.output_directory == 'test_1_2_3'
+
+
+def test_cmdline_params_not_in_global_namespace(monkeypatch, tmp_path):
+    """Test that parameters are NOT available as direct variables."""
+    config_file = tmp_path / "test_config.py"
+    config_file.write_text("""
+# Try to access parameter directly as a variable (should fail)
+try:
+    x = my_param  # This should raise NameError
+    general.output_directory = "SHOULD_NOT_GET_HERE"
+except NameError:
+    # Expected - parameter not in namespace
+    general.output_directory = "params_not_global"
+""")
+
+    test_args = [
+        'driver.py',
+        str(config_file),
+        '-p', 'my_param=42'
+    ]
+    monkeypatch.setattr(sys, 'argv', test_args)
+
+    state = load_configuration()
+    # Should have caught the NameError, not accessed my_param directly
+    assert state.config_general.output_directory == 'params_not_global'

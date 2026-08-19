@@ -4,9 +4,7 @@
 # This config can be run with parameters like:
 #   python3.11 driver.py examples/cmdline_params_demo_config.py -p distance=1.5 -p basis=sto-6g
 #
-# Parameters can be accessed in two ways:
-#   1. Directly as variables: distance, basis, etc.
-#   2. Via the params dict: params.get('distance', default_value)
+# Parameters are accessed via the 'params' dictionary that is provided to all configuration files.
 # _________________________________________________________________________________________________
 
 # _________________________________________________________________________________________________
@@ -19,13 +17,13 @@ general.file_format = "default"
 # _________________________________________________________________________________________________
 # Demonstrate different ways to use command-line parameters
 
-# Method 1: Use parameter directly with a default value using params dict
+# Method 1: Use parameter with a default value (recommended)
 distance = params.get('distance', 1.30)  # Default to 1.30 if not provided
 basis_set = params.get('basis', 'sto-3g')  # Default to 'sto-3g' if not provided
 
-# Method 2: Use parameter directly (will fail if not provided)
+# Method 2: Require parameter (will raise KeyError if not provided)
 # Uncomment this to require the parameter:
-# distance = distance  # Will raise NameError if -p distance=... not provided
+# distance = params['distance']  # Will raise KeyError if -p distance=... not provided
 
 # Method 3: Use parameter with type conversion and validation
 num_occupied = int(params.get('num_occupied', 3))

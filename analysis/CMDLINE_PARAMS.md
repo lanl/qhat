@@ -18,19 +18,9 @@ python3.11 driver.py my_config.py -p distance=1.5 -p basis=sto-6g -p num_steps=1
 
 ## Accessing Parameters in Configuration Files
 
-Parameters are available in two ways within your configuration script:
+All command-line parameters are available via the `params` dictionary that is automatically provided to your configuration file.
 
-### Method 1: Direct access (if parameter is guaranteed to exist)
-
-```python
-# Access parameter directly as a variable
-hamiltonian.add_atom("H", distance, 0, 0)
-hamiltonian.basis = basis
-```
-
-**Note:** This will raise a `NameError` if the parameter wasn't provided on the command line.
-
-### Method 2: Using the `params` dictionary with defaults (recommended)
+### Method 1: Using `params.get()` with defaults (recommended)
 
 ```python
 # Access with a default value
@@ -40,6 +30,16 @@ basis_set = params.get('basis', 'sto-3g')  # Defaults to 'sto-3g' if not provide
 hamiltonian.add_atom("H", distance, 0, 0)
 hamiltonian.basis = basis_set
 ```
+
+### Method 2: Direct dictionary access (if parameter is required)
+
+```python
+# Access parameter directly - will raise KeyError if not provided
+distance = params['distance']
+hamiltonian.add_atom("H", distance, 0, 0)
+```
+
+**Note:** This will raise a `KeyError` if the parameter wasn't provided on the command line.
 
 ## Type Conversion
 
