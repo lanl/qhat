@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Audit and fill missing four-way HGBS-5 active-space comparisons.
 
-The target universe combines successful HGBS-5 deterministic active-space
-rows with the H-H and He-He bond/active-space cases in the original coloring
-sweep.  For each exact tensor/settings key, this script collects:
+The target universe is the union of successful HGBS-5 deterministic
+active-space rows and every HGBS-5 case in the original coloring sweep.  For
+each exact tensor/settings key, this script collects:
 
 1. ``jw_raw``
 2. ``jw_magnitude_descending_lexicographic``
@@ -52,8 +52,7 @@ TARGET_CSVS = (
     ANALYSIS_DIR / "heteronuclear_hgbs-5_deterministic_ordering.csv",
     ANALYSIS_DIR / "polyatomic_reference_deterministic_ordering.csv",
 )
-LIGHT_DIATOMIC_TARGET_CSV = ANALYSIS_DIR / "l_sweep_trotter_state_t1.csv"
-LIGHT_DIATOMIC_MOLECULES = {"H-H", "He-He"}
+COLORING_TARGET_CSV = ANALYSIS_DIR / "l_sweep_trotter_state_t1.csv"
 
 JW_RAW = "jw_raw"
 JW_MAGNITUDE = "jw_magnitude_descending_lexicographic"
@@ -121,7 +120,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("analysis/four_way_missing_fermionic_coloring_hgbs5.csv"),
+        default=Path("analysis/four_way_missing_all_cases_hgbs5.csv"),
     )
     parser.add_argument(
         "--audit-output",
@@ -169,7 +168,11 @@ def cross_engine_close(left: float, right: float) -> bool:
 
 
 def source_priority(path: Path, method: str) -> int:
-    if path.name == "four_way_missing_fermionic_coloring_hgbs5.csv":
+    if path.name in {
+        "four_way_missing_all_cases_hgbs5.csv",
+        "four_way_missing_fermionic_coloring_hgbs5.csv",
+        "four_way_missing_h_h_he_he_hgbs5.csv",
+    }:
         return 0
     if path in TARGET_CSVS:
         return 1
@@ -188,13 +191,7 @@ def read_targets(args: argparse.Namespace) -> list[TargetCase]:
         (path, FERMIONIC_AWARE, None)
         for path in TARGET_CSVS
     ]
-    target_specs.append(
-        (
-            LIGHT_DIATOMIC_TARGET_CSV,
-            FERMIONIC_COLORING,
-            LIGHT_DIATOMIC_MOLECULES,
-        )
-    )
+    target_specs.append((COLORING_TARGET_CSV, FERMIONIC_COLORING, None))
     for path, defining_ordering, allowed_molecules in target_specs:
         with path.open(newline="", encoding="utf-8") as stream:
             for row in csv.DictReader(stream):
