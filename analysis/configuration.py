@@ -9,6 +9,10 @@ from qhat.analysis.config_types import (
     State,
     UnitaryConfiguration,
 )
+from qhat.common.config_utils import (
+    parse_key_value_params,
+    get_standard_exec_namespace,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,17 +41,7 @@ def load_configuration() -> tuple[State, str]:
     args = parser.parse_args()
 
     # Parse the key=value parameters
-    config_params = {}
-    for param in args.params:
-        if '=' not in param:
-            raise ValueError(f"Parameter must be in KEY=VALUE format, got: {param}")
-        key, value = param.split('=', 1)
-        # Try to evaluate as Python literal (numbers, lists, etc.)
-        try:
-            config_params[key] = eval(value)
-        except:
-            # If evaluation fails, treat as string
-            config_params[key] = value
+    config_params = parse_key_value_params(args.params)
 
     # Read the configuration file
     with open(args.configuration_file, 'r') as fin:
@@ -61,19 +55,10 @@ def load_configuration() -> tuple[State, str]:
     unitary = UnitaryConfiguration()
     algorithm = AlgorithmConfiguration()
     analysis = AnalysisConfiguration()
-    def meV_to_Hartree(meV):
-        return 3.67493221757e-5 * meV
-    def string_to_seed(s):
-        import hashlib
-        """Convert a string to a deterministic integer seed."""
-        # Use SHA-256 hash and convert to integer
-        hash_bytes = hashlib.sha256(s.encode('utf-8')).digest()
-        # Take first 8 bytes and convert to integer (fits in 64-bit)
-        seed = int.from_bytes(hash_bytes[:8], byteorder='big')
-        return seed
 
-    # Create namespace with config objects and params dictionary
-    exec_namespace = {
+    # Create namespace with config objects, params, and standard utilities
+    exec_namespace = get_standard_exec_namespace()
+    exec_namespace.update({
         # configuration objects
         'general': general,
         'hamiltonian': hamiltonian,
@@ -82,10 +67,7 @@ def load_configuration() -> tuple[State, str]:
         'analysis': analysis,
         # command-line parameters
         'params': config_params,
-        # utility functions
-        'meV_to_Hartree': meV_to_Hartree,
-        'string_to_seed': string_to_seed,
-    }
+    })
     exec(config_script, exec_namespace)
 
     # Build the state (does some post-processing of user configuration)

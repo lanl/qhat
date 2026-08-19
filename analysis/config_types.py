@@ -5,6 +5,8 @@ import subprocess
 import tomlkit
 from tomlkit.toml_file import TOMLFile
 
+from qhat.common.git_utils import get_git_hash
+
 logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------------------------------
@@ -342,26 +344,12 @@ class AnalysisConfiguration(ConfigurationBase):
 # internal types and support functions
 # -------------------------------------------------------------------------------------------------
 
-def _get_git_hash():
-    file_path = os.path.realpath(__file__)
-    dirpath = os.path.dirname(file_path)
-    commands = ";".join([
-            f"pushd {dirpath} > /dev/null",
-            "if [[ $(git diff --stat) != '' ]]",
-            "then echo $(git rev-parse HEAD)-dirty",
-            "else git rev-parse HEAD",
-            "fi",
-            "popd > /dev/null"
-        ])
-    output = subprocess.run(commands, shell=True, capture_output=True)
-    return output.stdout.decode("utf-8")[:-1]
-
 class GeneralConfiguration:
     def __init__(self, user_config: GeneralConfigurationUser):
         self.logfile = user_config.logfile
         self.loglevel = user_config._loglevel
         self.output_directory = user_config.output_directory
-        self.git_hash = _get_git_hash()
+        self.git_hash = get_git_hash(reference_file=__file__)
 
     def get_output_path(self, filename):
         """
