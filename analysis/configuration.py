@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------------------------------
 
-def load_configuration() -> State:
+def load_configuration() -> tuple[State, str]:
 
     # Set up and read command-line arguments
     parser = argparse.ArgumentParser()
@@ -24,7 +24,30 @@ def load_configuration() -> State:
             nargs='?',
             default=default_config,
             help=f"Name of the configuration file; defaults to \"{default_config}\"")
+
+    # Add support for arbitrary key=value arguments
+    parser.add_argument(
+            '--param', '-p',
+            action='append',
+            dest='params',
+            default=[],
+            metavar='KEY=VALUE',
+            help='Parameters to pass to the configuration file (e.g., -p distance=1.5)')
+
     args = parser.parse_args()
+
+    # Parse the key=value parameters
+    config_params = {}
+    for param in args.params:
+        if '=' not in param:
+            raise ValueError(f"Parameter must be in KEY=VALUE format, got: {param}")
+        key, value = param.split('=', 1)
+        # Try to evaluate as Python literal (numbers, lists, etc.)
+        try:
+            config_params[key] = eval(value)
+        except:
+            # If evaluation fails, treat as string
+            config_params[key] = value
 
     # Read the configuration file
     with open(args.configuration_file, 'r') as fin:
@@ -40,15 +63,44 @@ def load_configuration() -> State:
     analysis = AnalysisConfiguration()
     def meV_to_Hartree(meV):
         return 3.67493221757e-5 * meV
-    exec(config_script)
+    def string_to_seed(s):
+        import hashlib
+        """Convert a string to a deterministic integer seed."""
+        # Use SHA-256 hash and convert to integer
+        hash_bytes = hashlib.sha256(s.encode('utf-8')).digest()
+        # Take first 8 bytes and convert to integer (fits in 64-bit)
+        seed = int.from_bytes(hash_bytes[:8], byteorder='big')
+        return seed
+
+    # Create namespace with config objects and params dictionary
+    exec_namespace = {
+        # configuration objects
+        'general': general,
+        'hamiltonian': hamiltonian,
+        'unitary': unitary,
+        'algorithm': algorithm,
+        'analysis': analysis,
+        # command-line parameters
+        'params': config_params,
+        # utility functions
+        'meV_to_Hartree': meV_to_Hartree,
+        'string_to_seed': string_to_seed,
+    }
+    exec(config_script, exec_namespace)
 
     # Build the state (does some post-processing of user configuration)
     state = State(config_script, general, hamiltonian, unitary, algorithm, analysis)
 
-    logger.info("\n".join([
-        f"Contents of configuration file \"{args.configuration_file}\":",
-        config_script
-        ]))
+    # Prepare log messages with configuration file contents and any parameters passed
+    # These will be logged after logging is configured
+    config_file_message = f"Contents of configuration file \"{args.configuration_file}\":\n{config_script}"
 
-    return state
+    params_message = None
+    if config_params:
+        params_lines = ["Command-line parameters:"]
+        for key, value in config_params.items():
+            params_lines.append(f"  {key} = {value!r}")
+        params_message = "\n".join(params_lines)
+
+    return state, config_file_message, params_message
 

@@ -52,6 +52,20 @@ run-analysis-trotter:
       - .venv/
     policy: pull
 
+run-analysis-pauli-lcu:
+  stage: test
+  script:
+    - hostname
+    - source .venv/bin/activate
+    - module load gcc/13.2.0
+    - cd analysis
+    - python driver.py -p method=pauli-lcu
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .venv/
+    policy: pull
+
 run-analysis-dbl-fact:
   stage: test
   script:
@@ -59,8 +73,7 @@ run-analysis-dbl-fact:
     - source .venv/bin/activate
     - module load gcc/13.2.0
     - cd analysis
-    - sed -e 's/^my_method = "Trotter"/my_method = "double-factorization"/' config.py > config-df.py
-    - python driver.py config-df.py
+    - python driver.py -p method=double-factorization
   cache:
     key: "${CI_COMMIT_REF_SLUG}"
     paths:

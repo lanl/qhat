@@ -70,30 +70,31 @@ jobs:
             directory: analysis
             script: driver.py
             config_file: ''
+            config_params: ''
 
           - name: analysis-pauli-lcu
             directory: analysis
             script: driver.py
-            config_file: config-pl.py
-            config_setup: 'sed -e ''s/^my_method = "Trotter"/my_method = "pauli-lcu"/'' config.py > config-pl.py'
+            config_file: ''
+            config_params: '-p method=pauli-lcu'
 
           - name: analysis-dbl-factor
             directory: analysis
             script: driver.py
-            config_file: config-df.py
-            config_setup: 'sed -e ''s/^my_method = "Trotter"/my_method = "double-factorization"/'' config.py > config-df.py'
+            config_file: ''
+            config_params: '-p method=double-factorization'
 
           - name: common-unit-tests
             directory: common
             script: pytest
             config_file: ''
-            config_setup: ''
+            config_params: ''
 
           - name: analysis-unit-tests
             directory: analysis
             script: pytest
             config_file: ''
-            config_setup: ''
+            config_params: ''
 
     name: Test ${{ matrix.test-suite.name }}
 
@@ -117,12 +118,6 @@ jobs:
         pip install --upgrade pip
         pip install --find-links=python-wheels .
 
-    - name: Setup config
-      if: matrix.test-suite.config_setup != ''
-      run: |
-        cd ${{ matrix.test-suite.directory }}
-        ${{ matrix.test-suite.config_setup }}
-
     - name: Run test
       run: |
         set -euxo pipefail
@@ -130,5 +125,5 @@ jobs:
         if [ "${{ matrix.test-suite.script }}" = "pytest" ]; then
           python -m pytest tests/ -v
         else
-          python ${{ matrix.test-suite.script }} ${{ matrix.test-suite.config_file }}
+          python ${{ matrix.test-suite.script }} ${{ matrix.test-suite.config_file }} ${{ matrix.test-suite.config_params }}
         fi

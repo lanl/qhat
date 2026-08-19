@@ -13,12 +13,65 @@ of a configuration file as a command line argument
 python driver.py my_configuration_file.py
 ```
 
+### Command-line Parameters
+
+Configuration files can access command-line parameters via the `params` dictionary, allowing runtime
+customization without modifying the config file itself. Parameters are passed using the `-p` or
+`--param` flag with `KEY=VALUE` format:
+
+```bash
+python driver.py config.py -p output_directory=my_run -p timestep=0.1
+```
+
+**Parameter evaluation**:
+- Values are evaluated as Python literals when possible (numbers, lists, etc.)
+- If evaluation fails, the value is treated as a string
+- Parameters are accessed in config files via `params.get(key, default)`
+
+**Example configuration usage**:
+```python
+# In your config.py file
+general.output_directory = params.get("output_directory", "default_output")
+timestep = params.get("timestep", 0.01)  # Will be converted to float
+run_name = params.get("run_name", "unnamed")  # String parameter
+```
+
+**Multiple parameters**:
+```bash
+python driver.py -p dir=results/run1 -p error=1e-4 -p phases=[0,1,2,3]
+```
+
+This feature is particularly useful for:
+- Running parameter sweeps without editing config files
+- Organizing outputs into different directories per run
+- Automating analyses with scripts or job schedulers
+- Quick testing of different parameter values
+
 ## Configuration Options
 
 Configuration files are themselves Python scripts, allowing users to use control logic to build up
 complex configuration files.
 
 Configuration is broken down by several parts of the processing script.
+
+### Utility Functions
+
+Configuration files have access to several utility functions:
+
+- **`meV_to_Hartree(meV)`**: Converts energy from milli-electronvolts (meV) to Hartree atomic units.
+  Useful for specifying energy errors in more intuitive units.
+  ```python
+  energy_error = meV_to_Hartree(1e4)  # 0.01 keV
+  ```
+
+- **`string_to_seed(s)`**: Converts a string to a deterministic integer seed for random number
+  generation. Uses SHA-256 hashing to ensure the same string always produces the same seed. This is
+  particularly useful in large test suites where reproducible random behavior is needed.
+  ```python
+  import random
+  seed = string_to_seed("my_experiment_name")
+  random.seed(seed)
+  ```
 
 ### General
 
@@ -56,6 +109,9 @@ general.output_directory = ""
 You can configure the log file that the script will write to by setting **`general.logfile`** to
 the name of the logfile you want to use.  The default is `analysis.log`. If `output_directory` is
 set, the logfile will be written to that directory.
+
+The logfile automatically records the configuration file contents and any command-line parameters
+that were passed via `-p`, making it easy to reproduce analyses.
 
 #### Log Level
 
