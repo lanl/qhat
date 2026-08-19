@@ -32,7 +32,7 @@ general.output_directory = f"test_{test_value}_{numeric_value}"
     monkeypatch.setattr(sys, 'argv', test_args)
 
     # Load configuration
-    state = load_configuration()
+    state, _, _ = load_configuration()
 
     # Verify the parameters were used
     assert 'hello' in state.config_general.output_directory
@@ -68,7 +68,7 @@ general.output_directory = "test"
     ]
     monkeypatch.setattr(sys, 'argv', test_args)
 
-    state = load_configuration()
+    state, _, _ = load_configuration()
     # If we got here without errors, the types were correctly evaluated
     assert True
 
@@ -90,7 +90,7 @@ general.output_directory = string_val
     ]
     monkeypatch.setattr(sys, 'argv', test_args)
 
-    state = load_configuration()
+    state, _, _ = load_configuration()
     assert state.config_general.output_directory == 'hello-world'
 
 
@@ -107,7 +107,7 @@ general.output_directory = test_value
     test_args = ['driver.py', str(config_file)]
     monkeypatch.setattr(sys, 'argv', test_args)
 
-    state = load_configuration()
+    state, _, _ = load_configuration()
     assert state.config_general.output_directory == 'default_value'
 
 
@@ -148,7 +148,7 @@ general.output_directory = f"test_{a}_{b}_{c}"
     ]
     monkeypatch.setattr(sys, 'argv', test_args)
 
-    state = load_configuration()
+    state, _, _ = load_configuration()
     assert state.config_general.output_directory == 'test_1_2_3'
 
 
@@ -172,6 +172,6 @@ except NameError:
     ]
     monkeypatch.setattr(sys, 'argv', test_args)
 
-    state = load_configuration()
+    state, _, _ = load_configuration()
     # Should have caught the NameError, not accessed my_param directly
     assert state.config_general.output_directory == 'params_not_global'
