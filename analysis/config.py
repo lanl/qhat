@@ -1,10 +1,21 @@
 """
 QHAT Analysis Configuration: basic example
+
+This configuration demonstrates the use of command-line parameters to select between different
+quantum simulation methods without editing the file. This is useful for CI pipelines and automated
+testing.
+
+Usage:
+  python driver.py                                  # Uses Trotter (default)
+  python driver.py -p method=pauli-lcu              # Uses Pauli-LCU
+  python driver.py -p method=double-factorization   # Uses double-factorization
+
+Each method automatically outputs to a separate directory (Be-H-trotter/, Be-H-pauli-lcu/, etc.)
+to avoid overwriting results. You can override this with -p output_directory=custom_dir
 """
 
-my_method = "Trotter"
-#my_method = "pauli-lcu"
-#my_method = "double-factorization"
+# Method selection: override via command-line with -p method=<name>
+my_method = params.get("method", "Trotter")
 
 # this configuration file assumes equipartition of energy between Trotterization error and phase
 # estimation error (see usage of energy_error below)
@@ -15,11 +26,15 @@ energy_error = meV_to_Hartree(1e4) # 0.01 keV
 
 general.print_verbose()
 
-# Set output directory for all generated files (logfiles, matrices, eigendecompositions, etc.).  If
-# not set or empty, files are written to the current directory.  Can be changed on the command line
-# using `-p "output_directory=directory_name"`, demonstrating the use of `params` to allow
-# command-line arguments.
-general.output_directory = params.get("output_directory", "Be-H")
+# Set output directory based on method to keep results separated
+# Override with: -p output_directory=custom_dir
+default_output_dir = {
+    "Trotter": "Be-H-trotter",
+    "pauli-lcu": "Be-H-pauli-lcu",
+    "double-factorization": "Be-H-double-factorization"
+}.get(my_method, "Be-H")
+
+general.output_directory = params.get("output_directory", default_output_dir)
 
 general.logfile = "Be-H.log"
 
