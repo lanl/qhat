@@ -1,0 +1,6 @@
+x,y,purpose,n,pearson_r,pearson_p,spearman_rho,spearman_p
+collision_weight_fraction,signed_minus_jwmag_l1_channel_cancellation,Does collision opportunity enable signed-order cancellation leverage?,7,0.06665701939662963,0.8870907565951527,0.504524979109513,0.2482031142645112
+signed_minus_jwmag_l1_channel_cancellation,actual_log10_jwmag_over_fermionic_advantage,Primary structural-mechanism test,7,0.5299924324851707,0.22110338213331052,0.6785714285714287,0.0937502539598313
+log10_jwmag_over_signed_bch_norm_advantage,actual_log10_jwmag_over_fermionic_advantage,Leading BCH mechanism check,7,0.9996816532450455,3.4724087217457284e-09,0.9642857142857145,0.0004541491691941692
+signed_better_channel_weight_fraction,actual_log10_jwmag_over_fermionic_advantage,Do wins improve more high-weight BCH channels?,7,0.2478962603185906,0.5919690552002388,0.5,0.25316999510032256
+weighted_pair_orientation_flip_fraction_signed_vs_jwmag,signed_minus_jwmag_l1_channel_cancellation,"Are orientation changes sufficient, or must they be favorable?",7,0.45838968453276685,0.3009245961279502,0.3571428571428572,0.43161135203832796
