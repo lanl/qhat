@@ -1,0 +1,5 @@
+x,y,purpose,n,pearson_r,pearson_p,spearman_rho,spearman_p
+log10_jwmag_over_signed_bch_norm_advantage,actual_log10_jwmag_over_fermionic_advantage,BCH-to-finite-step bridge,7,0.9996816532450454,3.4724087217457284e-09,0.9642857142857145,0.0004541491691941692
+normalized_interference_cut_score,actual_log10_jwmag_over_fermionic_advantage,Does net interference-cut direction track Trotter advantage?,7,0.9214051077524925,0.0031871643229861245,0.9642857142857145,0.0004541491691941692
+positive_interference_cut_share,actual_log10_jwmag_over_fermionic_advantage,Are winning cases dominated by beneficial cut interference?,7,0.8180947926960436,0.02451192279041908,0.9285714285714288,0.002519472403794688
+top5_abs_interference_cut_fraction,actual_log10_jwmag_over_fermionic_advantage,Is the ordering effect concentrated in a few channels?,7,0.39141526207397664,0.38522237550036675,0.42857142857142866,0.3373683110858241
