@@ -94,6 +94,35 @@ also require:
 3. robustness to signed versus magnitude fermionic parent ordering; and
 4. confirmation that the gain is not a numerical-floor or single-time effect.
 
+### Weighted interaction-graph follow-up
+
+The proposed "distributed versus hub-dominated" explanation was tested on a
+coefficient-weighted occupied-to-virtual spin-orbital graph. Each complete
+Hermitian fermionic parent contributes its absolute canonical coefficient to
+every occupied--virtual support pair it touches. Strength-weighted Freeman
+centralization is normalized separately within the occupied and virtual
+partitions, and the graph statistic is the larger of the two partition values.
+It was then compared with
+
+```text
+E_JW-magnitude / E_fermionic
+```
+
+for the HGBS-5 sweep.
+
+The result does not confirm the hypothesis. The 85 available, numerically valid
+cases have no resolved aggregate correlation between graph centralization and
+log advantage (Pearson `r = -0.065`, `p = 0.554`). The matched B-H/Be-H/Li-H
+estimate points in the opposite direction (`r = 0.217`, `p = 0.286`), as does
+the molecule-and-active-space-size fixed-effect estimate (`r = 0.165`,
+`p = 0.182`). The virtual-side centralization—the closest direct test of the
+original virtual-hub claim—is also null (`r = -0.120`, `p = 0.275`). In this
+sweep, occupied-to-virtual hub dominance is therefore not a systematic
+predictor of fermionic-ordering benefit.
+
+The definition, coverage limitations, case table, correlation table, and
+figure are in `analysis/fermionic_graph_centralization/`.
+
 ## Practical case-selection rule
 
 Prioritize new overnight studies in this order:
@@ -114,6 +143,7 @@ Run from the repository root:
 ```bash
 python analysis/analyze_jw_magnitude_baseline.py
 python analysis/analyze_fermionic_aware_performance.py
+python analysis/analyze_fermionic_graph_centralization.py
 ```
 
 The case table, molecule summaries, condition summaries, and figures are in

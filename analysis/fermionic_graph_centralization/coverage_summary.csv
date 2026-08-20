@@ -1,0 +1,15 @@
+molecule,input_cases,graph_cases,direct_tensor_cases,reconstructed_cases,unavailable_cases,error_cases,valid_ratio_cases
+B-B,9,9,9,0,0,0,8
+B-H,9,9,6,3,0,0,9
+Be-Be,6,6,6,0,0,0,6
+Be-H,9,9,6,3,0,0,8
+BeH2,9,9,6,3,0,0,9
+C-C,9,0,0,0,9,0,0
+CH4,9,9,6,3,0,0,7
+F-F,8,8,8,0,0,0,8
+H2O,9,9,6,3,0,0,9
+Li-H,9,9,6,3,0,0,9
+Li-Li,7,7,7,0,0,0,7
+N-N,9,0,0,0,9,0,0
+NH3,9,9,6,3,0,0,5
+O-O,9,0,0,0,9,0,0
