@@ -123,6 +123,46 @@ predictor of fermionic-ordering benefit.
 The definition, coverage limitations, case table, correlation table, and
 figure are in `analysis/fermionic_graph_centralization/`.
 
+### Signed-order cancellation-structure follow-up
+
+The revised mechanism was tested on a parent interaction network whose nodes
+are complete Hermitian fermionic parents and whose edge weights are
+
+```text
+w_ij = |c_i c_j| * |support_i intersect support_j|.
+```
+
+For the signed ascending-coefficient order, the analysis measured the weighted
+opposite-sign interaction share, normalized mean edge span, interaction weight
+within 5% and 10% of the parent sequence, local opposite-sign enrichment, and
+the corresponding improvements over fermionic magnitude ordering. It compared
+these quantities against `E_JW-magnitude / E_fermionic`, absolute fermionic
+infidelity, and the independently measured HF-state BCH2 cancellation ratio.
+
+The strict structural hypothesis is not verified. There is strong direct
+evidence for the cancellation premise itself: across the eight independent BCH
+cases, cancellation strength `-log10(R_BCH)` correlates with greater
+JW-magnitude/fermionic advantage (`r = 0.852`, `p = 0.0072`) and lower absolute
+fermionic infidelity (`r = -0.870`, `p = 0.0050`). However, none of the nine
+shared-support structural proxies predicts measured cancellation after FDR
+correction. The strongest is local opposite-sign interaction weight
+(`r = 0.699`, `p = 0.081`, `q = 0.433`, `n = 7`).
+
+Across the 85 usable full-sweep cases, the global opposite-sign interaction
+share correlates with relative advantage after molecule and active-size
+adjustment (`r = 0.344`, `q = 0.019`), but that feature is order invariant.
+The genuinely order-sensitive locality results are inconsistent with relative
+advantage: larger edge span and smaller local weight often accompany more
+advantage. They do track lower absolute fermionic infidelity, while no metric
+survives FDR correction in the active-size-matched B-H/Be-H/Li-H comparison.
+Thus the useful cancellation appears to depend on Pauli-commutator orientations
+or BCH-vector alignment that shared parent support and coefficient signs alone
+do not encode.
+
+The full case table, matched-size table, correlation/FDR tables, favorable-case
+group comparison, report, and figure are in
+`analysis/signed_order_cancellation_structure/`.
+
 ## Practical case-selection rule
 
 Prioritize new overnight studies in this order:
@@ -144,6 +184,7 @@ Run from the repository root:
 python analysis/analyze_jw_magnitude_baseline.py
 python analysis/analyze_fermionic_aware_performance.py
 python analysis/analyze_fermionic_graph_centralization.py
+python analysis/analyze_signed_order_cancellation_structure.py
 ```
 
 The case table, molecule summaries, condition summaries, and figures are in
