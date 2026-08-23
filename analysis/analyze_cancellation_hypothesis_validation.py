@@ -356,6 +356,54 @@ def bootstrap_case_fixed_effect_r(
     return float(lower), float(upper), len(estimates)
 
 
+def bootstrap_correlation_r(
+    x: np.ndarray,
+    y: np.ndarray,
+    samples: int,
+    seed: int,
+) -> tuple[float, float, int]:
+    mask = np.isfinite(x) & np.isfinite(y)
+    x = x[mask]
+    y = y[mask]
+    if len(x) < 3 or samples <= 0:
+        return math.nan, math.nan, 0
+    rng = np.random.default_rng(seed)
+    estimates: list[float] = []
+    for _ in range(samples):
+        selected = rng.integers(0, len(x), size=len(x))
+        x_sample = x[selected]
+        y_sample = y[selected]
+        if np.std(x_sample) == 0.0 or np.std(y_sample) == 0.0:
+            continue
+        estimate = float(stats.pearsonr(x_sample, y_sample).statistic)
+        if math.isfinite(estimate):
+            estimates.append(estimate)
+    if not estimates:
+        return math.nan, math.nan, 0
+    lower, upper = np.quantile(estimates, [0.025, 0.975])
+    return float(lower), float(upper), len(estimates)
+
+
+def leave_one_out_pearson_range(
+    x: np.ndarray,
+    y: np.ndarray,
+) -> tuple[float, float, int]:
+    mask = np.isfinite(x) & np.isfinite(y)
+    x = x[mask]
+    y = y[mask]
+    if len(x) < 4:
+        return math.nan, math.nan, 0
+    estimates: list[float] = []
+    for omitted in range(len(x)):
+        keep = np.arange(len(x)) != omitted
+        estimate = float(correlation_statistics(x[keep], y[keep])["pearson_r"])
+        if math.isfinite(estimate):
+            estimates.append(estimate)
+    if not estimates:
+        return math.nan, math.nan, 0
+    return min(estimates), max(estimates), len(estimates)
+
+
 def build_schedule_summary(aggregated: pd.DataFrame) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     for schedule, group in aggregated.groupby("schedule", sort=True):
@@ -506,10 +554,44 @@ def build_case_summary(
     return summary
 
 
+def build_matched_pair_summary(case_summary: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    for matched_pair, group in case_summary.groupby("matched_pair", sort=True):
+        favorable = group[group["expected_outcome"] == "favorable"]
+        negative = group[group["expected_outcome"] == "negative_control"]
+        if len(favorable) != 1 or len(negative) != 1:
+            continue
+        favorable_row = favorable.iloc[0]
+        negative_row = negative.iloc[0]
+        values = [
+            favorable_row["fresh_best_jw_to_signed_bch_cancellation_ratio"],
+            negative_row["fresh_best_jw_to_signed_bch_cancellation_ratio"],
+            favorable_row["fresh_jw_to_signed_advantage"],
+            negative_row["fresh_jw_to_signed_advantage"],
+        ]
+        if not all(np.isfinite(values)) or not all(value > 0.0 for value in values):
+            continue
+        cancellation_delta = math.log10(values[0]) - math.log10(values[1])
+        error_delta = math.log10(values[2]) - math.log10(values[3])
+        rows.append(
+            {
+                "matched_pair": matched_pair,
+                "n_qubits": int(favorable_row["n_qubits"]),
+                "favorable_case_id": favorable_row["case_id"],
+                "negative_control_case_id": negative_row["case_id"],
+                "delta_log10_relative_cancellation": cancellation_delta,
+                "delta_log10_fresh_advantage": error_delta,
+                "direction_concordant": cancellation_delta * error_delta > 0.0,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def build_validation_statistics(
     deltas: pd.DataFrame,
     aggregated: pd.DataFrame,
     case_summary: pd.DataFrame,
+    matched_pair_summary: pd.DataFrame,
     bootstrap_samples: int,
     seed: int,
 ) -> pd.DataFrame:
@@ -614,13 +696,36 @@ def build_validation_statistics(
         & np.isfinite(case_summary["fresh_jw_to_signed_advantage"])
         & (case_summary["fresh_jw_to_signed_advantage"] > 0.0)
     ]
-    direct_stats = correlation_statistics(
-        np.log10(
-            direct["fresh_best_jw_to_signed_bch_cancellation_ratio"].to_numpy(
-                float
-            )
-        ),
-        np.log10(direct["fresh_jw_to_signed_advantage"].to_numpy(float)),
+    direct_x = np.log10(
+        direct["fresh_best_jw_to_signed_bch_cancellation_ratio"].to_numpy(float)
+    )
+    direct_y = np.log10(direct["fresh_jw_to_signed_advantage"].to_numpy(float))
+    direct_stats = correlation_statistics(direct_x, direct_y)
+    direct_lower, direct_upper, direct_bootstrap = bootstrap_correlation_r(
+        direct_x,
+        direct_y,
+        bootstrap_samples,
+        seed + 3,
+    )
+    loo_lower, loo_upper, loo_samples = leave_one_out_pearson_range(
+        direct_x,
+        direct_y,
+    )
+    direct_concordant = int(np.sum(direct_x * direct_y > 0.0))
+    direct_concordance = (
+        direct_concordant / len(direct_x) if len(direct_x) else math.nan
+    )
+    direct_binomial_p = (
+        float(
+            stats.binomtest(
+                direct_concordant,
+                len(direct_x),
+                0.5,
+                alternative="greater",
+            ).pvalue
+        )
+        if len(direct_x)
+        else math.nan
     )
     rows.append(
         {
@@ -630,9 +735,61 @@ def build_validation_statistics(
                 "best-JW/signed error ratio"
             ),
             **direct_stats,
-            "bootstrap_95ci_lower": math.nan,
-            "bootstrap_95ci_upper": math.nan,
-            "valid_bootstrap_samples": 0,
+            "bootstrap_95ci_lower": direct_lower,
+            "bootstrap_95ci_upper": direct_upper,
+            "valid_bootstrap_samples": direct_bootstrap,
+            "leave_one_out_min_pearson_r": loo_lower,
+            "leave_one_out_max_pearson_r": loo_upper,
+            "leave_one_out_samples": loo_samples,
+            "direction_concordance_fraction": direct_concordance,
+            "direction_concordant_cases": direct_concordant,
+            "binomial_p_value": direct_binomial_p,
+        }
+    )
+    if matched_pair_summary.empty:
+        pair_stats = correlation_statistics(np.array([]), np.array([]))
+        pair_lower, pair_upper, pair_bootstrap = math.nan, math.nan, 0
+        concordant_pairs = 0
+        concordance_fraction = math.nan
+        binomial_p_value = math.nan
+    else:
+        pair_x = matched_pair_summary[
+            "delta_log10_relative_cancellation"
+        ].to_numpy(float)
+        pair_y = matched_pair_summary["delta_log10_fresh_advantage"].to_numpy(
+            float
+        )
+        pair_stats = correlation_statistics(pair_x, pair_y)
+        pair_lower, pair_upper, pair_bootstrap = bootstrap_correlation_r(
+            pair_x,
+            pair_y,
+            bootstrap_samples,
+            seed + 4,
+        )
+        concordant_pairs = int(matched_pair_summary["direction_concordant"].sum())
+        concordance_fraction = concordant_pairs / len(matched_pair_summary)
+        binomial_p_value = float(
+            stats.binomtest(
+                concordant_pairs,
+                len(matched_pair_summary),
+                0.5,
+                alternative="greater",
+            ).pvalue
+        )
+    rows.append(
+        {
+            "test": "matched_pair_delta_correlation",
+            "description": (
+                "Expected-favorable minus negative-control delta in relative BCH "
+                "cancellation versus the corresponding fresh error-ratio delta"
+            ),
+            **pair_stats,
+            "bootstrap_95ci_lower": pair_lower,
+            "bootstrap_95ci_upper": pair_upper,
+            "valid_bootstrap_samples": pair_bootstrap,
+            "direction_concordance_fraction": concordance_fraction,
+            "direction_concordant_pairs": concordant_pairs,
+            "binomial_p_value": binomial_p_value,
         }
     )
     absolute = case_summary[
@@ -711,15 +868,32 @@ def make_plot(
         & np.isfinite(case_summary["fresh_jw_to_signed_advantage"])
         & (case_summary["fresh_jw_to_signed_advantage"] > 0.0)
     ]
-    colors = valid["expected_outcome"].map(
-        {"favorable": "#2a9d8f", "negative_control": "#e76f51"}
-    )
     x = np.log10(valid["fresh_best_jw_to_signed_bch_cancellation_ratio"])
     y = np.log10(valid["fresh_jw_to_signed_advantage"])
-    axes[1].scatter(x, y, c=colors, s=48)
+    palette = {"favorable": "#2a9d8f", "negative_control": "#e76f51"}
+    for outcome, group in valid.groupby("expected_outcome", sort=True):
+        group_x = np.log10(
+            group["fresh_best_jw_to_signed_bch_cancellation_ratio"]
+        )
+        group_y = np.log10(group["fresh_jw_to_signed_advantage"])
+        axes[1].scatter(
+            group_x,
+            group_y,
+            color=palette[outcome],
+            s=48,
+            label=outcome.replace("_", " ").title(),
+        )
     for row, x_value, y_value in zip(valid.itertuples(), x, y, strict=True):
+        annotate = (
+            abs(x_value) > 0.35
+            or abs(y_value) > 0.7
+            or not bool(row.performance_label_reproduced)
+        )
+        if not annotate:
+            continue
+        molecule = str(row.molecule).replace("-", "")
         axes[1].annotate(
-            row.molecule,
+            f"{molecule} {row.active_occupied}+{row.active_vacant}",
             (x_value, y_value),
             xytext=(4, 4),
             textcoords="offset points",
@@ -730,6 +904,7 @@ def make_plot(
     axes[1].set_xlabel(r"$\log_{10}(R_{best-JW}/R_{signed})$")
     axes[1].set_ylabel(r"$\log_{10}(\epsilon_{best-JW}/\epsilon_{signed})$")
     axes[1].set_title("BCH-held-out matched cases")
+    axes[1].legend(frameon=False, loc="upper left")
     fig.tight_layout()
     fig.savefig(outdir / "cancellation_validation.png", dpi=dpi)
     fig.savefig(outdir / "cancellation_validation.pdf")
@@ -751,6 +926,7 @@ def write_report(
     aggregated: pd.DataFrame,
     schedule_summary: pd.DataFrame,
     case_summary: pd.DataFrame,
+    matched_pair_summary: pd.DataFrame,
     validation_statistics: pd.DataFrame,
     outdir: Path,
 ) -> None:
@@ -768,6 +944,9 @@ def write_report(
     ]
     direct = validation_statistics[
         validation_statistics["test"] == "relative_cancellation_vs_fresh_advantage"
+    ].iloc[0]
+    matched = validation_statistics[
+        validation_statistics["test"] == "matched_pair_delta_correlation"
     ].iloc[0]
     absolute = validation_statistics[
         validation_statistics["test"]
@@ -799,6 +978,23 @@ def write_report(
     else:
         verdict = "does not yet establish the proposed cancellation mechanism"
     reproduced = int(case_summary["performance_label_reproduced"].fillna(False).sum())
+    drifted_cases = case_summary.loc[
+        ~case_summary["performance_label_reproduced"].fillna(False),
+        "case_id",
+    ].tolist()
+    if int(random_blocks["observations"]) > 0:
+        random_sensitivity = (
+            "- Random-parent-block sensitivity (seeds and Trotter conditions "
+            "collapsed, centered within case): "
+            f"r={format_number(random_blocks['pearson_r'])}, "
+            f"p={format_number(random_blocks['pearson_p_value'])}, "
+            f"n={int(random_blocks['observations'])}"
+        )
+    else:
+        random_sensitivity = (
+            "- Random-parent-block sensitivity: not rerun in this deterministic "
+            "full panel; see the pilot analysis."
+        )
 
     lines = [
         "# BCH cancellation hypothesis validation",
@@ -819,6 +1015,8 @@ def write_report(
         f"- Primary case/schedule inference units: {int(primary['observations'])}",
         f"- Historical performance labels reproduced from current tensors: "
         f"{reproduced}/{len(case_summary)}",
+        "- Historical-label drift: "
+        + (", ".join(drifted_cases) if drifted_cases else "none"),
         f"- Trotter step counts: {sorted(results['trotter_steps'].unique().tolist())}",
         f"- Evolution times: {sorted(results['evolution_time'].unique().tolist())}",
         "",
@@ -839,10 +1037,7 @@ def write_report(
         f"r={format_number(deterministic['pearson_r'])}, "
         f"p={format_number(deterministic['pearson_p_value'])}, "
         f"n={int(deterministic['observations'])}",
-        "- Random-parent-block sensitivity (raw seeds, centered within case): "
-        f"r={format_number(random_blocks['pearson_r'])}, "
-        f"p={format_number(random_blocks['pearson_p_value'])}, "
-        f"n={int(random_blocks['observations'])}",
+        random_sensitivity,
         "- Step-specific Pearson r values: "
         + ", ".join(
             f"{row.test.removeprefix('within_case_condition_')}="
@@ -859,7 +1054,28 @@ def write_report(
         "",
         "- Best-JW/signed cancellation ratio vs best-JW/signed error ratio: "
         f"r={format_number(direct['pearson_r'])}, "
-        f"p={format_number(direct['pearson_p_value'])}, n={int(direct['observations'])}",
+        f"p={format_number(direct['pearson_p_value'])}, "
+        f"rho={format_number(direct['spearman_rho'])}, "
+        f"n={int(direct['observations'])}",
+        "- Case bootstrap 95% interval: "
+        f"[{format_number(direct['bootstrap_95ci_lower'])}, "
+        f"{format_number(direct['bootstrap_95ci_upper'])}]",
+        "- Leave-one-case-out Pearson r range: "
+        f"[{format_number(direct['leave_one_out_min_pearson_r'])}, "
+        f"{format_number(direct['leave_one_out_max_pearson_r'])}]",
+        "- Relative-cancellation direction predicts the winning ordering in "
+        f"{int(direct['direction_concordant_cases'])}/{int(direct['observations'])} "
+        f"cases (one-sided binomial p={format_number(direct['binomial_p_value'])})",
+        "- Matched-pair delta correlation: "
+        f"r={format_number(matched['pearson_r'])}, "
+        f"p={format_number(matched['pearson_p_value'])}, "
+        f"n={int(matched['observations'])} pairs",
+        "- Matched-pair bootstrap 95% interval: "
+        f"[{format_number(matched['bootstrap_95ci_lower'])}, "
+        f"{format_number(matched['bootstrap_95ci_upper'])}]",
+        "- Matched-pair direction concordance: "
+        f"{int(matched['direction_concordant_pairs'])}/{len(matched_pair_summary)} "
+        f"(one-sided binomial p={format_number(matched['binomial_p_value'])})",
         f"- Absolute signed cancellation strength (supplemental): "
         f"r={format_number(absolute['pearson_r'])}, "
         f"p={format_number(absolute['pearson_p_value'])}, "
@@ -889,8 +1105,14 @@ def write_report(
             "inference, preventing either from inflating sample size.",
             "- `R_BCH` is evaluated on the HF initial state. A later campaign "
             "should repeat the analysis with propagated local-error vectors over time.",
-            "- A pilot panel can establish workflow correctness and effect direction, "
-            "but the full 20-case panel is needed for a report-level mechanism claim.",
+            (
+                "- This full matched panel establishes the current cross-case result; "
+                "external confirmation still requires prospectively selected tensors."
+                if len(manifest) >= 20
+                else "- A pilot panel can establish workflow correctness and effect "
+                "direction, but the full 20-case panel is needed for a report-level "
+                "mechanism claim."
+            ),
             "",
             "## Files",
             "",
@@ -898,6 +1120,7 @@ def write_report(
             "- `primary_aggregated_deltas.csv`: one median per case/schedule/condition.",
             "- `schedule_summary.csv`: schedule-level ratios and concordance.",
             "- `case_summary.csv`: case-level outcome and cancellation results.",
+            "- `matched_pair_summary.csv`: within-pair cancellation and error deltas.",
             "- `validation_statistics.csv`: primary and held-out correlations.",
             "- `cancellation_validation.{png,pdf}`: diagnostic figure.",
             "",
@@ -929,10 +1152,12 @@ def main() -> None:
         raise ValueError("No valid alternative/reference deltas were available.")
     schedule_summary = build_schedule_summary(aggregated)
     case_summary = build_case_summary(aggregated, results, manifest)
+    matched_pair_summary = build_matched_pair_summary(case_summary)
     validation_statistics = build_validation_statistics(
         deltas,
         aggregated,
         case_summary,
+        matched_pair_summary,
         args.bootstrap_samples,
         args.seed,
     )
@@ -942,6 +1167,10 @@ def main() -> None:
     aggregated.to_csv(args.outdir / "primary_aggregated_deltas.csv", index=False)
     schedule_summary.to_csv(args.outdir / "schedule_summary.csv", index=False)
     case_summary.to_csv(args.outdir / "case_summary.csv", index=False)
+    matched_pair_summary.to_csv(
+        args.outdir / "matched_pair_summary.csv",
+        index=False,
+    )
     validation_statistics.to_csv(
         args.outdir / "validation_statistics.csv",
         index=False,
@@ -954,6 +1183,7 @@ def main() -> None:
         aggregated,
         schedule_summary,
         case_summary,
+        matched_pair_summary,
         validation_statistics,
         args.outdir,
     )

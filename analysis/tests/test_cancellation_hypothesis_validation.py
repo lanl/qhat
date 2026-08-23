@@ -9,6 +9,7 @@ try:
         REFERENCE,
         aggregate_random_replicates,
         build_case_summary,
+        build_matched_pair_summary,
         build_within_case_deltas,
         collapse_conditions_for_inference,
     )
@@ -21,6 +22,7 @@ except ImportError:
         REFERENCE,
         aggregate_random_replicates,
         build_case_summary,
+        build_matched_pair_summary,
         build_within_case_deltas,
         collapse_conditions_for_inference,
     )
@@ -148,3 +150,31 @@ def test_repeated_step_counts_do_not_inflate_primary_units() -> None:
     assert len(collapsed) == 1
     assert math.isclose(collapsed.iloc[0]["cancellation_ratio_to_signed"], 4.0)
     assert math.isclose(collapsed.iloc[0]["error_ratio_to_signed"], 8.0)
+
+
+def test_matched_pair_summary_uses_favorable_minus_control_deltas() -> None:
+    cases = pd.DataFrame(
+        [
+            {
+                "case_id": "fav",
+                "matched_pair": "pair",
+                "expected_outcome": "favorable",
+                "n_qubits": 12,
+                "fresh_best_jw_to_signed_bch_cancellation_ratio": 4.0,
+                "fresh_jw_to_signed_advantage": 8.0,
+            },
+            {
+                "case_id": "control",
+                "matched_pair": "pair",
+                "expected_outcome": "negative_control",
+                "n_qubits": 12,
+                "fresh_best_jw_to_signed_bch_cancellation_ratio": 2.0,
+                "fresh_jw_to_signed_advantage": 2.0,
+            },
+        ]
+    )
+    pair = build_matched_pair_summary(cases).iloc[0]
+
+    assert math.isclose(pair["delta_log10_relative_cancellation"], math.log10(2.0))
+    assert math.isclose(pair["delta_log10_fresh_advantage"], math.log10(4.0))
+    assert bool(pair["direction_concordant"])

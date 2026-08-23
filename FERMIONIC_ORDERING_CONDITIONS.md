@@ -163,7 +163,7 @@ The full case table, matched-size table, correlation/FDR tables, favorable-case
 group comparison, report, and figure are in
 `analysis/signed_order_cancellation_structure/`.
 
-### Within-Hamiltonian cancellation-ablation pilot
+### Within-Hamiltonian cancellation-ablation validation
 
 The stronger test keeps each final JW Hamiltonian fixed and changes only its
 Pauli schedule. A BCH-held-out 12-qubit pilot paired two favorable cases
@@ -186,17 +186,35 @@ descendants within each parent changes neither quantity materially. This
 localizes the important structure to the relative ordering of fermionic-parent
 blocks, not arbitrary descendant order inside a block.
 
-The cross-case result is promising but still preliminary. The best-JW/signed
-BCH cancellation ratio versus the freshly recomputed best-JW/signed error ratio
-has Pearson `r = 0.943` (`p = 0.057`) and Spearman `rho = 1.0` for the four
-cases. Absolute signed cancellation strength alone is less informative
-(`r = 0.568`, `p = 0.432`), which supports using an order-relative rather than
-an absolute molecular metric. All four historical favorable/control labels
-were reproduced, but the prepared 20-case matched panel must be run before a
-full-sweep mechanism claim is justified. A previously selected NH3 4+8 case
-was excluded because the current tensor produces 1,542 Pauli terms rather than
-the historical 1,502 and reverses its old performance label; Li2 6+6 replaced
-it in the pilot.
+The decisive cross-case test extends the deterministic signed-reference,
+JW-signed, and JW-magnitude comparison to 20 BCH-held-out HGBS-5 cases arranged
+as ten active-size-matched favorable/control pairs from 12 through 20 qubits.
+The best-JW/signed BCH cancellation ratio strongly tracks the freshly
+recomputed best-JW/signed error ratio: Pearson `r = 0.807` (`p = 1.73e-5`) and
+Spearman `rho = 0.806` (`p = 1.78e-5`). A 10,000-sample case bootstrap gives a
+95% interval `[0.349, 0.967]`, and every leave-one-case-out estimate remains
+strongly positive (`r = 0.694` to `0.907`). The matched-pair difference test is
+also positive (`r = 0.713`, `p = 0.0205`, ten pairs), with the predicted
+direction in eight of ten pairs. The sign of the relative cancellation ratio
+alone identifies the winning ordering in 17 of 20 cases (one-sided binomial
+`p = 0.00129`). The ten-pair bootstrap interval remains wide and crosses zero
+(`[-0.179, 0.984]`), so the full-case result is stronger than the pair-only
+uncertainty estimate.
+
+Absolute signed cancellation strength remains a poor predictor (`r = 0.242`,
+`p = 0.304`). The predictive quantity is therefore the cancellation produced
+by one ordering relative to its competing ordering on the same Hamiltonian,
+not an absolute molecular cancellation score. Current tensors reproduce 19 of
+20 historical favorable/control labels. The exception is F2 14+2, whose old
+large favorable label is not reproduced; all reported correlations use fresh
+errors and cancellation ratios, so that drift is not silently inherited.
+
+Together, the pilot intervention and full matched panel support the mechanism
+claim: fermionic-aware ordering succeeds when its parent-block sequence
+produces stronger destructive BCH cancellation than the best direct JW
+ordering. The remaining limitation is external validation on prospectively
+selected Hamiltonians and, later, cancellation measured along propagated
+states rather than only on the HF initial state.
 
 The runner, analysis, raw results, statistical tables, report, and figure are
 in `analysis/cancellation_hypothesis_validation/`.
@@ -225,6 +243,13 @@ python analysis/analyze_fermionic_graph_centralization.py
 python analysis/analyze_signed_order_cancellation_structure.py
 python analysis/run_cancellation_hypothesis_validation.py --panel pilot --execute
 python analysis/analyze_cancellation_hypothesis_validation.py
+python analysis/run_cancellation_hypothesis_validation.py --panel full \
+  --samples 0 --schedules fermionic_signed_reference jw_signed_baseline \
+  jw_magnitude_baseline --execute
+python analysis/analyze_cancellation_hypothesis_validation.py \
+  --input analysis/cancellation_hypothesis_validation/full_ablation_results.csv \
+  --manifest analysis/cancellation_hypothesis_validation/full_panel_manifest.csv \
+  --outdir analysis/cancellation_hypothesis_validation/full_analysis
 ```
 
 The case table, molecule summaries, condition summaries, and figures are in

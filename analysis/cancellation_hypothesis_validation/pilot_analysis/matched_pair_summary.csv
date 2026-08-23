@@ -1,0 +1,3 @@
+matched_pair,n_qubits,favorable_case_id,negative_control_case_id,delta_log10_relative_cancellation,delta_log10_fresh_advantage,direction_concordant
+12q_heteronuclear,12,Be-H_1.47_hgbs-5_as-005-007,Li-H_1.81_hgbs-5_as-004-008,0.2346318124194753,0.4910936649085857,True
+12q_pair_a,12,Li-Li_2.66_hgbs-5_as-006-006,H2O_s-1.00_hgbs-5_as-004-008,0.20958508416097926,0.5765506783145431,True
