@@ -1,0 +1,7 @@
+schedule,schedule_label,case_conditions,cases,median_cancellation_ratio_to_signed,median_error_ratio_to_signed,signed_stronger_cancellation_fraction,signed_lower_error_fraction,direction_concordance_fraction
+fermionic_magnitude_reference,Fermionic magnitude,12,4,0.8902678785892961,0.9366616449509091,0.25,0.5,0.75
+jw_magnitude_baseline,JW magnitude,12,4,0.8973282008514107,1.035912805500541,0.25,0.5,0.75
+jw_signed_baseline,JW signed,12,4,1.178528984741289,1.309001599466467,0.5,0.5,1.0
+signed_parent_blocks_randomized,Random parent blocks,12,4,5.947491666834077,99.11765423032908,1.0,1.0,1.0
+signed_parent_descendants_round_robin,Round robin,12,4,2.216779650967288,5.236672863444891,0.75,1.0,0.75
+signed_parent_within_randomized,Within-parent shuffle,12,4,1.0,0.9999997301717132,0.0,0.4166666666666667,0.0

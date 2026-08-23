@@ -163,6 +163,44 @@ The full case table, matched-size table, correlation/FDR tables, favorable-case
 group comparison, report, and figure are in
 `analysis/signed_order_cancellation_structure/`.
 
+### Within-Hamiltonian cancellation-ablation pilot
+
+The stronger test keeps each final JW Hamiltonian fixed and changes only its
+Pauli schedule. A BCH-held-out 12-qubit pilot paired two favorable cases
+(Li2 6+6 and BeH 5+7) with two negative controls (H2O 4+8 and LiH 4+8).
+Each case used the signed fermionic reference, fermionic magnitude, JW signed,
+JW magnitude, parent-descendant round robin, five randomized parent-block
+orders, and five within-parent shuffles.
+
+The pilot supports the order--cancellation--error link. Results were repeated
+at 50, 100, and 200 Trotter steps. After collapsing step-count repeats to one
+median per case and alternative schedule, the case-centered association between
+`log10(R_alt/R_signed)` and `log10(E_alt/E_signed)` is Pearson `r = 0.891`
+(`p = 5.47e-9`; case-block bootstrap 95% interval `[0.835, 0.988]`). The
+step-specific estimates are all `r = 0.891` to the reported precision. The four
+deterministic controls give `r = 0.937`, while the randomized parent-block
+orders, also collapsed across step counts and centered within case, give
+`r = 0.988`. Randomizing intact parent blocks increases the median BCH
+cancellation ratio by `5.95x` and the median Trotter error by `99.1x`; shuffling
+descendants within each parent changes neither quantity materially. This
+localizes the important structure to the relative ordering of fermionic-parent
+blocks, not arbitrary descendant order inside a block.
+
+The cross-case result is promising but still preliminary. The best-JW/signed
+BCH cancellation ratio versus the freshly recomputed best-JW/signed error ratio
+has Pearson `r = 0.943` (`p = 0.057`) and Spearman `rho = 1.0` for the four
+cases. Absolute signed cancellation strength alone is less informative
+(`r = 0.568`, `p = 0.432`), which supports using an order-relative rather than
+an absolute molecular metric. All four historical favorable/control labels
+were reproduced, but the prepared 20-case matched panel must be run before a
+full-sweep mechanism claim is justified. A previously selected NH3 4+8 case
+was excluded because the current tensor produces 1,542 Pauli terms rather than
+the historical 1,502 and reverses its old performance label; Li2 6+6 replaced
+it in the pilot.
+
+The runner, analysis, raw results, statistical tables, report, and figure are
+in `analysis/cancellation_hypothesis_validation/`.
+
 ## Practical case-selection rule
 
 Prioritize new overnight studies in this order:
@@ -185,6 +223,8 @@ python analysis/analyze_jw_magnitude_baseline.py
 python analysis/analyze_fermionic_aware_performance.py
 python analysis/analyze_fermionic_graph_centralization.py
 python analysis/analyze_signed_order_cancellation_structure.py
+python analysis/run_cancellation_hypothesis_validation.py --panel pilot --execute
+python analysis/analyze_cancellation_hypothesis_validation.py
 ```
 
 The case table, molecule summaries, condition summaries, and figures are in

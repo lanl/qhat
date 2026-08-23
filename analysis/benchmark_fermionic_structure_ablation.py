@@ -38,6 +38,10 @@ Two deterministic controls are also included:
     jw_signed_baseline
         Final JW Pauli terms ordered directly by increasing signed coefficient.
 
+    jw_magnitude_baseline
+        Final JW Pauli terms ordered directly by decreasing absolute
+        coefficient magnitude.
+
 Every schedule is evaluated on the same final Pauli set and coefficients.
 Besides Trotter state error, the script records state-dependent BCH diagnostics,
 a cancellation ratio, Pauli-pair orientation changes relative to the signed
@@ -121,6 +125,7 @@ DETERMINISTIC_SCHEDULES = (
     REFERENCE,
     "fermionic_magnitude_reference",
     "jw_signed_baseline",
+    "jw_magnitude_baseline",
     "signed_parent_descendants_round_robin",
 )
 RANDOM_SCHEDULES = (
@@ -522,6 +527,13 @@ def build_schedule_specs(
         tolerance=args.tolerance,
     )
     jw_signed_indices = [raw_index_by_key[key] for key in jw_signed_keys]
+    jw_magnitude_keys = baseline.magnitude_descending_lexicographic_order(
+        raw_pauli_keys=raw_pauli_keys,
+        final_coefficients=final_coefficients,
+        n_qubits=n_qubits,
+        tolerance=args.tolerance,
+    )
+    jw_magnitude_indices = [raw_index_by_key[key] for key in jw_magnitude_keys]
 
     round_robin_indices, round_robin_parents = round_robin_descendants(
         reference_buckets,
@@ -548,6 +560,13 @@ def build_schedule_specs(
             sample_index=-1,
             random_seed=-1,
             pauli_order_indices=tuple(jw_signed_indices),
+            parent_order=tuple(),
+        ),
+        "jw_magnitude_baseline": ScheduleSpec(
+            name="jw_magnitude_baseline",
+            sample_index=-1,
+            random_seed=-1,
+            pauli_order_indices=tuple(jw_magnitude_indices),
             parent_order=tuple(),
         ),
         "signed_parent_descendants_round_robin": ScheduleSpec(
@@ -624,6 +643,10 @@ def ordering_definition(name: str) -> str:
         "jw_signed_baseline": (
             "final JW Pauli terms ordered directly by increasing signed "
             "coefficient with dense Pauli lexicographic tie-breaking"
+        ),
+        "jw_magnitude_baseline": (
+            "final JW Pauli terms ordered directly by decreasing absolute "
+            "coefficient magnitude with dense Pauli lexicographic tie-breaking"
         ),
         "signed_parent_blocks_randomized": (
             "reference signed-fermionic parent-owned Pauli blocks preserved "
