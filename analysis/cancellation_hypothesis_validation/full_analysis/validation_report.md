@@ -12,7 +12,7 @@ This validation panel **supports both the within-Hamiltonian and cross-case clai
 - Case/schedule/condition medians: 40
 - Primary case/schedule inference units: 40
 - Historical performance labels reproduced from current tensors: 19/20
-- Historical-label drift: F-F_1.28_hgbs-5_as-014-002
+- Historical-label drift: Li-H_1.81_hgbs-5_as-004-016
 - Trotter step counts: [100]
 - Evolution times: [1.0]
 
@@ -22,7 +22,7 @@ The variables are `delta log10 cancellation = log10(R_alt/R_signed)` and `delta 
 
 - Case-centered Pearson r: 0.835
 - p-value: 2.2e-11
-- Case-block bootstrap 95% interval: [0.0562, 0.962]
+- Case-block bootstrap 95% interval: [0.0527, 0.961]
 - Direction-concordant deltas: 90.0%
 - Signed stronger-cancellation and lower-error deltas: 50.0%
 - Deterministic-control sensitivity: r=0.835, p=2.2e-11, n=40
@@ -31,16 +31,16 @@ The variables are `delta log10 cancellation = log10(R_alt/R_signed)` and `delta 
 
 ## Held-out cross-case check
 
-The panel cases were not among the eight BCH cases used to formulate the hypothesis. Favorable/control labels were used only to construct the matched panel; the reported advantage below is freshly recomputed from this run's JW-signed, JW-magnitude, and signed-reference rows.
+The panel cases were not among the eight BCH cases used to formulate the hypothesis. Favorable/control labels were used only to construct the matched panel; the reported advantage below is freshly recomputed from this run's JW-magnitude and signed-reference rows; JW-signed is retained as a secondary diagnostic.
 
-- Best-JW/signed cancellation ratio vs best-JW/signed error ratio: r=0.807, p=1.73e-05, rho=0.806, n=20
-- Case bootstrap 95% interval: [0.349, 0.967]
-- Leave-one-case-out Pearson r range: [0.694, 0.907]
+- JW-magnitude/signed cancellation ratio vs JW-magnitude/signed error ratio: r=0.903, p=5.28e-08, rho=0.848, n=20
+- Case bootstrap 95% interval: [0.494, 0.988]
+- Leave-one-case-out Pearson r range: [0.831, 0.964]
 - Relative-cancellation direction predicts the winning ordering in 17/20 cases (one-sided binomial p=0.00129)
-- Matched-pair delta correlation: r=0.713, p=0.0205, n=10 pairs
-- Matched-pair bootstrap 95% interval: [-0.179, 0.984]
-- Matched-pair direction concordance: 8/10 (one-sided binomial p=0.0547)
-- Absolute signed cancellation strength (supplemental): r=0.242, p=0.304, n=20
+- Matched-pair delta correlation: r=0.916, p=0.000196, n=10 pairs
+- Matched-pair bootstrap 95% interval: [0.452, 0.991]
+- Matched-pair direction concordance: 9/10 (one-sided binomial p=0.0107)
+- Absolute signed cancellation strength (supplemental): r=0.211, p=0.371, n=20
 
 ## Schedule medians relative to signed fermionic
 
