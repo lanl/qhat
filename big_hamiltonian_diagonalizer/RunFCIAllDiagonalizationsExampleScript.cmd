@@ -1,0 +1,6 @@
+time python qhat_low_energies_fci.py F-F_1.00_hgbs-5_as-010-010.pickle -o FCI-F-F_1.00_hgbs-5_as-012-012-20q_lowest3 --num-electrons 10 --spin 0 -k 3 --threads 32 --tol 1e-9 |& tee OutFCITrace-F-F_1.00_hgbs-5_as-010-010-k3.txt 
+time python qhat_low_energies_fci.py F-F_1.00_hgbs-5_as-010-012.pickle -o FCI-F-F_1.00_hgbs-5_as-012-012-22q_lowest3 --num-electrons 10 --spin 0 -k 3 --threads 32 --tol 1e-9 |& tee OutFCITrace-F-F_1.00_hgbs-5_as-010-012-k3.txt 
+time python qhat_low_energies_fci.py F-F_1.00_hgbs-5_as-012-012.pickle -o FCI-F-F_1.00_hgbs-5_as-012-012-24q_lowest3 --num-electrons 12 --spin 0 -k 3 --threads 32 --tol 1e-9 |& tee OutFCITrace-F-F_1.00_hgbs-5_as-012-012-k3.txt 
+time python qhat_low_energies_fci.py F-F_1.00_hgbs-5_as-012-014.pickle -o FCI-F-F_1.00_hgbs-5_as-012-012-26q_lowest3 --num-electrons 12 --spin 0 -k 3 --threads 32 --tol 1e-9 |& tee OutFCITrace-F-F_1.00_hgbs-5_as-012-014-k3.txt 
+time python qhat_low_energies_fci.py F-F_1.00_hgbs-5_as-014-014.pickle -o FCI-F-F_1.00_hgbs-5_as-012-012-28q_lowest3 --num-electrons 14 --spin 0 -k 3 --threads 32 --tol 1e-9 |& tee OutFCITrace-F-F_1.00_hgbs-5_as-014-014-k3.txt 
+time python qhat_low_energies_fci.py F-F_1.00_hgbs-5_as-014-016.pickle -o FCI-F-F_1.00_hgbs-5_as-012-012-30q_lowest3 --num-electrons 14 --spin 0 -k 3 --threads 32 --tol 1e-9 |& tee OutFCITrace-F-F_1.00_hgbs-5_as-014-016-k3.txt 

@@ -10,9 +10,39 @@ See ALTERNATION_BUG_SUMMARY.md for details.
 
 import pytest
 from qhat.common.trotter_flattened import (
-    expand_ramped_trotterization,
+    Trotterization,
     get_trotterization_coefficients,
 )
+
+
+def expand_ramped_trotterization(
+    num_terms: int,
+    coefficients: list,
+    num_steps: int,
+    combine_terms: bool = True
+) -> list:
+    """Helper function to test expansion logic via Trotterization class.
+
+    Creates dummy Pauli terms and returns the expanded sequence.
+    """
+    # Create dummy pauli terms (using 'X', 'Y', 'Z' pattern)
+    pauli_chars = ['X', 'Y', 'Z', 'I']
+    pauli_terms = tuple(
+        (pauli_chars[i % len(pauli_chars)], 1.0)
+        for i in range(num_terms)
+    )
+
+    # Create Trotterization instance
+    trotter = Trotterization(
+        pauli_terms=pauli_terms,
+        coefficients=tuple(coefficients),
+        time=1.0,
+        num_steps=num_steps,
+        combine_terms=combine_terms
+    )
+
+    # Return the expanded sequence (it's a cached_property, not a method)
+    return trotter.expanded_sequence
 
 
 class TestAlternationReset:

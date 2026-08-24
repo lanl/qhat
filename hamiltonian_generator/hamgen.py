@@ -1,3 +1,12 @@
+"""
+Hamiltonian Generator for QHAT
+
+Generates quantum Hamiltonians from molecular specifications using PySCF.
+
+Usage:
+    # Basic usage with default config
+    python3.11 -m qhat.hamiltonian_generator.hamgen
+"""
 import argparse
 import logging
 import math
@@ -13,6 +22,10 @@ from openfermion.transforms.opconversions.binary_codes import _encoder_bk
 from openfermionpyscf import PyscfMolecularData
 from openfermionpyscf._run_pyscf import compute_integrals, compute_scf, prepare_pyscf_molecule
 
+from qhat.common.config_utils import (
+    parse_key_value_params,
+    get_standard_exec_namespace,
+)
 from qhat.common.logging_utils import configure_logging
 from qhat.hamiltonian_generator.hamgen_types import (
     GeneralConfiguration,
@@ -39,7 +52,20 @@ def load_configuration() -> State:
             nargs='?',
             default=default_config,
             help=f"Name of the configuration file; defaults to \"{default_config}\"")
+
+    # Add support for arbitrary key=value arguments
+    parser.add_argument(
+            '--param', '-p',
+            action='append',
+            dest='params',
+            default=[],
+            metavar='KEY=VALUE',
+            help='Parameters to pass to the configuration file (e.g., -p distance=1.5)')
+
     args = parser.parse_args()
+
+    # Parse the key=value parameters
+    config_params = parse_key_value_params(args.params)
 
     # Read the configuration file
     with open(args.configuration_file, 'r') as fin:
@@ -50,15 +76,31 @@ def load_configuration() -> State:
     # Execute the configuration file
     general = GeneralConfigurationUser()
     hamiltonian = HamiltonianConfiguration()
-    exec(config_script)
+
+    # Create namespace with config objects, params, and standard utilities
+    exec_namespace = get_standard_exec_namespace()
+    exec_namespace.update({
+        'general': general,
+        'hamiltonian': hamiltonian,
+        'params': config_params,
+    })
+    exec(config_script, exec_namespace)
 
     # Build the state (does some post-processing of user configuration)
     state = State(config_script, general, hamiltonian)
 
+    # Log configuration file contents
     state.log("\n".join([
         f"Contents of configuration file \"{args.configuration_file}\":",
         config_script
-        ]))
+    ]))
+
+    # Log parameters if any were passed
+    if config_params:
+        params_lines = ["Command-line parameters:"]
+        for key, value in config_params.items():
+            params_lines.append(f"  {key} = {value!r}")
+        state.log("\n".join(params_lines))
 
     return state
 
@@ -326,12 +368,14 @@ def write_data(state, pauli_sum, num_qubits):
             hamlib_str.extend(term + " +\n".encode(encoding))
         del hamlib_str[-3:]
         # TODO: This needs to be saved to the appropriate data file (HDF5)
-        with open(state.filename_ham3(), 'w') as f:
+        ham3_filepath = state.config_general.get_output_path(state.filename_ham3())
+        with open(ham3_filepath, 'w') as f:
             for key, value in state.metadata.items():
                 print(f"# {key} = {value}", file=f)
             print(hamlib_str.decode(), file=f)
     else:
-        with open(state.filename_ham3(), 'w') as f:
+        ham3_filepath = state.config_general.get_output_path(state.filename_ham3())
+        with open(ham3_filepath, 'w') as f:
             for key, value in state.metadata.items():
                 print(f"# {key} = {value}", file=f)
             for string, coefficient in pauli_sum.items():
@@ -352,25 +396,27 @@ def write_initial_state(vec, path, n_qubits):
 
 def get_ham1(state):
     ham1_filename = state.filename_ham1()
+    ham1_cache_path = state.config_general.get_cache_path(ham1_filename)
     try:
-        with open(ham1_filename, 'rb') as file:
+        with open(ham1_cache_path, 'rb') as file:
             ham1_HartreeFock = pickle.load(file)
     # TODO: Python errors get a little weird if you have an exception inside an exception.  So
     #       instead the exception clause should _only_ flag that we're going to recompute versus
     #       load, and the actual recomputing should be outside of the except clause.
     except FileNotFoundError as err:
-        state.log(f"Could not load \"{ham1_filename}\".  Recomputing from the beginning.")
-        # Compute ham1_ActiveSpace from scratch
+        state.log(f"Could not load \"{ham1_cache_path}\".  Recomputing from the beginning.")
+        # Compute ham1_HartreeFock from scratch
         state.log("Perform Hartree-Fock calculation.")
         ham1_HartreeFock = compute_Hartree_Fock(state)
-        state.log(f"Pickle to \"{ham1_filename}\" file.")
-        # Save ham2_ActiveSpace for later re-use
-        with open(ham1_filename, 'wb') as ham1_file:
+        ham1_output_path = state.config_general.get_output_path(ham1_filename)
+        state.log(f"Pickle to \"{ham1_output_path}\" file.")
+        # Save ham1_HartreeFock for later re-use
+        with open(ham1_output_path, 'wb') as ham1_file:
             pickle.dump(ham1_HartreeFock, ham1_file)
         return ham1_HartreeFock
     else:
         state.log(' '.join([
-            f"Loaded \"{ham1_filename}\".",
+            f"Loaded \"{ham1_cache_path}\".",
             "Continuing from after the Hartree-Fock calculation."]))
         return ham1_HartreeFock
 
@@ -378,30 +424,33 @@ def get_ham1(state):
 
 def get_ham2(state):
     ham2_filename = state.filename_ham2()
-    state.log(f"Trying to load \"{ham2_filename}\".")
+    ham2_cache_path = state.config_general.get_cache_path(ham2_filename)
+    state.log(f"Trying to load \"{ham2_cache_path}\".")
     try:
-        with open(ham2_filename, 'rb') as file:
+        with open(ham2_cache_path, 'rb') as file:
             ham2_ActiveSpace = pickle.load(file)
     # TODO: Python errors get a little weird if you have an exception inside an exception.  So
     #       instead the exception clause should _only_ flag that we're going to recompute versus
     #       load, and the actual recomputing should be outside of the except clause.
     except FileNotFoundError as err:
         state.log(' '.join([
-            f"Could not load \"{ham2_filename}\".",
+            f"Could not load \"{ham2_cache_path}\".",
             f"Trying to load \"{state.filename_ham1()}\"."]))
         # Get ham1_HartreeFock (by loading or by recomputing, depending on data availability)
         ham1_HartreeFock = get_ham1(state)
         # Recompute ham2_ActiveSpace from ham1_HartreeFock
         state.log("Apply active space.")
         ham2_ActiveSpace = apply_active_space(state, ham1_HartreeFock)
-        state.log(f"Pickle to \"{ham2_filename}\" file.")
+        ham2_output_path = state.config_general.get_output_path(ham2_filename)
+        state.log(f"Pickle to \"{ham2_output_path}\" file.")
         # Save ham2_ActiveSpace for later re-use
-        with open(ham2_filename, 'wb') as ham2_file:
+        with open(ham2_output_path, 'wb') as ham2_file:
             pickle.dump(ham2_ActiveSpace, ham2_file)
         # Save the one-body and two-body tensors using numpy's `save` function.  These files can be
         # loaded using numpy's `load` function.
-        t_filename = ham2_filename[:ham2_filename.rfind('.')] + ".tensors.npz"
-        np.savez_compressed(t_filename,
+        t_filename_base = ham2_filename[:ham2_filename.rfind('.')] + ".tensors.npz"
+        t_filepath = state.config_general.get_output_path(t_filename_base)
+        np.savez_compressed(t_filepath,
                             constant=ham2_ActiveSpace.constant,
                             one_body=ham2_ActiveSpace.one_body_tensor,
                             two_body=ham2_ActiveSpace.two_body_tensor)
@@ -420,7 +469,7 @@ def get_ham2(state):
                 "remove the cache and rerun."
             )
         state.log(' '.join([
-            f"Loaded \"{ham2_filename}\".",
+            f"Loaded \"{ham2_cache_path}\".",
             "Continuing from after the active space is applied."]))
         return ham2_ActiveSpace
 
@@ -507,15 +556,16 @@ def run():
     state = load_configuration()
 
     # Configure logging based on user settings
+    logfile_path = state.config_general.get_output_path(state.config_general.logfile)
     configure_logging(
         level=state.config_general.loglevel,
-        logfile=state.config_general.logfile
+        logfile=logfile_path
     )
 
     logger.info("=" * 80)
     logger.info("HAMILTONIAN GENERATOR START")
     logger.info("=" * 80)
-    logger.info(f"Logfile: {state.config_general.logfile}")
+    logger.info(f"Logfile: {logfile_path}")
     logger.info(f"Git hash: {state.config_general.git_hash}")
 
     # TODO: If the final result files already exist, exit as no-op
@@ -537,12 +587,14 @@ def run():
     compute_metadata(state, ham3_Fermion2Qubit)
 
     ham3_filename = state.filename_ham3()
-    state.log(f"Save sum of Pauli strings to data file \"{ham3_filename}\".")
+    ham3_filepath = state.config_general.get_output_path(ham3_filename)
+    state.log(f"Save sum of Pauli strings to data file \"{ham3_filepath}\".")
     write_data(state, pauli_sum, ham2_ActiveSpace.n_qubits)
 
     is_filename = ham3_filename[0:-4] + ".npy"
-    state.log(f"Save initial state to data file \"{is_filename}\".")
-    write_initial_state(psi0, is_filename, ham2_ActiveSpace.n_qubits)
+    is_filepath = state.config_general.get_output_path(is_filename)
+    state.log(f"Save initial state to data file \"{is_filepath}\".")
+    write_initial_state(psi0, is_filepath, ham2_ActiveSpace.n_qubits)
 
     state.log("Hamiltonian generation complete.")
 
