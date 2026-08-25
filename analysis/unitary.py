@@ -1,15 +1,22 @@
 import logging
 import math
+from typing import Dict
 import cirq
 import numpy as np
 
+from qualtran import (
+    Bloq,
+    BloqBuilder,
+    SoquetT,
+)
+from qualtran._infra.registers import Signature
 from qualtran.bloqs.block_encoding import LCUBlockEncoding
 from qualtran.bloqs.multiplexers.select_pauli_lcu import SelectPauliLCU
 from qualtran.bloqs.state_preparation import StatePreparationAliasSampling
 
 from pyLIQTR.BlockEncodings.DoubleFactorized import DoubleFactorized
 from pyLIQTR.BlockEncodings.LinearT import Fermionic_LinearT
-from pyLIQTR.BlockEncodings.PauliStringLCU import PauliStringLCU as PyLIQTRPauliStringLCU
+from pyLIQTR.BlockEncodings.PauliStringLCU import PauliStringLCU as PyLIQTRPauliStringLCU_orig
 from pyLIQTR.ProblemInstances.ChemicalHamiltonian import ChemicalHamiltonian
 
 from qhat.analysis.config_types import UnitaryConfiguration
@@ -36,10 +43,8 @@ class PauliStringLCU(LCUBlockEncoding):
         n_tot    =  2**(int(np.ceil(np.log2(n_terms))))
         n_pad    =  n_tot - n_terms
 
-        alphas = [np.sqrt(np.abs(t.coefficient)) for t in pauli_terms]
-        alpha = np.sum([a**2 for a in alphas])
-        alphas_scaled = [a/np.sqrt(alpha) for a in alphas]
-        alphas_scaled.extend([0.0 for i in range(n_pad)])
+        weights = [np.abs(t.coefficient) for t in pauli_terms]
+        alpha = np.sum(weights)
 
         selection_bitsize = int(np.ceil(np.log2(n_tot)))
 
@@ -54,23 +59,13 @@ class PauliStringLCU(LCUBlockEncoding):
             # see https://github.com/quantumlib/Qualtran/issues/1045
             #prepare = StatePreparationViaRotations(
             #              phase_bitsize = 4,
-            #              state_coefficients = alphas_scaled,
+            #              state_coefficients = weights,
             #          )
             raise NotImplementedError("PauliStringLCU")
 
         elif prepare_type=='AS':
-            for t in pauli_terms:
-                coeff = np.real(t.coefficient)
-                if coeff < 0:
-                    logger.warning("Alias sampling preparation with negative coefficients is not "
-                                   "supported yet. Circuits and estimates will assume positive "
-                                   "coefficients.")
-                    break
-
             prepare = StatePreparationAliasSampling.from_lcu_probs(
-                          lcu_probabilities=[
-                              np.abs(np.real(t.coefficient)) for t in pauli_terms
-                          ],
+                          lcu_probabilities=weights,
                           probability_epsilon=probability_eps,
                       )
 
@@ -87,6 +82,26 @@ class PauliStringLCU(LCUBlockEncoding):
     @property
     def _prepare_gate(self):
         return self.prepare
+
+    # Backport corrected LCUBlockEncoding method from v0.5.0
+    def build_composite_bloq(self, bb: 'BloqBuilder', **soqs: SoquetT) -> Dict[str, 'SoquetT']:
+        def _extract_soqs(bloq: Bloq) -> Dict[str, 'SoquetT']:
+            return {reg.name: soqs.pop(reg.name) for reg in bloq.signature.lefts()}
+
+        soqs |= bb.add_d(self.prepare, **_extract_soqs(self.prepare))
+        soqs |= bb.add_d(self.select, **_extract_soqs(self.select))
+        soqs |= bb.add_d(self.prepare.adjoint(), **_extract_soqs(self.prepare.adjoint()))
+        return soqs
+
+# -------------------------------------------------------------------------------------------------
+
+# add bugfix:  correct ordering of Signature registers
+class PyLIQTRPauliStringLCU(PyLIQTRPauliStringLCU_orig):
+    @property
+    def signature(self):
+        return Signature(
+            [*self.control_registers, *self.selection_registers,
+             *self.junk_registers, *self.target_registers] )
 
 # -------------------------------------------------------------------------------------------------
 
