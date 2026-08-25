@@ -74,6 +74,25 @@ Currently allowed values are
 - for Bravyi-Kitaev: "Bravyi-Kitaev", "Bravyi Kitaev", "BK", "bravyi-kitaev", "bravyi\_kitaev",
   "bravyi kitaev", or "bk"
 
+**`hamiltonian.coefficient_threshold`** controls the absolute cutoff, in Hartrees, used when QHAT
+expands active-space spatial integrals into spin-orbital tensors.  QHAT sets tensor coefficients to
+zero when `abs(value) < coefficient_threshold`, so coefficients exactly equal to the threshold are
+retained.  Its default is `1e-8`; set it to `0.0` to disable filtering at this stage:
+
+```python
+hamiltonian.coefficient_threshold = 0.0
+```
+
+The value must be finite and non-negative.  This setting affects only tensor construction; QHAT
+does not apply an additional coefficient cutoff after OpenFermion's standard JW/BK mapping.  The
+tensor threshold is recorded in the generated `.dat` file metadata.
+
+Active-space pickles record the threshold used to construct their tensors.  If the configured value
+does not match `[filestub]_[astag].pickle`, QHAT stops rather than silently reusing incompatible
+tensors.  Remove that active-space pickle and rerun; QHAT will rebuild it and overwrite
+`[filestub]_[astag].tensors.npz`.  Pickles created before this setting existed are interpreted as
+using the historical `1e-8` cutoff.
+
 ## Generated Files
 
 This script will generate various files for intermediate and final stages of the process.  These
