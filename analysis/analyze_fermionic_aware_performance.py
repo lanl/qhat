@@ -10,7 +10,7 @@ the same Hamiltonian and numerical settings. Signed-coefficient JW is
 retained only as a secondary diagnostic.
 
 This script writes auditable case, molecule, molecule/basis, and condition
-summaries and two publication-style figures.
+summaries and three publication-style figures.
 """
 
 # ruff: noqa: E402  # Configure the headless Matplotlib backend before imports.
@@ -68,6 +68,21 @@ OUTCOME_COLORS = {
     "fermionic_win": "#2a9d8f",
     "tie": "#8d99ae",
     "jw_magnitude_win": "#e76f51",
+}
+
+ERROR_SERIES_STYLES = {
+    "jw_magnitude": {
+        "column": "jw_magnitude_one_minus_overlap",
+        "label": "JW magnitude descending",
+        "color": "#e76f51",
+        "x_offset": -0.11,
+    },
+    "fermionic": {
+        "column": "fermionic_aware_one_minus_overlap",
+        "label": "Fermionic signed ascending",
+        "color": "#2a9d8f",
+        "x_offset": 0.11,
+    },
 }
 
 REQUIRED_COLUMNS = {
@@ -1204,6 +1219,234 @@ def plot_molecule_scaling(
     return paths
 
 
+def plot_molecule_actual_errors(
+    cases: pd.DataFrame,
+    molecule_summary: pd.DataFrame,
+    outdir: Path,
+    formats: list[str],
+    dpi: int,
+) -> list[Path]:
+    """Plot paired absolute Trotter errors for the two fixed schedules."""
+
+    valid = cases[
+        cases["valid_comparison"]
+    ].copy()
+
+    order = molecule_order(
+        molecule_summary
+    )
+
+    n_columns = 4
+    n_rows = math.ceil(
+        len(order) / n_columns
+    )
+
+    figure, axes = plt.subplots(
+        n_rows,
+        n_columns,
+        figsize=(
+            13.2,
+            3.15 * n_rows,
+        ),
+        sharex=True,
+        sharey=True,
+        squeeze=False,
+    )
+
+    error_columns = [
+        str(style["column"])
+        for style in ERROR_SERIES_STYLES.values()
+    ]
+
+    error_values = valid[
+        error_columns
+    ].to_numpy(dtype=float)
+
+    minimum = float(np.nanmin(error_values))
+    maximum = float(np.nanmax(error_values))
+
+    y_lower = 10 ** math.floor(
+        math.log10(minimum)
+    )
+    y_upper = 10 ** math.ceil(
+        math.log10(maximum)
+    )
+
+    for index, molecule in enumerate(order):
+        axis = axes.flat[index]
+
+        group = valid[
+            valid["molecule"] == molecule
+        ]
+
+        for _, row in group.iterrows():
+            basis = str(row["basis"])
+            basis_style = BASIS_STYLES.get(
+                basis,
+                {
+                    "marker": "^",
+                    "label": basis,
+                },
+            )
+
+            n_qubits = float(row["n_qubits"])
+            jw_style = ERROR_SERIES_STYLES[
+                "jw_magnitude"
+            ]
+            fermionic_style = ERROR_SERIES_STYLES[
+                "fermionic"
+            ]
+
+            jw_x = n_qubits + float(
+                jw_style["x_offset"]
+            )
+            fermionic_x = n_qubits + float(
+                fermionic_style["x_offset"]
+            )
+            jw_error = float(
+                row[str(jw_style["column"])]
+            )
+            fermionic_error = float(
+                row[str(fermionic_style["column"])]
+            )
+
+            axis.plot(
+                [jw_x, fermionic_x],
+                [jw_error, fermionic_error],
+                color="#adb5bd",
+                linewidth=0.65,
+                alpha=0.7,
+                zorder=1,
+            )
+
+            for x_value, error, series_style in (
+                (jw_x, jw_error, jw_style),
+                (
+                    fermionic_x,
+                    fermionic_error,
+                    fermionic_style,
+                ),
+            ):
+                axis.scatter(
+                    x_value,
+                    error,
+                    marker=basis_style["marker"],
+                    color=series_style["color"],
+                    edgecolor="white",
+                    linewidth=0.45,
+                    s=31,
+                    alpha=0.92,
+                    zorder=3,
+                )
+
+        summary_row = molecule_summary[
+            molecule_summary["molecule"]
+            == molecule
+        ].iloc[0]
+
+        axis.set_yscale("log")
+        axis.set_ylim(
+            y_lower,
+            y_upper,
+        )
+        axis.set_xlim(
+            3,
+            21,
+        )
+        axis.set_xticks(
+            [4, 8, 12, 16, 20]
+        )
+        axis.yaxis.set_major_formatter(
+            LogFormatterMathtext()
+        )
+
+        axis.set_title(
+            f"{MOLECULE_LABELS.get(molecule, molecule)}  "
+            f"({int(summary_row['fermionic_wins'])}/"
+            f"{int(summary_row['valid_comparisons'])} F wins)"
+        )
+
+    for index in range(
+        len(order),
+        len(axes.flat),
+    ):
+        axes.flat[index].axis("off")
+
+    for row in range(n_rows):
+        axes[row, 0].set_ylabel(
+            r"Trotter error "
+            r"$1-|\langle\psi_{\mathrm{exact}}|"
+            r"\psi_{\mathrm{Trotter}}\rangle|$"
+        )
+
+    for axis in axes[-1, :]:
+        if axis.axison:
+            axis.set_xlabel(
+                "Qubits in active space"
+            )
+
+    series_handles = [
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="none",
+            markerfacecolor=style["color"],
+            markeredgecolor="white",
+            markersize=6,
+            label=style["label"],
+        )
+        for style in ERROR_SERIES_STYLES.values()
+    ]
+
+    basis_handles = [
+        Line2D(
+            [0],
+            [0],
+            marker=style["marker"],
+            color="none",
+            markerfacecolor="#6c757d",
+            markeredgecolor="white",
+            markersize=6,
+            label=style["label"],
+        )
+        for style in BASIS_STYLES.values()
+    ]
+
+    figure.legend(
+        handles=series_handles + basis_handles,
+        loc="lower center",
+        ncol=4,
+        frameon=False,
+        bbox_to_anchor=(0.5, 0.005),
+    )
+
+    figure.suptitle(
+        "Actual Trotter error: fermionic-aware ordering "
+        "vs JW magnitude descending",
+        fontsize=13,
+        y=1.0,
+    )
+
+    figure.subplots_adjust(
+        bottom=0.08,
+        hspace=0.32,
+        wspace=0.15,
+    )
+
+    paths = save_figure(
+        figure,
+        outdir,
+        "fermionic_aware_active_space_actual_errors",
+        formats,
+        dpi,
+    )
+
+    plt.close(figure)
+
+    return paths
+
+
 def write_csv(
     path: Path,
     frame: pd.DataFrame,
@@ -1287,6 +1530,14 @@ def main() -> None:
         args.dpi,
     )
 
+    actual_error_paths = plot_molecule_actual_errors(
+        cases,
+        molecule_summary,
+        args.outdir,
+        args.formats,
+        args.dpi,
+    )
+
     overall = molecule_summary[
         molecule_summary["molecule"] == "ALL"
     ].iloc[0]
@@ -1317,6 +1568,7 @@ def main() -> None:
     for path in (
         overview_paths
         + scaling_paths
+        + actual_error_paths
     ):
         print(f"  {path}")
 
