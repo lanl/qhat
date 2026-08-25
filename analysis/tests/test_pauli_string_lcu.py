@@ -38,7 +38,9 @@ def test_pauli_string_lcu1():
 
     # Verify that the upper corner of our unitary is equal to the
     # original Hamiltonian matrix, scaled
-    np.testing.assert_array_almost_equal(unitarymx[0:2,0:2], 0.5 * H_matrix)
+    alpha = np.sum([v for v in H.get_all_pauli_strings().values()])
+    scale = 1. / alpha
+    np.testing.assert_array_almost_equal(unitarymx[0:2,0:2], scale * H_matrix)
 
 
 def test_pauli_string_lcu2():
@@ -48,6 +50,7 @@ def test_pauli_string_lcu2():
     pauli_data = {
         'XX': 1.0,
         'YZ': 1.0,
+        'ZY': 2.0,
     }
     lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
     H = Hamiltonian(lcps)
@@ -56,12 +59,14 @@ def test_pauli_string_lcu2():
     H_matrix = H.to_matrix(memory_threshold_gb=1.0)
 
     # Create unitary operator and convert to matrix
-    unitaryop = PauliStringLCU(H, 'AS', probability_eps=0.5)
+    unitaryop = PauliStringLCU(H, 'AS', probability_eps=0.1)
     unitarymx = unitaryop.tensor_contract()
 
     # Verify that the upper corner of our unitary is equal to the
     # original Hamiltonian matrix, scaled
-    np.testing.assert_array_almost_equal(unitarymx[0:4,0:4], 0.5 * H_matrix)
+    alpha = np.sum([v for v in H.get_all_pauli_strings().values()])
+    scale = 1. / alpha
+    np.testing.assert_array_almost_equal(unitarymx[0:4,0:4], scale * H_matrix)
 
 
 # Define a wrapper class to make a QHAT PauliString Hamiltonian behave
@@ -78,6 +83,9 @@ class PauliStringInstance(Hamiltonian, ProblemInstance):
 
     def n_qubits(self):
         return self.num_qubits()
+
+    def get_alpha(self):
+        return np.sum([v for v in self.get_all_pauli_strings().values()])
 
     def yield_PauliLCU_Info(self, do_pad=0, return_as='strings'):
         for t in self.get_all_pauli_strings(return_as=return_as).items():
@@ -99,12 +107,13 @@ def test_pauli_string_lcu_pyliqtr1():
     H_matrix = inst.to_matrix(memory_threshold_gb=1.0)
 
     # Create unitary operator and convert to matrix
-    unitaryop = PauliStringLCU(inst, 'AS', probability_eps=0.5)
+    unitaryop = PyLIQTRPauliStringLCU(inst, 'AS', probability_eps=0.5)
     unitarymx = unitaryop.tensor_contract()
 
     # Verify that the upper corner of our unitary is equal to the
     # original Hamiltonian matrix, scaled
-    np.testing.assert_array_almost_equal(unitarymx[0:2,0:2], 0.5 * H_matrix)
+    scale = 1. / inst.get_alpha()
+    np.testing.assert_array_almost_equal(unitarymx[0:2,0:2], scale * H_matrix)
 
 
 def test_pauli_string_lcu_pyliqtr2():
@@ -114,6 +123,7 @@ def test_pauli_string_lcu_pyliqtr2():
     pauli_data = {
         'XX': 1.0,
         'YZ': 1.0,
+        'ZY': 2.0,
     }
     lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
     inst = PauliStringInstance(lcps)
@@ -122,11 +132,12 @@ def test_pauli_string_lcu_pyliqtr2():
     H_matrix = inst.to_matrix(memory_threshold_gb=1.0)
 
     # Create unitary operator and convert to matrix
-    unitaryop = PyLIQTRPauliStringLCU(inst, 'AS', probability_eps=0.5)
+    unitaryop = PyLIQTRPauliStringLCU(inst, 'AS', probability_eps=0.1)
     unitarymx = unitaryop.tensor_contract()
 
     # Verify that the upper corner of our unitary is equal to the
     # original Hamiltonian matrix, scaled
-    np.testing.assert_array_almost_equal(unitarymx[0:4,0:4], 0.5 * H_matrix)
+    scale = 1. / inst.get_alpha()
+    np.testing.assert_array_almost_equal(unitarymx[0:4,0:4], scale * H_matrix)
 
 

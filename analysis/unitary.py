@@ -43,8 +43,8 @@ class PauliStringLCU(LCUBlockEncoding):
         n_tot    =  2**(int(np.ceil(np.log2(n_terms))))
         n_pad    =  n_tot - n_terms
 
-        weights = [np.sqrt(np.abs(t.coefficient)) for t in pauli_terms]
-        alpha = np.sum([np.abs(t.coefficient) for t in pauli_terms])
+        weights = [np.abs(t.coefficient) for t in pauli_terms]
+        alpha = np.sum(weights)
 
         selection_bitsize = int(np.ceil(np.log2(n_tot)))
 
@@ -64,14 +64,6 @@ class PauliStringLCU(LCUBlockEncoding):
             raise NotImplementedError("PauliStringLCU")
 
         elif prepare_type=='AS':
-            for t in pauli_terms:
-                coeff = np.real(t.coefficient)
-                if coeff < 0:
-                    logger.warning("Alias sampling preparation with negative coefficients is not "
-                                   "supported yet. Circuits and estimates will assume positive "
-                                   "coefficients.")
-                    break
-
             prepare = StatePreparationAliasSampling.from_lcu_probs(
                           lcu_probabilities=weights,
                           probability_epsilon=probability_eps,
