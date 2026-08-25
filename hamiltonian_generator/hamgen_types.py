@@ -6,14 +6,11 @@ import pprint
 import subprocess
 import sys
 
-<<<<<<< HEAD
+from qhat.common.git_utils import get_git_hash
 from qhat.hamiltonian_generator.thresholding import (
     DEFAULT_COEFFICIENT_THRESHOLD,
     validate_coefficient_threshold,
 )
-=======
-from qhat.common.git_utils import get_git_hash
->>>>>>> upstream/main
 
 logger = logging.getLogger(__name__)
 

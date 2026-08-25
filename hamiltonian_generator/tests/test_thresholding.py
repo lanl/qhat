@@ -31,9 +31,18 @@ class _ActiveSpaceState:
         pass
 
 
+class _PassthroughPaths:
+    def get_cache_path(self, filename):
+        return filename
+
+    def get_output_path(self, filename):
+        return filename
+
+
 class _CacheState:
     def __init__(self, cache_path, threshold):
         self.cache_path = cache_path
+        self.config_general = _PassthroughPaths()
         self.config_hamiltonian = HamiltonianConfiguration()
         self.config_hamiltonian.coefficient_threshold = threshold
 
