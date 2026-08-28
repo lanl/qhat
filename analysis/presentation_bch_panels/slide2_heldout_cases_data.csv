@@ -1,0 +1,21 @@
+case_id,molecule,expected_outcome,n_qubits,baseline_schedule,proposed_schedule,bch_ratio_jwmag_to_fermionic_signed,error_ratio_jwmag_to_fermionic_signed,log10_relative_cancellation,log10_fresh_advantage,direction_concordant,point_label
+B-B_1.70_hgbs-5_as-006-008,B-B,negative_control,14,jw_magnitude_baseline,fermionic_signed_reference,0.7948393340505759,0.6389084755269654,-0.09972064918875936,-0.1945613506373426,True,
+B-B_1.70_hgbs-5_as-006-010,B-B,negative_control,16,jw_magnitude_baseline,fermionic_signed_reference,0.7696531616508738,0.5959390465360062,-0.11370494225111424,-0.22479815822419794,True,
+B-B_1.70_hgbs-5_as-010-010,B-B,favorable,20,jw_magnitude_baseline,fermionic_signed_reference,2.5217172494743085,30.53421385137585,0.4016963891850467,1.4847867429202397,True,B$_2$ (20q)
+B-H_1.29_hgbs-5_as-006-012,B-H,favorable,18,jw_magnitude_baseline,fermionic_signed_reference,1.0552681033452311,2.0867231589107456,0.0233628113031089,0.3194648359689328,True,
+B-H_1.29_hgbs-5_as-006-014,B-H,negative_control,20,jw_magnitude_baseline,fermionic_signed_reference,0.7814193686117378,0.36997971887624037,-0.10711582835956923,-0.43182208193717814,True,
+Be-Be_2.04_hgbs-5_as-008-006,Be-Be,favorable,14,jw_magnitude_baseline,fermionic_signed_reference,1.5278796137451267,5.499970049614465,0.18408913621224599,0.7403603245265011,True,
+Be-H_1.47_hgbs-5_as-005-007,Be-H,favorable,12,jw_magnitude_baseline,fermionic_signed_reference,1.4798413454544979,1.888167516300178,0.1702151569577545,0.2760405218357183,True,
+Be-H_1.47_hgbs-5_as-005-013,Be-H,negative_control,18,jw_magnitude_baseline,fermionic_signed_reference,1.0451953313142612,0.9532417945718968,0.019197461150023493,-0.02079692440990078,False,BeH (18q)
+CH4_s-1.00_hgbs-5_as-008-010,CH4,favorable,18,jw_magnitude_baseline,fermionic_signed_reference,6.7137072144337,47.249222535525035,0.8269623976911998,1.6743946667858265,True,CH$_4$ (18q)
+F-F_1.28_hgbs-5_as-012-002,F-F,negative_control,14,jw_magnitude_baseline,fermionic_signed_reference,2.490779419705309,0.6612627506551053,0.3963352686659734,-0.17962594068717092,False,F$_2$ (14q)
+F-F_1.28_hgbs-5_as-014-002,F-F,favorable,16,jw_magnitude_baseline,fermionic_signed_reference,1.0313976047463482,1.00106817324284,0.013426118493372385,0.00046365415766153127,True,
+H2O_s-1.00_hgbs-5_as-004-008,H2O,negative_control,12,jw_magnitude_baseline,fermionic_signed_reference,0.8451122672606383,0.7661661136745465,-0.07308559423003154,-0.11567706009191094,True,
+H2O_s-1.00_hgbs-5_as-006-008,H2O,favorable,14,jw_magnitude_baseline,fermionic_signed_reference,1.3208626619286343,1.9625131856170552,0.12085766374073761,0.2928125833390686,True,
+H2O_s-1.00_hgbs-5_as-008-012,H2O,favorable,20,jw_magnitude_baseline,fermionic_signed_reference,11.050462792341268,154.6078212839723,1.0433804666140107,2.1892314601809617,True,H$_2$O (20q)
+Li-H_1.81_hgbs-5_as-004-008,Li-H,negative_control,12,jw_magnitude_baseline,fermionic_signed_reference,0.8398944828918602,0.673881282814369,-0.07577527152889378,-0.1714166060757296,True,
+Li-H_1.81_hgbs-5_as-004-012,Li-H,negative_control,16,jw_magnitude_baseline,fermionic_signed_reference,0.88891673902724,0.9568661179655533,-0.05113891560395904,-0.019148823243308487,True,
+Li-H_1.81_hgbs-5_as-004-014,Li-H,negative_control,18,jw_magnitude_baseline,fermionic_signed_reference,0.8374796328419726,0.6043136632385119,-0.07702574602472914,-0.21873758645316665,True,
+Li-H_1.81_hgbs-5_as-004-016,Li-H,negative_control,20,jw_magnitude_baseline,fermionic_signed_reference,1.0572877398931602,1.6905454739884749,0.024193196240142968,0.2280268573476599,True,
+Li-Li_2.66_hgbs-5_as-006-006,Li-Li,favorable,12,jw_magnitude_baseline,fermionic_signed_reference,0.9495441344421833,1.305553082715653,-0.022484844619170257,0.11579453457475594,False,Li$_2$ (12q)
+NH3_s-1.00_hgbs-5_as-006-010,NH3,favorable,16,jw_magnitude_baseline,fermionic_signed_reference,1.0083153532147304,1.0330685438769667,0.0035963800679185685,0.014129137821610195,True,

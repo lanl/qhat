@@ -1,0 +1,10 @@
+row,slot,parent,descendant_order,parent_order_changed,descendant_order_changed,contiguity_preserved
+Intact signed order,1,P1,d1|d2|d3,False,False,True
+Intact signed order,2,P2,d1|d2|d3,False,False,True
+Intact signed order,3,P3,d1|d2|d3,False,False,True
+Parent-block intervention,1,P3,d1|d2|d3,True,False,True
+Parent-block intervention,2,P1,d1|d2|d3,True,False,True
+Parent-block intervention,3,P2,d1|d2|d3,True,False,True
+Within-parent control,1,P1,d3|d1|d2,False,True,True
+Within-parent control,2,P2,d2|d3|d1,False,True,True
+Within-parent control,3,P3,d2|d1|d3,False,True,True

@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1450" height="610" viewBox="0 0 1450 610">
+<rect width="100%" height="100%" fill="#FFFFFF"/>
+<text x="34" y="87" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="bold" text-anchor="start" fill="#202124">Intact signed order</text>
+<text x="34" y="116" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="normal" text-anchor="start" fill="#55585C">Reference</text>
+<text x="34" y="139" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="normal" text-anchor="start" fill="#55585C">Parent + descendant order intact</text>
+<rect x="420" y="38" width="250" height="108" rx="8" fill="#56B4E9" fill-opacity="0.18" stroke="#56B4E9" stroke-width="3"/>
+<text x="438" y="69" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="bold" text-anchor="start" fill="#202124">P1</text>
+<rect x="438" y="86" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="468.5" y="114" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d1</text>
+<rect x="510" y="86" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="540.5" y="114" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d2</text>
+<rect x="582" y="86" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="612.5" y="114" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d3</text>
+<rect x="690" y="38" width="250" height="108" rx="8" fill="#E69F00" fill-opacity="0.18" stroke="#E69F00" stroke-width="3"/>
+<text x="708" y="69" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="bold" text-anchor="start" fill="#202124">P2</text>
+<rect x="708" y="86" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="738.5" y="114" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d1</text>
+<rect x="780" y="86" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="810.5" y="114" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d2</text>
+<rect x="852" y="86" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="882.5" y="114" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d3</text>
+<rect x="960" y="38" width="250" height="108" rx="8" fill="#009E73" fill-opacity="0.18" stroke="#009E73" stroke-width="3"/>
+<text x="978" y="69" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="bold" text-anchor="start" fill="#202124">P3</text>
+<rect x="978" y="86" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="1008.5" y="114" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d1</text>
+<rect x="1050" y="86" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="1080.5" y="114" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d2</text>
+<rect x="1122" y="86" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="1152.5" y="114" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d3</text>
+<path d="M 800 157 L 800 185" stroke="#777A7E" stroke-width="3" fill="none"/>
+<path d="M 791 176 L 800 187 L 809 176" fill="none" stroke="#777A7E" stroke-width="3"/>
+<text x="34" y="277" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="bold" text-anchor="start" fill="#202124">Parent-block intervention</text>
+<text x="34" y="306" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="normal" text-anchor="start" fill="#55585C">Whole parent blocks permuted</text>
+<text x="34" y="329" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="normal" text-anchor="start" fill="#55585C">Descendant order + contiguity preserved</text>
+<rect x="420" y="228" width="250" height="108" rx="8" fill="#009E73" fill-opacity="0.18" stroke="#009E73" stroke-width="3"/>
+<text x="438" y="259" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="bold" text-anchor="start" fill="#202124">P3</text>
+<rect x="438" y="276" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="468.5" y="304" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d1</text>
+<rect x="510" y="276" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="540.5" y="304" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d2</text>
+<rect x="582" y="276" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="612.5" y="304" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d3</text>
+<rect x="690" y="228" width="250" height="108" rx="8" fill="#56B4E9" fill-opacity="0.18" stroke="#56B4E9" stroke-width="3"/>
+<text x="708" y="259" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="bold" text-anchor="start" fill="#202124">P1</text>
+<rect x="708" y="276" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="738.5" y="304" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d1</text>
+<rect x="780" y="276" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="810.5" y="304" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d2</text>
+<rect x="852" y="276" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="882.5" y="304" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d3</text>
+<rect x="960" y="228" width="250" height="108" rx="8" fill="#E69F00" fill-opacity="0.18" stroke="#E69F00" stroke-width="3"/>
+<text x="978" y="259" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="bold" text-anchor="start" fill="#202124">P2</text>
+<rect x="978" y="276" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="1008.5" y="304" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d1</text>
+<rect x="1050" y="276" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="1080.5" y="304" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d2</text>
+<rect x="1122" y="276" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="1152.5" y="304" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d3</text>
+<path d="M 800 347 L 800 375" stroke="#777A7E" stroke-width="3" fill="none"/>
+<path d="M 791 366 L 800 377 L 809 366" fill="none" stroke="#777A7E" stroke-width="3"/>
+<text x="34" y="467" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="bold" text-anchor="start" fill="#202124">Within-parent control</text>
+<text x="34" y="496" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="normal" text-anchor="start" fill="#55585C">Parent-block order fixed</text>
+<text x="34" y="519" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="normal" text-anchor="start" fill="#55585C">Descendants shuffled within each block</text>
+<rect x="420" y="418" width="250" height="108" rx="8" fill="#56B4E9" fill-opacity="0.18" stroke="#56B4E9" stroke-width="3"/>
+<text x="438" y="449" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="bold" text-anchor="start" fill="#202124">P1 ↻</text>
+<rect x="438" y="466" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="468.5" y="494" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d3</text>
+<rect x="510" y="466" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="540.5" y="494" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d1</text>
+<rect x="582" y="466" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="612.5" y="494" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d2</text>
+<rect x="690" y="418" width="250" height="108" rx="8" fill="#E69F00" fill-opacity="0.18" stroke="#E69F00" stroke-width="3"/>
+<text x="708" y="449" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="bold" text-anchor="start" fill="#202124">P2 ↻</text>
+<rect x="708" y="466" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="738.5" y="494" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d2</text>
+<rect x="780" y="466" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="810.5" y="494" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d3</text>
+<rect x="852" y="466" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="882.5" y="494" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d1</text>
+<rect x="960" y="418" width="250" height="108" rx="8" fill="#009E73" fill-opacity="0.18" stroke="#009E73" stroke-width="3"/>
+<text x="978" y="449" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="bold" text-anchor="start" fill="#202124">P3 ↻</text>
+<rect x="978" y="466" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="1008.5" y="494" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d2</text>
+<rect x="1050" y="466" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="1080.5" y="494" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d1</text>
+<rect x="1122" y="466" width="61" height="42" rx="4" fill="#FFFFFF" stroke="#606368" stroke-width="1.5"/>
+<text x="1152.5" y="494" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="normal" text-anchor="middle" fill="#202124">d3</text>
+</svg>

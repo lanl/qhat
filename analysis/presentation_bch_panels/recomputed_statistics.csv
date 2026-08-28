@@ -1,0 +1,5 @@
+figure,baseline_schedule,proposed_schedule,pearson_r,pearson_p_value,direction_agreement,direction_total,schedule,median_bch_ratio,median_error_ratio
+slide2_heldout_cases,jw_magnitude_baseline,fermionic_signed_reference,0.9025090632664474,5.2798004434901604e-08,17,20,,,
+slide2_matched_pairs,jw_magnitude_baseline,fermionic_signed_reference,0.9161206958781457,0.00019552341258566316,9,10,,,
+slide3_parent_block_ablation,,,,,,,signed_parent_blocks_randomized,5.947491666834077,99.11807220196599
+slide3_parent_block_ablation,,,,,,,signed_parent_within_randomized,1.0,0.9999997301717132
