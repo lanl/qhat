@@ -201,6 +201,61 @@ function reference_first_order_trotter_unitary(
     return exp(-im * time / 2) * U_s
 end
 
+# Apply one symmetric Trotter step of the given even `order` to U_s (left-multiply).
+# order==2 is Strang; higher even orders use the Suzuki fractal recursion
+#   S_{2k}(dt) = S_{2k-2}(p·dt)² S_{2k-2}((1-4p)·dt) S_{2k-2}(p·dt)²,  p = 1/(4 - 4^(1/(2k-1)))
+# `ops` are precomputed (coeff, sparse_pauli) pairs; `dt` is already normalized.
+function apply_symmetric_trotter_step(
+    U_s,
+    Identity,
+    ops::Vector{Tuple{Float64,SparseMatrixCSC{ComplexF64,Int}}},
+    dt::Real,
+    order::Int
+)
+    if order == 2
+        for (coeff, P) in ops
+            θ = coeff * dt / 2
+            U_s = (cos(θ) * Identity - im * sin(θ) * P) * U_s
+        end
+        for (coeff, P) in reverse(ops)
+            θ = coeff * dt / 2
+            U_s = (cos(θ) * Identity - im * sin(θ) * P) * U_s
+        end
+        return U_s
+    else
+        p = 1 / (4 - 4^(1 / (order - 1)))
+        for δ in (p * dt, p * dt, (1 - 4p) * dt, p * dt, p * dt)
+            U_s = apply_symmetric_trotter_step(U_s, Identity, ops, δ, order - 2)
+        end
+        return U_s
+    end
+end
+
+# Reference symmetric (even-order) Trotter unitary built from the Suzuki recursion.
+function reference_symmetric_trotter_unitary(
+    ham::Dict,
+    normalization::Real,
+    nqubits::Int,
+    order::Int;
+    numsteps::Int,
+    time::Real=pi
+)
+    dim = 2^nqubits
+    U_s = sparse(I, dim, dim) .+ 0.0im
+    Identity = sparse(I, dim, dim) .+ 0.0im
+    id_key = "I"^nqubits
+    ops = Tuple{Float64,SparseMatrixCSC{ComplexF64,Int}}[
+        (real(v), sparse(OP_from_string(k))) for (k, v) in ham if k != id_key
+    ]
+    dt = time / (numsteps * normalization)
+
+    for _ in 1:numsteps
+        U_s = apply_symmetric_trotter_step(U_s, Identity, ops, dt, order)
+    end
+
+    return exp(-im * time / 2) * U_s
+end
+
 function reference_trotter_unitary_by_order(
     ham::Dict{String,ComplexF64},
     normalization::Real,
@@ -222,6 +277,24 @@ function reference_trotter_unitary_by_order(
             ham,
             normalization,
             nqubits;
+            numsteps=numsteps,
+            time=time
+        )
+    elseif order == :fourth
+        return reference_symmetric_trotter_unitary(
+            ham,
+            normalization,
+            nqubits,
+            4;
+            numsteps=numsteps,
+            time=time
+        )
+    elseif order == :sixth
+        return reference_symmetric_trotter_unitary(
+            ham,
+            normalization,
+            nqubits,
+            6;
             numsteps=numsteps,
             time=time
         )
