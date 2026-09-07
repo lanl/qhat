@@ -17,7 +17,7 @@ This directory contains a self-contained version of the quantum simulation code 
 Before the first run. Start julia REPL, hit `]` to get into package mode and run `activate .` and `instantiate` to have all the dependencies installed. Then outside the REP do the following: 
 
 ```bash
-cd QHAT_standalone
+cd julia_trotter
 julia --project=. trotter_expts.jl
 ```
 
