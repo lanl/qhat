@@ -10,6 +10,7 @@ include("error_bounds.jl")
 include("statevector_simulators.jl")
 
 const TROTTER_SPECTRAL_DEFAULT_NEV = 4
+const TROTTER_ARNOLDI_BASE_TOL = 1e-12
 
 function cosine_value_to_energy(
     cosine_eigenvalue::Real,
@@ -29,12 +30,88 @@ function trotter_krylov_dimension(n::Int, nev::Int)
     return min(40, max(nev + 2, min(n - 1, 2 * nev + 1)))
 end
 
-function build_trotter_terms(ham::Dict{String,ComplexF64}, nqubits::Int)
-    id_key = "I"^nqubits
+function trotter_single_step_time(time::Real, nsteps::Int)
+    nsteps >= 1 || throw(ArgumentError("nsteps must be positive"))
+    return time / nsteps
+end
+
+function trotter_arnoldi_tolerance(nsteps::Int)
+    nsteps >= 1 || throw(ArgumentError("nsteps must be positive"))
+    # Eigenvalue separations in U + U' shrink quadratically with the
+    # single-step evolution time. Tighten the residual tolerance by the same
+    # factor, down to the useful limit of Float64 arithmetic.
+    return max(eps(Float64), TROTTER_ARNOLDI_BASE_TOL / Float64(nsteps)^2)
+end
+
+function trotter_safety_parameters(
+    ham::Dict{String,ComplexF64},
+    normalization::Real,
+    nqubits::Int,
+    nsteps::Int,
+    order::Symbol;
+    term_ordering=:magnitude,
+)
+    ε = if order == :first
+        only(first_order_commutator_error_bounds(
+            ham,
+            normalization,
+            nqubits;
+            nsteps_list=[nsteps],
+            time=π,
+            term_ordering=term_ordering,
+        ))
+    elseif order == :second
+        bounds, _ = commutator_error_bounds(
+            ham,
+            normalization,
+            nqubits;
+            nsteps_list=[nsteps],
+            time=π,
+            term_ordering=term_ordering,
+        )
+        only(bounds)
+    else
+        return (error_bound=0.0, shift=0.0, scale=1.0)
+    end
+
+    0 <= ε < sqrt(2) || error(
+        "The certified $order-order Trotter bound must be in [0, sqrt(2)); got ε=$ε",
+    )
+    b = 2asin(ε / 2)
+    s = (π - 2b) / π
+    return (error_bound=ε, shift=b, scale=s)
+end
+
+function safe_cosine_value_to_energy(
+    cosine_eigenvalue::Real,
+    shift::Real,
+    normalization::Real,
+    step_time::Real,
+    safety_scale::Real,
+    safety_phase_shift::Real,
+)
+    safe_phase = acos(clamp(cosine_eigenvalue / 2, -1.0, 1.0))
+    original_phase = (safe_phase - safety_phase_shift) / safety_scale
+    return shift + normalization * (original_phase / step_time - 0.5)
+end
+
+function format_trotter_energy_result(energy::Real, safety, return_details::Bool)
+    return return_details ? (
+        energy=Float64(real(energy)),
+        safe_scaling_factor=Float64(safety.scale),
+    ) : Float64(real(energy))
+end
+
+function build_trotter_terms(
+    ham::Dict{String,ComplexF64},
+    nqubits::Int;
+    term_ordering=:magnitude,
+)
     terms = Tuple{Float64,SparseMatrixCSC{ComplexF64,Int}}[]
 
-    for (k, v) in ham
-        k == id_key && continue
+    for (k, v) in ordered_hamiltonian_terms(
+        ham, nqubits; term_ordering=term_ordering
+    )
         @assert isapprox(imag(v), 0.0) "Coefficient not real for $k"
         push!(terms, (real(v), sparse(OP_from_string(k))))
     end
@@ -183,12 +260,14 @@ function reference_first_order_trotter_unitary(
     normalization::Real,
     nqubits::Int;
     numsteps::Int=10,
-    time::Real=pi
+    time::Real=pi,
+    term_ordering=:magnitude,
 )
     U_s = sparse(I, 2^nqubits, 2^nqubits) .+ 0.0im
     Identity = sparse(I, 2^nqubits, 2^nqubits) .+ 0.0im
-    id_key = "I"^nqubits
-    H_terms = [(k, v) for (k, v) in ham if k != id_key]
+    H_terms = ordered_hamiltonian_terms(
+        ham, nqubits; term_ordering=term_ordering
+    )
     dt = time / (numsteps * normalization)
 
     for _ in 1:numsteps
@@ -238,14 +317,17 @@ function reference_symmetric_trotter_unitary(
     nqubits::Int,
     order::Int;
     numsteps::Int,
-    time::Real=pi
+    time::Real=pi,
+    term_ordering=:magnitude,
 )
     dim = 2^nqubits
     U_s = sparse(I, dim, dim) .+ 0.0im
     Identity = sparse(I, dim, dim) .+ 0.0im
-    id_key = "I"^nqubits
     ops = Tuple{Float64,SparseMatrixCSC{ComplexF64,Int}}[
-        (real(v), sparse(OP_from_string(k))) for (k, v) in ham if k != id_key
+        (real(v), sparse(OP_from_string(k)))
+        for (k, v) in ordered_hamiltonian_terms(
+            ham, nqubits; term_ordering=term_ordering
+        )
     ]
     dt = time / (numsteps * normalization)
 
@@ -262,7 +344,8 @@ function reference_trotter_unitary_by_order(
     nqubits::Int,
     order::Symbol;
     numsteps::Int,
-    time::Real=pi
+    time::Real=pi,
+    term_ordering=:magnitude,
 )
     if order == :first
         return reference_first_order_trotter_unitary(
@@ -270,7 +353,8 @@ function reference_trotter_unitary_by_order(
             normalization,
             nqubits;
             numsteps=numsteps,
-            time=time
+            time=time,
+            term_ordering=term_ordering,
         )
     elseif order == :second
         return reference_trotter_unitary(
@@ -278,7 +362,8 @@ function reference_trotter_unitary_by_order(
             normalization,
             nqubits;
             numsteps=numsteps,
-            time=time
+            time=time,
+            term_ordering=term_ordering,
         )
     elseif order == :fourth
         return reference_symmetric_trotter_unitary(
@@ -287,7 +372,8 @@ function reference_trotter_unitary_by_order(
             nqubits,
             4;
             numsteps=numsteps,
-            time=time
+            time=time,
+            term_ordering=term_ordering,
         )
     elseif order == :sixth
         return reference_symmetric_trotter_unitary(
@@ -296,7 +382,8 @@ function reference_trotter_unitary_by_order(
             nqubits,
             6;
             numsteps=numsteps,
-            time=time
+            time=time,
+            term_ordering=term_ordering,
         )
     else
         error("Unsupported Trotter order: $order")
@@ -309,25 +396,53 @@ function trotter_energy_arpack(
     nsteps::Int;
     order::Symbol=:second,
     time::Real=pi,
-    nev::Int=TROTTER_SPECTRAL_DEFAULT_NEV
+    nev::Int=TROTTER_SPECTRAL_DEFAULT_NEV,
+    term_ordering=:magnitude,
+    safe_normalization::Bool=true,
+    return_details::Bool=false,
 )
     nqubits = parse(Int, meta["number of qubits"])
     norm_info = normalize_hamiltonian(meta, ham)
+    step_time = trotter_single_step_time(time, nsteps)
+    safety = safe_normalization ?
+             trotter_safety_parameters(
+                 ham,
+                 norm_info.normalization,
+                 nqubits,
+                 nsteps,
+                 order;
+                 term_ordering=term_ordering,
+             ) :
+             (error_bound=0.0, shift=0.0, scale=1.0)
+    safe_step_time = safety.scale * step_time
+    safety_phase_shift = safety.shift * time / (π * nsteps)
     U = reference_trotter_unitary_by_order(
         ham,
         norm_info.normalization,
         nqubits,
         order;
-        numsteps=nsteps,
-        time=time
+        numsteps=1,
+        time=safe_step_time,
+        term_ordering=term_ordering,
     )
+    U .*= exp(-im * safety_phase_shift)
 
     C = sparse(U + U')
     n = size(C, 1)
     nvals = trotter_candidate_count(n; nev=nev)
-    vals, _ = Arpack.eigs(C; nev=nvals, which=:LR)
-    energies = cosine_value_to_energy.(real.(vals), norm_info.shift, norm_info.normalization, time)
-    return minimum(real.(energies))
+    # tol=0 requests machine precision from ARPACK. Its default was already
+    # tighter than the scale-dependent ArnoldiMethod tolerance below.
+    vals, _ = Arpack.eigs(C; nev=nvals, which=:LR, tol=0.0)
+    energies = safe_cosine_value_to_energy.(
+        real.(vals),
+        norm_info.shift,
+        norm_info.normalization,
+        step_time,
+        safety.scale,
+        safety_phase_shift,
+    )
+    energy = minimum(real.(energies))
+    return format_trotter_energy_result(energy, safety, return_details)
 end
 
 function trotter_energy_arnoldi(
@@ -336,20 +451,41 @@ function trotter_energy_arnoldi(
     nsteps::Int;
     order::Symbol=:second,
     time::Real=pi,
-    nev::Int=TROTTER_SPECTRAL_DEFAULT_NEV
+    nev::Int=TROTTER_SPECTRAL_DEFAULT_NEV,
+    term_ordering=:magnitude,
+    safe_normalization::Bool=true,
+    return_details::Bool=false,
 )
     nqubits = parse(Int, meta["number of qubits"])
     nelectrons = parse(Int, meta["number of active, occupied, single-occupancy orbitals"])
     norm_info = normalize_hamiltonian(meta, ham)
-    terms = build_trotter_terms(ham, nqubits)
+    step_time = trotter_single_step_time(time, nsteps)
+    solver_tolerance = trotter_arnoldi_tolerance(nsteps)
+    safety = safe_normalization ?
+             trotter_safety_parameters(
+                 ham,
+                 norm_info.normalization,
+                 nqubits,
+                 nsteps,
+                 order;
+                 term_ordering=term_ordering,
+             ) :
+             (error_bound=0.0, shift=0.0, scale=1.0)
+    safe_step_time = safety.scale * step_time
+    safety_phase_shift = safety.shift * time / (π * nsteps)
+    safe_phase = exp(-im * safety_phase_shift)
+    terms = build_trotter_terms(ham, nqubits; term_ordering=term_ordering)
     n = 2^nqubits
     nvals = trotter_candidate_count(n; nev=nev)
     maxdim = trotter_krylov_dimension(n, nvals)
     mindim = min(maxdim, max(nvals, 2 * nvals))
     stateHF = construct_hf_state(nqubits, nelectrons)
     C = LinearMap{ComplexF64}(
-        x -> apply_trotter_unitary(x, terms, nsteps, norm_info.normalization, order; time=time) +
-             apply_trotter_unitary_adjoint(x, terms, nsteps, norm_info.normalization, order; time=time),
+        x -> safe_phase * apply_trotter_unitary(
+                 x, terms, 1, norm_info.normalization, order; time=safe_step_time
+             ) + conj(safe_phase) * apply_trotter_unitary_adjoint(
+                 x, terms, 1, norm_info.normalization, order; time=safe_step_time
+             ),
         n;
         ismutating=false
     )
@@ -360,10 +496,19 @@ function trotter_energy_arnoldi(
         nev=nvals,
         which=:LR,
         mindim=mindim,
-        maxdim=maxdim
+        maxdim=maxdim,
+        tol=solver_tolerance
     )
-    energies = cosine_value_to_energy.(real.(diag(schur.R)), norm_info.shift, norm_info.normalization, time)
-    return minimum(real.(energies))
+    energies = safe_cosine_value_to_energy.(
+        real.(diag(schur.R)),
+        norm_info.shift,
+        norm_info.normalization,
+        step_time,
+        safety.scale,
+        safety_phase_shift,
+    )
+    energy = minimum(real.(energies))
+    return format_trotter_energy_result(energy, safety, return_details)
 end
 
 function trotter_energy(
@@ -373,12 +518,31 @@ function trotter_energy(
     method::Symbol=:arpack,
     order::Symbol=:second,
     time::Real=pi,
-    nev::Int=TROTTER_SPECTRAL_DEFAULT_NEV
+    nev::Int=TROTTER_SPECTRAL_DEFAULT_NEV,
+    term_ordering=:magnitude,
+    safe_normalization::Bool=true,
+    return_details::Bool=false,
 )
     if method == :arpack
-        return trotter_energy_arpack(meta, ham, nsteps; order=order, time=time, nev=nev)
+        return trotter_energy_arpack(
+            meta, ham, nsteps;
+            order=order,
+            time=time,
+            nev=nev,
+            term_ordering=term_ordering,
+            safe_normalization=safe_normalization,
+            return_details=return_details,
+        )
     elseif method == :arnoldi
-        return trotter_energy_arnoldi(meta, ham, nsteps; order=order, time=time, nev=nev)
+        return trotter_energy_arnoldi(
+            meta, ham, nsteps;
+            order=order,
+            time=time,
+            nev=nev,
+            term_ordering=term_ordering,
+            safe_normalization=safe_normalization,
+            return_details=return_details,
+        )
     else
         error("Unsupported Trotter eigensolver method: $method")
     end

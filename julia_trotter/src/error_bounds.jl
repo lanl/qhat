@@ -2,34 +2,88 @@
 #
 # Commutator-based error bounds for Trotter-Suzuki formulas.
 # Based on Childs et al., "Theory of Trotter Error with Commutator Scaling",
-# PRX Quantum 2, 010323 (2021).
+# Phys. Rev. X 11, 011020 (2021).
 
 using ArnoldiMethod
 using LinearAlgebra, SparseArrays
 
-include("quantum_utils.jl")  # For OP_from_string
+if !isdefined(@__MODULE__, :ordered_hamiltonian_terms)
+    include("hamiltonian_utils.jl")
+end
+
+function pauli_anticommuting_suffix_weights(
+    pauli_strings::Vector{String},
+    abs_coeffs::Vector{Float64},
+)
+    length(pauli_strings) == length(abs_coeffs) || throw(DimensionMismatch(
+        "Pauli strings and coefficients must have the same length",
+    ))
+    isempty(pauli_strings) && return Float64[]
+
+    nqubits = length(first(pauli_strings))
+    nchunks = cld(nqubits, 64)
+    x_masks = zeros(UInt64, nchunks, length(pauli_strings))
+    z_masks = zeros(UInt64, nchunks, length(pauli_strings))
+
+    for (term, pstr) in enumerate(pauli_strings)
+        length(pstr) == nqubits || throw(DimensionMismatch(
+            "All Pauli strings must have the same length",
+        ))
+        for (site, pauli) in enumerate(pstr)
+            chunk = (site - 1) ÷ 64 + 1
+            bit = UInt64(1) << ((site - 1) % 64)
+            if pauli == 'X'
+                x_masks[chunk, term] |= bit
+            elseif pauli == 'Y'
+                x_masks[chunk, term] |= bit
+                z_masks[chunk, term] |= bit
+            elseif pauli == 'Z'
+                z_masks[chunk, term] |= bit
+            elseif pauli != 'I'
+                throw(ArgumentError("Invalid Pauli '$pauli' in '$pstr'"))
+            end
+        end
+    end
+
+    anticommuting_weights = zeros(Float64, length(pauli_strings))
+    for j in 1:length(pauli_strings)-1
+        for k in j+1:length(pauli_strings)
+            parity = false
+            @inbounds for chunk in 1:nchunks
+                crossings = (x_masks[chunk, j] & z_masks[chunk, k]) ⊻
+                            (z_masks[chunk, j] & x_masks[chunk, k])
+                parity = xor(parity, isodd(count_ones(crossings)))
+            end
+            parity && (anticommuting_weights[j] += abs_coeffs[k])
+        end
+    end
+    return anticommuting_weights
+end
 
 # ----------------------------------------------------------------------
 # Strang (2nd-order) commutator-bound helper (fast upper bound)
 # ----------------------------------------------------------------------
 
 """
-    commutator_bound_prefactor_fast(abs_coeffs; nqubits, norm_mode=:l1)
+    commutator_bound_prefactor_fast(pauli_strings, abs_coeffs;
+                                    nqubits, norm_mode=:l1)
 
 Compute prefactor C for Strang splitting error bound using inequality-based upper bounds.
 
-Given abs_coeffs[j] = ‖H_j‖ for a decomposition H = Σ_j H_j, returns a
-prefactor `C` such that the *single-step* Strang error obeys:
+Given `abs_coeffs[j] = ‖H_j‖` and the corresponding Pauli strings for a
+decomposition `H = Σ_j H_j`, returns a prefactor `C` such that the
+*single-step* Strang error obeys:
 
     ‖S2(dt) - exp(-i dt H)‖ ≤ (dt^3) * C
 
-This is obtained from Prop. 16 (Eq. 152) in Childs et al. (PRX 2021)
+This is obtained from Proposition 10, Eq. (121), in Childs et al. (PRX 2021)
 by upper-bounding the nested-commutator norms using:
 
     ‖[A,[A,B]]‖ ≤ 4 ‖A‖^2 ‖B‖
 
 # Arguments
 - `abs_coeffs`: Vector of term norms ‖H_j‖
+- `pauli_strings`: Pauli string for each coefficient
 - `nqubits`: Number of qubits
 - `norm_mode`: `:l1` (sum of norms) or `:fro` (Frobenius norm scaling)
 
@@ -37,13 +91,16 @@ by upper-bounding the nested-commutator norms using:
 Prefactor C for single-step error bound
 """
 function commutator_bound_prefactor_fast(
+    pauli_strings::Vector{String},
     abs_coeffs::Vector{Float64};
     nqubits::Int,
     norm_mode::Symbol = :l1,
 )
-    error("There is a better bound - use exact method for accurate estimates")
     m = length(abs_coeffs)
     m == 0 && return 0.0
+    anticommuting_weights = pauli_anticommuting_suffix_weights(
+        pauli_strings, abs_coeffs
+    )
 
     # Suffix bounds for ‖R_j‖ = ‖Σ_{k=j+1}^m H_k‖
     if norm_mode == :l1
@@ -64,18 +121,20 @@ function commutator_bound_prefactor_fast(
         error("Unknown norm_mode=$norm_mode (use :l1 or :fro)")
     end
 
-    # Prop. 16 structure:
+    # Proposition 10 structure:
     #   (dt^3/12) Σ_j ‖[R_j,[R_j,H_j]]‖ + (dt^3/24) Σ_j ‖[H_j,[H_j,R_j]]‖
-    # Upper bound:
-    #   ‖[R,[R,Hj]]‖ ≤ 4‖R‖^2‖Hj‖
-    #   ‖[Hj,[Hj,R]]‖ ≤ 4‖Hj‖^2‖R‖
+    # If Aj is the coefficient weight of suffix terms that anticommute with
+    # Hj, then ‖[R,Hj]‖ ≤ 2‖Hj‖Aj. Consequently,
+    #   ‖[R,[R,Hj]]‖ ≤ 4‖R‖‖Hj‖Aj
+    #   ‖[Hj,[Hj,R]]‖ ≤ 4‖Hj‖²Aj.
     sum1 = 0.0
     sum2 = 0.0
     for j in 1:m
         hj = abs_coeffs[j]
         rj = Rnorm(j)
-        sum1 += 4.0 * (rj^2) * hj
-        sum2 += 4.0 * (hj^2) * rj
+        aj = anticommuting_weights[j]
+        sum1 += 4.0 * rj * hj * aj
+        sum2 += 4.0 * (hj^2) * aj
     end
 
     return (sum1 / 12.0) + (sum2 / 24.0)
@@ -83,11 +142,21 @@ end
 
 
 # ----------------------------------------------------------------------
-# Exact Prop. 16 prefactor via explicit sparse nested-commutators
+# Exact first- and second-order prefactors via sparse commutators
 # (Expensive but tight bounds, limited to ~12 qubits)
 # ----------------------------------------------------------------------
 
 @inline comm(A, B) = A * B - B * A
+
+function first_order_commutator_bound_prefactor_fast(
+    pauli_strings::Vector{String},
+    abs_coeffs::Vector{Float64},
+)
+    anticommuting_weights = pauli_anticommuting_suffix_weights(
+        pauli_strings, abs_coeffs
+    )
+    return sum(abs_coeffs .* anticommuting_weights)
+end
 
 """
     hermitian_opnorm(A; scale=1E2)
@@ -105,15 +174,100 @@ function hermitian_opnorm(A::SparseMatrixCSC{ComplexF64, Int}; scale::Float64 = 
     # Numerically symmetrize before wrapping
     H = scale * Hermitian((A + A') / 2)
     n = size(A, 1)
-    maxdim = min(40, n - 1)  # Ensure maxdim < matrix dimension
+    # Small commutator matrices often have large degeneracies. A dense solve
+    # is deterministic here and avoids an iterative solve missing an extremal
+    # invariant subspace, which would underestimate a purported bound.
+    if n <= 64
+        return maximum(abs, eigvals(Hermitian(Matrix(H)))) / scale
+    end
+
+    # ArnoldiMethod requires its default `mindim` to be no larger than
+    # `maxdim`.  Letting the Krylov space span a small matrix keeps that
+    # invariant and is also exact for the small systems used in validation.
+    maxdim = min(40, n)
     vals, _ = partialschur(H; nev=1, which=:LM, maxdim=maxdim)
     return abs(real(vals.R[1])) / scale
 end
 
 """
+    first_order_commutator_bound_prefactor_exact(term_mats)
+
+Compute the first-order Lie-Trotter prefactor
+
+    C₁ = (1/2) ∑ⱼ ‖[∑ₖ₌ⱼ₊₁ Hₖ, Hⱼ]‖,
+
+so that one step satisfies `‖S₁(dt) - exp(-im*dt*H)‖ ≤ dt²*C₁`.
+This is Proposition 9, Eq. (120), of Childs et al., Phys. Rev. X 11,
+011020 (2021), DOI: 10.1103/PhysRevX.11.011020.
+"""
+function first_order_commutator_bound_prefactor_exact(
+    term_mats::Vector{SparseMatrixCSC{ComplexF64, Int}}
+)::Float64
+    isempty(term_mats) && return 0.0
+    N = size(term_mats[1], 1)
+    R = spzeros(ComplexF64, N, N)
+    commutator_sum = 0.0
+
+    for j in length(term_mats):-1:1
+        Hj = term_mats[j]
+        # [R,Hj] is anti-Hermitian, so im*[R,Hj] is Hermitian with the
+        # same operator norm.
+        commutator_sum += hermitian_opnorm(im * comm(R, Hj))
+        R += Hj
+    end
+
+    return commutator_sum / 2
+end
+
+"""
+    first_order_commutator_error_bounds(ham, normalization, nqubits;
+                                        nsteps_list=[1], time=π,
+                                        term_ordering=:magnitude)
+
+Compute rigorous additive-error bounds for first-order Lie-Trotter evolution.
+For `nsteps` over total time `time`, the single-step bound is applied with
+`dt = time/(nsteps*normalization)` and accumulated using the unitary
+telescoping inequality.
+`term_ordering` must match the ordering used by the product formula.
+"""
+function first_order_commutator_error_bounds(
+    ham::Dict,
+    normalization::Real,
+    nqubits::Int;
+    nsteps_list::Vector{Int}=[1],
+    time::Real=π,
+    term_ordering=:magnitude,
+)
+    all(>(0), nsteps_list) || throw(ArgumentError("nsteps values must be positive"))
+    normalization > 0 || throw(ArgumentError("normalization must be positive"))
+
+    term_mats = SparseMatrixCSC{ComplexF64,Int}[]
+    pauli_strings = String[]
+    abs_coeffs = Float64[]
+    for (pauli, coefficient) in ordered_hamiltonian_terms(
+        ham, nqubits; term_ordering=term_ordering
+    )
+        @assert isapprox(imag(coefficient), 0.0) "Coefficient not real for $pauli"
+        push!(pauli_strings, pauli)
+        push!(abs_coeffs, abs(real(coefficient)))
+        if nqubits <= 12
+            push!(term_mats, real(coefficient) * sparse(OP_from_string(pauli)))
+        end
+    end
+
+    prefactor = nqubits <= 12 ?
+                first_order_commutator_bound_prefactor_exact(term_mats) :
+                first_order_commutator_bound_prefactor_fast(pauli_strings, abs_coeffs)
+    return [
+        nsteps * (time / (nsteps * normalization))^2 * prefactor
+        for nsteps in nsteps_list
+    ]
+end
+
+"""
     commutator_bound_prefactor_exact(term_mats)
 
-Compute exact Prop. 16 prefactor via explicit nested commutators.
+Compute the exact Proposition 10 prefactor via explicit nested commutators.
 
 Returns prefactor C such that:
     ‖S2(dt) - exp(-i dt Σ H_j)‖ ≤ dt^3 * C
@@ -160,7 +314,8 @@ end
 
 
 """
-    commutator_error_bounds(ham, normalization, nqubits; nsteps_list, time=π)
+    commutator_error_bounds(ham, normalization, nqubits; nsteps_list, time=π,
+                            term_ordering=:magnitude)
 
 Compute commutator-based upper bounds for full Strang evolution error.
 
@@ -175,6 +330,8 @@ using telescoping inequality for unitaries.
 - `nqubits`: Number of qubits
 - `nsteps_list`: List of Trotter step counts
 - `time`: Total evolution time (default π)
+- `term_ordering`: Ordering accepted by `ordered_hamiltonian_terms`; it must
+  match the product formula
 
 # Environment Variables
 - `COMM_METHOD`: "exact" (default) or "fast"
@@ -192,9 +349,11 @@ function commutator_error_bounds(
     nqubits::Int;
     nsteps_list::Vector{Int} = [1],
     time = π,
+    term_ordering=:magnitude,
 )
-    id_key = "I"^nqubits
-    H_terms = [(k, v) for (k, v) in ham if k != id_key]
+    H_terms = ordered_hamiltonian_terms(
+        ham, nqubits; term_ordering=term_ordering
+    )
 
     # Method selection
     comm_method = lowercase(get(ENV, "COMM_METHOD", "exact"))
@@ -218,13 +377,17 @@ function commutator_error_bounds(
     end
 
     if comm_method_used == "fast"
+        pauli_strings = String[]
         coeffs = Float64[]
         for (k, v) in H_terms
             @assert imag(v) ≈ 0.0 "Coefficient not real for $k"
+            push!(pauli_strings, k)
             push!(coeffs, abs(real(v)))
         end
         norm_mode = Symbol(get(ENV, "COMM_NORM_MODE", "l1"))
-        pref = commutator_bound_prefactor_fast(coeffs; nqubits=nqubits, norm_mode=norm_mode)
+        pref = commutator_bound_prefactor_fast(
+            pauli_strings, coeffs; nqubits=nqubits, norm_mode=norm_mode
+        )
     end
 
     bounds = Float64[]
@@ -240,7 +403,8 @@ end
 
 
 """
-    reference_trotter_unitary(ham, normalization, nqubits; numsteps=10, time=π)
+    reference_trotter_unitary(ham, normalization, nqubits; numsteps=10, time=π,
+                              term_ordering=:magnitude)
 
 Construct reference second-order Trotter unitary matrix for benchmarking.
 
@@ -266,14 +430,14 @@ function reference_trotter_unitary(
     normalization::Real,
     nqubits::Int;
     numsteps::Int=10,
-    time=π
+    time=π,
+    term_ordering=:magnitude,
 )
     U_s      = sparse(I, 2^nqubits, 2^nqubits) .+ 0.0im
     Identity = sparse(I, 2^nqubits, 2^nqubits) .+ 0.0im
-    id_key   = "I"^nqubits
-
-    # Ignore identity term in Trotter product
-    H_terms = [(k, v) for (k, v) in ham if k != id_key]
+    H_terms = ordered_hamiltonian_terms(
+        ham, nqubits; term_ordering=term_ordering
+    )
 
     dt = time / (numsteps * normalization)
 

@@ -43,7 +43,9 @@ end
     first_order_trotter_statevec(H_terms, psi0, dt, nsteps)
 
 First-order Trotter evolution:
-    U(T) ≈ [exp(-iH₁dt) exp(-iH₂dt) ⋯ exp(-iHₘdt)]^nsteps
+    U(T) ≈ [exp(-iHₘdt) ⋯ exp(-iH₂dt) exp(-iH₁dt)]^nsteps
+
+The vector order is chronological: `H₁` is applied to the state first.
 
 # Arguments
 - `H_terms`: Vector of `(coeff, P_sparse)` tuples where H = Σⱼ coeff_j * P_j

@@ -8,6 +8,53 @@ using SparseArrays, LinearAlgebra
 include("quantum_utils.jl")  # For OP_from_string
 
 """
+    ordered_hamiltonian_terms(ham, nqubits; term_ordering=:magnitude)
+
+Return the nonidentity `(Pauli string, coefficient)` pairs in the requested
+chronological Trotter application order.
+
+`term_ordering` may be:
+- `:magnitude`: decreasing coefficient magnitude, with Pauli-string tie breaks
+- `:increasing_magnitude`: increasing coefficient magnitude, with the same tie breaks
+- `:lexicographic`: increasing Pauli-string order
+- `:dict`: the iteration order of `ham`
+- a vector containing every nonidentity Pauli string exactly once
+"""
+function ordered_hamiltonian_terms(
+    ham::AbstractDict{String,<:Number},
+    nqubits::Int;
+    term_ordering=:magnitude,
+)
+    id_key = "I"^nqubits
+    terms = [(pauli, coefficient) for (pauli, coefficient) in ham if pauli != id_key]
+
+    if term_ordering == :magnitude
+        sort!(terms; by=term -> (-abs(term[2]), term[1]))
+    elseif term_ordering == :increasing_magnitude
+        sort!(terms; by=term -> (abs(term[2]), term[1]))
+    elseif term_ordering == :lexicographic
+        sort!(terms; by=first)
+    elseif term_ordering == :dict
+        # Keep the order produced by this dictionary instance.
+    elseif term_ordering isa AbstractVector{<:AbstractString}
+        requested = String.(term_ordering)
+        available = Set(first.(terms))
+        length(requested) == length(available) && Set(requested) == available ||
+            throw(ArgumentError(
+                "Explicit term_ordering must contain every nonidentity Pauli string exactly once",
+            ))
+        coefficients = Dict(terms)
+        terms = [(pauli, coefficients[pauli]) for pauli in requested]
+    else
+        throw(ArgumentError(
+            "term_ordering must be :magnitude, :increasing_magnitude, :lexicographic, :dict, or an explicit vector of Pauli strings",
+        ))
+    end
+
+    return terms
+end
+
+"""
     normalize_hamiltonian(meta, ham)
 
 Extract energy shift and compute normalization factor from metadata.
@@ -45,7 +92,8 @@ function normalize_hamiltonian(meta::Dict{String,String}, ham::Dict{String,Compl
 end
 
 """
-    build_hamiltonian_terms(ham, meta; normalize=true, scale_by_pi=true)
+    build_hamiltonian_terms(ham, meta; normalize=true, scale_by_pi=true,
+                            term_ordering=:magnitude)
 
 Build list of (coefficient, Pauli_matrix) tuples for state-vector simulation.
 
@@ -54,13 +102,14 @@ This function:
 2. Optionally normalizes coefficients
 3. Optionally scales by π (common for QPE convention)
 4. Converts Pauli strings to sparse matrices
-5. Sorts terms by coefficient for determinism
+5. Orders terms for their chronological application in the product formula
 
 # Arguments
 - `ham`: Hamiltonian dictionary (Pauli string => coefficient)
 - `meta`: Metadata dictionary (needed for normalization)
 - `normalize`: If true, divide coefficients by normalization factor
 - `scale_by_pi`: If true, multiply coefficients by π
+- `term_ordering`: Ordering accepted by `ordered_hamiltonian_terms`
 
 # Returns
 Named tuple with fields:
@@ -72,7 +121,8 @@ function build_hamiltonian_terms(
     ham::Dict{String,ComplexF64},
     meta::Dict{String,String};
     normalize::Bool=true,
-    scale_by_pi::Bool=true
+    scale_by_pi::Bool=true,
+    term_ordering=:magnitude,
 )
     nqubits = parse(Int, meta["number of qubits"])
     id_key = "I"^nqubits
@@ -89,21 +139,18 @@ function build_hamiltonian_terms(
 
     # Build terms
     H_terms = Tuple{Float64, SparseMatrixCSC{ComplexF64, Int}}[]
-    for (k, v) in ham
-        if k != id_key
-            coeff = real(v)
-            if normalize
-                coeff /= normalization
-            end
-            if scale_by_pi
-                coeff *= π
-            end
-            push!(H_terms, (coeff, sparse(OP_from_string(k))))
+    for (k, v) in ordered_hamiltonian_terms(
+        ham, nqubits; term_ordering=term_ordering
+    )
+        coeff = real(v)
+        if normalize
+            coeff /= normalization
         end
+        if scale_by_pi
+            coeff *= π
+        end
+        push!(H_terms, (coeff, sparse(OP_from_string(k))))
     end
-
-    # Sort by coefficient for determinism
-    sort!(H_terms, by=x -> x[1])
 
     return (H_terms=H_terms, normalization=normalization, shift=shift)
 end
@@ -127,7 +174,12 @@ In the computational basis, this corresponds to:
 Normalized state vector with one nonzero entry at HF configuration
 """
 function construct_hf_state(nqubits::Int, nelectrons::Int)
-    kint = sum(2^ii for ii in nqubits-nelectrons:nqubits-1) + 1
+    nqubits >= 0 || throw(ArgumentError("nqubits must be nonnegative"))
+    0 <= nelectrons <= nqubits || throw(ArgumentError(
+        "nelectrons must be between zero and nqubits",
+    ))
+
+    kint = sum((2^ii for ii in nqubits-nelectrons:nqubits-1); init=0) + 1
     state = zeros(ComplexF64, 2^nqubits)
     state[kint] = 1.0
     return state

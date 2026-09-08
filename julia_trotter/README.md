@@ -27,22 +27,40 @@ This runs the demonstration on the smallest system (4 qubits). To use a differen
 julia --project=. trotter_expts.jl Li-Li_jw/Li-Li_2.90_hgbs-5_as-004-004_jw.dat  # 8 qubits
 ```
 
+Run the mathematical test suite with:
+
+```bash
+julia --project=. test/runtests.jl
+```
+
 ## Additional Scripts
 
 ### `trotter_ground_energy.jl`
 
-Reads a single Hamiltonian, builds second-order Trotter product unitaries, and reports:
+Reads a single Hamiltonian, builds first- or second-order Trotter product unitaries, and reports:
 - metadata ground-state energy
 - Trotter-derived ground-state energies for `nsteps = 1, 5, 10`
 
 The default Hamiltonian is `He-He/He-He_2.40_hgbs-5_as-004-004_jw.dat`.
-By default it uses Arpack on `U + U'`. Pass `--arnoldi` to use matrix-free Arnoldi with the Hartree-Fock start vector:
+By default it uses Arpack on `U + U'`, orders terms by decreasing coefficient
+magnitude, and applies the commutator-bound safety shift and scale. The options
+below change those choices:
 
 ```bash
 julia --project=. trotter_ground_energy.jl
 julia --project=. trotter_ground_energy.jl --arnoldi
+julia --project=. trotter_ground_energy.jl --trotter-order=first
+julia --project=. trotter_ground_energy.jl --term-order=increasing-magnitude
+julia --project=. trotter_ground_energy.jl --term-order=XX,ZI,IZ
+julia --project=. trotter_ground_energy.jl --safe-normalization=false
+julia --project=. trotter_ground_energy.jl --benchmark
 julia --project=. trotter_ground_energy.jl --arnoldi He-He/He-He_2.40_hgbs-5_as-004-004_jw.dat
 ```
+
+`--benchmark` times each complete Trotter diagonalization and adds a
+`time_seconds` column. Timing is disabled by default.
+When safe normalization is enabled, each row also reports its
+`safe_scaling_factor` value (s).
 
 ### `bond_energy_curve.jl`
 
@@ -136,5 +154,8 @@ The `Li-Li_bond/` directory contains bond-length scans for:
 For the curve scripts:
 - exact energies come from metadata if present, otherwise from sparse eigensolves of the Hamiltonian
 - Trotter energies are extracted from the largest eigenvalues of `U + U'`
+- an `nsteps` estimate uses one product-formula step of duration `π / nsteps`; the shorter time is also used to convert the eigenphase back to energy
+- first- and second-order estimates use their certified commutator bound to compress the phase spectrum away from `0` and `π`; this safety shift and scale are removed when converting back to Hartrees
+- nonidentity terms are applied in decreasing coefficient magnitude by default; pass `term_ordering=:increasing_magnitude`, `:lexicographic`, `:dict`, or a vector containing the Pauli strings in the desired order to `trotter_energy`
 - the default Trotter eigensolver is Arpack on the full Trotter unitary
 - passing `--arnoldi` switches to matrix-free Arnoldi actions for `U + U'`, which avoids constructing the full unitary
