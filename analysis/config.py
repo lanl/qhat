@@ -73,7 +73,8 @@ if my_method == "Trotter":
 elif my_method == "pauli-lcu":
     algorithm.method = "QPE: pyLIQTR qubitized"
 #    algorithm.method = "QPE: qualtran qubitization"
-    algorithm.num_phase_qubits = 12
+#    algorithm.num_phase_qubits = 12
+    algorithm.energy_error = 0.5 * energy_error
 elif my_method == "double-factorization":
     algorithm.method = "QPE: pyLIQTR qubitized"
     algorithm.num_phase_qubits = 12

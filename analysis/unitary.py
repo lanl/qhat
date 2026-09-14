@@ -14,6 +14,7 @@ from qualtran.bloqs.block_encoding import LCUBlockEncoding
 from qualtran.bloqs.multiplexers.select_pauli_lcu import SelectPauliLCU
 from qualtran.bloqs.state_preparation import StatePreparationAliasSampling
 
+from pyLIQTR.BlockEncodings import VALID_ENCODINGS
 from pyLIQTR.BlockEncodings.DoubleFactorized import DoubleFactorized
 from pyLIQTR.BlockEncodings.LinearT import Fermionic_LinearT
 from pyLIQTR.BlockEncodings.PauliStringLCU import PauliStringLCU as PyLIQTRPauliStringLCU_orig
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 class PauliStringLCU(LCUBlockEncoding):
 
-    def __init__(self, hamiltonian, prepare_type=None, probability_eps=0.002, **kwargs):
+    def __init__(self, hamiltonian, prepare_type=None, energy_error=0.001, **kwargs):
 
         pauli_terms = [cirq.DensePauliString(term[0],coefficient=term[1])
                           for term in hamiltonian.get_all_pauli_strings(return_as='strings').items()
@@ -47,6 +48,8 @@ class PauliStringLCU(LCUBlockEncoding):
         alpha = np.sum(weights)
 
         selection_bitsize = int(np.ceil(np.log2(n_tot)))
+
+        eps = energy_error / (2 * np.sqrt(2) * alpha * n_terms)
 
         select = SelectPauliLCU(
                      selection_bitsize=selection_bitsize,
@@ -66,11 +69,11 @@ class PauliStringLCU(LCUBlockEncoding):
         elif prepare_type=='AS':
             prepare = StatePreparationAliasSampling.from_lcu_probs(
                           lcu_probabilities=weights,
-                          probability_epsilon=probability_eps,
+                          probability_epsilon=eps,
                       )
 
         super().__init__(
-            alpha=alpha, epsilon=probability_eps,
+            alpha=alpha, epsilon=eps,
             select=select, prepare=prepare
         )
 
@@ -95,8 +98,16 @@ class PauliStringLCU(LCUBlockEncoding):
 
 # -------------------------------------------------------------------------------------------------
 
-# add bugfix:  correct ordering of Signature registers
+# wrapper to add bugfixes to PyLIQTR's class
 class PyLIQTRPauliStringLCU(PyLIQTRPauliStringLCU_orig):
+    # use energy_error to determine probability_eps
+    def __init__(self,ProblemInstance, prepare_type=None, energy_error=0.001, **kwargs):
+        alpha = ProblemInstance.get_alpha()
+        n_terms = ProblemInstance.n_terms(VALID_ENCODINGS.PauliLCU)
+        eps = energy_error / (2 * np.sqrt(2) * alpha * n_terms)
+        super().__init__(ProblemInstance, prepare_type, probability_eps=eps, **kwargs)
+
+    # correct ordering of Signature registers
     @property
     def signature(self):
         return Signature(
@@ -160,7 +171,7 @@ def encode_pauli_lcu_pyliqtr(
             ProblemInstance=problem_instance,
             # TODO: Setting `prepare_type='AS'` might give the alias sampling Obenland mentioned?
             prepare_type='AS',
-            # TODO: What to do with energy_error?
+            energy_error=config_unitary.energy_error
             )
 
 # -------------------------------------------------------------------------------------------------
@@ -175,7 +186,7 @@ def encode_pauli_lcu_qualtran(
     return PauliStringLCU(
             hamiltonian=hamiltonian,
             prepare_type='AS',
-            # TODO: What to do with energy_error?
+            energy_error=config_unitary.energy_error
             )
 
 # -------------------------------------------------------------------------------------------------

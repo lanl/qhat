@@ -136,9 +136,15 @@ def build_qpe_qualtran_qubitized(
     logger.verbose(
             "Build a QPE algorithm with Qualtran's \"QubitizationQPE\" method.")
 
+    P = config_algorithm.num_phase_qubits
+    if P is None:
+        dE = config_algorithm.energy_error
+        alpha = unitary.alpha
+        P = int(math.ceil(math.log2(math.pi * alpha / (2 * dE))))
+
     return NewQubitizationQPE(QubitizationWalkOperator(unitary._select_gate,
                                                        unitary._prepare_gate),
-                              config_algorithm.num_phase_qubits)
+                              P)
 
 # -------------------------------------------------------------------------------------------------
 
@@ -149,9 +155,15 @@ def build_qpe_pyliqtr_qubitized(
     logger.verbose(
             "Build a QPE algorithm with pyLIQTR's \"QubitizedPhaseEstimation\" method.")
 
+    P = config_algorithm.num_phase_qubits
+    if P is None:
+        dE = config_algorithm.energy_error
+        alpha = unitary.alpha
+        P = int(math.ceil(math.log2(math.pi * alpha / (2 * dE))))
+
     # TODO: The name and signature suggest that this may _only_ be valid for block-encoded
     #       unitaries.  Is that true?
-    return QubitizedPhaseEstimation(block_encoding=unitary, prec=config_algorithm.num_phase_qubits)
+    return QubitizedPhaseEstimation(block_encoding=unitary, prec=P)
 
 # -------------------------------------------------------------------------------------------------
 
