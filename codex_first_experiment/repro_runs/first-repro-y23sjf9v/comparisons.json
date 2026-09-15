@@ -1,0 +1,806 @@
+[
+  {
+    "kind": "repeat",
+    "case": "f2",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "one_minus_overlap",
+    "first": 1.0581536502574096e-07,
+    "fresh": 1.0581536502574096e-07,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "f2",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "first": 0.09985591240644963,
+    "fresh": 0.09985591240644963,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "f2",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "first": 1176,
+    "fresh": 1176,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "f2",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "first": 656,
+    "fresh": 656,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "f2",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "one_minus_overlap",
+    "first": 4.3457536236246597e-08,
+    "fresh": 4.3457536236246597e-08,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "f2",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "first": 0.4129830078755785,
+    "fresh": 0.4129830078755785,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "f2",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "first": 1176,
+    "fresh": 1176,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "f2",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "first": 656,
+    "fresh": 656,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "f2",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "one_minus_overlap",
+    "first": 1.0592839416734279e-07,
+    "fresh": 1.0592839416734279e-07,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "f2",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "first": 0.10299114887575951,
+    "fresh": 0.10299114887575951,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "f2",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "first": 1176,
+    "fresh": 1176,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "f2",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "first": 656,
+    "fresh": 656,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "nh3",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "one_minus_overlap",
+    "first": 9.633077668880219e-10,
+    "fresh": 9.633077668880219e-10,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "nh3",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "first": 0.009138447632254297,
+    "fresh": 0.009138447632254297,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "nh3",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "first": 5098,
+    "fresh": 5098,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "nh3",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "first": 2628,
+    "fresh": 2628,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "nh3",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "one_minus_overlap",
+    "first": 1.0398051308868617e-09,
+    "fresh": 1.0398051308868617e-09,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "nh3",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "first": 0.011343076201149997,
+    "fresh": 0.011343076201149997,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "nh3",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "first": 5098,
+    "fresh": 5098,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "nh3",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "first": 2628,
+    "fresh": 2628,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "nh3",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "one_minus_overlap",
+    "first": 9.951629520443817e-10,
+    "fresh": 9.951629520443817e-10,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "nh3",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "first": 0.009214437052151156,
+    "fresh": 0.009214437052151156,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "nh3",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "first": 5098,
+    "fresh": 5098,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "nh3",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "first": 2628,
+    "fresh": 2628,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "li2",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "one_minus_overlap",
+    "first": 2.855927716538531e-10,
+    "fresh": 2.855927716538531e-10,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "li2",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "first": 0.013214371136933729,
+    "fresh": 0.013214371136933729,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "li2",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "first": 326,
+    "fresh": 326,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "li2",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "first": 202,
+    "fresh": 202,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "li2",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "one_minus_overlap",
+    "first": 1.1426169788109064e-08,
+    "fresh": 1.1426169788109064e-08,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "li2",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "first": 0.27229027150116436,
+    "fresh": 0.27229027150116436,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "li2",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "first": 326,
+    "fresh": 326,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "li2",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "first": 202,
+    "fresh": 202,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "li2",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "one_minus_overlap",
+    "first": 3.7285652343399533e-10,
+    "fresh": 3.7285652343399533e-10,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "li2",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "first": 0.012547628603417862,
+    "fresh": 0.012547628603417862,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "li2",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "first": 326,
+    "fresh": 326,
+    "result": "match"
+  },
+  {
+    "kind": "repeat",
+    "case": "li2",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "first": 202,
+    "fresh": 202,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "li2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "one_minus_overlap",
+    "historical": 2.855927716538531e-10,
+    "fresh": 2.855927716538531e-10,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "li2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "historical": 0.013214371136933729,
+    "fresh": 0.013214371136933729,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "li2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "historical": 326.0,
+    "fresh": 326.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "li2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "historical": 202.0,
+    "fresh": 202.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "li2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "one_minus_overlap",
+    "historical": 1.1426169788109064e-08,
+    "fresh": 1.1426169788109064e-08,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "li2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "historical": 0.27229027150116436,
+    "fresh": 0.27229027150116436,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "li2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "historical": 326.0,
+    "fresh": 326.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "li2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "historical": 202.0,
+    "fresh": 202.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "li2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "one_minus_overlap",
+    "historical": 3.7285652343399533e-10,
+    "fresh": 3.7285652343399533e-10,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "li2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "historical": 0.012547628603417862,
+    "fresh": 0.012547628603417862,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "li2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "historical": 326.0,
+    "fresh": 326.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "li2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "historical": 202.0,
+    "fresh": 202.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "f2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "one_minus_overlap",
+    "historical": 1.0581536502574096e-07,
+    "fresh": 1.0581536502574096e-07,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "f2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "historical": 0.09985591240644963,
+    "fresh": 0.09985591240644963,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "f2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "historical": 1176.0,
+    "fresh": 1176.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "f2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "historical": 656.0,
+    "fresh": 656.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "f2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "one_minus_overlap",
+    "historical": 4.3457536236246597e-08,
+    "fresh": 4.3457536236246597e-08,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "f2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "historical": 0.4129830078755785,
+    "fresh": 0.4129830078755785,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "f2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "historical": 1176.0,
+    "fresh": 1176.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "f2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "historical": 656.0,
+    "fresh": 656.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "f2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "one_minus_overlap",
+    "historical": 1.0592839416734279e-07,
+    "fresh": 1.0592839416734279e-07,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "f2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "historical": 0.10299114887575951,
+    "fresh": 0.10299114887575951,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "f2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "historical": 1176.0,
+    "fresh": 1176.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "f2",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "historical": 656.0,
+    "fresh": 656.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "nh3",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "one_minus_overlap",
+    "historical": 9.633077668880219e-10,
+    "fresh": 9.633077668880219e-10,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "nh3",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "historical": 0.009138447632254297,
+    "fresh": 0.009138447632254297,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "nh3",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "historical": 5098.0,
+    "fresh": 5098.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "nh3",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "historical": 2628.0,
+    "fresh": 2628.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "nh3",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "one_minus_overlap",
+    "historical": 1.0398051308868617e-09,
+    "fresh": 1.0398051308868617e-09,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "nh3",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "historical": 0.011343076201149997,
+    "fresh": 0.011343076201149997,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "nh3",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "historical": 5098.0,
+    "fresh": 5098.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "nh3",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "signed_coefficient_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "historical": 2628.0,
+    "fresh": 2628.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "nh3",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "one_minus_overlap",
+    "historical": 9.951629520443817e-10,
+    "fresh": 9.951629520443817e-10,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "nh3",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "historical": 0.009214437052151156,
+    "fresh": 0.009214437052151156,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "nh3",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "historical": 5098.0,
+    "fresh": 5098.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "nh3",
+    "source": "analysis/cancellation_hypothesis_validation/full_ablation_results.csv",
+    "ordering": "jw_magnitude_descending_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "historical": 2628.0,
+    "fresh": 2628.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "li2",
+    "source": "analysis/fermionic_body_rank_ablation_20case.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "one_minus_overlap",
+    "historical": 2.855817804459093e-10,
+    "fresh": 2.855927716538531e-10,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "li2",
+    "source": "analysis/fermionic_body_rank_ablation_20case.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "historical": 0.013214371136844321,
+    "fresh": 0.013214371136933729,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "li2",
+    "source": "analysis/fermionic_body_rank_ablation_20case.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "historical": 326.0,
+    "fresh": 326.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "li2",
+    "source": "analysis/fermionic_body_rank_ablation_20case.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "historical": 202.0,
+    "fresh": 202.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "f2",
+    "source": "analysis/fermionic_body_rank_ablation_20case.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "one_minus_overlap",
+    "historical": 5.858635798716705e-11,
+    "fresh": 1.0581536502574096e-07,
+    "result": "different"
+  },
+  {
+    "kind": "historical",
+    "case": "f2",
+    "source": "analysis/fermionic_body_rank_ablation_20case.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "historical": 0.0031775389693344666,
+    "fresh": 0.09985591240644963,
+    "result": "different"
+  },
+  {
+    "kind": "historical",
+    "case": "f2",
+    "source": "analysis/fermionic_body_rank_ablation_20case.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "historical": 1176.0,
+    "fresh": 1176.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "f2",
+    "source": "analysis/fermionic_body_rank_ablation_20case.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "historical": 656.0,
+    "fresh": 656.0,
+    "result": "match"
+  },
+  {
+    "kind": "historical",
+    "case": "nh3",
+    "source": "analysis/fermionic_body_rank_ablation_20case.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "one_minus_overlap",
+    "historical": 6.537134167317049e-10,
+    "fresh": 9.633077668880219e-10,
+    "result": "different"
+  },
+  {
+    "kind": "historical",
+    "case": "nh3",
+    "source": "analysis/fermionic_body_rank_ablation_20case.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "bch2_hf_state_norm",
+    "historical": 0.007793256100025248,
+    "fresh": 0.009138447632254297,
+    "result": "different"
+  },
+  {
+    "kind": "historical",
+    "case": "nh3",
+    "source": "analysis/fermionic_body_rank_ablation_20case.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_pauli_terms",
+    "historical": 5064.0,
+    "fresh": 5098.0,
+    "result": "different"
+  },
+  {
+    "kind": "historical",
+    "case": "nh3",
+    "source": "analysis/fermionic_body_rank_ablation_20case.csv",
+    "ordering": "fermionic_signed_coefficient_lexicographic",
+    "metric": "number_of_fermionic_terms",
+    "historical": 2620.0,
+    "fresh": 2628.0,
+    "result": "different"
+  }
+]
