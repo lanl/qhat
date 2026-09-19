@@ -40,14 +40,20 @@ end
 
 
 function dense_first_order_trotter(H_list, dt::Float64)
-    return mapreduce(x -> dense_matrix_exp(x, -dt), *, H_list)
+    isempty(H_list) && throw(ArgumentError("H_list must contain at least one term"))
+    # Matrix products act on states from right to left, so reverse the
+    # chronological term list to apply H_list[1] first.
+    return mapreduce(x -> dense_matrix_exp(x, dt), *, reverse(H_list))
 end
 
 
 function dense_second_order_trotter(H_list, dt::Float64)
-    U_temp1 = mapreduce(x->dense_matrix_exp(x, -dt/2), *, H_list[1:end-1] )
-    U_temp2 = mapreduce(x->dense_matrix_exp(x, -dt/2), *, reverse(H_list[1:end-1]))
-    return U_temp1 * dense_matrix_exp(H_list[end],-dt) * U_temp2
+    isempty(H_list) && throw(ArgumentError("H_list must contain at least one term"))
+    length(H_list) == 1 && return dense_matrix_exp(only(H_list), dt)
+
+    U_temp1 = mapreduce(x->dense_matrix_exp(x, dt/2), *, H_list[1:end-1] )
+    U_temp2 = mapreduce(x->dense_matrix_exp(x, dt/2), *, reverse(H_list[1:end-1]))
+    return U_temp1 * dense_matrix_exp(H_list[end],dt) * U_temp2
 end
 
 
@@ -58,7 +64,6 @@ function dense_fourth_order_trotter(H_list, dt::Float64)
     U1sq = U1*U1
     return U1sq*U2*U1sq
 end
-
 
 
 

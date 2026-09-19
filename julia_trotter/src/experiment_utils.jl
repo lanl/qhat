@@ -82,8 +82,14 @@ Merge all part-*.jld2 files from a parallel run into single output file.
 Writes JLD2 file with key "db" containing merged DataFrame
 """
 function merge_results(outdir::String, outfile::String)
-    files = sort(filter(f -> endswith(f, ".jld2"), readdir(outdir; join=true)))
-    @assert !isempty(files) "No .jld2 part files found in $outdir"
+    part_pattern = r"^part-\d+\.jld2$"
+    output_path = normpath(abspath(outfile))
+    files = sort(filter(
+        f -> occursin(part_pattern, basename(f)) &&
+             normpath(abspath(f)) != output_path,
+        readdir(outdir; join=true),
+    ))
+    @assert !isempty(files) "No part-<number>.jld2 files found in $outdir"
 
     dfs = DataFrame[]
     for file in files

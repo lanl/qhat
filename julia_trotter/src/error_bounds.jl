@@ -357,6 +357,7 @@ function commutator_error_bounds(
 
     # Method selection
     comm_method = lowercase(get(ENV, "COMM_METHOD", "exact"))
+    @assert comm_method in ("fast", "exact") "COMM_METHOD must be 'fast' or 'exact', got '$comm_method'"
 
     pref = 0.0
     comm_method_used = comm_method

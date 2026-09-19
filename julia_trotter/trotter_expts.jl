@@ -132,9 +132,16 @@ function main(filepath::String)
             # Small system: use dense norm
             op_err = opnorm(Matrix(E_op))
         else
-            # Large system: use Arpack
-            vals, _ = Arpack.eigs(E_op; nev=1, which=:LM)
-            op_err = abs(vals[1])
+            # Large system: compute the operator norm as the largest singular
+            # value without materializing a dense matrix.
+            svd_result, nconv, _, _, _ = Arpack.svds(
+                E_op;
+                nsv=1,
+                ritzvec=false,
+                tol=0.0,
+            )
+            nconv == 1 || error("Largest singular value did not converge")
+            op_err = only(svd_result.S)
         end
 
         push!(op_errors, op_err)
