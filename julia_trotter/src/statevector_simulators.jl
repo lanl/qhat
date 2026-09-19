@@ -7,6 +7,7 @@
 #   exp(-i*c*P*dt)|ψ⟩ = cos(c*dt)|ψ⟩ - i*sin(c*dt)*P|ψ⟩
 
 using LinearAlgebra, SparseArrays
+using Base.Threads
 
 """
     apply_pauli_rotation!(psi, P_sparse, coeff, dt)
@@ -210,6 +211,317 @@ function hamiltonian_matvec(
     result = zeros(ComplexF64, size(psi))
     for (coeff, P) in H_terms
         result .+= coeff .* (P * psi)
+    end
+    return result
+end
+
+
+# =============================================================================
+# Compact Pauli backend
+#
+# Bit-mask representation of a Pauli string that applies exp(-i c P dt) directly
+# to amplitude pairs of a dense state vector, without ever forming a 2^n x 2^n
+# sparse matrix. Threaded over independent amplitudes/pairs for large vectors.
+#
+# This backend coexists with the sparse-matrix routines above; the methods are
+# selected by dispatch on `CompactPauliTerm`.
+# =============================================================================
+
+"""
+Compact representation of `coeff * P`, where P = ⊗_j σ_{p_j}.
+
+- `xmask`: bit set for X or Y
+- `zmask`: bit set for Z or Y
+- `yphase`: i^(number of Y operators)
+
+For computational-basis state |j⟩:
+
+    P|j⟩ = yphase * (-1)^popcount(zmask & j) * |j ⊻ xmask⟩
+"""
+struct CompactPauliTerm
+    coeff::Float64
+    xmask::UInt64
+    zmask::UInt64
+    yphase::ComplexF64
+end
+
+# State vectors smaller than this run faster without thread startup overhead.
+const PAULI_THREAD_THRESHOLD = 1 << 15
+
+"""
+    compact_pauli_term(pauli, coeff; leftmost_is_msb=true)
+
+Convert a Pauli string to a `CompactPauliTerm`.
+
+`leftmost_is_msb=true` means the first character acts on the most-significant
+computational-basis bit. For this repo `OP_from_string("XI") = kron(X, I)`, so
+the leftmost character is the MSB; the default matches that convention.
+"""
+function compact_pauli_term(
+    pauli::AbstractString,
+    coeff::Real;
+    leftmost_is_msb::Bool=true,
+)
+    nqubits = length(pauli)
+    if nqubits > 63
+        error("CompactPauliTerm supports at most 63 qubits; received $nqubits")
+    end
+
+    xmask = UInt64(0)
+    zmask = UInt64(0)
+    ny = 0
+
+    for (pos, op) in enumerate(pauli)
+        bit = leftmost_is_msb ? (nqubits - pos) : (pos - 1)
+        bitmask = UInt64(1) << bit
+        if op == 'I'
+            # nothing
+        elseif op == 'X'
+            xmask |= bitmask
+        elseif op == 'Y'
+            xmask |= bitmask
+            zmask |= bitmask
+            ny += 1
+        elseif op == 'Z'
+            zmask |= bitmask
+        else
+            error("Unsupported Pauli character '$op' in string '$pauli'")
+        end
+    end
+
+    yphase = if ny % 4 == 0
+        ComplexF64(1.0, 0.0)
+    elseif ny % 4 == 1
+        ComplexF64(0.0, 1.0)
+    elseif ny % 4 == 2
+        ComplexF64(-1.0, 0.0)
+    else
+        ComplexF64(0.0, -1.0)
+    end
+
+    return CompactPauliTerm(Float64(coeff), xmask, zmask, yphase)
+end
+
+"""
+Scalar `s` such that `P|basis⟩ = s * |basis ⊻ xmask⟩`.
+
+Each Z or Y qubit sitting on a set bit of `basis` contributes a factor `-1`, so
+the sign is `(-1)^(number of set bits in zmask & basis)`; the Y operators also
+contribute the overall `yphase = i^(#Y)`.
+"""
+@inline function compact_pauli_phase(term::CompactPauliTerm, basis::UInt64)::ComplexF64
+    parity = isodd(count_ones(term.zmask & basis))
+    return parity ? -term.yphase : term.yphase
+end
+
+"""
+    apply_pauli_rotation!(psi, term::CompactPauliTerm, dt)
+
+Apply exp(-i * term.coeff * P * dt) to `psi` in place, without forming P.
+
+Diagonal (I/Z only) strings scale each amplitude independently. Off-diagonal
+strings pair each basis index j with k = j ⊻ xmask; each pair is touched exactly
+once, so different threads never write the same amplitude.
+"""
+function apply_pauli_rotation!(
+    psi::AbstractVector{ComplexF64},
+    term::CompactPauliTerm,
+    dt::Real,
+)
+    theta = term.coeff * dt
+    c = cos(theta)
+    alpha = -im * sin(theta)
+    n = length(psi)
+
+    # Diagonal case: only I and Z.
+    if term.xmask == 0
+        if Threads.nthreads() > 1 && n >= PAULI_THREAD_THRESHOLD
+            Threads.@threads :static for idx in eachindex(psi)
+                basis = UInt64(idx - 1)
+                phase = compact_pauli_phase(term, basis)
+                @inbounds psi[idx] = (c + alpha * phase) * psi[idx]
+            end
+        else
+            @inbounds for idx in eachindex(psi)
+                basis = UInt64(idx - 1)
+                phase = compact_pauli_phase(term, basis)
+                psi[idx] = (c + alpha * phase) * psi[idx]
+            end
+        end
+        return psi
+    end
+
+    # Off-diagonal case: xmask ≠ 0, so P sends each basis state |j⟩ to a
+    # *different* state |k⟩ = |j ⊻ xmask⟩. We update the two amplitudes of each
+    # pair {j, k} together, and must visit every pair exactly once.
+    #
+    # Enumeration trick: take the lowest set bit of xmask as a "pivot". Exactly
+    # one member of each pair has that bit = 0, so iterating over the n/2 indices
+    # whose pivot bit is 0 hits every pair once. We turn a counter 0..n/2-1 into
+    # such an index by inserting a 0 bit at the pivot position — bits below the
+    # pivot stay, bits at/above it shift up by one (so the pivot bit is always 0).
+    pivot = trailing_zeros(term.xmask)
+    below_pivot = pivot == 0 ? UInt64(0) : (UInt64(1) << pivot) - UInt64(1)
+    npairs = n >> 1
+
+    # For the pair (j, k): P|j⟩ = phase_j·|k⟩, and because Pauli strings are
+    # Hermitian the reverse element ⟨j|P|k⟩ is conj(phase_j). With the rotation
+    # exp(-i c P dt) = cos·I - i sin·P and alpha = -i sin(cθ):
+    #   psi[j] ← cos·psi[j] + alpha·conj(phase_j)·psi[k]
+    #   psi[k] ← cos·psi[k] + alpha·phase_j·psi[j]
+    if Threads.nthreads() > 1 && n >= PAULI_THREAD_THRESHOLD
+        Threads.@threads :static for pair_index in 0:(npairs - 1)
+            counter = UInt64(pair_index)
+            j = (counter & below_pivot) | ((counter & ~below_pivot) << 1)
+            k = j ⊻ term.xmask
+            phase_j = compact_pauli_phase(term, j)
+            ji = Int(j) + 1
+            ki = Int(k) + 1
+            @inbounds begin
+                a = psi[ji]
+                b = psi[ki]
+                psi[ji] = c * a + alpha * conj(phase_j) * b
+                psi[ki] = c * b + alpha * phase_j * a
+            end
+        end
+    else
+        @inbounds for pair_index in 0:(npairs - 1)
+            counter = UInt64(pair_index)
+            j = (counter & below_pivot) | ((counter & ~below_pivot) << 1)
+            k = j ⊻ term.xmask
+            phase_j = compact_pauli_phase(term, j)
+            ji = Int(j) + 1
+            ki = Int(k) + 1
+            a = psi[ji]
+            b = psi[ki]
+            psi[ji] = c * a + alpha * conj(phase_j) * b
+            psi[ki] = c * b + alpha * phase_j * a
+        end
+    end
+
+    return psi
+end
+
+"""
+    first_order_trotter_statevec(H_terms::Vector{CompactPauliTerm}, psi0, dt, nsteps)
+
+First-order Trotter evolution using the compact backend.
+"""
+function first_order_trotter_statevec(
+    H_terms::Vector{CompactPauliTerm},
+    psi0::AbstractVector{ComplexF64},
+    dt::Real,
+    nsteps::Int,
+)
+    psi = copy(psi0)
+    for _ in 1:nsteps
+        for term in H_terms
+            apply_pauli_rotation!(psi, term, dt)
+        end
+    end
+    return psi
+end
+
+"""
+    second_order_trotter_statevec(H_terms::Vector{CompactPauliTerm}, psi0, dt, nsteps)
+
+Second-order (Strang) Trotter evolution using the compact backend.
+"""
+function second_order_trotter_statevec(
+    H_terms::Vector{CompactPauliTerm},
+    psi0::AbstractVector{ComplexF64},
+    dt::Real,
+    nsteps::Int,
+)
+    psi = copy(psi0)
+    for _ in 1:nsteps
+        for term in H_terms
+            apply_pauli_rotation!(psi, term, dt / 2)
+        end
+        for term in Iterators.reverse(H_terms)
+            apply_pauli_rotation!(psi, term, dt / 2)
+        end
+    end
+    return psi
+end
+
+"""
+    fourth_order_trotter_statevec(H_terms::Vector{CompactPauliTerm}, psi0, dt, nsteps)
+
+Fourth-order Trotter evolution using the compact backend.
+"""
+function fourth_order_trotter_statevec(
+    H_terms::Vector{CompactPauliTerm},
+    psi0::AbstractVector{ComplexF64},
+    dt::Real,
+    nsteps::Int,
+)
+    p = 1 / (4 - 4^(1 / 3))
+    psi = copy(psi0)
+
+    function apply_s2_step!(state, delta_t)
+        for term in H_terms
+            apply_pauli_rotation!(state, term, delta_t / 2)
+        end
+        for term in Iterators.reverse(H_terms)
+            apply_pauli_rotation!(state, term, delta_t / 2)
+        end
+        return state
+    end
+
+    for _ in 1:nsteps
+        apply_s2_step!(psi, p * dt)
+        apply_s2_step!(psi, p * dt)
+        apply_s2_step!(psi, (1 - 4p) * dt)
+        apply_s2_step!(psi, p * dt)
+        apply_s2_step!(psi, p * dt)
+    end
+    return psi
+end
+
+"""
+Add `coeff * P * psi` to `result` for a compact Pauli term.
+
+Each source amplitude `psi[basis]` contributes to `result[basis ⊻ xmask]`.
+`basis ↦ basis ⊻ xmask` is a bijection, so distinct iterations write distinct
+`result` slots — the threaded loop needs no locking.
+"""
+function add_compact_pauli_action!(
+    result::AbstractVector{ComplexF64},
+    psi::AbstractVector{ComplexF64},
+    term::CompactPauliTerm,
+)
+    n = length(psi)
+    if Threads.nthreads() > 1 && n >= PAULI_THREAD_THRESHOLD
+        Threads.@threads :static for idx in eachindex(psi)
+            basis = UInt64(idx - 1)
+            destination = basis ⊻ term.xmask
+            phase = compact_pauli_phase(term, basis)
+            @inbounds result[Int(destination) + 1] += term.coeff * phase * psi[idx]
+        end
+    else
+        @inbounds for idx in eachindex(psi)
+            basis = UInt64(idx - 1)
+            destination = basis ⊻ term.xmask
+            phase = compact_pauli_phase(term, basis)
+            result[Int(destination) + 1] += term.coeff * phase * psi[idx]
+        end
+    end
+    return result
+end
+
+"""
+    hamiltonian_matvec(psi, H_terms::Vector{CompactPauliTerm})
+
+Compute H|ψ⟩ = Σⱼ cⱼPⱼ|ψ⟩ using the compact backend.
+"""
+function hamiltonian_matvec(
+    psi::AbstractVector{ComplexF64},
+    H_terms::Vector{CompactPauliTerm},
+)
+    result = zeros(ComplexF64, length(psi))
+    for term in H_terms
+        add_compact_pauli_action!(result, psi, term)
     end
     return result
 end
