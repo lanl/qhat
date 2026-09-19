@@ -119,6 +119,28 @@ function build_trotter_terms(
     return terms
 end
 
+# Compact (bit-mask) counterpart of `build_trotter_terms`. Produces the same
+# ordered terms via `ordered_hamiltonian_terms`, but as `CompactPauliTerm`s that
+# the matrix-free backend can apply without forming any sparse operator. Used by
+# the Arnoldi energy path; `compact_pauli_term`'s default `leftmost_is_msb=true`
+# matches `OP_from_string("XI") = kron(X, I)`.
+function build_compact_trotter_terms(
+    ham::Dict{String,ComplexF64},
+    nqubits::Int;
+    term_ordering=:magnitude,
+)
+    terms = CompactPauliTerm[]
+
+    for (k, v) in ordered_hamiltonian_terms(
+        ham, nqubits; term_ordering=term_ordering
+    )
+        @assert isapprox(imag(v), 0.0) "Coefficient not real for $k"
+        push!(terms, compact_pauli_term(k, real(v)))
+    end
+
+    return terms
+end
+
 function apply_first_order_trotter_step!(
     psi::Vector{ComplexF64},
     terms::Vector{Tuple{Float64,SparseMatrixCSC{ComplexF64,Int}}},
@@ -253,6 +275,140 @@ function apply_trotter_unitary_adjoint(
     end
 
     return exp(im * time / 2) * psi
+end
+
+# =============================================================================
+# Compact-backend Trotter evolution (matrix-free, in place)
+#
+# CompactPauliTerm-typed methods of the same step/unitary helpers used above.
+# They mutate `psi` directly (no per-call allocation) so the Arnoldi LinearMap
+# can drive them on persistent work buffers. dt/sign conventions match the
+# sparse versions exactly, so both engines produce identical results.
+# =============================================================================
+
+function apply_first_order_trotter_step!(
+    psi::AbstractVector{ComplexF64},
+    terms::Vector{CompactPauliTerm},
+    dt::Real,
+    normalization::Real
+)
+    normalized_dt = dt / normalization
+    for term in terms
+        apply_pauli_rotation!(psi, term, normalized_dt)
+    end
+    return psi
+end
+
+function apply_first_order_trotter_adjoint_step!(
+    psi::AbstractVector{ComplexF64},
+    terms::Vector{CompactPauliTerm},
+    dt::Real,
+    normalization::Real
+)
+    normalized_dt = -dt / normalization
+    for term in Iterators.reverse(terms)
+        apply_pauli_rotation!(psi, term, normalized_dt)
+    end
+    return psi
+end
+
+function apply_second_order_trotter_step!(
+    psi::AbstractVector{ComplexF64},
+    terms::Vector{CompactPauliTerm},
+    dt::Real,
+    normalization::Real
+)
+    half_dt = dt / (2 * normalization)
+    for term in terms
+        apply_pauli_rotation!(psi, term, half_dt)
+    end
+    for term in Iterators.reverse(terms)
+        apply_pauli_rotation!(psi, term, half_dt)
+    end
+    return psi
+end
+
+function apply_second_order_trotter_adjoint_step!(
+    psi::AbstractVector{ComplexF64},
+    terms::Vector{CompactPauliTerm},
+    dt::Real,
+    normalization::Real
+)
+    half_dt = -dt / (2 * normalization)
+    for term in terms
+        apply_pauli_rotation!(psi, term, half_dt)
+    end
+    for term in Iterators.reverse(terms)
+        apply_pauli_rotation!(psi, term, half_dt)
+    end
+    return psi
+end
+
+function apply_trotter_step!(
+    psi::AbstractVector{ComplexF64},
+    terms::Vector{CompactPauliTerm},
+    dt::Real,
+    normalization::Real,
+    order::Symbol
+)
+    if order == :first
+        return apply_first_order_trotter_step!(psi, terms, dt, normalization)
+    elseif order == :second
+        return apply_second_order_trotter_step!(psi, terms, dt, normalization)
+    else
+        error("Unsupported Trotter order: $order")
+    end
+end
+
+function apply_trotter_adjoint_step!(
+    psi::AbstractVector{ComplexF64},
+    terms::Vector{CompactPauliTerm},
+    dt::Real,
+    normalization::Real,
+    order::Symbol
+)
+    if order == :first
+        return apply_first_order_trotter_adjoint_step!(psi, terms, dt, normalization)
+    elseif order == :second
+        return apply_second_order_trotter_adjoint_step!(psi, terms, dt, normalization)
+    else
+        error("Unsupported Trotter order: $order")
+    end
+end
+
+# In-place unitary drivers: evolve `psi` for `nsteps` steps over total `time`,
+# then apply the global phase. Mirror the allocating sparse
+# `apply_trotter_unitary`/`_adjoint` above but write into the caller's buffer.
+function apply_trotter_unitary!(
+    psi::AbstractVector{ComplexF64},
+    terms::Vector{CompactPauliTerm},
+    nsteps::Int,
+    normalization::Real,
+    order::Symbol;
+    time::Real=pi
+)
+    dt = time / nsteps
+    for _ in 1:nsteps
+        apply_trotter_step!(psi, terms, dt, normalization, order)
+    end
+    rmul!(psi, exp(-im * time / 2))
+    return psi
+end
+
+function apply_trotter_unitary_adjoint!(
+    psi::AbstractVector{ComplexF64},
+    terms::Vector{CompactPauliTerm},
+    nsteps::Int,
+    normalization::Real,
+    order::Symbol;
+    time::Real=pi
+)
+    dt = time / nsteps
+    for _ in 1:nsteps
+        apply_trotter_adjoint_step!(psi, terms, dt, normalization, order)
+    end
+    rmul!(psi, exp(im * time / 2))
+    return psi
 end
 
 function reference_first_order_trotter_unitary(
@@ -474,21 +630,34 @@ function trotter_energy_arnoldi(
     safe_step_time = safety.scale * step_time
     safety_phase_shift = safety.shift * time / (π * nsteps)
     safe_phase = exp(-im * safety_phase_shift)
-    terms = build_trotter_terms(ham, nqubits; term_ordering=term_ordering)
+    terms = build_compact_trotter_terms(ham, nqubits; term_ordering=term_ordering)
     n = 2^nqubits
     nvals = trotter_candidate_count(n; nev=nev)
     maxdim = trotter_krylov_dimension(n, nvals)
     mindim = min(maxdim, max(nvals, 2 * nvals))
     stateHF = construct_hf_state(nqubits, nelectrons)
-    C = LinearMap{ComplexF64}(
-        x -> safe_phase * apply_trotter_unitary(
-                 x, terms, 1, norm_info.normalization, order; time=safe_step_time
-             ) + conj(safe_phase) * apply_trotter_unitary_adjoint(
-                 x, terms, 1, norm_info.normalization, order; time=safe_step_time
-             ),
-        n;
-        ismutating=false
-    )
+
+    # Persistent buffers reused across every Arnoldi matvec: copy the Krylov
+    # view into contiguous storage, evolve in place with the compact backend,
+    # then combine into C*x = safe_phase·U·x + conj(safe_phase)·U'·x.
+    work_u = Vector{ComplexF64}(undef, n)
+    work_adj = similar(work_u)
+    function apply_C!(y, x)
+        copyto!(work_u, x)
+        copyto!(work_adj, x)
+        apply_trotter_unitary!(
+            work_u, terms, 1, norm_info.normalization, order; time=safe_step_time
+        )
+        apply_trotter_unitary_adjoint!(
+            work_adj, terms, 1, norm_info.normalization, order; time=safe_step_time
+        )
+        @inbounds @simd for i in eachindex(y)
+            y[i] = safe_phase * work_u[i] + conj(safe_phase) * work_adj[i]
+        end
+        return y
+    end
+    # C = e^{-iφ}U + e^{+iφ}U† is Hermitian, so declare it as a hint to the solver.
+    C = LinearMap{ComplexF64}(apply_C!, n; ismutating=true, ishermitian=true)
 
     schur, _ = partialschur(
         C;

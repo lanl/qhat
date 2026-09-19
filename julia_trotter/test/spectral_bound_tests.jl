@@ -514,6 +514,37 @@ end
     end
 end
 
+@testset "Compact vs sparse Trotter evolution" begin
+    # The compact in-place drivers used by the Arnoldi path must match the
+    # sparse allocating drivers term-for-term, independent of the eigensolver.
+    ham = Dict("II" => 0.0 + 0.0im, "XI" => 0.7 + 0.0im, "ZI" => -0.4 + 0.0im)
+    sparse_terms = build_trotter_terms(ham, 2)
+    compact_terms = build_compact_trotter_terms(ham, 2)
+    normalization = 2.5
+    total_time = 0.6
+    nsteps = 3
+    psi = ComplexF64[1, 2im, -1, 0.5]
+    psi /= norm(psi)
+
+    for order in (:first, :second)
+        expected_u = apply_trotter_unitary(
+            psi, sparse_terms, nsteps, normalization, order; time=total_time
+        )
+        got_u = apply_trotter_unitary!(
+            copy(psi), compact_terms, nsteps, normalization, order; time=total_time
+        )
+        @test got_u ≈ expected_u atol=1e-12
+
+        expected_adj = apply_trotter_unitary_adjoint(
+            psi, sparse_terms, nsteps, normalization, order; time=total_time
+        )
+        got_adj = apply_trotter_unitary_adjoint!(
+            copy(psi), compact_terms, nsteps, normalization, order; time=total_time
+        )
+        @test got_adj ≈ expected_adj atol=1e-12
+    end
+end
+
 @testset "Spectral ground energy" begin
     metadata = Dict(
         "number of qubits" => "2",
