@@ -652,12 +652,17 @@ function trotter_energy_arnoldi(
     function apply_C!(y, x)
         copyto!(work_u, x)
         copyto!(work_adj, x)
+        # The U and U' evolutions are independent (separate buffers) but each is
+        # a long sequential chain of rotations. Run them on two threads — one
+        # fork per matvec — instead of threading inside every rotation, where
+        # the per-call fork/join overhead outweighs the tiny per-rotation work.
+        adj_task = Threads.@spawn apply_trotter_unitary_adjoint!(
+            work_adj, terms, 1, norm_info.normalization, order; time=safe_step_time
+        )
         apply_trotter_unitary!(
             work_u, terms, 1, norm_info.normalization, order; time=safe_step_time
         )
-        apply_trotter_unitary_adjoint!(
-            work_adj, terms, 1, norm_info.normalization, order; time=safe_step_time
-        )
+        wait(adj_task)
         @inbounds @simd for i in eachindex(y)
             y[i] = safe_phase * work_u[i] + conj(safe_phase) * work_adj[i]
         end

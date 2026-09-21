@@ -7,7 +7,6 @@
 #   exp(-i*c*P*dt)|ψ⟩ = cos(c*dt)|ψ⟩ - i*sin(c*dt)*P|ψ⟩
 
 using LinearAlgebra, SparseArrays
-using Base.Threads
 
 """
     apply_pauli_rotation!(psi, P_sparse, coeff, dt)
@@ -221,7 +220,12 @@ end
 #
 # Bit-mask representation of a Pauli string that applies exp(-i c P dt) directly
 # to amplitude pairs of a dense state vector, without ever forming a 2^n x 2^n
-# sparse matrix. Threaded over independent amplitudes/pairs for large vectors.
+# sparse matrix.
+#
+# The kernels here are single-threaded: a single rotation touches only ~n
+# amplitudes, too little work to amortize a per-call thread fork/join. Threading
+# is better applied at a coarser grain by the caller (e.g. evolving U and U'
+# concurrently in the Arnoldi matvec).
 #
 # This backend coexists with the sparse-matrix routines above; the methods are
 # selected by dispatch on `CompactPauliTerm`.
@@ -244,9 +248,6 @@ struct CompactPauliTerm
     zmask::UInt64
     yphase::ComplexF64
 end
-
-# State vectors smaller than this run faster without thread startup overhead.
-const PAULI_THREAD_THRESHOLD = 1 << 15
 
 """
     compact_pauli_term(pauli, coeff; leftmost_is_msb=true)
@@ -321,7 +322,7 @@ Apply exp(-i * term.coeff * P * dt) to `psi` in place, without forming P.
 
 Diagonal (I/Z only) strings scale each amplitude independently. Off-diagonal
 strings pair each basis index j with k = j ⊻ xmask; each pair is touched exactly
-once, so different threads never write the same amplitude.
+once (so the update is safe to parallelize at a coarser grain if ever needed).
 """
 function apply_pauli_rotation!(
     psi::AbstractVector{ComplexF64},
@@ -333,20 +334,12 @@ function apply_pauli_rotation!(
     alpha = -im * sin(theta)
     n = length(psi)
 
-    # Diagonal case: only I and Z.
+    # Diagonal case: only I and Z, so each amplitude scales independently.
     if term.xmask == 0
-        if Threads.nthreads() > 1 && n >= PAULI_THREAD_THRESHOLD
-            Threads.@threads :static for idx in eachindex(psi)
-                basis = UInt64(idx - 1)
-                phase = compact_pauli_phase(term, basis)
-                @inbounds psi[idx] = (c + alpha * phase) * psi[idx]
-            end
-        else
-            @inbounds for idx in eachindex(psi)
-                basis = UInt64(idx - 1)
-                phase = compact_pauli_phase(term, basis)
-                psi[idx] = (c + alpha * phase) * psi[idx]
-            end
+        @inbounds for idx in eachindex(psi)
+            basis = UInt64(idx - 1)
+            phase = compact_pauli_phase(term, basis)
+            psi[idx] = (c + alpha * phase) * psi[idx]
         end
         return psi
     end
@@ -369,34 +362,17 @@ function apply_pauli_rotation!(
     # exp(-i c P dt) = cos·I - i sin·P and alpha = -i sin(cθ):
     #   psi[j] ← cos·psi[j] + alpha·conj(phase_j)·psi[k]
     #   psi[k] ← cos·psi[k] + alpha·phase_j·psi[j]
-    if Threads.nthreads() > 1 && n >= PAULI_THREAD_THRESHOLD
-        Threads.@threads :static for pair_index in 0:(npairs - 1)
-            counter = UInt64(pair_index)
-            j = (counter & below_pivot) | ((counter & ~below_pivot) << 1)
-            k = j ⊻ term.xmask
-            phase_j = compact_pauli_phase(term, j)
-            ji = Int(j) + 1
-            ki = Int(k) + 1
-            @inbounds begin
-                a = psi[ji]
-                b = psi[ki]
-                psi[ji] = c * a + alpha * conj(phase_j) * b
-                psi[ki] = c * b + alpha * phase_j * a
-            end
-        end
-    else
-        @inbounds for pair_index in 0:(npairs - 1)
-            counter = UInt64(pair_index)
-            j = (counter & below_pivot) | ((counter & ~below_pivot) << 1)
-            k = j ⊻ term.xmask
-            phase_j = compact_pauli_phase(term, j)
-            ji = Int(j) + 1
-            ki = Int(k) + 1
-            a = psi[ji]
-            b = psi[ki]
-            psi[ji] = c * a + alpha * conj(phase_j) * b
-            psi[ki] = c * b + alpha * phase_j * a
-        end
+    @inbounds for pair_index in 0:(npairs - 1)
+        counter = UInt64(pair_index)
+        j = (counter & below_pivot) | ((counter & ~below_pivot) << 1)
+        k = j ⊻ term.xmask
+        phase_j = compact_pauli_phase(term, j)
+        ji = Int(j) + 1
+        ki = Int(k) + 1
+        a = psi[ji]
+        b = psi[ki]
+        psi[ji] = c * a + alpha * conj(phase_j) * b
+        psi[ki] = c * b + alpha * phase_j * a
     end
 
     return psi
@@ -484,28 +460,18 @@ Add `coeff * P * psi` to `result` for a compact Pauli term.
 
 Each source amplitude `psi[basis]` contributes to `result[basis ⊻ xmask]`.
 `basis ↦ basis ⊻ xmask` is a bijection, so distinct iterations write distinct
-`result` slots — the threaded loop needs no locking.
+`result` slots (safe to parallelize at a coarser grain if ever needed).
 """
 function add_compact_pauli_action!(
     result::AbstractVector{ComplexF64},
     psi::AbstractVector{ComplexF64},
     term::CompactPauliTerm,
 )
-    n = length(psi)
-    if Threads.nthreads() > 1 && n >= PAULI_THREAD_THRESHOLD
-        Threads.@threads :static for idx in eachindex(psi)
-            basis = UInt64(idx - 1)
-            destination = basis ⊻ term.xmask
-            phase = compact_pauli_phase(term, basis)
-            @inbounds result[Int(destination) + 1] += term.coeff * phase * psi[idx]
-        end
-    else
-        @inbounds for idx in eachindex(psi)
-            basis = UInt64(idx - 1)
-            destination = basis ⊻ term.xmask
-            phase = compact_pauli_phase(term, basis)
-            result[Int(destination) + 1] += term.coeff * phase * psi[idx]
-        end
+    @inbounds for idx in eachindex(psi)
+        basis = UInt64(idx - 1)
+        destination = basis ⊻ term.xmask
+        phase = compact_pauli_phase(term, basis)
+        result[Int(destination) + 1] += term.coeff * phase * psi[idx]
     end
     return result
 end

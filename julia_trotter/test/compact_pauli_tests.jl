@@ -83,8 +83,8 @@ end
     end
 end
 
-@testset "Threaded path (>= 2^15 amplitudes)" begin
-    # 15-qubit string exercises the threaded branch (n = 2^15 = PAULI_THREAD_THRESHOLD).
+@testset "Large state vector (2^15 amplitudes)" begin
+    # 15-qubit string exercises the kernel on a large state vector.
     p = "XYZIXZYIXZYIXZY"  # 15 chars
     @test length(p) == 15
     coeff = 0.53
