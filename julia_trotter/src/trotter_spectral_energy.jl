@@ -671,15 +671,25 @@ function trotter_energy_arnoldi(
     # C = e^{-iφ}U + e^{+iφ}U† is Hermitian, so declare it as a hint to the solver.
     C = LinearMap{ComplexF64}(apply_C!, n; ismutating=true, ishermitian=true)
 
-    schur, history = partialschur(
-        C;
-        v1=stateHF,
-        nev=nvals,
-        which=:LR,
-        mindim=mindim,
-        maxdim=maxdim,
-        tol=solver_tolerance
-    )
+    # BLAS multithreads the tiny (maxdim-sized) dense Krylov operations by
+    # default. That is pure overhead here and oversubscribes the CPU against the
+    # two threads running U ‖ U' in apply_C!. Pin BLAS to one thread for the
+    # solve and restore the caller's setting afterward.
+    blas_threads = BLAS.get_num_threads()
+    BLAS.set_num_threads(1)
+    schur, history = try
+        partialschur(
+            C;
+            v1=stateHF,
+            nev=nvals,
+            which=:LR,
+            mindim=mindim,
+            maxdim=maxdim,
+            tol=solver_tolerance
+        )
+    finally
+        BLAS.set_num_threads(blas_threads)
+    end
     # A non-converged solve silently returns whatever Krylov vectors it has, so
     # surface it rather than reporting a possibly-inaccurate energy as final.
     history.converged || @warn(
