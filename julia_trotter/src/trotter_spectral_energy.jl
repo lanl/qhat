@@ -27,7 +27,14 @@ function trotter_candidate_count(n::Int; nev::Int=TROTTER_SPECTRAL_DEFAULT_NEV)
 end
 
 function trotter_krylov_dimension(n::Int, nev::Int)
-    return min(40, max(nev + 2, min(n - 1, 2 * nev + 1)))
+    # At short evolution times the U + U' spectrum is near-degenerate, so the
+    # Arnoldi solver needs a generous Krylov subspace to separate the extreme
+    # eigenvalues. A subspace only slightly larger than nev stalls: partialschur
+    # burns its full restart budget without converging. A target of ~4*nev
+    # (floor 16) converges reliably in far fewer matrix-vector products. The
+    # clamp keeps maxdim > nev and, for tiny matrices, bounded by n.
+    target = max(16, 4 * nev)
+    return clamp(target, nev + 2, max(nev + 2, n))
 end
 
 function trotter_single_step_time(time::Real, nsteps::Int)
@@ -659,7 +666,7 @@ function trotter_energy_arnoldi(
     # C = e^{-iφ}U + e^{+iφ}U† is Hermitian, so declare it as a hint to the solver.
     C = LinearMap{ComplexF64}(apply_C!, n; ismutating=true, ishermitian=true)
 
-    schur, _ = partialschur(
+    schur, history = partialschur(
         C;
         v1=stateHF,
         nev=nvals,
@@ -667,6 +674,13 @@ function trotter_energy_arnoldi(
         mindim=mindim,
         maxdim=maxdim,
         tol=solver_tolerance
+    )
+    # A non-converged solve silently returns whatever Krylov vectors it has, so
+    # surface it rather than reporting a possibly-inaccurate energy as final.
+    history.converged || @warn(
+        "Arnoldi eigensolver did not converge; Trotter energy may be inaccurate",
+        nsteps, order, nconverged=history.nconverged, nev=nvals,
+        tol=solver_tolerance,
     )
     energies = safe_cosine_value_to_energy.(
         real.(diag(schur.R)),
