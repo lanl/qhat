@@ -27,6 +27,31 @@ dependencies = [
     "numba>=0.56.0",  # JIT compilation for jkg_utils_fast.py
 ]
 
+[project.optional-dependencies]
+# Backend optional dependencies
+# Qualtran backend is included in base dependencies (via pyLIQTR)
+# Install additional backends with: pip install qhat[backend-pennylane]
+backend-pennylane = [
+    "pennylane>=0.35.0",
+    "pennylane-lightning>=0.35.0",
+]
+backend-qiskit = [
+    "qiskit>=1.0.0",
+    "qiskit-aer>=0.13.0",
+]
+# Install all backends at once
+backends-all = [
+    "pennylane>=0.35.0",
+    "pennylane-lightning>=0.35.0",
+    "qiskit>=1.0.0",
+    "qiskit-aer>=0.13.0",
+]
+# Development dependencies
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
 [tool.setuptools]
-packages = ["qhat", "qhat.analysis", "qhat.common", "qhat.hamiltonian_generator"]
-package-dir = {"qhat" = ".", "qhat.analysis" = "analysis", "qhat.common" = "common", "qhat.hamiltonian_generator" = "hamiltonian_generator"}
+packages = ["qhat", "qhat.analysis", "qhat.analysis.backend", "qhat.common", "qhat.hamiltonian_generator"]
+package-dir = {"qhat" = ".", "qhat.analysis" = "analysis", "qhat.analysis.backend" = "analysis/backend", "qhat.common" = "common", "qhat.hamiltonian_generator" = "hamiltonian_generator"}

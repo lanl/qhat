@@ -115,6 +115,38 @@ class HamiltonianConfiguration(ConfigurationBase):
 
 # -------------------------------------------------------------------------------------------------
 
+class BackendConfiguration(ConfigurationBase):
+    """Configuration for backend selection.
+
+    This determines which quantum computing framework (Qualtran, PennyLane, Qiskit)
+    will be used to implement quantum operations.
+    """
+    def __init__(self):
+        self.name = "qualtran"  # Default to existing behavior
+        self.options = {}  # Backend-specific options
+
+    def set_backend(self, name: str, **options):
+        """Set backend and options.
+
+        Args:
+            name: Backend identifier ('qualtran', 'pennylane', 'qiskit')
+            **options: Backend-specific configuration
+        """
+        self.name = name
+        self.options = options
+
+    def _generate_TOML_table(self):
+        table = tomlkit.table()
+        table["name"] = self.name
+        if self.options:
+            options_table = tomlkit.table()
+            for key, value in self.options.items():
+                options_table[key] = value
+            table["options"] = options_table
+        return table
+
+# -------------------------------------------------------------------------------------------------
+
 class UnitaryConfiguration(ConfigurationBase):
     def __init__(self):
         self.method = None

@@ -178,21 +178,73 @@ def build_controlled_time_evolution(
 def build_algorithm(
         config_algorithm: AlgorithmConfiguration,
         unitary,
-        P0):
+        P0,
+        backend=None):
+    """Build quantum algorithm using specified backend.
+
+    Args:
+        config_algorithm: Algorithm configuration
+        unitary: Unitary operator to analyze (from encode_as_unitary)
+        P0: Initial number of phase qubits
+        backend: Backend instance (if None, infer from unitary)
+
+    Returns:
+        Algorithm unitary (backend-specific wrapper)
+    """
 
     logger.info("Beginning to construct quantum algorithm.")
 
-    if config_algorithm.method.lower() in ("qpe: qualtran textbook",):
-        return build_qpe_qualtran_textbook(config_algorithm, unitary, P0)
-    elif config_algorithm.method.lower() in ("qpe: qualtran qubitization",):
-        # TODO: This may be more specialized (for LCU only?), but I'm not yet sure of the details.
-        return build_qpe_qualtran_qubitized(config_algorithm, unitary)
-    elif config_algorithm.method.lower() in ("qpe: pyliqtr qubitized",):
-        return build_qpe_pyliqtr_qubitized(config_algorithm, unitary)
-    elif config_algorithm.method.lower() in ("time evolution",):
+    # Get backend from unitary if not provided
+    if backend is None:
+        # Try to infer backend from unitary object
+        if hasattr(unitary, 'backend_name'):
+            from qhat.analysis.backend import get_backend
+            backend = get_backend(unitary.backend_name)
+            logger.info(f"Inferred backend from unitary: {backend.name}")
+        else:
+            # Fall back to Qualtran (for backward compatibility with Bloq objects)
+            from qhat.analysis.backend import get_backend
+            backend = get_backend("qualtran")
+            logger.info("Using default Qualtran backend")
+
+    # Simplify method names
+    method = config_algorithm.method.lower()
+
+    # Textbook QPE
+    if "textbook" in method or method in ("qpe: qualtran textbook",):
+        if backend.name == "qualtran":
+            # Use existing Qualtran-specific implementation
+            return build_qpe_qualtran_textbook(config_algorithm, unitary, P0)
+        else:
+            # Use backend's build_textbook_qpe
+            return backend.build_textbook_qpe(
+                unitary=unitary,
+                num_phase_qubits=config_algorithm.num_phase_qubits or P0
+            )
+
+    # Qubitized QPE
+    elif "qubitization" in method or method in ("qpe: qualtran qubitization", "qpe: pyliqtr qubitized"):
+        if backend.name == "qualtran":
+            # Use existing Qualtran-specific implementations
+            if method == "qpe: pyliqtr qubitized":
+                return build_qpe_pyliqtr_qubitized(config_algorithm, unitary)
+            else:
+                return build_qpe_qualtran_qubitized(config_algorithm, unitary)
+        else:
+            # Use backend's build_qubitized_qpe
+            return backend.build_qubitized_qpe(
+                block_encoding=unitary,
+                num_phase_qubits=config_algorithm.num_phase_qubits
+            )
+
+    # Time evolution (no QPE)
+    elif method in ("time evolution",):
         return build_time_evolution(config_algorithm, unitary)
-    elif config_algorithm.method.lower() in ("controlled time evolution",):
+
+    # Controlled time evolution
+    elif method in ("controlled time evolution",):
         return build_controlled_time_evolution(config_algorithm, unitary)
+
     else:
         raise ValueError(f"Invalid algorithm method \"{config_algorithm.method}\".")
 

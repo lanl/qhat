@@ -1,0 +1,23 @@
+[
+  {
+    "test_name": "unitarity",
+    "data": {
+      "unitarity_errors": {},
+      "passed": true
+    }
+  },
+  {
+    "test_name": "controlled_operations",
+    "data": {
+      "controlled_results": {},
+      "passed": true
+    }
+  },
+  {
+    "test_name": "adjoint_operations",
+    "data": {
+      "adjoint_results": {},
+      "passed": true
+    }
+  }
+]

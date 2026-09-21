@@ -363,16 +363,62 @@ def encode_ramped_trotter(
 def encode_as_unitary(
         config_unitary: UnitaryConfiguration,
         hamiltonian,
-        tevol_hbar):
+        tevol_hbar,
+        backend=None):
+    """Encode Hamiltonian as unitary operator using specified backend.
+
+    Args:
+        config_unitary: Configuration specifying encoding method and parameters
+        hamiltonian: Hamiltonian to encode
+        tevol_hbar: Time evolution parameter
+        backend: Backend instance (if None, will be loaded based on config)
+
+    Returns:
+        Unitary operator (backend-specific wrapper)
+    """
 
     logger.info("Beginning to encode the Hamiltonian as a unitary.")
 
-    if config_unitary.method.lower() in ("double factorization", "double-factorization"):
-        return encode_double_factorization(config_unitary, hamiltonian)
+    # Get backend if not provided
+    if backend is None:
+        from qhat.analysis.backend import get_backend
+        # Check if backend is specified in config_unitary or use default
+        backend_name = getattr(config_unitary, 'backend_name', 'qualtran')
+        backend_options = getattr(config_unitary, 'backend_options', {})
+        logger.info(f"Loading backend: {backend_name}")
+        backend = get_backend(backend_name, **backend_options)
+
+    # Dispatch based on encoding method
+    if config_unitary.method.lower() in ("ramped trotter"):
+        return _encode_ramped_trotter_via_backend(
+            backend, config_unitary, hamiltonian, tevol_hbar)
+
     elif config_unitary.method.lower() in ("pauli lcu", "pauli-lcu", "paulilcu",):
-        return encode_pauli_lcu(config_unitary, hamiltonian)
+        return _encode_pauli_lcu_via_backend(
+            backend, config_unitary, hamiltonian)
+
+    elif config_unitary.method.lower() in ("double factorization", "double-factorization"):
+        # Double factorization currently only supported by Qualtran
+        if backend.name != "qualtran":
+            logger.warning(
+                f"Double factorization requested but backend is {backend.name}. "
+                f"Falling back to Qualtran backend for this operation."
+            )
+            from qhat.analysis.backend import get_backend
+            backend = get_backend("qualtran")
+        return encode_double_factorization(config_unitary, hamiltonian)
+
     elif config_unitary.method.lower() in ("linear t", "linear-t", "lineart",):
+        # Linear T currently only supported by Qualtran
+        if backend.name != "qualtran":
+            logger.warning(
+                f"Linear T requested but backend is {backend.name}. "
+                f"Falling back to Qualtran backend for this operation."
+            )
+            from qhat.analysis.backend import get_backend
+            backend = get_backend("qualtran")
         return encode_linear_t(config_unitary, hamiltonian)
+
     elif config_unitary.method.lower() in ("first quantization",):
         # TODO: This will be important for Marian's team.  Something is available in pyLIQTR, but
         #       I've not yet looked to see how it works.
@@ -381,7 +427,92 @@ def encode_as_unitary(
         #          Hamiltonian, and then any Hamiltonian will be eligible for encoding to
         #          unitaries.  But I've not confirmed this.
         raise NotImplementedError()
-    elif config_unitary.method.lower() in ("ramped trotter"):
-        return encode_ramped_trotter(config_unitary, hamiltonian, tevol_hbar)
+
     else:
         raise ValueError(f"Invalid unitary encoding method \"{config_unitary.method}\".")
+
+
+def _encode_ramped_trotter_via_backend(backend, config_unitary, hamiltonian, tevol_hbar):
+    """Encode Hamiltonian using Trotterization via backend."""
+    logger.verbose(f"Encoding Hamiltonian via {backend.name} backend using Trotterization.")
+
+    # Get Pauli strings
+    pauli_strings = hamiltonian.get_all_pauli_strings(return_as="tuples")
+
+    # Reorder if requested
+    if config_unitary.ordering_method:
+        from qhat.analysis.ordering import reorder_paulis
+        pauli_strings = reorder_paulis(pauli_strings, config_unitary.ordering_method)
+
+    # For Qualtran backend, use the existing encode_ramped_trotter function
+    # which has all the sophisticated logic for step calculation, etc.
+    if backend.name == "qualtran":
+        return encode_ramped_trotter(config_unitary, hamiltonian, tevol_hbar)
+
+    # For other backends, we need to handle step calculation ourselves
+    # Get trotter_order and trotter_steps
+    trotter_order = config_unitary.trotter_order
+    trotter_steps = config_unitary.trotter_steps
+
+    # If steps not provided, calculate them (simplified version)
+    if trotter_steps is None:
+        # Simplified calculation - real version is in encode_ramped_trotter
+        from qhat.analysis.trotter_coefficients_fast import trotter_error_estimator_fast
+
+        error_coeff_mode = getattr(config_unitary, 'error_coeff_mode', 'monte_carlo')
+        error_coeff_auto_exact = getattr(config_unitary, 'error_coeff_auto_exact', False)
+        error_coeff_time_limit = getattr(config_unitary, 'error_coeff_time_limit', 60)
+
+        c1, c2 = trotter_error_estimator_fast(
+            hamiltonian.get_grouped_terms(),
+            error_coeff_time_limit,
+            mode=error_coeff_mode,
+            auto_exact=error_coeff_auto_exact
+        )
+
+        if trotter_order is None or trotter_order.lower() == "second order":
+            trotter_order = "second order"
+            s2 = tevol_hbar * math.sqrt(config_unitary.error_scale * c2 / config_unitary.energy_error)
+            trotter_steps = max(1, math.ceil(s2))
+        elif trotter_order.lower() == "first order":
+            s1 = tevol_hbar * config_unitary.error_scale * c1 / config_unitary.energy_error
+            trotter_steps = max(1, math.ceil(s1))
+        else:
+            raise ValueError(
+                f"When using non-Qualtran backend with auto step calculation, "
+                f"only 'first order' and 'second order' are supported. Got: {trotter_order}"
+            )
+
+        logger.info(f"-- Calculated {trotter_steps} Trotter steps for {trotter_order}")
+
+    # Call backend's encode_pauli_trotter
+    return backend.encode_pauli_trotter(
+        pauli_strings=pauli_strings,
+        trotter_order=trotter_order,
+        evolution_time=tevol_hbar,
+        num_steps=trotter_steps,
+        num_qubits=hamiltonian.num_qubits(),
+        trotter_implementation=getattr(config_unitary, 'trotter_implementation', 'flattened'),
+        combine_terms=getattr(config_unitary, 'trotter_combine_terms', True),
+        tensor_contraction_method=getattr(config_unitary, 'tensor_contraction_method', None),
+    )
+
+
+def _encode_pauli_lcu_via_backend(backend, config_unitary, hamiltonian):
+    """Encode Hamiltonian using LCU via backend."""
+    logger.verbose(f"Encoding Hamiltonian via {backend.name} backend using LCU.")
+
+    # For Qualtran backend, use existing implementation
+    if backend.name == "qualtran":
+        return encode_pauli_lcu(config_unitary, hamiltonian)
+
+    # Get Pauli strings
+    pauli_strings = hamiltonian.get_all_pauli_strings(return_as="tuples")
+
+    # Call backend's encode_pauli_lcu
+    return backend.encode_pauli_lcu(
+        pauli_strings=pauli_strings,
+        num_qubits=hamiltonian.num_qubits(),
+        prepare_type='AS',
+        probability_eps=0.002
+    )
