@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 class PauliStringLCU(LCUBlockEncoding):
 
-    def __init__(self, hamiltonian, prepare_type=None, energy_error=0.001, **kwargs):
+    def __init__(self, hamiltonian, prepare_type=None, energy_error=None, **kwargs):
 
         pauli_terms = [cirq.DensePauliString(term[0],coefficient=term[1])
                           for term in hamiltonian.get_all_pauli_strings(return_as='strings').items()
@@ -101,7 +101,7 @@ class PauliStringLCU(LCUBlockEncoding):
 # wrapper to add bugfixes to PyLIQTR's class
 class PyLIQTRPauliStringLCU(PyLIQTRPauliStringLCU_orig):
     # use energy_error to determine probability_eps
-    def __init__(self,ProblemInstance, prepare_type=None, energy_error=0.001, **kwargs):
+    def __init__(self,ProblemInstance, prepare_type=None, energy_error=None, **kwargs):
         alpha = ProblemInstance.get_alpha()
         n_terms = ProblemInstance.n_terms(VALID_ENCODINGS.PauliLCU)
         eps = energy_error / (2 * np.sqrt(2) * alpha * n_terms)
