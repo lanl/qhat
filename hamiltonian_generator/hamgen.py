@@ -441,11 +441,8 @@ def get_ham2(state):
             f"Trying to load \"{state.filename_ham1()}\"."]))
         # Get ham1_HartreeFock (by loading or by recomputing, depending on data availability)
         ham1_HartreeFock = get_ham1(state)
-        # Recompute ham2_ActiveSpace from ham1_HartreeFock
-        state.log("Apply active space.")
-        ham2_ActiveSpace = apply_active_space(state, ham1_HartreeFock)
 
-        # Apply symmetry reduction if requested
+        # Apply symmetry reduction BEFORE active space selection (if requested)
         if state.config_hamiltonian.apply_symmetry_reduction:
             if state.point_group is None or state.mo_irreps is None:
                 state.log("Warning: symmetry reduction requested but no symmetry data available")
@@ -453,33 +450,35 @@ def get_ham2(state):
             else:
                 state.log(f"Applying SymUCCSD symmetry reduction (point group: {state.point_group})")
 
-                # Get number of occupied spatial orbitals in active space
-                num_occupied_spatial = ham2_ActiveSpace.asmeta['n_act_occ_so'] // 2
+                # Get the number of occupied spatial orbitals in the full molecule
+                num_occupied_spatial = ham1_HartreeFock.n_electrons // 2
 
-                # Filter the Hamiltonian tensors
+                # Get the full molecular integrals before active space selection
+                one_body_full = ham1_HartreeFock.one_body_integrals
+                two_body_full = ham1_HartreeFock.two_body_integrals
+                nuclear_repulsion = ham1_HartreeFock.nuclear_repulsion
+
+                # Apply symmetry filtering to the full integrals
                 f_const, f_one, f_two = filter_hamiltonian_tensors(
-                    ham2_ActiveSpace.constant,
-                    ham2_ActiveSpace.one_body_tensor,
-                    ham2_ActiveSpace.two_body_tensor,
+                    nuclear_repulsion,
+                    one_body_full,
+                    two_body_full,
                     state.mo_irreps,
                     state.point_group,
                     num_occupied_spatial
                 )
 
-                # Create new InteractionOperator with filtered tensors
-                ham2_ActiveSpace = InteractionOperator(f_const, f_one, f_two)
+                # Replace the integrals in ham1_HartreeFock with filtered versions
+                # This way, when apply_active_space() is called, it will use the filtered integrals
+                # Note: one_body_integrals and two_body_integrals are properties,
+                # but we can set the underlying private attributes directly
+                ham1_HartreeFock._one_body_integrals = f_one
+                ham1_HartreeFock._two_body_integrals = f_two
+                # Note: nuclear_repulsion is handled via f_const and doesn't need to be changed here
 
-                # Restore metadata (InteractionOperator doesn't preserve custom attributes)
-                ham2_ActiveSpace.hf_energy = ham1_HartreeFock.hf_energy
-                ham2_ActiveSpace.asmeta = ham1_HartreeFock._pyscf_data['scf'].__dict__.get('asmeta', {})
-                # Get asmeta from the original ham2 before reconstruction
-                # We need to preserve this from apply_active_space
-                idx_act_occ, idx_frz_vac, asmeta = define_active_orbitals(state, ham1_HartreeFock)
-                ham2_ActiveSpace.asmeta = asmeta
-                ham2_ActiveSpace.basis = ham1_HartreeFock.basis
-                ham2_ActiveSpace.separation = ham1_HartreeFock.separation
-                ham2_ActiveSpace.hf_time = ham1_HartreeFock.hf_time
-                ham2_ActiveSpace.as_time = 0.0  # Will be updated
+        # Recompute ham2_ActiveSpace from ham1_HartreeFock (with filtered integrals if symmetry enabled)
+        state.log("Apply active space.")
+        ham2_ActiveSpace = apply_active_space(state, ham1_HartreeFock)
 
         ham2_output_path = state.config_general.get_output_path(ham2_filename)
         state.log(f"Pickle to \"{ham2_output_path}\" file.")

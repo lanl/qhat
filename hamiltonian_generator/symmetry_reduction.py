@@ -243,8 +243,13 @@ def get_reference_irrep(occupied_mo_irreps: List[str], point_group: str) -> str:
     The reference state is a Slater determinant of occupied orbitals.
     Its irrep is the direct product of all occupied orbital irreps.
 
+    IMPORTANT: For closed-shell systems, each spatial orbital is occupied by
+    TWO electrons (spin-up and spin-down). Since the irrep is the same for both
+    spins, we multiply each spatial orbital's irrep twice (irrep ⊗ irrep).
+    For Abelian groups, irrep ⊗ irrep = totally symmetric irrep.
+
     Args:
-        occupied_mo_irreps: List of irrep names for occupied MOs
+        occupied_mo_irreps: List of irrep names for occupied SPATIAL MOs
         point_group: Point group name
 
     Returns:
@@ -253,14 +258,19 @@ def get_reference_irrep(occupied_mo_irreps: List[str], point_group: str) -> str:
     if not occupied_mo_irreps:
         raise ValueError("No occupied orbitals provided")
 
-    # Start with the first irrep
+    # Start with the first irrep (which will be doubled for closed-shell)
     result = occupied_mo_irreps[0]
 
-    # Multiply with each subsequent occupied orbital irrep
+    # For closed-shell: multiply each spatial orbital's irrep TWICE
+    # (once for spin-up, once for spin-down)
+    result = PointGroupTables.multiply(point_group, result, occupied_mo_irreps[0])
+
+    # Multiply with each subsequent occupied orbital irrep (doubled)
     for irrep in occupied_mo_irreps[1:]:
         result = PointGroupTables.multiply(point_group, result, irrep)
+        result = PointGroupTables.multiply(point_group, result, irrep)
 
-    logger.debug(f"Reference state irrep: {result} (from {occupied_mo_irreps})")
+    logger.debug(f"Reference state irrep: {result} (from {occupied_mo_irreps}, closed-shell)")
     return result
 
 
@@ -338,6 +348,8 @@ def filter_hamiltonian_tensors(
 
     logger.info(f"Reference state irrep: {ref_irrep}")
     logger.info(f"Filtering Hamiltonian with {point_group} symmetry")
+    logger.debug(f"MO irreps: {irrep_names}")
+    logger.debug(f"Num occupied: {num_occupied}, occupied irreps: {occupied_irreps}")
 
     # Constant term always preserved
     filtered_constant = constant
@@ -359,8 +371,10 @@ def filter_hamiltonian_tensors(
                 exc_irrep = get_excitation_irrep(irrep_names, point_group, i=q, a=p)
                 if exc_irrep == ref_irrep:
                     one_body_kept += 1
+                    logger.debug(f"h[{p},{q}]: {irrep_names[q]}→{irrep_names[p]} gives {exc_irrep} == {ref_irrep} ✓ KEEP")
                 else:
                     filtered_one_body[p, q] = 0.0
+                    logger.debug(f"h[{p},{q}]: {irrep_names[q]}→{irrep_names[p]} gives {exc_irrep} != {ref_irrep} ✗ ZERO")
             except Exception as e:
                 logger.debug(f"Could not determine irrep for h[{p},{q}]: {e}")
                 # Keep term if we can't determine (conservative)
