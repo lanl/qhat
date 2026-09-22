@@ -33,7 +33,8 @@ def test_pauli_string_lcu1():
     H_matrix = H.to_matrix(memory_threshold_gb=1.0)
 
     # Create unitary operator and convert to matrix
-    unitaryop = PauliStringLCU(H, 'AS', probability_eps=0.5)
+    # energy error = 5.0 => probability_eps ~= 0.44
+    unitaryop = PauliStringLCU(H, 'AS', energy_error=5.0)
     unitarymx = unitaryop.tensor_contract()
 
     # Verify that the upper corner of our unitary is equal to the
@@ -59,7 +60,8 @@ def test_pauli_string_lcu2():
     H_matrix = H.to_matrix(memory_threshold_gb=1.0)
 
     # Create unitary operator and convert to matrix
-    unitaryop = PauliStringLCU(H, 'AS', probability_eps=0.1)
+    # energy error = 5.0 => probability_eps ~= 0.10
+    unitaryop = PauliStringLCU(H, 'AS', energy_error=5.0)
     unitarymx = unitaryop.tensor_contract()
 
     # Verify that the upper corner of our unitary is equal to the
@@ -78,7 +80,7 @@ class PauliStringInstance(Hamiltonian, ProblemInstance):
     def __str__(self):
         return str(self.get_all_pauli_strings(return_as='strings'))
 
-    def n_terms(self, **kwargs):
+    def n_terms(self, encoding, **kwargs):
         return len(self.get_all_pauli_strings())
 
     def n_qubits(self):
@@ -107,7 +109,8 @@ def test_pauli_string_lcu_pyliqtr1():
     H_matrix = inst.to_matrix(memory_threshold_gb=1.0)
 
     # Create unitary operator and convert to matrix
-    unitaryop = PyLIQTRPauliStringLCU(inst, 'AS', probability_eps=0.5)
+    # energy error = 5.0 => probability_eps ~= 0.44
+    unitaryop = PyLIQTRPauliStringLCU(inst, 'AS', energy_error=5.0)
     unitarymx = unitaryop.tensor_contract()
 
     # Verify that the upper corner of our unitary is equal to the
@@ -132,7 +135,8 @@ def test_pauli_string_lcu_pyliqtr2():
     H_matrix = inst.to_matrix(memory_threshold_gb=1.0)
 
     # Create unitary operator and convert to matrix
-    unitaryop = PyLIQTRPauliStringLCU(inst, 'AS', probability_eps=0.1)
+    # energy error = 5.0 => probability_eps ~= 0.10
+    unitaryop = PyLIQTRPauliStringLCU(inst, 'AS', energy_error=5.0)
     unitarymx = unitaryop.tensor_contract()
 
     # Verify that the upper corner of our unitary is equal to the
