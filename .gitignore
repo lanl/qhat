@@ -10,3 +10,5 @@ qhat.egg-info
 *~
 .*.sw?
 julia_trotter/sandbox
+julia_trotter/CLAUDE.md
+julia_trotter/REPORT.md

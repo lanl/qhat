@@ -1,6 +1,7 @@
 module SpectralBoundTests
 
 using LinearAlgebra
+using Random
 using SparseArrays
 using Test
 
@@ -631,6 +632,52 @@ end
             )
             @test energy ≈ expected atol=2e-10
         end
+    end
+end
+
+@testset "Arnoldi safe-normalization energy is RNG-independent" begin
+    # Regression guard for a nondeterminism bug: `hermitian_opnorm` used to seed
+    # ArnoldiMethod's Krylov start vector from the global RNG, so the certified
+    # commutator bound — and hence the safe-normalized Trotter energy — jittered
+    # between fresh processes. A fresh process differs from ours only in its RNG
+    # state, which we reproduce here by scrambling the global RNG between calls.
+    #
+    # The Hamiltonian must be large enough that the commutator matrices exceed
+    # the 64-dim dense-solve cutoff in `hermitian_opnorm`; only above it does the
+    # iterative (formerly RNG-seeded) branch run. Seven qubits gives 2^7 = 128.
+    metadata = Dict(
+        "number of qubits" => "7",
+        "number of active, occupied, single-occupancy orbitals" => "2",
+        "one-norm of sum of Pauli strings" => "2.4",
+    )
+    ham = Dict{String,ComplexF64}(
+        "IIIIIII" => 0.0, "XIIIIII" => 0.9, "ZIIIIII" => 0.6,
+        "IXIIIII" => 0.4, "IZIIIII" => 0.3, "IIXIIII" => 0.2,
+        "IIIXZII" => 0.15,
+    )
+    normalization = normalize_hamiltonian(metadata, ham).normalization
+
+    reference_energy() = trotter_energy(
+        metadata, ham, 3;
+        method=:arnoldi, order=:second, time=π, nev=4,
+        safe_normalization=true,
+    )
+    reference_bound() = only(commutator_error_bounds(
+        ham, normalization, 7; nsteps_list=[3], time=π,
+    )[1])
+
+    baseline_energy = reference_energy()
+    baseline_bound = reference_bound()
+
+    # Adversarial seeds spanning the RNG state space; each mimics a distinct
+    # fresh instantiation. The fix makes both the bound and the energy exactly
+    # reproducible (not merely close), so assert bitwise equality — any residual
+    # RNG dependence would perturb the low-order bits and fail this.
+    for seed in (0, 1, 2, 999, typemax(Int))
+        Random.seed!(seed)
+        rand(1000)
+        @test reference_bound() == baseline_bound
+        @test reference_energy() == baseline_energy
     end
 end
 

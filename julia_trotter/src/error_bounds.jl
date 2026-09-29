@@ -5,7 +5,7 @@
 # Phys. Rev. X 11, 011020 (2021).
 
 using ArnoldiMethod
-using LinearAlgebra, SparseArrays
+using LinearAlgebra, SparseArrays, Random
 
 if !isdefined(@__MODULE__, :ordered_hamiltonian_terms)
     include("hamiltonian_utils.jl")
@@ -185,7 +185,13 @@ function hermitian_opnorm(A::SparseMatrixCSC{ComplexF64, Int}; scale::Float64 = 
     # `maxdim`.  Letting the Krylov space span a small matrix keeps that
     # invariant and is also exact for the small systems used in validation.
     maxdim = min(40, n)
-    vals, _ = partialschur(H; nev=1, which=:LM, maxdim=maxdim)
+    # Without an explicit `v1`, ArnoldiMethod seeds its starting vector from the
+    # global RNG, so the returned norm — and hence the certified Trotter bound —
+    # jitters run to run. Seed a fixed random start vector: reproducible, while
+    # keeping the generic overlap with the extremal eigenvector that a constant
+    # vector could lose by symmetry against these degenerate commutator matrices.
+    v1 = randn(MersenneTwister(0), ComplexF64, n)
+    vals, _ = partialschur(H; v1=v1, nev=1, which=:LM, maxdim=maxdim)
     return abs(real(vals.R[1])) / scale
 end
 

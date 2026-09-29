@@ -9,6 +9,11 @@
 #
 # Options:
 #
+#   --nsteps=N or --nsteps=N1,N2,...
+#       Trotter step counts to evaluate. The default is a single step (1).
+#       Give a comma-separated list of positive integers to sweep several step
+#       counts; each produces one row in the printed table.
+#
 #   --arnoldi
 #       Use the matrix-free Arnoldi eigensolver. The default is Arpack, which
 #       constructs the full Trotter unitary. Arnoldi applies the unitary and
@@ -67,8 +72,8 @@
 #       compilation time.
 #
 # If no Hamiltonian file is given, DEFAULT_FILE below is used. The script
-# reports Trotter energies for the selected formula and the step counts in
-# DEFAULT_NSTEPS.
+# reports Trotter energies for the selected formula and the step counts given
+# by --nsteps (a single step by default).
 # =============================================================================
 
 using Printf
@@ -77,7 +82,7 @@ include("src/parser.jl")
 include("src/trotter_spectral_energy.jl")
 
 const DEFAULT_FILE = "He-He/He-He_2.40_hgbs-5_as-004-004_jw.dat"
-const DEFAULT_NSTEPS = [1, 5, 10]
+const DEFAULT_NSTEPS = [1]
 const TOTAL_TIME = π
 
 function parse_boolean_option(value::AbstractString, option::AbstractString)
@@ -104,6 +109,21 @@ function parse_term_ordering(value::AbstractString)
     error("Unknown term order '$value'")
 end
 
+function parse_nsteps(value::AbstractString)
+    entries = split(value, ',')
+    steps = Int[]
+    for entry in entries
+        trimmed = strip(entry)
+        isempty(trimmed) && continue
+        n = tryparse(Int, trimmed)
+        (n === nothing || n < 1) &&
+            error("--nsteps must be positive integers; got '$entry'")
+        push!(steps, n)
+    end
+    isempty(steps) && error("--nsteps requires at least one value")
+    return steps
+end
+
 function parse_trotter_order(value::AbstractString)
     normalized = lowercase(value)
     normalized in ("first", "1") && return :first
@@ -117,11 +137,14 @@ function parse_cli(args)
     term_ordering = :magnitude
     safe_normalization = true
     benchmark = false
+    nsteps = DEFAULT_NSTEPS
     filepath = DEFAULT_FILE
 
     for arg in args
         if arg == "--arnoldi"
             use_arnoldi = true
+        elseif startswith(arg, "--nsteps=")
+            nsteps = parse_nsteps(split(arg, '='; limit=2)[2])
         elseif startswith(arg, "--trotter-order=")
             trotter_order = parse_trotter_order(split(arg, '='; limit=2)[2])
         elseif startswith(arg, "--term-order=")
@@ -152,11 +175,37 @@ function parse_cli(args)
         term_ordering=term_ordering,
         safe_normalization=safe_normalization,
         benchmark=benchmark,
+        nsteps=nsteps,
     )
 end
 
 function metadata_ground_energy(meta::Dict{String,String})
     return parse(Float64, meta["smallest eigenvalue"])
+end
+
+"""
+Print an aligned, comma-separated table. `columns` is a vector of header strings
+and `rows` is a vector of string vectors (one per row, same length as
+`columns`). Fields are comma-separated (so the output stays machine-parseable)
+and space-padded to a common width per column; numeric-looking cells are
+right-aligned, the rest left-aligned. Split lines on `,` and strip whitespace to
+parse.
+"""
+function print_aligned_csv(columns::Vector{String}, rows::Vector{Vector{String}})
+    ncols = length(columns)
+    # A trailing comma follows every field except the last, so include it in the
+    # width so the value columns still line up.
+    cell(c, s) = c == ncols ? s : s * ","
+    widths = [maximum(length, [cell(c, columns[c]); [cell(c, row[c]) for row in rows]]) for c in 1:ncols]
+    right_align = [all(row -> occursin(r"^[-+]?[\d.eE]+$", row[c]), rows) for c in 1:ncols]
+
+    pad(c, s) = right_align[c] ? lpad(cell(c, s), widths[c]) : rpad(cell(c, s), widths[c])
+    line(cells) = rstrip(join([pad(c, cells[c]) for c in 1:ncols], " "))
+
+    println(line(columns))
+    for row in rows
+        println(line(row))
+    end
 end
 
 function main(
@@ -166,6 +215,7 @@ function main(
     term_ordering=:magnitude,
     safe_normalization::Bool=true,
     benchmark::Bool=false,
+    nsteps=DEFAULT_NSTEPS,
 )
     meta, ham = parse_hamiltonian_file(filepath)
 
@@ -184,14 +234,14 @@ function main(
     columns = ["nsteps", "method", "trotter_ground_energy", "error"]
     safe_normalization && push!(columns, "safe_scaling_factor")
     benchmark && push!(columns, "time_seconds")
-    println(join(columns, ','))
 
     results = NamedTuple[]
-    for nsteps in DEFAULT_NSTEPS
+    table_rows = Vector{String}[]
+    for n in nsteps
         compute_energy = () -> trotter_energy(
             meta,
             ham,
-            nsteps;
+            n;
             method=method,
             order=trotter_order,
             time=TOTAL_TIME,
@@ -212,13 +262,17 @@ function main(
         safe_scaling_factor = calculation.safe_scaling_factor
         energy_error = energy - exact_energy
 
-        row = @sprintf("%d,%s,%.12f,%.12e",
-                       nsteps, String(method), energy, energy_error)
-        safe_normalization && (row *= @sprintf(",%.12f", safe_scaling_factor))
-        benchmark && (row *= @sprintf(",%.6f", elapsed))
-        println(row)
+        row = [
+            @sprintf("%d", n),
+            String(method),
+            @sprintf("%.12f", energy),
+            @sprintf("%.12e", energy_error),
+        ]
+        safe_normalization && push!(row, @sprintf("%.12f", safe_scaling_factor))
+        benchmark && push!(row, @sprintf("%.6f", elapsed))
+        push!(table_rows, row)
         push!(results, (
-            nsteps=nsteps,
+            nsteps=n,
             method=method,
             trotter_order=trotter_order,
             energy=energy,
@@ -228,6 +282,7 @@ function main(
         ))
     end
 
+    print_aligned_csv(columns, table_rows)
     return results
 end
 
@@ -240,5 +295,6 @@ if abspath(PROGRAM_FILE) == @__FILE__
         term_ordering=opts.term_ordering,
         safe_normalization=opts.safe_normalization,
         benchmark=opts.benchmark,
+        nsteps=opts.nsteps,
     )
 end
