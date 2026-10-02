@@ -37,6 +37,8 @@ from qualtran.bloqs.qubitization.qubitization_walk_operator import QubitizationW
 from pyLIQTR.qubitization.phase_estimation import QubitizedPhaseEstimation
 
 from qhat.analysis.config_types import AlgorithmConfiguration
+from qhat.common.flexible_qpe import FlexibleQPE
+from qhat.common.qpe_window_state import RectangularWindowState
 
 logger = logging.getLogger(__name__)
 
@@ -62,13 +64,7 @@ class NewQubitizationQPE(QubitizationQPE):
 
 # -------------------------------------------------------------------------------------------------
 
-def build_qpe_qualtran_textbook(
-        config_algorithm: AlgorithmConfiguration,
-        unitary,
-        P0):
-
-    logger.verbose("Build a QPE algorithm with Qualtran's \"textbook\" method.")
-
+def textbook_phase_qubits(config_algorithm: AlgorithmConfiguration, P0):
     P = config_algorithm.num_phase_qubits
     if P is None:
         assert P0 is not None
@@ -76,6 +72,18 @@ def build_qpe_qualtran_textbook(
         Pextra = math.ceil(math.log2(2.0 + 0.5 / config_algorithm.probability_of_failure))
         P = P0 + Pextra
         logger.verbose(f"-- extending the phase register by {Pextra} qubits (total = {P})")
+    return P
+
+# -------------------------------------------------------------------------------------------------
+
+def build_qpe_qualtran_textbook(
+        config_algorithm: AlgorithmConfiguration,
+        unitary,
+        P0):
+
+    logger.verbose("Build a QPE algorithm with Qualtran's \"textbook\" method.")
+
+    P = textbook_phase_qubits(config_algorithm, P0)
 
     # TODO: There is a note in the documentation (see link below) that a fast-forwardable unitary
     #       can lower the cost from (2^m - 1) * cost(C-U) to m * cost(C-U).  If we have a
@@ -126,6 +134,28 @@ def build_qpe_qualtran_textbook(
     #       -- The RectangularWindowState isn't added until a later version of qualtran than the
     #          one I'm using.  The interface changes in later versions.
     return TextbookQPE(unitary, P)
+
+# -------------------------------------------------------------------------------------------------
+
+def build_qpe_qhat_textbook(
+        config_algorithm: AlgorithmConfiguration,
+        unitary,
+        P0):
+
+    logger.verbose("Build a QPE algorithm with QHAT's FlexibleQPE.")
+
+    P = textbook_phase_qubits(config_algorithm, P0)
+
+    ctrl_state_prep_name = (config_algorithm.ctrl_state_prep or "rectangular").lower()
+    if ctrl_state_prep_name == "rectangular":
+        ctrl_state_prep = RectangularWindowState(P)
+    else:
+        raise ValueError(f"Invalid QPE ctrl_state_prep \"{config_algorithm.ctrl_state_prep}\".")
+
+    qft_inv_name = (config_algorithm.qft_inv or "textbook").lower()
+    if qft_inv_name == "textbook":
+        return FlexibleQPE(unitary, ctrl_state_prep)
+    raise ValueError(f"Invalid QPE qft_inv \"{config_algorithm.qft_inv}\".")
 
 # -------------------------------------------------------------------------------------------------
 
@@ -196,6 +226,8 @@ def build_algorithm(
 
     if config_algorithm.method.lower() in ("qpe: qualtran textbook",):
         return build_qpe_qualtran_textbook(config_algorithm, unitary, P0)
+    elif config_algorithm.method.lower() in ("qpe: qhat textbook",):
+        return build_qpe_qhat_textbook(config_algorithm, unitary, P0)
     elif config_algorithm.method.lower() in ("qpe: qualtran qubitization",):
         # TODO: This may be more specialized (for LCU only?), but I'm not yet sure of the details.
         return build_qpe_qualtran_qubitized(config_algorithm, unitary)

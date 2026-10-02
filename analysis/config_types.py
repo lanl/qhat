@@ -188,12 +188,17 @@ class AlgorithmConfiguration(ConfigurationBase):
         self.num_phase_qubits = None
         self.probability_of_failure = None
         self.energy_error = None
+        # Components for "QPE: qhat textbook"; None means "rectangular" / "textbook"
+        self.ctrl_state_prep = None
+        self.qft_inv = None
     def _generate_TOML_table(self):
         table = tomlkit.table()
         table["method"] = self.method
         self.save_if_present(table, "num_phase_qubits")
         self.save_if_present(table, "probability_of_failure")
         self.save_if_present(table, "energy_error")
+        self.save_if_present(table, "ctrl_state_prep")
+        self.save_if_present(table, "qft_inv")
         return table
 
 # -------------------------------------------------------------------------------------------------
