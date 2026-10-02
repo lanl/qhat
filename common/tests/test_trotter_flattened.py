@@ -595,6 +595,43 @@ class TestStringRepresentations:
 
 
 # ==================================================================================
+# Test: Integer powers (__pow__)
+# ==================================================================================
+
+class TestPower:
+    """Test that U**k is the unitary U^k (needed for fast-forwarding in phase estimation)."""
+
+    @pytest.mark.parametrize("method", ["first order", "second order", "fourth order"])
+    @pytest.mark.parametrize("combine_terms", [True, False])
+    @pytest.mark.parametrize("k", [1, 2, 3, 8])
+    def test_power_matches_matrix_power(self, method, combine_terms, k):
+        trotter = Trotterization.from_method(
+            pauli_terms=[("XZ", 0.5), ("ZY", 0.3), ("YI", 0.2)],
+            method=method,
+            time=0.4,
+            num_steps=3,
+            combine_terms=combine_terms,
+        )
+        expected = np.linalg.matrix_power(trotter.tensor_contract(), k)
+        np.testing.assert_allclose((trotter ** k).tensor_contract(), expected, atol=1e-10)
+
+    def test_power_preserves_time_step(self):
+        trotter = Trotterization.from_method(
+            pauli_terms=[("X", 1.0), ("Z", 1.0)], method="second order", time=0.5, num_steps=4)
+        powered = trotter ** 3
+        assert powered.num_steps == 12
+        assert powered.time == pytest.approx(1.5)
+        assert powered.time / powered.num_steps == pytest.approx(trotter.time / trotter.num_steps)
+
+    @pytest.mark.parametrize("power", [0, -1, 1.5])
+    def test_invalid_power_raises(self, power):
+        trotter = Trotterization.from_method(
+            pauli_terms=[("X", 1.0)], method="first order", time=1.0, num_steps=1)
+        with pytest.raises(ValueError):
+            trotter ** power
+
+
+# ==================================================================================
 # Test: Properties
 # ==================================================================================
 
