@@ -188,7 +188,7 @@ class AlgorithmConfiguration(ConfigurationBase):
         self.num_phase_qubits = None
         self.probability_of_failure = None
         self.energy_error = None
-        # Components for "QPE: qhat textbook"; None means "rectangular" / "textbook"
+        # Components for "QPE: QHAT flexible"; `None` yields default options
         self.ctrl_state_prep = None
         self.qft_inv = None
     def _generate_TOML_table(self):
