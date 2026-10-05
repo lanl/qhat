@@ -255,17 +255,15 @@ However, this section is still under development and currently has very limited 
   unitary encoding of the Hamiltonian into a phase estimation algorithm that uses the classic
   "textbook" method (see, for example, Nielson and Chuang's "Quantum Computation and Quantum
   Information").
-- QHAT Textbook Phase Estimation: Setting `algorithm.method` to "QPE: qhat textbook" builds the
-  same textbook algorithm with QHAT's `FlexibleQPE` (`common/flexible_qpe.py`).  Unlike the
-  Qualtran 0.4.0 version, it supports tensor contraction (algorithm matrix output and numerical
-  simulation) for all unitaries, implements U^(2^j) with the unitary's `__pow__` when available
-  (fast-forwarding; for ramped Trotter, U^k is the same Trotter sequence applied k times), and
-  uses the structure of QPE to speed up tensor contraction and resource estimation.  Its
-  components can be chosen with
-  - `algorithm.ctrl_state_prep`: initial state of the phase register; currently only
-    "rectangular" (a Hadamard on each phase qubit, the default).
-  - `algorithm.qft_inv`: inverse quantum Fourier transform; currently only "textbook" (the
-    default).
+- Flexible Phase Estimation: Setting `algorithm.method` to "QPE: QHAT flexible" builds the QPE
+  algorithm with QHAT's `FlexibleQPE` (`common/flexible_qpe.py`), which supports tensor contraction
+  (algorithm matrix output and numerical simulation) for all unitaries, implements U^(2^j) with the
+  unitary's `__pow__` when available, and uses the structure of QPE to speed up tensor contraction
+  and resource estimation.  It can be used to implement multiple QPE variations by customizing its
+  components:
+  - `algorithm.ctrl_state_prep`: initial state of the phase register; defaults to "rectangular" (a
+    Hadamard on each phase qubit, yielding "textbook" phase estimation);
+  - `algorithm.qft_inv`: inverse quantum Fourier transform; defaults to "textbook".
 - Qubitized Phase Estimation: Setting `algorithm.method` to "QPE: pyliqtr qubitized" will embed the
   unitary encoding of the Hamiltonian into a phase estimation algorithm that uses pyLIQTR's
   qubitized phase estimation.  This uses only a single ancilla qubit for the phase, with multiple
