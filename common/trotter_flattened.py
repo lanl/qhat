@@ -729,6 +729,13 @@ class Trotterization(Bloq):
         else:
             return f"{len(self.coefficients)}-coeff"
 
+    def phase_error_from_energy_error(self, energy_error: float) -> float:
+        """Eigenphase error, in turns ([0, 1)), corresponding to an energy error.
+
+        U = exp(-i H t / hbar), so an energy E has phase E t / (2 pi hbar) turns.
+        """
+        return energy_error * self.time / (2 * np.pi * self.hbar)
+
     def __pow__(self, power: int):
         """Raise the Trotterization to an integer power.
 

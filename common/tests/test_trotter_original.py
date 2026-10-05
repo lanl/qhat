@@ -25,3 +25,15 @@ class TestPower:
         powered = trotter ** 3
         assert powered.numsteps == 12
         assert powered.timestep == pytest.approx(1.5)
+
+
+class TestPhaseErrorFromEnergyError:
+    """The eigenphase (in turns) of U changes by phase_error_from_energy_error(dE) per dE."""
+
+    def test_matches_eigenphase_shift(self):
+        # A single ZI term is exact (two qubits; this implementation fails on one-qubit terms)
+        c, t = 0.3, 0.7
+        trotter = build_ramped_trotterized_unitary([("ZI", c)], "first order", timestep=t,
+                                                   numsteps=1)
+        phases = np.angle(np.linalg.eigvals(trotter.tensor_contract())) / (2 * np.pi)
+        assert np.ptp(phases) == pytest.approx(trotter.phase_error_from_energy_error(2 * c))

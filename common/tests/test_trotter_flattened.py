@@ -632,6 +632,30 @@ class TestPower:
 
 
 # ==================================================================================
+# Test: Energy error to phase error conversion
+# ==================================================================================
+
+class TestPhaseErrorFromEnergyError:
+    """The eigenphase (in turns) of U changes by phase_error_from_energy_error(dE) per dE."""
+
+    @pytest.mark.parametrize("hbar", [1.0, 2.0])
+    def test_matches_eigenphase_shift(self, hbar):
+        # A single Z term is exact: energies +/- c give eigenvalues exp(-/+ i c t / hbar)
+        c, t = 0.3, 0.7
+        trotter = Trotterization.from_method(
+            pauli_terms=[("Z", c)], method="first order", time=t, num_steps=1, hbar=hbar)
+        phases = np.angle(np.linalg.eigvals(trotter.tensor_contract())) / (2 * np.pi)
+        assert np.ptp(phases) == pytest.approx(trotter.phase_error_from_energy_error(2 * c))
+
+    def test_scales_with_time(self):
+        trotter = Trotterization.from_method(
+            pauli_terms=[("X", 1.0)], method="first order", time=0.5, num_steps=2)
+        assert trotter.phase_error_from_energy_error(0.1) == pytest.approx(0.1 * 0.5 / (2 * np.pi))
+        assert (trotter ** 4).phase_error_from_energy_error(0.1) == pytest.approx(
+            4 * trotter.phase_error_from_energy_error(0.1))
+
+
+# ==================================================================================
 # Test: Properties
 # ==================================================================================
 

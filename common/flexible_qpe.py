@@ -16,7 +16,7 @@ See `qpe_window_state.py` for the one intentional deviation from upstream (THRU 
 
 from collections import Counter
 from functools import cached_property
-from typing import Dict, Set, Tuple, TYPE_CHECKING
+from typing import Callable, Dict, Optional, Set, Tuple, Type, TYPE_CHECKING
 
 import attrs
 import numpy as np
@@ -27,7 +27,7 @@ from qualtran.bloqs.qft.qft_text_book import QFTTextBook
 from qualtran.resource_counting import get_cost_value, QubitCount
 from qualtran.symbolics import is_symbolic, SymbolicInt
 
-from qhat.common.qpe_window_state import QPEWindowStateBase
+from qhat.common.qpe_window_state import QPEWindowStateBase, RectangularWindowState
 
 if TYPE_CHECKING:
     import quimb.tensor as qtn
@@ -101,6 +101,43 @@ class FlexibleQPE(GateWithRegisters):
 
     def __str__(self) -> str:
         return f'FlexibleQPE[{self.m_bits}]'
+
+    @classmethod
+    def from_requirements(
+        cls,
+        unitary: Bloq,
+        phase_error: float,
+        probability_of_failure: float,
+        *,
+        ctrl_state_prep: Type[QPEWindowStateBase] = RectangularWindowState,
+        qft_inv: Optional[Callable[[int], Bloq]] = None,
+    ) -> 'FlexibleQPE':
+        """Build a QPE meeting Pr[|phase estimate error| > phase_error] <= probability_of_failure.
+
+        Phases are in turns ([0, 1)). Sizing is delegated to the `ctrl_state_prep` class.
+        `qft_inv`, if given, maps the phase-register size to an inverse-QFT bloq.
+        """
+        prep = ctrl_state_prep.from_requirements(phase_error, probability_of_failure)
+        return cls._from_window_state(unitary, prep, qft_inv)
+
+    @classmethod
+    def from_num_phase_qubits(
+        cls,
+        unitary: Bloq,
+        num_phase_qubits: int,
+        *,
+        ctrl_state_prep: Type[QPEWindowStateBase] = RectangularWindowState,
+        qft_inv: Optional[Callable[[int], Bloq]] = None,
+    ) -> 'FlexibleQPE':
+        """Build a QPE with exactly `num_phase_qubits` phase qubits."""
+        prep = ctrl_state_prep.from_num_phase_qubits(num_phase_qubits)
+        return cls._from_window_state(unitary, prep, qft_inv)
+
+    @classmethod
+    def _from_window_state(cls, unitary, prep, qft_inv):
+        if qft_inv is None:
+            return cls(unitary, prep)
+        return cls(unitary, prep, qft_inv(prep.m_bits))
 
     def unitary_power(self, k: int) -> Bloq:
         """Return a bloq for U^k, fast-forwarded via `unitary.__pow__` if available."""

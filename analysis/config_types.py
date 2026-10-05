@@ -134,22 +134,16 @@ class UnitaryConfiguration(ConfigurationBase):
         self.ordering_method = kwargs.get("ordering_method", None)
         self.trotter_order = kwargs.get("trotter_order", None)
         self.trotter_steps = kwargs.get("trotter_steps", None)
-        self.phase_scale_factor = kwargs.get("phase_scale_factor", 1.01)
         self.tensor_contraction_method = kwargs.get("tensor_contraction_method", None)
+        if "phase_scale_factor" in kwargs:
+            raise ValueError(
+                "phase_scale_factor has been removed; the evolution time now includes explicit "
+                "margins for the encoding and phase estimation energy errors.")
         # Validate trotter_steps
         if self.trotter_steps is not None:
             if not isinstance(self.trotter_steps, int) or self.trotter_steps < 1:
                 raise ValueError(
                     f"trotter_steps must be a positive integer, got {self.trotter_steps}")
-        # Validate phase_scale_factor
-        if self.phase_scale_factor <= 0:
-            raise ValueError(
-                f"phase_scale_factor must be positive, got {self.phase_scale_factor}")
-        if self.phase_scale_factor < 1.0:
-            logger.warning(
-                f"phase_scale_factor = {self.phase_scale_factor} < 1.0 will map eigenvalue phases "
-                f"outside the range [-π, π], which may cause phase wrapping issues. "
-                f"Values >= 1.0 are recommended (default: 1.01).")
         # Validate tensor_contraction_method
         if self.tensor_contraction_method is not None:
             valid_methods = ["auto", "incremental", "structured", "qualtran"]
@@ -176,7 +170,6 @@ class UnitaryConfiguration(ConfigurationBase):
         self.save_if_present(table, "ordering_method")
         self.save_if_present(table, "trotter_order")
         self.save_if_present(table, "trotter_steps")
-        self.save_if_present(table, "phase_scale_factor")
         self.save_if_present(table, "tensor_contraction_method")
         return table
 

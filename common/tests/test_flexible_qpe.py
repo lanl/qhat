@@ -81,6 +81,43 @@ class TestRectangularWindowState:
         # m = ceil(2*log2(pi/eps))
         assert RectangularWindowState.from_standard_deviation_eps(0.1).m_bits == 10
 
+    @pytest.mark.parametrize("phase_error, p_fail, expected", [
+        (1 / 8, 0.1, 3 + 3),      # 2^-3 = 1/8 exactly; ceil(log2(2 + 5)) = 3
+        (0.1, 0.1, 4 + 3),        # 2^-4 < 0.1 < 2^-3
+        (1 / 1024, 0.01, 10 + 6),  # ceil(log2(2 + 50)) = 6
+    ])
+    def test_from_requirements(self, phase_error, p_fail, expected):
+        assert RectangularWindowState.from_requirements(phase_error, p_fail).m_bits == expected
+
+    def test_from_requirements_tolerates_round_off(self):
+        """A phase error of 2^-n (up to round-off) needs exactly n precision bits."""
+        phase_error = (1 / 3) * (3 / 2**7)
+        assert RectangularWindowState.from_requirements(phase_error, 0.5).m_bits == 7 + 2
+
+    @pytest.mark.parametrize("phase_error, p_fail", [(0.0, 0.1), (1.0, 0.1), (0.1, 0.0), (0.1, 1.0)])
+    def test_from_requirements_rejects_out_of_range(self, phase_error, p_fail):
+        with pytest.raises(ValueError):
+            RectangularWindowState.from_requirements(phase_error, p_fail)
+
+    def test_from_num_phase_qubits(self):
+        assert RectangularWindowState.from_num_phase_qubits(5) == RectangularWindowState(5)
+
+    @pytest.mark.parametrize("phase_error, p_fail", [(1 / 8, 0.2), (1 / 16, 0.05)])
+    def test_from_requirements_meets_requirements(self, phase_error, p_fail):
+        """Worst-case textbook QPE (phase halfway between grid points) meets the requirement."""
+        prep = RectangularWindowState.from_requirements(phase_error, p_fail)
+        m = prep.m_bits
+        phi = 0.5 / 2**m
+        z = ZPowGate(exponent=2 * phi)
+        mat = FlexibleQPE(z, prep).tensor_contract()
+        psi_in = np.zeros(2**(m + 1))
+        psi_in[1] = 1.0
+        probs = np.abs(mat @ psi_in).reshape(2**m, 2)[:, 1] ** 2
+        estimates = np.arange(2**m) / 2**m
+        dist = np.abs(estimates - phi)
+        dist = np.minimum(dist, 1 - dist)
+        assert probs[dist > phase_error].sum() <= p_fail
+
 
 # -------------------------------------------------------------------------------------------------
 # FlexibleQPE construction
@@ -112,6 +149,40 @@ class TestConstruction:
         from qualtran.bloqs.basic_gates import Power
         qpe = FlexibleQPE(TwoQubitPlainBloq(), RectangularWindowState(3))
         assert qpe.unitary_power(4) == Power(TwoQubitPlainBloq(), 4)
+
+    def test_from_requirements_dispatches_to_window_state(self):
+        u = small_trotterization()
+        qpe = FlexibleQPE.from_requirements(u, 0.1, 0.1)
+        assert qpe == FlexibleQPE(u, RectangularWindowState.from_requirements(0.1, 0.1))
+
+    def test_from_requirements_uses_given_window_state_class(self):
+        calls = []
+
+        @attrs.frozen
+        class RecordingWindowState(RectangularWindowState):
+            @classmethod
+            def from_requirements(cls, phase_error, probability_of_failure):
+                calls.append((phase_error, probability_of_failure))
+                return cls(2)
+
+        qpe = FlexibleQPE.from_requirements(
+            small_trotterization(), 0.1, 0.2, ctrl_state_prep=RecordingWindowState)
+        assert calls == [(0.1, 0.2)]
+        assert qpe.ctrl_state_prep == RecordingWindowState(2)
+
+    def test_from_requirements_qft_inv_factory_receives_register_size(self):
+        sizes = []
+
+        def factory(m):
+            sizes.append(m)
+            return QFTTextBook(m, with_reverse=True).adjoint()
+
+        qpe = FlexibleQPE.from_requirements(small_trotterization(), 1 / 8, 0.1, qft_inv=factory)
+        assert sizes == [qpe.m_bits] == [6]
+
+    def test_from_num_phase_qubits(self):
+        u = small_trotterization()
+        assert FlexibleQPE.from_num_phase_qubits(u, 4) == FlexibleQPE(u, RectangularWindowState(4))
 
 
 # -------------------------------------------------------------------------------------------------

@@ -344,12 +344,11 @@ class OperatorRepresentation:
         3. Remove energy shift if not desired: λ_shifted → λ_unshifted
 
         The energy shift centers eigenvalues around zero, placing them in the range
-        [-dE, +dE] where dE is the one-norm bound. With tevol_hbar t/ℏ = π/(s·dE) where
-        s is the phase_scale_factor (default 1.01), this maps shifted eigenvalues to
-        phases in approximately [-π/s, +π/s]. This ensures phases never hit exactly ±π
-        (avoiding aliasing ambiguity) while matching np.angle()'s output range directly.
-        This eliminates the need for phase wrapping and correctly handles the logarithm
-        branch cut.
+        [-dE, +dE] where dE is the one-norm bound. The driver chooses
+        t/ℏ = 2π/(2·dE + 2·dE_enc + 2·dE_qpe) (see error_budget.txt), so shifted
+        eigenvalues map to phases strictly inside (-π, +π), with the error margins centered
+        on ±π. This matches np.angle()'s output range directly, eliminating the need for
+        phase wrapping and correctly handling the logarithm branch cut.
 
         Parameters
         ----------
@@ -413,11 +412,11 @@ class OperatorRepresentation:
         We use θ = angle(λ_U) ∈ (-π, π] from the principal branch of the logarithm.
 
         The Hamiltonian is energy-shifted to center eigenvalues around zero, placing
-        them in the range [-dE, +dE] where dE is the one-norm bound. With tevol_hbar
-        t/ℏ = π/(s·dE) where s is the phase_scale_factor (default 1.01), this maps
-        eigenvalues to phases in approximately [-π/s, +π/s], ensuring they never hit
-        exactly ±π (avoiding aliasing ambiguity). This matches the output range of
-        np.angle() directly - no phase wrapping needed!
+        them in the range [-dE, +dE] where dE is the one-norm bound. The driver chooses
+        t/ℏ = 2π/(2·dE + 2·dE_enc + 2·dE_qpe) (see error_budget.txt), so eigenvalues map
+        to phases strictly inside (-π, +π), keeping them away from ±π (avoiding aliasing
+        ambiguity). This matches the output range of np.angle() directly - no phase
+        wrapping needed!
         """
         if self.tevol_hbar is None:
             raise ValueError(

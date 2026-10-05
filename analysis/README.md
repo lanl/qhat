@@ -204,17 +204,16 @@ supports
 
 - Trotterization: The function **`unitary.encode_ramped_trotter()`** uses a Trotter formula to
   encode the Hamiltonian into a time-evolution unitary.  It takes the following arguments:
-  - `timestep`: If not provided, QHAT will attempt to pick the timestep that provides the most
-    efficient algorithm while still preventing aliasing of phases.  Providing a timestep will
-    override this with a user-selected value.
+  - `timestep`: If not provided, QHAT picks the longest evolution time t that still prevents
+    aliasing of phases: t/ℏ = 2π / (W + 2 ΔE_enc + 2 ΔE_qpe), where W is the width of the energy
+    bounds, ΔE_enc is this `energy_error`, and ΔE_qpe is `algorithm.energy_error` (zero for
+    algorithms without phase estimation).  The margins keep the top and bottom of the spectrum
+    distinguishable despite the encoding and phase estimation errors (see `error_budget.txt` at
+    the repository root).  Providing a timestep overrides this with a user-selected value; QHAT
+    warns if the override is too long to prevent aliasing.
   - `energy_error`: The maximum error allowed from the Trotterization process.  If not provided,
     the script will generate an error.
   - `error_scale`: This option is deprecated.
-  - `phase_scale_factor`: (Optional, default: 1.01) Scales the energy range by this factor when
-    computing the time evolution parameter. This ensures eigenvalue phases never hit exactly ±π,
-    avoiding the aliasing ambiguity at the complex exponential's branch cut. Values slightly larger
-    than 1.0 (e.g., 1.01) are recommended. The default maps phases to approximately [-3.11, 3.11]
-    instead of [-π, π].
   - `trotter_implementation`: (Optional) Choose between two Trotter implementations:
     - `"flattened"` (default, recommended): Flattened QHAT implementation with flat expansion and
       optional term combining. Term combining reduces operation count (benefit varies by
@@ -281,12 +280,19 @@ However, this section is still under development and currently has very limited 
 
 When performing phase estimation, it is necessary to set the number of phase qubits (which, in the
 qubitized method, translates to the number of measurements of the single phase qubit).  This can be
-controlled directly by the user by setting `algorithm.num_phase_qubits`.  But this can also be
-computed by the script by setting
+controlled directly by the user by setting `algorithm.num_phase_qubits`, which is then used exactly
+as given.  But this can also be computed by the script by setting
 
 - `algorithm.energy_error`: The maximum energy error permitted from phase estimation.
 - `algorithm.probability_of_failure`: The maximum probability of measuring the wrong phase at the
-  end of the algorithm.
+  end of the algorithm (textbook and flexible phase estimation only).
+
+For textbook and flexible phase estimation, the unitary converts `algorithm.energy_error` into an
+error in the eigenphase (measured in turns, i.e. as a fraction of 2π), and each QPE method builds
+itself to meet that phase error with at most `algorithm.probability_of_failure` chance of failure.
+For flexible phase estimation the register size is determined by the `algorithm.ctrl_state_prep`
+choice.  The qubitized methods size their registers from `algorithm.energy_error` and the
+block-encoding's normalization instead.
 
 ### Analyzing an Algorithm
 
