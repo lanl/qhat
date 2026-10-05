@@ -66,6 +66,12 @@ jobs:
             script: hamgen.py
             config_file: ''
 
+          - name: hamgen-unit-tests
+            directory: hamiltonian_generator
+            script: pytest
+            config_file: ''
+            config_setup: ''
+
           - name: analysis-trotter
             directory: analysis
             script: driver.py
