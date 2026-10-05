@@ -6,9 +6,10 @@ import os
 os.environ["QSHARP_PYTHON_TELEMETRY"] = "none"
 
 import logging
+import math
 
 from qhat.common.logging_utils import configure_logging
-from qhat.analysis.algorithm import build_algorithm, compute_evolution_time
+from qhat.analysis.algorithm import build_algorithm, compute_initial_phase_qubits
 from qhat.analysis.analysis import analyze_algorithm
 from qhat.analysis.configuration import load_configuration
 from qhat.analysis.hamiltonian import get_physical_hamiltonian
@@ -50,29 +51,26 @@ def run():
         # first-pass computation of energy bounds
         Elo1, Ehi1 = physical_hamiltonian.compute_initial_energy_bounds(state.config_hamiltonian)
 
-        # energy-shift Hamiltonian to center at zero, so that eigenphases lie in (-π, π] (the
-        # range of np.angle) with the anti-aliasing margin centered on ±π
+        # energy-shift Hamiltonian to center at zero
+        # This maps eigenvalues from [Elo1, Ehi1] to [-(Ehi1-Elo1)/2, +(Ehi1-Elo1)/2], so that
+        # eigenphases lie in the range of np.angle
         E0 = (Elo1 + Ehi1) / 2
         physical_hamiltonian.energy_shift(-E0)
         Elo2 = Elo1 - E0
         Ehi2 = Ehi1 - E0
         logger.verbose(f"-- shifted bounds = [{Elo2}, {Ehi2})")
+        tevol_hbar = 2 * math.pi / (Ehi2 - Elo2)
+        logger.verbose(f"-- preliminary evolution time = {tevol_hbar} * hbar")
 
-        # fit the spectrum plus error margins into one turn of phase (see error_budget.txt)
-        tevol_min = compute_evolution_time(
-                state.config_algorithm, state.config_unitary.energy_error, Elo2, Ehi2)
-        tevol_hbar = tevol_min
-        logger.verbose(f"-- evolution time = {tevol_hbar} * hbar")
+        # preliminiary number of phase qubits, with upper bound correction
+        _, Elo3, Ehi3 = compute_initial_phase_qubits(state.config_algorithm, Elo2, Ehi2)
+        tevol_hbar = 2 * math.pi / (Ehi3 - Elo3)
+        logger.verbose(f"-- optimized evolution time = {tevol_hbar} * hbar")
 
         # check for user-defined timestep
         if getattr(state.config_unitary, 'timestep', None) is not None:
             tevol_hbar = state.config_unitary.timestep
             logger.verbose(f"-- user timestep override = {tevol_hbar} * hbar")
-            if tevol_hbar > tevol_min:
-                logger.warning(
-                    f"User timestep {tevol_hbar} * hbar exceeds {tevol_min} * hbar, so the "
-                    "spectrum plus error margins does not fit in one turn of phase; the top and "
-                    "bottom of the spectrum may alias.")
 
     # Unitary _____________________________________________________________________________________
 

@@ -1,6 +1,6 @@
 """
 Tests for QPE construction in analysis/algorithm.py: the "QPE: QHAT flexible" and
-"QPE: qualtran textbook" methods, phase-register sizing, and the evolution-time rule.
+"QPE: qualtran textbook" methods and phase-register sizing.
 """
 
 import math
@@ -8,7 +8,7 @@ import math
 import pytest
 
 from qhat.analysis.algorithm import (
-    build_algorithm, compute_evolution_time, NewTextbookQPE)
+    build_algorithm, compute_initial_phase_qubits, NewTextbookQPE)
 from qhat.analysis.config_types import AlgorithmConfiguration
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.pauli_string_evolution import PauliStringEvolution
@@ -102,35 +102,19 @@ class TestPhaseQubits:
             build_algorithm(config, unitary)
 
 
-class TestEvolutionTime:
-
-    def test_qpe_includes_both_margins(self):
-        config = make_config(energy_error=0.1)
-        t = compute_evolution_time(config, 0.2, -1.0, 2.0)
-        assert t == pytest.approx(2 * math.pi / (3.0 + 2 * 0.2 + 2 * 0.1))
-
-    @pytest.mark.parametrize("method", ["time evolution", "controlled time evolution"])
-    def test_non_qpe_ignores_algorithm_energy_error(self, method):
-        config = make_config(method=method, energy_error=0.1)
-        t = compute_evolution_time(config, 0.2, -1.0, 2.0)
-        assert t == pytest.approx(2 * math.pi / (3.0 + 2 * 0.2))
-
-    def test_qpe_with_explicit_qubits_still_uses_qpe_margin(self):
-        config = make_config(num_phase_qubits=4, energy_error=0.1)
-        t = compute_evolution_time(config, 0.2, -1.0, 2.0)
-        assert t == pytest.approx(2 * math.pi / (3.0 + 2 * 0.2 + 2 * 0.1))
-
-    def test_missing_errors_are_zero_margin(self):
-        assert compute_evolution_time(make_config(), None, -1.0, 2.0) == pytest.approx(
-            2 * math.pi / 3.0)
-
-    def test_spectrum_and_margins_fit_in_one_turn(self, trotter):
-        """With t from the rule, a QPE error of dE_qpe stays within the anti-aliasing gap."""
-        dE_enc, dE_qpe, W = 0.2, 0.1, 3.0
-        t = compute_evolution_time(make_config(energy_error=dE_qpe), dE_enc, -1.0, 2.0)
-        spectrum_turns = (W + 2 * dE_enc) * t / (2 * math.pi)
-        phase_error = dE_qpe * t / (2 * math.pi)
-        assert spectrum_turns + 2 * phase_error == pytest.approx(1.0)
+@pytest.mark.parametrize("method", ["QPE: QHAT flexible", "QPE: qualtran textbook"])
+@pytest.mark.parametrize("W, dE", [(3.0, 0.1), (4.0, 0.5), (2.0, 0.25)])
+def test_driver_evolution_time_gives_P0_precision_bits(method, W, dE):
+    """With the driver's t = 2 pi / (2^P0 dE), the phase error is 2^-P0, so the register is
+    P0 plus the textbook confidence bits."""
+    p_fail = 0.1
+    config = make_config(method=method, energy_error=dE, probability_of_failure=p_fail)
+    P0, Elo, Ehi = compute_initial_phase_qubits(config, -W / 2, W / 2)
+    t = 2 * math.pi / (Ehi - Elo)
+    u = Trotterization.from_method(
+        pauli_terms=[("XZ", 0.5), ("ZY", 0.3)], method="second order", time=t, num_steps=1)
+    algorithm = build_algorithm(config, u)
+    assert algorithm.m_bits == P0 + math.ceil(math.log2(2 + 1 / (2 * p_fail)))
 
 
 def test_tensor_contract_shape(unitary):

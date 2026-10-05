@@ -290,27 +290,22 @@ def build_algorithm(
 
 # -------------------------------------------------------------------------------------------------
 
-def uses_phase_estimation(config_algorithm: AlgorithmConfiguration):
-    return config_algorithm.method.lower().startswith("qpe:")
+def compute_initial_phase_qubits(
+        config_algorithm: AlgorithmConfiguration,
+        Elo2, Ehi2):
 
-# -------------------------------------------------------------------------------------------------
+    logger.info("Computing initial phase qubits.")
 
-def compute_evolution_time(config_algorithm: AlgorithmConfiguration, energy_error_encoding,
-                           Elo, Ehi):
-    """Evolution time t/hbar that fits the spectrum plus error margins into one turn of phase.
+    if config_algorithm.energy_error is None:
+        Elo3 = Elo2
+        Ehi3 = Ehi2
+        P0 = None
+    else:
+        P0 = math.ceil(math.log2((Ehi2 - Elo2) / config_algorithm.energy_error))
+        logger.verbose(f"-- initial number of phase qubits = {P0}")
+        dE_new = 2**P0 * config_algorithm.energy_error
+        Elo3 = Elo2
+        Ehi3 = Elo3 + dE_new
+        logger.verbose(f"-- QPE-optimized bounds = [{Elo3}, {Ehi3})")
 
-    t/hbar = 2 pi / (W + 2 dE_enc + 2 dE_qpe), with W = Ehi - Elo.  dE_qpe is
-    algorithm.energy_error for phase-estimation algorithms and zero otherwise.  See
-    error_budget.txt for the rationale.
-    """
-    logger.info("Computing evolution time.")
-
-    dE_enc = energy_error_encoding or 0.0
-    dE_qpe = 0.0
-    if uses_phase_estimation(config_algorithm) and config_algorithm.energy_error is not None:
-        dE_qpe = config_algorithm.energy_error
-    energy_per_turn = (Ehi - Elo) + 2 * dE_enc + 2 * dE_qpe
-    logger.verbose(f"-- spectrum width = {Ehi - Elo}, margins: 2 * {dE_enc} (encoding) + "
-                   f"2 * {dE_qpe} (phase estimation)")
-    logger.verbose(f"-- energy per full turn of phase = {energy_per_turn}")
-    return 2 * math.pi / energy_per_turn
+    return (P0, Elo3, Ehi3)
