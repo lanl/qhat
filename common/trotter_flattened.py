@@ -707,13 +707,14 @@ class Trotterization(Bloq):
         """Raise the Trotterization to an integer power.
 
         For QPE, we need U^k where k is an integer. Since U applies the Trotter
-        sequence num_steps times, U^k applies it (num_steps * k) times.
+        sequence num_steps times with time step time / num_steps, U^k applies the same
+        sequence (num_steps * k) times with the same time step, i.e. for total time (time * k).
 
         Args:
             power: Integer power to raise to (must be positive)
 
         Returns:
-            New Trotterization bloq with num_steps multiplied by power
+            New Trotterization bloq with num_steps and time multiplied by power
 
         Raises:
             ValueError: If power is not a positive integer
@@ -721,7 +722,7 @@ class Trotterization(Bloq):
         if not isinstance(power, int) or power < 1:
             raise ValueError(f"Power must be a positive integer, got {power}")
 
-        return attrs.evolve(self, num_steps=self.num_steps * power)
+        return attrs.evolve(self, num_steps=self.num_steps * power, time=self.time * power)
 
 
 # =================================================================================================

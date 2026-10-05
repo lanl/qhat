@@ -137,7 +137,9 @@ class RampedTrotterizedUnitary(Bloq):
         return soqs
 
     def __pow__(self, exponent: int):
-        return attrs.evolve(self, numsteps = exponent * self.numsteps)
+        # timestep is the total time, so scale it with numsteps to keep the per-step time fixed
+        return attrs.evolve(self, numsteps = exponent * self.numsteps,
+                            timestep = exponent * self.timestep)
 
     def _t_complexity_(self) -> TComplexity:
         return self.numsteps * t_complexity(self._generate_step_())
