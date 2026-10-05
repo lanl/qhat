@@ -24,6 +24,30 @@ from qhat.common.pauli_utils import validate_pauli_string
 logger = logging.getLogger(__name__)
 
 
+import math
+import numpy as np
+
+def Sn(n):
+    if n == 2:
+        return np.array((0.5, 0.5))
+    else:
+        # note: usual notation is 1/(k+1) but that uses k as the source power and we use n as the
+        #       target power so k = n - 2 and k + 1 = n - 1
+        a = 1 / (4 - math.pow(4, 1/(n-1)))
+        b = 1 - 4 * a
+        base = Sn(n - 2)
+        outer = base * a
+        inner = base * b
+        return np.concatenate((outer, outer, inner, outer, outer))
+
+
+def suzuki_fiveterm_recursion(n):
+    assert isinstance(n, int)
+    assert n >= 2
+    assert n % 2 == 0
+    return tuple(Sn(n))
+
+
 def get_trotterization_coefficients(method):
     """Get coefficients for a named Trotterization method.
 
@@ -80,9 +104,7 @@ def get_trotterization_coefficients(method):
             # to get a fourth-order method; also discussed in Hatano and Suzuki (2005) and
             # Ostmeyer (2023). Ostmeyer 2023 recommends Suzuki 5-term recursion for
             # low-precision Hamiltonians with more than two terms in the Hamiltonian.
-            s2 = 0.5 / (4.0 - cbrt(4.0))
-            k = 0.5 - 4.0 * s2
-            return (s2, s2, s2, s2, k, k, s2, s2, s2, s2)
+            return suzuki_fiveterm_recursion(4)
         elif m in ("bm4", "blanes and moan 2002 fourth order", "blanes moan 4"):
             # Fourth-order Blanes & Moan (2002) from equation 46 of Ostmeyer (2023) (6 cycles)
             # Ostmeyer 2023 recommends this as a reasonable default and notes it is optimal when
@@ -211,6 +233,10 @@ def get_trotterization_coefficients(method):
                     b3/2, b3/2,
                     b2/2, b2/2,
                     b1/2, b1/2)
+        elif m[:m.rstrip().rfind(' ')] in ("suzuki recursion", "suzuki 5-term recursion",
+                                           "suzuki 1990 5-term recursion"):
+            order = int(m[m.rstrip().rfind(' '):].rstrip())
+            return suzuki_fiveterm_recursion(order)
         else:
             raise ValueError(f"Unknown Trotter method \"{method}\".")
     else:
