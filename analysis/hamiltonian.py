@@ -367,18 +367,27 @@ def load_fci(config_hamiltonian: HamiltonianConfiguration):
     logger.info(f"Loading second-quantization Hamiltonian from file \"{filename}\".")
     data = tools.fcidump.read(filename)
 
+    isym = data['ISYM']
+    if isym != 1:
+        raise ValueError(f"Unsupported value ISYM = {isym}. "
+                         f"Reader only supports ISYM = 1.")
+
     n = data['NORB']
     f0 = data['ECORE']
 
     # check that f1 has correct shape
     f1 = data['H1']
-    assert f1.shape == (n, n)
+    if f1.shape != (n, n):
+        raise ValueError(f"Incorrect f1 shape {f1.shape}. "
+                         f"f1 shape should be ({n}, {n}).")
 
     # reader returns a packed f2 - unpack it here
     f2packed = data['H2']
     f2 = ao2mo.restore('s1', f2packed, n)
     # check that f2 has correct shape
-    assert f2.shape == (n, n, n, n)
+    if f2.shape != (n, n, n, n):
+        raise ValueError(f"Incorrect f2 shape {f2.shape}. "
+                         f"f2 shape should be ({n}, {n}, {n}, {n}).")
 
     return _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, None, None)
 
