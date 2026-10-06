@@ -82,9 +82,11 @@ class HamiltonianConfiguration(ConfigurationBase):
             self.source = "hdf5"
         elif filename.endswith('.npy') or filename.endswith('.npz'):
             self.source = "numpy"
+        elif filename.endswith('.fci'):
+            self.source = "fci"
         else:
             raise ValueError(f"Unable to determine file format from extension: {filename}. "
-                           f"Supported extensions: .h5, .hdf5, .npy, .npz")
+                           f"Supported extensions: .h5, .hdf5, .npy, .npz, .fci")
         self.fermion_to_qubit_transform = fermion_to_qubit_transform
         self.boson_to_qubit_transform = boson_to_qubit_transform
         self.max_bosons_per_state = max_bosons_per_state

@@ -20,11 +20,8 @@ class MockConfig:
 def test_toy_fci_file():
     """Test loading a toy FCIDump file (simple data for testing)."""
     # Path to the toy FCIDump file
-    test_file = Path(__file__).parent / "fcidump.toy"
-
-    if not test_file.exists():
-        print("⚠ Skipping toy FCIDump file test (file not found)")
-        return
+    test_file = Path(__file__).parent / "toy.fci"
+    assert test_file.exists()
 
     config_hamiltonian = MockConfig()
     config_hamiltonian.filename = str(test_file)
@@ -78,11 +75,8 @@ def test_toy_fci_file():
 def test_real_fci_file():
     """Test loading a real FCIDump file (from PyLIQTR example)."""
     # Path to the real FCIDump file
-    test_file = Path(__file__).parent / "fcidump.32_2ru_III_3pl"
-
-    if not test_file.exists():
-        print("⚠ Skipping real FCIDump file test (file not found)")
-        return
+    test_file = Path(__file__).parent / "32_2ru_III_3pl.fci"
+    assert test_file.exists()
 
     config_hamiltonian = MockConfig()
     config_hamiltonian.filename = str(test_file)
