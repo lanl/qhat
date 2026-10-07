@@ -1,0 +1,82 @@
+{
+  "HCN_s1.00": {
+    "noncommuting_pairs": 0,
+    "parent_blocks": 187,
+    "fallback_count": 0,
+    "max_Nalpha_Nbeta_N_commutator_l1": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "HCN_s1.25": {
+    "noncommuting_pairs": 0,
+    "parent_blocks": 187,
+    "fallback_count": 0,
+    "max_Nalpha_Nbeta_N_commutator_l1": [
+      6.938893903907228e-18,
+      6.938893903907228e-18,
+      6.938893903907228e-18
+    ]
+  },
+  "CH2O_s1.00": {
+    "noncommuting_pairs": 0,
+    "parent_blocks": 117,
+    "fallback_count": 0,
+    "max_Nalpha_Nbeta_N_commutator_l1": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "CH2O_s1.25": {
+    "noncommuting_pairs": 0,
+    "parent_blocks": 117,
+    "fallback_count": 0,
+    "max_Nalpha_Nbeta_N_commutator_l1": [
+      6.938893903907228e-18,
+      6.938893903907228e-18,
+      6.938893903907228e-18
+    ]
+  },
+  "H2S_s1.00": {
+    "noncommuting_pairs": 0,
+    "parent_blocks": 117,
+    "fallback_count": 0,
+    "max_Nalpha_Nbeta_N_commutator_l1": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "H2S_s1.25": {
+    "noncommuting_pairs": 0,
+    "parent_blocks": 133,
+    "fallback_count": 0,
+    "max_Nalpha_Nbeta_N_commutator_l1": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "SiH4_s1.00": {
+    "noncommuting_pairs": 0,
+    "parent_blocks": 317,
+    "fallback_count": 0,
+    "max_Nalpha_Nbeta_N_commutator_l1": [
+      3.469446951953614e-18,
+      3.469446951953614e-18,
+      3.469446951953614e-18
+    ]
+  },
+  "SiH4_s1.25": {
+    "noncommuting_pairs": 0,
+    "parent_blocks": 306,
+    "fallback_count": 0,
+    "max_Nalpha_Nbeta_N_commutator_l1": [
+      1.0842021724855044e-19,
+      1.0842021724855044e-19,
+      1.0842021724855044e-19
+    ]
+  }
+}

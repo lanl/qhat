@@ -1,0 +1,20 @@
+{
+  "case": "H2S_s1.00",
+  "family": "H2S",
+  "scale": 1.0,
+  "ordering": "fermionic_signed",
+  "T": 0.25,
+  "steps": 200,
+  "one_minus_overlap": 4.5700875236916323e-11,
+  "infidelity": 9.140175047174408e-11,
+  "naive_normalized_one_minus_overlap": 4.5700776496460094e-11,
+  "inside_sector_error": 9.140175047174405e-11,
+  "outside_sector_error": 9.814006996743466e-39,
+  "particle_number_leakage": 9.814006984427368e-39,
+  "spin_sector_leakage": 9.814006996743466e-39,
+  "conditional_sector_infidelity": 9.140175047174405e-11,
+  "exact_spin_leakage": 0.0,
+  "exact_norm_drift": 2.220446049250313e-16,
+  "trotter_norm_drift": 4.107825191113079e-14,
+  "below_analysis_floor": false
+}

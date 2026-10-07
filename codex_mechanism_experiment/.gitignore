@@ -1,0 +1,5 @@
+__pycache__/
+runs/**/cache/
+runs/**/mpl_cache/
+!runs/**/inputs/*.npz
+!VALIDATION_TESTS.txt

@@ -1,0 +1,26 @@
+{
+  "f2": {
+    "parent_blocks": 414,
+    "within_bucket_noncommuting_pairs": 0,
+    "max_bucket_commutator_coefficient_l1_Nalpha": 1.0321604682062002e-16,
+    "max_bucket_commutator_coefficient_l1_Nbeta": 1.0321604682062002e-16,
+    "max_bucket_commutator_coefficient_l1_N": 1.0321604682062002e-16,
+    "fallback_count": 0
+  },
+  "nh3": {
+    "parent_blocks": 1654,
+    "within_bucket_noncommuting_pairs": 0,
+    "max_bucket_commutator_coefficient_l1_Nalpha": 5.421010862427522e-19,
+    "max_bucket_commutator_coefficient_l1_Nbeta": 5.421010862427522e-19,
+    "max_bucket_commutator_coefficient_l1_N": 5.421010862427522e-19,
+    "fallback_count": 0
+  },
+  "li2": {
+    "parent_blocks": 157,
+    "within_bucket_noncommuting_pairs": 0,
+    "max_bucket_commutator_coefficient_l1_Nalpha": 1.4446993948369347e-17,
+    "max_bucket_commutator_coefficient_l1_Nbeta": 1.4446993948369347e-17,
+    "max_bucket_commutator_coefficient_l1_N": 1.4446993948369347e-17,
+    "fallback_count": 0
+  }
+}

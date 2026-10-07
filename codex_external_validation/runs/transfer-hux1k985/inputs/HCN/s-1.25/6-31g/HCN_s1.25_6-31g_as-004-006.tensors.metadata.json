@@ -1,0 +1,57 @@
+{
+  "case": "HCN_s1.25",
+  "family": "HCN",
+  "scale": 1.25,
+  "geometry": [
+    [
+      "C",
+      [
+        0.0,
+        0.0,
+        0.0
+      ]
+    ],
+    [
+      "N",
+      [
+        0.0,
+        0.0,
+        1.45
+      ]
+    ],
+    [
+      "H",
+      [
+        0.0,
+        0.0,
+        -1.3250000000000002
+      ]
+    ]
+  ],
+  "basis": "6-31g",
+  "charge": 0,
+  "spin": 0,
+  "active_electrons": 4,
+  "active_spatial_orbitals": 5,
+  "unit": "Angstrom",
+  "hf_energy_hartree": -92.65619614076174,
+  "scf_converged": true,
+  "total_electrons": 14,
+  "total_spatial_orbitals": 20,
+  "active_spatial_indices": [
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "frozen_occupied_spatial_indices": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "hf_tensor_expectation_residual": 8.526512829121202e-14,
+  "tensor_sha256": "9035636f062b4115ac12a5d9cb94a48bf5fdf299c661a23a4279d636e7307f2c"
+}

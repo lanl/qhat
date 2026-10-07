@@ -1,0 +1,9 @@
+.DS_Store
+~$*
+__pycache__/
+**/cache/
+**/mpl_cache/
+
+!presentations/*_Script_EN*.txt
+!experiments/**/runs/**/SUMMARY.txt
+!experiments/**/runs/**/inputs/*.npz

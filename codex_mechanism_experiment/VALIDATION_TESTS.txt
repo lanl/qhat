@@ -1,0 +1,19 @@
+Matplotlib is building the font cache; this may take a moment.
+test_affine_closed_and_actions (test_mechanism_experiment.MechanismTests.test_affine_closed_and_actions) ... ok
+test_all_pauli_y_phases (test_mechanism_experiment.MechanismTests.test_all_pauli_y_phases) ... ok
+test_hamiltonian_against_openfermion (test_mechanism_experiment.MechanismTests.test_hamiltonian_against_openfermion) ... ok
+test_leading_defect (test_mechanism_experiment.MechanismTests.test_leading_defect) ... ok
+test_no_overwrite (test_mechanism_experiment.MechanismTests.test_no_overwrite) ... ok
+test_phase_invariance_and_sector_split (test_mechanism_experiment.MechanismTests.test_phase_invariance_and_sector_split) ... ok
+test_product_against_dense (test_mechanism_experiment.MechanismTests.test_product_against_dense) ... ok
+test_projected_decomposition_dense_cross_terms (test_mechanism_experiment.MechanismTests.test_projected_decomposition_dense_cross_terms) ... ok
+test_small_error_not_subtractive_floor (test_mechanism_experiment.MechanismTests.test_small_error_not_subtractive_floor) ... ok
+test_augmented_prediction_converges_to_product_error (test_prediction.PredictionTests.test_augmented_prediction_converges_to_product_error) ... ok
+test_common_energy_shift_preserves_projected_decomposition (test_prediction.PredictionTests.test_common_energy_shift_preserves_projected_decomposition) ... ok
+test_number_conserving_block (test_prediction.PredictionTests.test_number_conserving_block) ... ok
+test_small_commutator_not_silently_pruned (test_prediction.PredictionTests.test_small_commutator_not_silently_pruned) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.196s
+
+OK

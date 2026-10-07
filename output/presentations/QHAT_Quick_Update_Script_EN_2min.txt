@@ -1,0 +1,21 @@
+FERMIONIC ORDERING: QUICK UPDATE
+2 slides, approximately 2 minutes (206 words)
+
+SLIDE 1: Fermionic ordering and symmetry
+About 50 seconds
+
+Just a quick update on the fermionic ordering work. The idea is to order fermionic parent terms by signed coefficient, then keep their assigned Pauli terms together. The Hamiltonian stays the same.
+
+What helps here is symmetry protection. In the cases we checked, complete blocks preserve electron number and spin projection, preventing leakage out of the physical sector.
+
+But errors can still accumulate inside that sector. So symmetry gives us one useful benefit, without guaranteeing the most accurate ordering. That is what I have been trying to understand in the follow-up.
+
+
+SLIDE 2: Recent progress
+About 70 seconds
+
+Since the last presentation, I checked block permutations and followed how errors accumulate in F2, NH3, and Li2. In F2, the better ordering actually changes with time. Propagating the local error explains this reversal, which the initial BCH norm alone misses.
+
+I then tested the prediction on four new molecules and repeated the calculations. The error predictions were accurate, but fermionic ordering did not consistently win. A simple BCH proxy also ranked the new cases correctly, so we have not yet shown better ordering selection.
+
+The main progress is understanding why an ordering succeeds or fails. Next, I want to compare stronger baselines and check whether the conclusions hold across different orbitals and active spaces.

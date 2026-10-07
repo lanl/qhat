@@ -1,0 +1,59 @@
+{
+  "case": "H2S_s1.00",
+  "family": "H2S",
+  "scale": 1.0,
+  "geometry": [
+    [
+      "S",
+      [
+        0.0,
+        0.0,
+        0.0
+      ]
+    ],
+    [
+      "H",
+      [
+        0.9639153324537925,
+        0.0,
+        0.9308422164150564
+      ]
+    ],
+    [
+      "H",
+      [
+        -0.9639153324537925,
+        0.0,
+        0.9308422164150564
+      ]
+    ]
+  ],
+  "basis": "6-31g",
+  "charge": 0,
+  "spin": 0,
+  "active_electrons": 4,
+  "active_spatial_orbitals": 5,
+  "unit": "Angstrom",
+  "hf_energy_hartree": -398.6267868697808,
+  "scf_converged": true,
+  "total_electrons": 18,
+  "total_spatial_orbitals": 17,
+  "active_spatial_indices": [
+    7,
+    8,
+    9,
+    10,
+    11
+  ],
+  "frozen_occupied_spatial_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "hf_tensor_expectation_residual": 6.821210263296962e-13,
+  "tensor_sha256": "aede4f4edfb5a2b30ff2be422113adb3fc3495a493e499c58886281ea4944d8c"
+}

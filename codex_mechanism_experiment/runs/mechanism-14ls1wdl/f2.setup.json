@@ -1,0 +1,65 @@
+{
+  "case": "f2",
+  "n_qubits": 16,
+  "n_electrons": 14,
+  "pauli_terms": 1176,
+  "parents": 656,
+  "parent_blocks": 414,
+  "fallback_count": 0,
+  "closed_dimension": 4096,
+  "flip_basis": [
+    15,
+    27,
+    51,
+    195,
+    354,
+    960,
+    1122,
+    3264,
+    4097,
+    8194,
+    16448,
+    32896
+  ],
+  "hamiltonian_nnz": 283648,
+  "fingerprints": {
+    "identity_free_jw_sha256": "c293112ec8df9e2c7284a5d732ced312cab5e62287c910b67e5c88209c431186",
+    "hermitian_parents_sha256": "336bce9306310fe0af1ac09cd6dc57de3d134590402565217ab12c6c26ce9b72",
+    "physical_order_sha256": {
+      "fermionic_signed": "bdf0d046da609455c85d5add8fd66eb939b92e500659ab798dd740c4db13669f",
+      "jw_signed": "6055944a10fa80579a897cea03c84f8b29b01ebf3e5be1ca9accd149b0e5fce4",
+      "jw_magnitude": "373e68eaae52b9efae510e4a608cbdf946ad265b2799f8da470e4bd835ab067e"
+    }
+  },
+  "full_space_slice_residuals": {
+    "fermionic_signed": 0.0,
+    "jw_signed": 0.0,
+    "jw_magnitude": 0.0
+  },
+  "hamiltonian_action_residual": 1.4836746952179563e-14,
+  "hamiltonian_sector_offblock_frobenius": 1.3302363165125225e-16,
+  "jw_identity_coefficient": -178.82798843406337,
+  "old_exact_minus_trotter_scalar": -48.12776476138802,
+  "leading_defects": {
+    "fermionic_signed": {
+      "bch_hf_norm": 0.09985591240645167,
+      "projected_bch_hf_norm": 0.09985591240645167,
+      "leading_defect_inside_norm2": 0.002492800810631237,
+      "leading_defect_outside_norm2": 1.6358240589989456e-31
+    },
+    "jw_signed": {
+      "bch_hf_norm": 0.41298300787557773,
+      "projected_bch_hf_norm": 0.41298300787557773,
+      "leading_defect_inside_norm2": 5.158603594063043e-06,
+      "leading_defect_outside_norm2": 0.042633582594895816
+    },
+    "jw_magnitude": {
+      "bch_hf_norm": 0.10299114887576022,
+      "projected_bch_hf_norm": 0.10299114887576022,
+      "leading_defect_inside_norm2": 0.002491060666508867,
+      "leading_defect_outside_norm2": 0.0001607335201783868
+    }
+  },
+  "tensor_sha256": "0e35f45a47e83ac97c379f370135e534e1ec5218a258a97e965c211839e339a6",
+  "tensor_file": "inputs/F-F_1.28_hgbs-5_as-014-002.tensors.npz"
+}

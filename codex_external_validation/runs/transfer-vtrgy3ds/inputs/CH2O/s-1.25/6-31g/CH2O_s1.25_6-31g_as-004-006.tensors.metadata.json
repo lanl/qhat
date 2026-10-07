@@ -1,0 +1,66 @@
+{
+  "case": "CH2O_s1.25",
+  "family": "CH2O",
+  "scale": 1.25,
+  "geometry": [
+    [
+      "C",
+      [
+        0.0,
+        0.0,
+        0.0
+      ]
+    ],
+    [
+      "O",
+      [
+        0.0,
+        0.0,
+        1.5125
+      ]
+    ],
+    [
+      "H",
+      [
+        1.1749999999999998,
+        0.0,
+        -0.7374999999999999
+      ]
+    ],
+    [
+      "H",
+      [
+        -1.1749999999999998,
+        0.0,
+        -0.7374999999999999
+      ]
+    ]
+  ],
+  "basis": "6-31g",
+  "charge": 0,
+  "spin": 0,
+  "active_electrons": 4,
+  "active_spatial_orbitals": 5,
+  "unit": "Angstrom",
+  "hf_energy_hartree": -113.63900935084253,
+  "scf_converged": true,
+  "total_electrons": 16,
+  "total_spatial_orbitals": 22,
+  "active_spatial_indices": [
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "frozen_occupied_spatial_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "hf_tensor_expectation_residual": 1.1368683772161603e-13,
+  "tensor_sha256": "04f3c613db471c1886166993006d7a9e611bbe800fe52fcbc8db36f578b857dc"
+}

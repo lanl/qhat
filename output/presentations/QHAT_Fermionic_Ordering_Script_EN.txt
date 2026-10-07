@@ -1,0 +1,40 @@
+FERMIONIC ORDERING: DEFINITION AND FOLLOW-UP EXPERIMENTS
+English presentation script
+4 slides, approximately 4-5 minutes (532 words)
+
+SLIDE 1: Fermionic ordering and symmetry
+
+Let me first define the ordering used here. We sort Hermitian fermionic parent terms by increasing signed coefficient. We then traverse their Pauli descendants, assign each merged Pauli term to its first parent, and keep those blocks together. The final Hamiltonian and coefficients stay the same.
+
+The structural benefit is symmetry protection. In the blocks we checked, the Pauli terms commute, and the block Hamiltonian conserves the numbers of alpha and beta electrons. Completing a block therefore preserves electron number and spin projection, suppressing leakage outside the physical sector.
+
+That explains one way this ordering can help. But errors can still develop inside the correct sector. The order of different blocks and the way their errors accumulate over time also matter. So the follow-up separates symmetry protection from final accuracy.
+
+
+SLIDE 2: Test 1: parent blocks and symmetry
+
+After the original PDF, the first goal was to test what the parent-block structure actually protects. Using frozen inputs for F2, NH3, and Li2, the mechanism study completed 129 configurations, including 21 structural controls.
+
+Shuffling Pauli terms inside each block left the result unchanged, consistent with their commutation. Shuffling whole blocks preserved electron number and spin projection, but changed the error. Interleaving descendants from different blocks improved F2 while making NH3 and Li2 worse.
+
+These controls show why symmetry alone cannot select the most accurate sequence. They separate the benefit of keeping a block intact from the benefit of a particular block order. This is the first part of the uncommitted mechanism work, with frozen inputs and numerical checks saved alongside the results.
+
+
+SLIDE 3: Test 2: the F₂ ranking reversal
+
+The next goal was to explain the puzzling F2 result. The plot shows the error of JW signed ordering divided by the fermionic error. At short time, the ratio is above one, so fermionic ordering wins. At time one, it is about 0.41, so JW signed wins.
+
+I separated the final infidelity into local error power and an accumulation factor. At time one, JW signed has roughly seventeen times more local power, but only about 2.4 percent of the fermionic accumulation factor. Its total error is therefore smaller. Both orderings still have accumulation factors above one, so this is weaker constructive accumulation.
+
+Propagating the leading BCH error, without fitting to the measured errors, reproduced the F2 infidelities within 0.06 percent at one hundred steps. The extra time point was exploratory. This connects the local BCH picture to finite-time accuracy.
+
+
+SLIDE 4: Test 3: prediction on new molecules
+
+Finally, I wanted to test whether the prediction transferred to new molecules. The validation used HCN, formaldehyde, hydrogen sulfide, and silane, with two geometries each. Predictions were saved before the target calculations. All 272 configurations were then repeated in a separate process.
+
+Every eligible prediction at one hundred or two hundred steps passed the preset five-percent criterion. The largest relative difference at one hundred steps was about 0.10 percent.
+
+However, fermionic ordering won only two of the eight anchor comparisons. Also, both the dynamic predictor and the simple static BCH proxy ranked all 72 eligible pairs correctly. So the new model improves error-value prediction, but this panel does not establish better ordering selection.
+
+The contribution is a tested explanation of symmetry protection and error accumulation, supported by a small new-molecule validation. Broader accuracy and practical cost advantages still need testing.

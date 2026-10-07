@@ -1,0 +1,17 @@
+Fermionic parent order: signed ascending versus magnitude descending
+Frozen HGBS-5 inputs, HF, first-order Trotter, r=100, coefficient cutoff=1e-12.
+E = 1 - abs(normalized overlap), evaluated using a stable orthogonal residual.
+Ratio below 1 favors magnitude descending. First-occurrence ownership is recomputed.
+
+case T signed_E magnitude_E magnitude/signed
+f2 0.25 4.819896487e-10 4.816756854e-10 0.999349
+f2 1 1.058153298e-07 1.057541766e-07 0.999422
+nh3 0.25 4.057030781e-12 6.780299245e-12 1.67125
+nh3 1 9.631483750e-10 1.652803447e-09 1.71604
+li2 0.25 7.226097723e-12 6.619879387e-12 0.916107
+li2 1 2.855298057e-10 3.727978232e-10 1.30564
+
+All six signed anchors agree with the frozen mechanism run.
+Both methods contain exactly the same final merged Pauli terms and coefficients.
+Full-space one-step checks retain leakage and agree with the exact closed-space calculation.
+Three fixed molecules and two times are a small case study, not a general ranking claim.

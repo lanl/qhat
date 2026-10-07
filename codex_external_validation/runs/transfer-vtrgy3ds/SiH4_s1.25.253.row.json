@@ -1,0 +1,20 @@
+{
+  "case": "SiH4_s1.25",
+  "family": "SiH4",
+  "scale": 1.25,
+  "ordering": "fermionic_signed",
+  "T": 0.75,
+  "steps": 200,
+  "one_minus_overlap": 5.38158879553388e-09,
+  "infidelity": 1.0763177562106261e-08,
+  "naive_normalized_one_minus_overlap": 5.381588841224527e-09,
+  "inside_sector_error": 1.0763177562106261e-08,
+  "outside_sector_error": 1.1028274426691382e-37,
+  "particle_number_leakage": 1.0763467665096385e-37,
+  "spin_sector_leakage": 1.1028274426691382e-37,
+  "conditional_sector_infidelity": 1.0763177562107052e-08,
+  "exact_spin_leakage": 0.0,
+  "exact_norm_drift": 0.0,
+  "trotter_norm_drift": 4.1455727739503345e-13,
+  "below_analysis_floor": false
+}

@@ -1,0 +1,210 @@
+{
+  "HCN_s1.00": {
+    "fermionic_signed": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        9.703717305597946e-05,
+        4.851925245303765e-05
+      ],
+      "finite_difference_ratio": 0.5000068625767523
+    },
+    "jw_signed": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        5.034928254455273e-05,
+        2.5175412612758978e-05
+      ],
+      "finite_difference_ratio": 0.500015319790941
+    },
+    "jw_magnitude": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        0.00010117854630162273,
+        5.059075414778531e-05
+      ],
+      "finite_difference_ratio": 0.5000146374604902
+    }
+  },
+  "HCN_s1.25": {
+    "fermionic_signed": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        4.938134197444255e-05,
+        2.469065801315214e-05
+      ],
+      "finite_difference_ratio": 0.49999973726778946
+    },
+    "jw_signed": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        7.077133693225662e-05,
+        3.538437521984183e-05
+      ],
+      "finite_difference_ratio": 0.49998172641153127
+    },
+    "jw_magnitude": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        4.2802482809440256e-05,
+        2.1400901446748056e-05
+      ],
+      "finite_difference_ratio": 0.4999920575174673
+    }
+  },
+  "CH2O_s1.00": {
+    "fermionic_signed": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        0.00011284050687430994,
+        5.641991851738465e-05
+      ],
+      "finite_difference_ratio": 0.4999970319189483
+    },
+    "jw_signed": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        9.690649590804912e-05,
+        4.845242175229042e-05
+      ],
+      "finite_difference_ratio": 0.4999914742378579
+    },
+    "jw_magnitude": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        0.00012369089389518493,
+        6.184477631976405e-05
+      ],
+      "finite_difference_ratio": 0.49999457819563514
+    }
+  },
+  "CH2O_s1.25": {
+    "fermionic_signed": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        0.00010910595738151371,
+        5.455237852928303e-05
+      ],
+      "finite_difference_ratio": 0.4999944992786074
+    },
+    "jw_signed": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        9.77375187165683e-05,
+        4.886556661176954e-05
+      ],
+      "finite_difference_ratio": 0.49996733346051203
+    },
+    "jw_magnitude": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        0.00011985268555528008,
+        5.992728144407476e-05
+      ],
+      "finite_difference_ratio": 0.5000078318348093
+    }
+  },
+  "H2S_s1.00": {
+    "fermionic_signed": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        2.952800175388207e-05,
+        1.4763620759353416e-05
+      ],
+      "finite_difference_ratio": 0.49998712687736924
+    },
+    "jw_signed": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        1.79294574890806e-05,
+        8.96461095741805e-06
+      ],
+      "finite_difference_ratio": 0.49999343052502726
+    },
+    "jw_magnitude": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        3.0448851806009683e-05,
+        1.5224489171224112e-05
+      ],
+      "finite_difference_ratio": 0.5000020778523825
+    }
+  },
+  "H2S_s1.25": {
+    "fermionic_signed": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        3.5680086822439263e-05,
+        1.78407345575223e-05
+      ],
+      "finite_difference_ratio": 0.5000193706452035
+    },
+    "jw_signed": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        1.737494572307383e-05,
+        8.688316623068508e-06
+      ],
+      "finite_difference_ratio": 0.5000485619664683
+    },
+    "jw_magnitude": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        3.173265053145717e-05,
+        1.5866973089662773e-05
+      ],
+      "finite_difference_ratio": 0.5000204150590429
+    }
+  },
+  "SiH4_s1.00": {
+    "fermionic_signed": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        1.829454793924245e-05,
+        9.147304089465713e-06
+      ],
+      "finite_difference_ratio": 0.5000016463836433
+    },
+    "jw_signed": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        4.403709270136202e-06,
+        2.2025539048155678e-06
+      ],
+      "finite_difference_ratio": 0.5001587910791951
+    },
+    "jw_magnitude": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        1.898575596306374e-05,
+        9.492526016714888e-06
+      ],
+      "finite_difference_ratio": 0.499981461637995
+    }
+  },
+  "SiH4_s1.25": {
+    "fermionic_signed": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        1.2721037249467954e-05,
+        6.360939373716584e-06
+      ],
+      "finite_difference_ratio": 0.5000330750531073
+    },
+    "jw_signed": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        5.127803169521006e-06,
+        2.564496740096436e-06
+      ],
+      "finite_difference_ratio": 0.5001160643878593
+    },
+    "jw_magnitude": {
+      "column_check": 0.0,
+      "finite_difference_residuals": [
+        1.3238183722350585e-05,
+        6.619580227108732e-06
+      ],
+      "finite_difference_ratio": 0.5000368907052268
+    }
+  }
+}

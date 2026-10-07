@@ -1,0 +1,18 @@
+[
+  {
+    "step": 0,
+    "time": 0.0,
+    "local_defect_norm2": 4.715850996256229e-13,
+    "transported_projected_norm2": 4.715845521009504e-13,
+    "overlap_contribution_real": -7.07331165143706e-13,
+    "overlap_contribution_imag": 7.39948763261433e-10
+  },
+  {
+    "step": 1,
+    "time": 0.125,
+    "local_defect_norm2": 4.715850996256349e-13,
+    "transported_projected_norm2": 4.715763393045699e-13,
+    "overlap_contribution_real": -2.362637523906049e-13,
+    "overlap_contribution_imag": 2.959783946376106e-09
+  }
+]

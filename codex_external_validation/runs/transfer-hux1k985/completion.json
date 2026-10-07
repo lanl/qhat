@@ -1,0 +1,9 @@
+{
+  "status": "complete",
+  "rows": 272,
+  "baseline_rows": 216,
+  "control_rows": 56,
+  "seconds": 18.698913097381592,
+  "prediction_sha256": "b8140c1255cd32392a9625a96141a00f64176e1d943e97f3712ae7eed2c349ea",
+  "completed_utc": "2026-09-17T21:19:30.921615+00:00"
+}

@@ -1,0 +1,20 @@
+{
+  "case": "nh3",
+  "ordering": "fermionic_magnitude",
+  "T": 0.25,
+  "steps": 100,
+  "bch_hf_norm": 0.01180370499764094,
+  "one_minus_overlap": 6.780299245128796e-12,
+  "infidelity": 1.3560598490211619e-11,
+  "naive_normalized_one_minus_overlap": 6.777578498429193e-12,
+  "inside_sector_error": 1.3560598490211706e-11,
+  "outside_sector_error": 1.4314067348301668e-38,
+  "particle_number_leakage": 2.298053301985488e-38,
+  "spin_sector_leakage": 2.2980828973522463e-38,
+  "conditional_sector_infidelity": 1.3560598490211844e-11,
+  "exact_spin_leakage": 5.900726551326521e-39,
+  "exact_norm_drift": 7.438494264988549e-15,
+  "trotter_norm_drift": 1.70219394135529e-12,
+  "below_analysis_floor": false,
+  "seconds": 19.192661667009816
+}

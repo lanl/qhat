@@ -1,0 +1,113 @@
+{
+  "case": "SiH4_s1.25",
+  "n_qubits": 10,
+  "n_electrons": 4,
+  "pauli_terms": 795,
+  "parents": 425,
+  "parent_blocks": 306,
+  "fallback_count": 0,
+  "closed_dimension": 256,
+  "flip_basis": [
+    5,
+    10,
+    20,
+    40,
+    80,
+    160,
+    320,
+    640
+  ],
+  "hamiltonian_nnz": 9664,
+  "fingerprints": {
+    "identity_free_jw_sha256": "b200b4ba3ad349ed844ca4b6b3d7c2d776ae0b10115fd69dad57d114be0a0533",
+    "hermitian_parents_sha256": "868ac64200afd8f96d43759654b0172513c30275b7f30f337e9ae8ef1e16c3d2",
+    "physical_order_sha256": {
+      "fermionic_signed": "4e81beccc86c07bcf717c69c868fcc0452e298d3b2fe2bbe159a120656172980",
+      "jw_signed": "091c6db9bb6fb5d509acdf164c0d796993213a29ee007ae3c3b0b9fb791325c8",
+      "jw_magnitude": "a48a79f305518a720c472462849cbd2c6b3133afd096027711f01057d3ced2bc",
+      "round_robin": "de0d33d49a8f4f03f6ccb266f92ad56296195a351c82f882c7db92bfec67578f",
+      "within_blocks_20260917": "1ebbe447596364ba79f5d060e11caa38affeb49ca73e722adce4e05c0973b664",
+      "blocks_random_1101": "31cdfd44d56ae447a8cb6f2a2279b0c24e0f2753304bbd7ce31745549305f003",
+      "blocks_random_1102": "4778b5cab28160e7c6b4b701c6f0acf0c33fdb894541fbc14f24f9f019c6681f",
+      "blocks_random_1103": "9db7608783dba9c135ae8ff0d539dcd11aa26e896d05661c16047ee061f3d6b0",
+      "blocks_random_1104": "27617f545cc9c8af49815e2521790d6471519f58f79091e4c89881d7b7fbeaf2",
+      "blocks_random_1105": "c53a0fce09ffdfb4d8f5f1df1a6e6a5cf4424c94b701e318582cd463b65ce339"
+    }
+  },
+  "full_space_slice_residuals": {
+    "fermionic_signed": 0.0,
+    "jw_signed": 0.0,
+    "jw_magnitude": 0.0
+  },
+  "hamiltonian_action_residual": 4.663114565608219e-16,
+  "hamiltonian_sector_offblock_frobenius": 0.0,
+  "jw_identity_coefficient": -290.0370656746119,
+  "old_exact_minus_trotter_scalar": null,
+  "leading_defects": {
+    "fermionic_signed": {
+      "bch_hf_norm": 0.07473793749835018,
+      "projected_bch_hf_norm": 0.07473793749835018,
+      "leading_defect_inside_norm2": 0.001396439825376825,
+      "leading_defect_outside_norm2": 5.739718509874451e-41
+    },
+    "jw_signed": {
+      "bch_hf_norm": 0.02125860747427025,
+      "projected_bch_hf_norm": 0.02125860747427025,
+      "leading_defect_inside_norm2": 0.000102406394893908,
+      "leading_defect_outside_norm2": 1.0575703042366744e-05
+    },
+    "jw_magnitude": {
+      "bch_hf_norm": 0.07549937514901846,
+      "projected_bch_hf_norm": 0.07549937514901846,
+      "leading_defect_inside_norm2": 0.001425038911973057,
+      "leading_defect_outside_norm2": 2.566391862267051e-36
+    },
+    "round_robin": {
+      "bch_hf_norm": 0.07009513517044495,
+      "projected_bch_hf_norm": 0.07009513517044495,
+      "leading_defect_inside_norm2": 0.0012241010659245857,
+      "leading_defect_outside_norm2": 4.230927716151914e-06
+    },
+    "within_blocks_20260917": {
+      "bch_hf_norm": 0.07473793749835018,
+      "projected_bch_hf_norm": 0.07473793749835018,
+      "leading_defect_inside_norm2": 0.001396439825376825,
+      "leading_defect_outside_norm2": 7.346839692639297e-40
+    },
+    "blocks_random_1101": {
+      "bch_hf_norm": 0.0474020717405909,
+      "projected_bch_hf_norm": 0.0474020717405909,
+      "leading_defect_inside_norm2": 0.0005617391013250314,
+      "leading_defect_outside_norm2": 6.203026774653693e-39
+    },
+    "blocks_random_1102": {
+      "bch_hf_norm": 0.0676824585480818,
+      "projected_bch_hf_norm": 0.0676824585480818,
+      "leading_defect_inside_norm2": 0.0011452287987782025,
+      "leading_defect_outside_norm2": 1.0315628056625201e-38
+    },
+    "blocks_random_1103": {
+      "bch_hf_norm": 0.07783014761306227,
+      "projected_bch_hf_norm": 0.07783014761306227,
+      "leading_defect_inside_norm2": 0.0015143829693677654,
+      "leading_defect_outside_norm2": 1.95035172414131e-37
+    },
+    "blocks_random_1104": {
+      "bch_hf_norm": 0.10435918516484764,
+      "projected_bch_hf_norm": 0.10435918516484764,
+      "leading_defect_inside_norm2": 0.0027227098820677394,
+      "leading_defect_outside_norm2": 5.019636460792648e-39
+    },
+    "blocks_random_1105": {
+      "bch_hf_norm": 0.038683835543415486,
+      "projected_bch_hf_norm": 0.038683835543415486,
+      "leading_defect_inside_norm2": 0.0003741097830875039,
+      "leading_defect_outside_norm2": 9.734562592747068e-39
+    }
+  },
+  "tensor_file": "inputs/SiH4/s-1.25/6-31g/SiH4_s1.25_6-31g_as-004-006.tensors.npz",
+  "tensor_sha256": "aee0ae27acce148602540dc455f6c15aef0b7f3f9ec3863f116d3e74b29f0865",
+  "family": "SiH4",
+  "scale": 1.25,
+  "spin_sector_dimension": 100
+}

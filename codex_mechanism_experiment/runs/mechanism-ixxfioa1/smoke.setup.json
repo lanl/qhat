@@ -1,0 +1,54 @@
+{
+  "case": "smoke",
+  "n_qubits": 4,
+  "n_electrons": 2,
+  "pauli_terms": 14,
+  "parents": 12,
+  "parent_blocks": 11,
+  "fallback_count": 0,
+  "closed_dimension": 2,
+  "flip_basis": [
+    15
+  ],
+  "hamiltonian_nnz": 4,
+  "fingerprints": {
+    "identity_free_jw_sha256": "ff7ef759e7b3e211ea46fa13d52b4ae9a38ca6321485e3af9685ff953c5c472d",
+    "hermitian_parents_sha256": "3727f1ef24528a82ed137e5b5ed4c713e77ccc85737e44c49effb0cc2d23d4d1",
+    "physical_order_sha256": {
+      "fermionic_signed": "1c30d06c7072cc78ca6debfb0cdf92ab7dd30537c356d8407c6bb29bcbc9ff31",
+      "jw_signed": "06f44ee7ff180ec8be7a35540d710d9b6de3ce5fabb7dc934820d8b9cad441a1",
+      "jw_magnitude": "10044c7fd77d4603915b76175ecdba2621696dd9b32b64bb8f1fb0a588abfeaa"
+    }
+  },
+  "full_space_slice_residuals": {
+    "fermionic_signed": 0.0,
+    "jw_signed": 0.0,
+    "jw_magnitude": 0.0
+  },
+  "hamiltonian_action_residual": 2.000580707114743e-17,
+  "hamiltonian_sector_offblock_frobenius": 0.0,
+  "jw_identity_coefficient": -48.904312809479606,
+  "old_exact_minus_trotter_scalar": null,
+  "leading_defects": {
+    "fermionic_signed": {
+      "bch_hf_norm": 8.790025635651601e-05,
+      "projected_bch_hf_norm": 8.790025635651601e-05,
+      "leading_defect_inside_norm2": 1.9316137668853082e-09,
+      "leading_defect_outside_norm2": 0.0
+    },
+    "jw_signed": {
+      "bch_hf_norm": 8.790025635651731e-05,
+      "projected_bch_hf_norm": 8.790025635651731e-05,
+      "leading_defect_inside_norm2": 1.9316137668853653e-09,
+      "leading_defect_outside_norm2": 0.0
+    },
+    "jw_magnitude": {
+      "bch_hf_norm": 8.790025635651601e-05,
+      "projected_bch_hf_norm": 8.790025635651601e-05,
+      "leading_defect_inside_norm2": 1.9316137668853082e-09,
+      "leading_defect_outside_norm2": 0.0
+    }
+  },
+  "tensor_sha256": "48b2a82aca7d370bf39c2f5bdf567c55e8eb94af689d9488f1a72f98f0e914e8",
+  "tensor_file": "inputs/B-B_1.70_hgbs-5_as-002-002.tensors.npz"
+}

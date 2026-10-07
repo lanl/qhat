@@ -1,0 +1,802 @@
+[
+  {
+    "step": 0,
+    "time": 0.0,
+    "local_defect_norm2": 2.033017590046514e-12,
+    "transported_projected_norm2": 2.0330175778858485e-12,
+    "overlap_contribution_real": -1.0640623081328047e-10,
+    "overlap_contribution_imag": 2.8954781678880365e-11
+  },
+  {
+    "step": 1,
+    "time": 0.01,
+    "local_defect_norm2": 2.0330271396913556e-12,
+    "transported_projected_norm2": 2.033027090635741e-12,
+    "overlap_contribution_real": -1.0559663372069613e-10,
+    "overlap_contribution_imag": -1.9469197607492202e-10
+  },
+  {
+    "step": 2,
+    "time": 0.02,
+    "local_defect_norm2": 2.0330413844444166e-12,
+    "transported_projected_norm2": 2.0330411983233617e-12,
+    "overlap_contribution_real": -1.0478567181731966e-10,
+    "overlap_contribution_imag": -4.1849852786351725e-10
+  },
+  {
+    "step": 3,
+    "time": 0.03,
+    "local_defect_norm2": 2.033060363779355e-12,
+    "transported_projected_norm2": 2.0330599400698625e-12,
+    "overlap_contribution_real": -1.039688897758592e-10,
+    "overlap_contribution_imag": -6.425729236521738e-10
+  },
+  {
+    "step": 4,
+    "time": 0.04,
+    "local_defect_norm2": 2.0330841355292563e-12,
+    "transported_projected_norm2": 2.0330833731698867e-12,
+    "overlap_contribution_real": -1.0314937058782927e-10,
+    "overlap_contribution_imag": -8.670176336282503e-10
+  },
+  {
+    "step": 5,
+    "time": 0.05,
+    "local_defect_norm2": 2.033112775616507e-12,
+    "transported_projected_norm2": 2.033111572824829e-12,
+    "overlap_contribution_real": -1.0232807375766375e-10,
+    "overlap_contribution_imag": -1.091934358526204e-09
+  },
+  {
+    "step": 6,
+    "time": 0.06,
+    "local_defect_norm2": 2.033146377692328e-12,
+    "transported_projected_norm2": 2.03314463178437e-12,
+    "overlap_contribution_real": -1.0150850268863013e-10,
+    "overlap_contribution_imag": -1.3174232355714737e-09
+  },
+  {
+    "step": 7,
+    "time": 0.07,
+    "local_defect_norm2": 2.0331850526872337e-12,
+    "transported_projected_norm2": 2.0331826598964037e-12,
+    "overlap_contribution_real": -1.0069276998399999e-10,
+    "overlap_contribution_imag": -1.5435840748466405e-09
+  },
+  {
+    "step": 8,
+    "time": 0.08,
+    "local_defect_norm2": 2.033228928280929e-12,
+    "transported_projected_norm2": 2.0332257835877614e-12,
+    "overlap_contribution_real": -9.987353992962499e-11,
+    "overlap_contribution_imag": -1.7705136101752524e-09
+  },
+  {
+    "step": 9,
+    "time": 0.09,
+    "local_defect_norm2": 2.0332781483050432e-12,
+    "transported_projected_norm2": 2.033274145275216e-12,
+    "overlap_contribution_real": -9.906232966419851e-11,
+    "overlap_contribution_imag": -1.99830340093455e-09
+  },
+  {
+    "step": 10,
+    "time": 0.1,
+    "local_defect_norm2": 2.033332872038497e-12,
+    "transported_projected_norm2": 2.0333279026517393e-12,
+    "overlap_contribution_real": -9.825329222956896e-11,
+    "overlap_contribution_imag": -2.2270458118716345e-09
+  },
+  {
+    "step": 11,
+    "time": 0.11,
+    "local_defect_norm2": 2.0333932734582645e-12,
+    "transported_projected_norm2": 2.033387227973116e-12,
+    "overlap_contribution_real": -9.745189759003769e-11,
+    "overlap_contribution_imag": -2.456824836298871e-09
+  },
+  {
+    "step": 12,
+    "time": 0.12,
+    "local_defect_norm2": 2.0334595403867988e-12,
+    "transported_projected_norm2": 2.033452307186416e-12,
+    "overlap_contribution_real": -9.665967802367891e-11,
+    "overlap_contribution_imag": -2.687723439921792e-09
+  },
+  {
+    "step": 13,
+    "time": 0.13,
+    "local_defect_norm2": 2.0335318736249746e-12,
+    "transported_projected_norm2": 2.0335233390918193e-12,
+    "overlap_contribution_real": -9.587160894623201e-11,
+    "overlap_contribution_imag": -2.919818794007985e-09
+  },
+  {
+    "step": 14,
+    "time": 0.14,
+    "local_defect_norm2": 2.0336104859699894e-12,
+    "transported_projected_norm2": 2.033600534349205e-12,
+    "overlap_contribution_real": -9.509336941412433e-11,
+    "overlap_contribution_imag": -3.1531853792352757e-09
+  },
+  {
+    "step": 15,
+    "time": 0.15,
+    "local_defect_norm2": 2.033695601166403e-12,
+    "transported_projected_norm2": 2.0336841144438997e-12,
+    "overlap_contribution_real": -9.432629496633379e-11,
+    "overlap_contribution_imag": -3.3878938964234195e-09
+  },
+  {
+    "step": 16,
+    "time": 0.16,
+    "local_defect_norm2": 2.0337874528500683e-12,
+    "transported_projected_norm2": 2.0337743106885397e-12,
+    "overlap_contribution_real": -9.35654156010138e-11,
+    "overlap_contribution_imag": -3.6240042827680225e-09
+  },
+  {
+    "step": 17,
+    "time": 0.17,
+    "local_defect_norm2": 2.0338862834233064e-12,
+    "transported_projected_norm2": 2.0338713630300306e-12,
+    "overlap_contribution_real": -9.281456907466443e-11,
+    "overlap_contribution_imag": -3.861577233689414e-09
+  },
+  {
+    "step": 18,
+    "time": 0.18,
+    "local_defect_norm2": 2.0339923428516696e-12,
+    "transported_projected_norm2": 2.0339755189212856e-12,
+    "overlap_contribution_real": -9.20770881809508e-11,
+    "overlap_contribution_imag": -4.100664847802988e-09
+  },
+  {
+    "step": 19,
+    "time": 0.19,
+    "local_defect_norm2": 2.034105887486761e-12,
+    "transported_projected_norm2": 2.034087032117823e-12,
+    "overlap_contribution_real": -9.135038625320584e-11,
+    "overlap_contribution_imag": -4.341315934687895e-09
+  },
+  {
+    "step": 20,
+    "time": 0.2,
+    "local_defect_norm2": 2.0342271787406286e-12,
+    "transported_projected_norm2": 2.0342061614278135e-12,
+    "overlap_contribution_real": -9.0634361397936e-11,
+    "overlap_contribution_imag": -4.583568285468511e-09
+  },
+  {
+    "step": 21,
+    "time": 0.21,
+    "local_defect_norm2": 2.0343564818777453e-12,
+    "transported_projected_norm2": 2.034333169439019e-12,
+    "overlap_contribution_real": -8.992824008148077e-11,
+    "overlap_contribution_imag": -4.82745809280088e-09
+  },
+  {
+    "step": 22,
+    "time": 0.22,
+    "local_defect_norm2": 2.034494064672389e-12,
+    "transported_projected_norm2": 2.034468321207035e-12,
+    "overlap_contribution_real": -8.923806167075863e-11,
+    "overlap_contribution_imag": -5.073017043364071e-09
+  },
+  {
+    "step": 23,
+    "time": 0.23,
+    "local_defect_norm2": 2.0346401960747138e-12,
+    "transported_projected_norm2": 2.0346118830215644e-12,
+    "overlap_contribution_real": -8.855857017133285e-11,
+    "overlap_contribution_imag": -5.320264140917798e-09
+  },
+  {
+    "step": 24,
+    "time": 0.24,
+    "local_defect_norm2": 2.034795144870312e-12,
+    "transported_projected_norm2": 2.0347641209824085e-12,
+    "overlap_contribution_real": -8.788995524531632e-11,
+    "overlap_contribution_imag": -5.569215677215865e-09
+  },
+  {
+    "step": 25,
+    "time": 0.25,
+    "local_defect_norm2": 2.034959178367071e-12,
+    "transported_projected_norm2": 2.0349252997321007e-12,
+    "overlap_contribution_real": -8.723009748783888e-11,
+    "overlap_contribution_imag": -5.819881947294782e-09
+  },
+  {
+    "step": 26,
+    "time": 0.26,
+    "local_defect_norm2": 2.0351325609905504e-12,
+    "transported_projected_norm2": 2.035095681089789e-12,
+    "overlap_contribution_real": -8.658550480924241e-11,
+    "overlap_contribution_imag": -6.072265121990017e-09
+  },
+  {
+    "step": 27,
+    "time": 0.27,
+    "local_defect_norm2": 2.0353155529906227e-12,
+    "transported_projected_norm2": 2.0352755227529918e-12,
+    "overlap_contribution_real": -8.595023998825882e-11,
+    "overlap_contribution_imag": -6.326361528325785e-09
+  },
+  {
+    "step": 28,
+    "time": 0.28,
+    "local_defect_norm2": 2.0355084090765902e-12,
+    "transported_projected_norm2": 2.035465076952117e-12,
+    "overlap_contribution_real": -8.532261302332623e-11,
+    "overlap_contribution_imag": -6.582161083174364e-09
+  },
+  {
+    "step": 29,
+    "time": 0.29,
+    "local_defect_norm2": 2.0357113771114444e-12,
+    "transported_projected_norm2": 2.035664589162089e-12,
+    "overlap_contribution_real": -8.47074820846861e-11,
+    "overlap_contribution_imag": -6.83964721295758e-09
+  },
+  {
+    "step": 30,
+    "time": 0.3,
+    "local_defect_norm2": 2.035924696800585e-12,
+    "transported_projected_norm2": 2.03587429683734e-12,
+    "overlap_contribution_real": -8.409841187324128e-11,
+    "overlap_contribution_imag": -7.0987950176171616e-09
+  },
+  {
+    "step": 31,
+    "time": 0.31,
+    "local_defect_norm2": 2.0361485984685595e-12,
+    "transported_projected_norm2": 2.036094428146964e-12,
+    "overlap_contribution_real": -8.350022440417373e-11,
+    "overlap_contribution_imag": -7.359575348339514e-09
+  },
+  {
+    "step": 32,
+    "time": 0.32,
+    "local_defect_norm2": 2.0363833017715904e-12,
+    "transported_projected_norm2": 2.036325200723609e-12,
+    "overlap_contribution_real": -8.290976588994182e-11,
+    "overlap_contribution_imag": -7.621953421014997e-09
+  },
+  {
+    "step": 33,
+    "time": 0.33,
+    "local_defect_norm2": 2.036629014513363e-12,
+    "transported_projected_norm2": 2.0365668205471545e-12,
+    "overlap_contribution_real": -8.232618893400834e-11,
+    "overlap_contribution_imag": -7.88588540413894e-09
+  },
+  {
+    "step": 34,
+    "time": 0.34,
+    "local_defect_norm2": 2.036885931508856e-12,
+    "transported_projected_norm2": 2.036819480769451e-12,
+    "overlap_contribution_real": -8.174786301177279e-11,
+    "overlap_contribution_imag": -8.151322389143441e-09
+  },
+  {
+    "step": 35,
+    "time": 0.35000000000000003,
+    "local_defect_norm2": 2.0371542335027503e-12,
+    "transported_projected_norm2": 2.037083360648498e-12,
+    "overlap_contribution_real": -8.116997435503423e-11,
+    "overlap_contribution_imag": -8.418210361323168e-09
+  },
+  {
+    "step": 36,
+    "time": 0.36,
+    "local_defect_norm2": 2.0374340860654435e-12,
+    "transported_projected_norm2": 2.037358624473131e-12,
+    "overlap_contribution_real": -8.059913298325445e-11,
+    "overlap_contribution_imag": -8.686489284643787e-09
+  },
+  {
+    "step": 37,
+    "time": 0.37,
+    "local_defect_norm2": 2.0377256387120187e-12,
+    "transported_projected_norm2": 2.0376454206490543e-12,
+    "overlap_contribution_real": -8.002969305222578e-11,
+    "overlap_contribution_imag": -8.956096148025395e-09
+  },
+  {
+    "step": 38,
+    "time": 0.38,
+    "local_defect_norm2": 2.0380290238012984e-12,
+    "transported_projected_norm2": 2.037943880725364e-12,
+    "overlap_contribution_real": -7.945898783486664e-11,
+    "overlap_contribution_imag": -9.226958448136999e-09
+  },
+  {
+    "step": 39,
+    "time": 0.39,
+    "local_defect_norm2": 2.038344355865614e-12,
+    "transported_projected_norm2": 2.0382541186108647e-12,
+    "overlap_contribution_real": -7.888787924892322e-11,
+    "overlap_contribution_imag": -9.499001602900779e-09
+  },
+  {
+    "step": 40,
+    "time": 0.4,
+    "local_defect_norm2": 2.038671730639258e-12,
+    "transported_projected_norm2": 2.038576229720379e-12,
+    "overlap_contribution_real": -7.831583771925491e-11,
+    "overlap_contribution_imag": -9.772143342595855e-09
+  },
+  {
+    "step": 41,
+    "time": 0.41000000000000003,
+    "local_defect_norm2": 2.0390112245777486e-12,
+    "transported_projected_norm2": 2.038910290337131e-12,
+    "overlap_contribution_real": -7.774308317701234e-11,
+    "overlap_contribution_imag": -1.0046302634834696e-08
+  },
+  {
+    "step": 42,
+    "time": 0.42,
+    "local_defect_norm2": 2.0393628939770847e-12,
+    "transported_projected_norm2": 2.0392563570412896e-12,
+    "overlap_contribution_real": -7.716185089875114e-11,
+    "overlap_contribution_imag": -1.0321384686352664e-08
+  },
+  {
+    "step": 43,
+    "time": 0.43,
+    "local_defect_norm2": 2.0397267746191746e-12,
+    "transported_projected_norm2": 2.0396144660226724e-12,
+    "overlap_contribution_real": -7.657512538782229e-11,
+    "overlap_contribution_imag": -1.0597298370445144e-08
+  },
+  {
+    "step": 44,
+    "time": 0.44,
+    "local_defect_norm2": 2.040102881283561e-12,
+    "transported_projected_norm2": 2.0399846326433078e-12,
+    "overlap_contribution_real": -7.598061061445463e-11,
+    "overlap_contribution_imag": -1.0873953614025693e-08
+  },
+  {
+    "step": 45,
+    "time": 0.45,
+    "local_defect_norm2": 2.0404912072163946e-12,
+    "transported_projected_norm2": 2.040366851227275e-12,
+    "overlap_contribution_real": -7.537721514138533e-11,
+    "overlap_contribution_imag": -1.115124689867079e-08
+  },
+  {
+    "step": 46,
+    "time": 0.46,
+    "local_defect_norm2": 2.040891723995063e-12,
+    "transported_projected_norm2": 2.0407610945963935e-12,
+    "overlap_contribution_real": -7.476310318238004e-11,
+    "overlap_contribution_imag": -1.142907735332055e-08
+  },
+  {
+    "step": 47,
+    "time": 0.47000000000000003,
+    "local_defect_norm2": 2.0413043812440705e-12,
+    "transported_projected_norm2": 2.0411673139767875e-12,
+    "overlap_contribution_real": -7.413453384432975e-11,
+    "overlap_contribution_imag": -1.1707338354808634e-08
+  },
+  {
+    "step": 48,
+    "time": 0.48,
+    "local_defect_norm2": 2.041729106657199e-12,
+    "transported_projected_norm2": 2.0415854387971264e-12,
+    "overlap_contribution_real": -7.348998564386809e-11,
+    "overlap_contribution_imag": -1.1985927552546828e-08
+  },
+  {
+    "step": 49,
+    "time": 0.49,
+    "local_defect_norm2": 2.0421658057872823e-12,
+    "transported_projected_norm2": 2.0420153767492483e-12,
+    "overlap_contribution_real": -7.283364066724718e-11,
+    "overlap_contribution_imag": -1.2264735353638922e-08
+  },
+  {
+    "step": 50,
+    "time": 0.5,
+    "local_defect_norm2": 2.042614362267639e-12,
+    "transported_projected_norm2": 2.0424570138432065e-12,
+    "overlap_contribution_real": -7.215836454490378e-11,
+    "overlap_contribution_imag": -1.2543652482543026e-08
+  },
+  {
+    "step": 51,
+    "time": 0.51,
+    "local_defect_norm2": 2.0430746379345937e-12,
+    "transported_projected_norm2": 2.0429102145527666e-12,
+    "overlap_contribution_real": -7.146402742602832e-11,
+    "overlap_contribution_imag": -1.2822568959445915e-08
+  },
+  {
+    "step": 52,
+    "time": 0.52,
+    "local_defect_norm2": 2.0435464731462807e-12,
+    "transported_projected_norm2": 2.043374822028357e-12,
+    "overlap_contribution_real": -7.074836119365872e-11,
+    "overlap_contribution_imag": -1.3101378270745814e-08
+  },
+  {
+    "step": 53,
+    "time": 0.53,
+    "local_defect_norm2": 2.0440296870377203e-12,
+    "transported_projected_norm2": 2.043850658643568e-12,
+    "overlap_contribution_real": -7.000878579081808e-11,
+    "overlap_contribution_imag": -1.3379966103169351e-08
+  },
+  {
+    "step": 54,
+    "time": 0.54,
+    "local_defect_norm2": 2.0445240779677182e-12,
+    "transported_projected_norm2": 2.0443375260700077e-12,
+    "overlap_contribution_real": -6.924819808161584e-11,
+    "overlap_contribution_imag": -1.365822471618026e-08
+  },
+  {
+    "step": 55,
+    "time": 0.55,
+    "local_defect_norm2": 2.0450294242360546e-12,
+    "transported_projected_norm2": 2.0448352062191797e-12,
+    "overlap_contribution_real": -6.845930395677237e-11,
+    "overlap_contribution_imag": -1.3936044280880498e-08
+  },
+  {
+    "step": 56,
+    "time": 0.56,
+    "local_defect_norm2": 2.045545484482856e-12,
+    "transported_projected_norm2": 2.0453434614687463e-12,
+    "overlap_contribution_real": -6.764965047535998e-11,
+    "overlap_contribution_imag": -1.4213319022469404e-08
+  },
+  {
+    "step": 57,
+    "time": 0.5700000000000001,
+    "local_defect_norm2": 2.0460719984992003e-12,
+    "transported_projected_norm2": 2.045862035653313e-12,
+    "overlap_contribution_real": -6.680649582405392e-11,
+    "overlap_contribution_imag": -1.448994074450475e-08
+  },
+  {
+    "step": 58,
+    "time": 0.58,
+    "local_defect_norm2": 2.0466086880696313e-12,
+    "transported_projected_norm2": 2.0463906546071425e-12,
+    "overlap_contribution_real": -6.593736299167126e-11,
+    "overlap_contribution_imag": -1.4765808977257625e-08
+  },
+  {
+    "step": 59,
+    "time": 0.59,
+    "local_defect_norm2": 2.047155257668259e-12,
+    "transported_projected_norm2": 2.046929027313569e-12,
+    "overlap_contribution_real": -6.50345565531305e-11,
+    "overlap_contribution_imag": -1.5040815310237053e-08
+  },
+  {
+    "step": 60,
+    "time": 0.6,
+    "local_defect_norm2": 2.0477113956663377e-12,
+    "transported_projected_norm2": 2.0474768463436075e-12,
+    "overlap_contribution_real": -6.410650309734872e-11,
+    "overlap_contribution_imag": -1.531486901956203e-08
+  },
+  {
+    "step": 61,
+    "time": 0.61,
+    "local_defect_norm2": 2.0482767750460204e-12,
+    "transported_projected_norm2": 2.0480337894800505e-12,
+    "overlap_contribution_real": -6.313718270359982e-11,
+    "overlap_contribution_imag": -1.5587866424430853e-08
+  },
+  {
+    "step": 62,
+    "time": 0.62,
+    "local_defect_norm2": 2.048851054783359e-12,
+    "transported_projected_norm2": 2.048599520136258e-12,
+    "overlap_contribution_real": -6.21410298554751e-11,
+    "overlap_contribution_imag": -1.585972211589759e-08
+  },
+  {
+    "step": 63,
+    "time": 0.63,
+    "local_defect_norm2": 2.0494338807685765e-12,
+    "transported_projected_norm2": 2.049173689008794e-12,
+    "overlap_contribution_real": -6.110715518299277e-11,
+    "overlap_contribution_imag": -1.613034487226346e-08
+  },
+  {
+    "step": 64,
+    "time": 0.64,
+    "local_defect_norm2": 2.050024887014438e-12,
+    "transported_projected_norm2": 2.049755935109273e-12,
+    "overlap_contribution_real": -6.00383579899976e-11,
+    "overlap_contribution_imag": -1.639964330588407e-08
+  },
+  {
+    "step": 65,
+    "time": 0.65,
+    "local_defect_norm2": 2.0506236974820397e-12,
+    "transported_projected_norm2": 2.050345886756257e-12,
+    "overlap_contribution_real": -5.893218502603927e-11,
+    "overlap_contribution_imag": -1.666755089329244e-08
+  },
+  {
+    "step": 66,
+    "time": 0.66,
+    "local_defect_norm2": 2.0512299264400398e-12,
+    "transported_projected_norm2": 2.0509431632064582e-12,
+    "overlap_contribution_real": -5.77936471481996e-11,
+    "overlap_contribution_imag": -1.6933986343324493e-08
+  },
+  {
+    "step": 67,
+    "time": 0.67,
+    "local_defect_norm2": 2.0518431803340165e-12,
+    "transported_projected_norm2": 2.0515473759556664e-12,
+    "overlap_contribution_real": -5.661206037762108e-11,
+    "overlap_contribution_imag": -1.7198871283447128e-08
+  },
+  {
+    "step": 68,
+    "time": 0.68,
+    "local_defect_norm2": 2.0524630595851957e-12,
+    "transported_projected_norm2": 2.05215812970786e-12,
+    "overlap_contribution_real": -5.5392547496231135e-11,
+    "overlap_contribution_imag": -1.746215361865196e-08
+  },
+  {
+    "step": 69,
+    "time": 0.6900000000000001,
+    "local_defect_norm2": 2.053089159207027e-12,
+    "transported_projected_norm2": 2.0527750245528015e-12,
+    "overlap_contribution_real": -5.4137466458645804e-11,
+    "overlap_contribution_imag": -1.7723761546586225e-08
+  },
+  {
+    "step": 70,
+    "time": 0.7000000000000001,
+    "local_defect_norm2": 2.053721070968228e-12,
+    "transported_projected_norm2": 2.0533976564710464e-12,
+    "overlap_contribution_real": -5.284164057866036e-11,
+    "overlap_contribution_imag": -1.7983651045959272e-08
+  },
+  {
+    "step": 71,
+    "time": 0.71,
+    "local_defect_norm2": 2.05435838455281e-12,
+    "transported_projected_norm2": 2.0540256196335815e-12,
+    "overlap_contribution_real": -5.1507474236038405e-11,
+    "overlap_contribution_imag": -1.824177256212849e-08
+  },
+  {
+    "step": 72,
+    "time": 0.72,
+    "local_defect_norm2": 2.0550006887456807e-12,
+    "transported_projected_norm2": 2.0546585074840204e-12,
+    "overlap_contribution_real": -5.013501028648759e-11,
+    "overlap_contribution_imag": -1.84980741738501e-08
+  },
+  {
+    "step": 73,
+    "time": 0.73,
+    "local_defect_norm2": 2.0556475737873313e-12,
+    "transported_projected_norm2": 2.055295913932212e-12,
+    "overlap_contribution_real": -4.872335953693549e-11,
+    "overlap_contribution_imag": -1.8752532659713278e-08
+  },
+  {
+    "step": 74,
+    "time": 0.74,
+    "local_defect_norm2": 2.0562986322188194e-12,
+    "transported_projected_norm2": 2.0559374356603495e-12,
+    "overlap_contribution_real": -4.727235001351438e-11,
+    "overlap_contribution_imag": -1.9005113096082233e-08
+  },
+  {
+    "step": 75,
+    "time": 0.75,
+    "local_defect_norm2": 2.0569534603074415e-12,
+    "transported_projected_norm2": 2.0565826729946012e-12,
+    "overlap_contribution_real": -4.578294604206436e-11,
+    "overlap_contribution_imag": -1.9255783982015665e-08
+  },
+  {
+    "step": 76,
+    "time": 0.76,
+    "local_defect_norm2": 2.0576116604305806e-12,
+    "transported_projected_norm2": 2.0572312311087244e-12,
+    "overlap_contribution_real": -4.42567446875626e-11,
+    "overlap_contribution_imag": -1.9504547244086063e-08
+  },
+  {
+    "step": 77,
+    "time": 0.77,
+    "local_defect_norm2": 2.058272841159726e-12,
+    "transported_projected_norm2": 2.0578827225464406e-12,
+    "overlap_contribution_real": -4.269463564392242e-11,
+    "overlap_contribution_imag": -1.975137439404306e-08
+  },
+  {
+    "step": 78,
+    "time": 0.78,
+    "local_defect_norm2": 2.0589366201835993e-12,
+    "transported_projected_norm2": 2.058536767556118e-12,
+    "overlap_contribution_real": -4.1087239020403004e-11,
+    "overlap_contribution_imag": -1.9996273135767272e-08
+  },
+  {
+    "step": 79,
+    "time": 0.79,
+    "local_defect_norm2": 2.059602624831848e-12,
+    "transported_projected_norm2": 2.0591929962902952e-12,
+    "overlap_contribution_real": -3.945934385554099e-11,
+    "overlap_contribution_imag": -2.0239243674428783e-08
+  },
+  {
+    "step": 80,
+    "time": 0.8,
+    "local_defect_norm2": 2.060270493595875e-12,
+    "transported_projected_norm2": 2.05985104981768e-12,
+    "overlap_contribution_real": -3.7776691454593165e-11,
+    "overlap_contribution_imag": -2.0480291773238532e-08
+  },
+  {
+    "step": 81,
+    "time": 0.81,
+    "local_defect_norm2": 2.0609398776021166e-12,
+    "transported_projected_norm2": 2.0605105813039144e-12,
+    "overlap_contribution_real": -3.607367373568193e-11,
+    "overlap_contribution_imag": -2.0719435245499114e-08
+  },
+  {
+    "step": 82,
+    "time": 0.8200000000000001,
+    "local_defect_norm2": 2.0616104426866955e-12,
+    "transported_projected_norm2": 2.0611712580542266e-12,
+    "overlap_contribution_real": -3.433009798021453e-11,
+    "overlap_contribution_imag": -2.0956704271267376e-08
+  },
+  {
+    "step": 83,
+    "time": 0.8300000000000001,
+    "local_defect_norm2": 2.06228186855987e-12,
+    "transported_projected_norm2": 2.061832761759503e-12,
+    "overlap_contribution_real": -3.2560714808242494e-11,
+    "overlap_contribution_imag": -2.119211504703543e-08
+  },
+  {
+    "step": 84,
+    "time": 0.84,
+    "local_defect_norm2": 2.0629538525831166e-12,
+    "transported_projected_norm2": 2.0624947908140353e-12,
+    "overlap_contribution_real": -3.0753948832644504e-11,
+    "overlap_contribution_imag": -2.1425704732309737e-08
+  },
+  {
+    "step": 85,
+    "time": 0.85,
+    "local_defect_norm2": 2.0636261094339573e-12,
+    "transported_projected_norm2": 2.0631570601257895e-12,
+    "overlap_contribution_real": -2.8920922191017398e-11,
+    "overlap_contribution_imag": -2.165752690747911e-08
+  },
+  {
+    "step": 86,
+    "time": 0.86,
+    "local_defect_norm2": 2.0642983719534206e-12,
+    "transported_projected_norm2": 2.0638193038249037e-12,
+    "overlap_contribution_real": -2.7057116843209845e-11,
+    "overlap_contribution_imag": -2.1887608284810598e-08
+  },
+  {
+    "step": 87,
+    "time": 0.87,
+    "local_defect_norm2": 2.0649703938041766e-12,
+    "transported_projected_norm2": 2.064481274366172e-12,
+    "overlap_contribution_real": -2.5173519242420217e-11,
+    "overlap_contribution_imag": -2.2116030482399267e-08
+  },
+  {
+    "step": 88,
+    "time": 0.88,
+    "local_defect_norm2": 2.0656419477347412e-12,
+    "transported_projected_norm2": 2.065142745790232e-12,
+    "overlap_contribution_real": -2.325741226387714e-11,
+    "overlap_contribution_imag": -2.2342815480638517e-08
+  },
+  {
+    "step": 89,
+    "time": 0.89,
+    "local_defect_norm2": 2.0663128295995567e-12,
+    "transported_projected_norm2": 2.0658035119351903e-12,
+    "overlap_contribution_real": -2.1303564446919516e-11,
+    "overlap_contribution_imag": -2.256805730505948e-08
+  },
+  {
+    "step": 90,
+    "time": 0.9,
+    "local_defect_norm2": 2.0669828566207607e-12,
+    "transported_projected_norm2": 2.0664633892018793e-12,
+    "overlap_contribution_real": -1.935860874573718e-11,
+    "overlap_contribution_imag": -2.2791819675612205e-08
+  },
+  {
+    "step": 91,
+    "time": 0.91,
+    "local_defect_norm2": 2.067651868670093e-12,
+    "transported_projected_norm2": 2.0671222171995865e-12,
+    "overlap_contribution_real": -1.7379059830498126e-11,
+    "overlap_contribution_imag": -2.301415148283756e-08
+  },
+  {
+    "step": 92,
+    "time": 0.92,
+    "local_defect_norm2": 2.0683197302688825e-12,
+    "transported_projected_norm2": 2.0677798577858054e-12,
+    "overlap_contribution_real": -1.5378849776259688e-11,
+    "overlap_contribution_imag": -2.3235151098457265e-08
+  },
+  {
+    "step": 93,
+    "time": 0.93,
+    "local_defect_norm2": 2.0689863294535396e-12,
+    "transported_projected_norm2": 2.068436196666016e-12,
+    "overlap_contribution_real": -1.335984738635421e-11,
+    "overlap_contribution_imag": -2.345490586290763e-08
+  },
+  {
+    "step": 94,
+    "time": 0.9400000000000001,
+    "local_defect_norm2": 2.069651578304309e-12,
+    "transported_projected_norm2": 2.0690911439464547e-12,
+    "overlap_contribution_real": -1.1325770398508815e-11,
+    "overlap_contribution_imag": -2.367349212898855e-08
+  },
+  {
+    "step": 95,
+    "time": 0.9500000000000001,
+    "local_defect_norm2": 2.070315414552641e-12,
+    "transported_projected_norm2": 2.0697446345562272e-12,
+    "overlap_contribution_real": -9.303568474243584e-12,
+    "overlap_contribution_imag": -2.3891000603937544e-08
+  },
+  {
+    "step": 96,
+    "time": 0.96,
+    "local_defect_norm2": 2.0709777996948314e-12,
+    "transported_projected_norm2": 2.070396627387937e-12,
+    "overlap_contribution_real": -7.217514870913498e-12,
+    "overlap_contribution_imag": -2.4107514488268096e-08
+  },
+  {
+    "step": 97,
+    "time": 0.97,
+    "local_defect_norm2": 2.0716387225149624e-12,
+    "transported_projected_norm2": 2.0710471067793086e-12,
+    "overlap_contribution_real": -5.177309080964586e-12,
+    "overlap_contribution_imag": -2.4323151704687145e-08
+  },
+  {
+    "step": 98,
+    "time": 0.98,
+    "local_defect_norm2": 2.0722981942827568e-12,
+    "transported_projected_norm2": 2.071696081406245e-12,
+    "overlap_contribution_real": -3.108033618528799e-12,
+    "overlap_contribution_imag": -2.4537988239704673e-08
+  },
+  {
+    "step": 99,
+    "time": 0.99,
+    "local_defect_norm2": 2.072956253293669e-12,
+    "transported_projected_norm2": 2.0723435844456813e-12,
+    "overlap_contribution_real": -1.052824386612367e-12,
+    "overlap_contribution_imag": -2.475214832856957e-08
+  }
+]

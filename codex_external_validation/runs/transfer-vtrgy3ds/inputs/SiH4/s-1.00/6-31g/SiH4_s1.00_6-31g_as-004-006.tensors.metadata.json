@@ -1,0 +1,75 @@
+{
+  "case": "SiH4_s1.00",
+  "family": "SiH4",
+  "scale": 1.0,
+  "geometry": [
+    [
+      "Si",
+      [
+        0.0,
+        0.0,
+        0.0
+      ]
+    ],
+    [
+      "H",
+      [
+        0.8544783984006462,
+        0.8544783984006462,
+        0.8544783984006462
+      ]
+    ],
+    [
+      "H",
+      [
+        0.8544783984006462,
+        -0.8544783984006462,
+        -0.8544783984006462
+      ]
+    ],
+    [
+      "H",
+      [
+        -0.8544783984006462,
+        0.8544783984006462,
+        -0.8544783984006462
+      ]
+    ],
+    [
+      "H",
+      [
+        -0.8544783984006462,
+        -0.8544783984006462,
+        0.8544783984006462
+      ]
+    ]
+  ],
+  "basis": "6-31g",
+  "charge": 0,
+  "spin": 0,
+  "active_electrons": 4,
+  "active_spatial_orbitals": 5,
+  "unit": "Angstrom",
+  "hf_energy_hartree": -291.17373045769716,
+  "scf_converged": true,
+  "total_electrons": 18,
+  "total_spatial_orbitals": 21,
+  "active_spatial_indices": [
+    7,
+    8,
+    9,
+    10,
+    11
+  ],
+  "frozen_occupied_spatial_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "hf_tensor_expectation_residual": 5.684341886080801e-13,
+  "tensor_sha256": "8166aeb7b6015859eb07e44e4e96507c1cc6949b5cd1e8863e0f468d98c1a309"
+}

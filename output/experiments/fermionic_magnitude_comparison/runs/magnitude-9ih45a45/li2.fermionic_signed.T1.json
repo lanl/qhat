@@ -1,0 +1,22 @@
+{
+  "case": "li2",
+  "ordering": "fermionic_signed",
+  "T": 1.0,
+  "steps": 100,
+  "bch_hf_norm": 0.0132143711369337,
+  "one_minus_overlap": 2.85529805696416e-10,
+  "infidelity": 5.710596113113047e-10,
+  "naive_normalized_one_minus_overlap": 2.8552948894144947e-10,
+  "inside_sector_error": 5.710596113113048e-10,
+  "outside_sector_error": 5.403981187945455e-37,
+  "particle_number_leakage": 4.180231713545998e-37,
+  "spin_sector_leakage": 4.1802369565656986e-37,
+  "conditional_sector_infidelity": 5.710596113113236e-10,
+  "exact_spin_leakage": 1.1004297026790887e-37,
+  "exact_norm_drift": 1.1257661469699087e-13,
+  "trotter_norm_drift": 1.1468603844377867e-13,
+  "below_analysis_floor": false,
+  "seconds": 0.014573374995961785,
+  "prior_signed_E": 2.855298057220174e-10,
+  "signed_anchor_match": true
+}

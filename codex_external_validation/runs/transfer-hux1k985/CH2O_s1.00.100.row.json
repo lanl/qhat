@@ -1,0 +1,20 @@
+{
+  "case": "CH2O_s1.00",
+  "family": "CH2O",
+  "scale": 1.0,
+  "ordering": "jw_signed",
+  "T": 1.0,
+  "steps": 200,
+  "one_minus_overlap": 3.940428762722873e-08,
+  "infidelity": 7.880857370175957e-08,
+  "naive_normalized_one_minus_overlap": 3.9404287610622646e-08,
+  "inside_sector_error": 7.798428367007609e-08,
+  "outside_sector_error": 8.242900316834957e-10,
+  "particle_number_leakage": 8.224973512062827e-10,
+  "spin_sector_leakage": 8.242900316834957e-10,
+  "conditional_sector_infidelity": 7.798428373435627e-08,
+  "exact_spin_leakage": 0.0,
+  "exact_norm_drift": 6.661338147750939e-16,
+  "trotter_norm_drift": 6.006306563222097e-13,
+  "below_analysis_floor": false
+}

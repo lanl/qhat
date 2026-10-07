@@ -1,0 +1,9 @@
+{
+  "prediction_rows": 39,
+  "new_time_rows": 3,
+  "max_relative_prediction_difference": 0.009537759916323774,
+  "r100_max_relative_prediction_difference": 0.0005981305798011816,
+  "r200_max_relative_prediction_difference": 0.00014958406965714932,
+  "source_sha256": "33b18b8177a4b0328d88e49282092168095fdf53f70b80d9475b138104185112",
+  "addendum_sha256": "758cc62b8565f97f5042ae27fc4c49973bb0c77a8cd96f8303aaeeab6829d25e"
+}

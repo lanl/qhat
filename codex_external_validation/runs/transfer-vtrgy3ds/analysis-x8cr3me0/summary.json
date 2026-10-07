@@ -1,0 +1,50 @@
+{
+  "campaign": "/Users/albertlee0125/Repos/qhat/codex_external_validation/runs/transfer-vtrgy3ds",
+  "unique_families": 4,
+  "geometries": 8,
+  "baseline_rows": 216,
+  "control_rows": 56,
+  "prediction_rows": 216,
+  "excluded_below_floor_rows": 1,
+  "primary_eligible_rows_r100_r200": 143,
+  "primary_prediction_failures": 0,
+  "r100_dynamic_max_relative_error": 0.00101497557320962,
+  "r200_dynamic_max_relative_error": 0.0005057146776232813,
+  "dynamic_median_relative_error": 2.302050295244218e-05,
+  "static_median_relative_error": 0.04337483607972126,
+  "static_max_relative_error": 0.2144040656210584,
+  "rank_eligible_pairs": 72,
+  "rank_excluded_pairs": 0,
+  "dynamic_rank_correct": 72,
+  "static_rank_correct": 72,
+  "case_time_exact_winner_counts": {
+    "fermionic_signed": 6,
+    "jw_signed": 18,
+    "jw_magnitude": 0
+  },
+  "r_scaling_slope_min_max": [
+    -2.0006298067899486,
+    -1.9988921858678717
+  ],
+  "max_norm_drift": 1.311839525897085e-12,
+  "max_defect_reconstruction": 5.144140275100358e-14,
+  "max_overlap_reconstruction": 5.0104627708058945e-14,
+  "max_projected_reconstruction_difference": 1.107717924683652e-17,
+  "fermionic_max_spin_leakage": 5.04172425712769e-37,
+  "jw_signed_max_spin_leakage": 1.172947950545761e-07,
+  "baseline_C_min_max": [
+    83.19762988625874,
+    99.77174352675672
+  ],
+  "baseline_net_destructive_count": 0,
+  "source_sha256": "e0e072fcb598cd5b15b7fdf8161d1b0d69c3a7290190c7c0d483b986f4adcf23",
+  "repeat": {
+    "path": "/Users/albertlee0125/Repos/qhat/codex_external_validation/runs/transfer-hux1k985",
+    "all_272_result_rows_exactly_equal": false,
+    "all_physical_metrics_within_rtol1e_8_atol1e_20": true,
+    "physical_metric_comparisons": 2288,
+    "max_relative_difference_above_1e_20": 3.2221079599655757e-13,
+    "all_216_predictions_exactly_equal": true,
+    "all_input_and_order_hashes_equal": true
+  }
+}

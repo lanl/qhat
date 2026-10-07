@@ -1,0 +1,20 @@
+{
+  "case": "HCN_s1.25",
+  "family": "HCN",
+  "scale": 1.25,
+  "ordering": "fermionic_signed",
+  "T": 1.0,
+  "steps": 200,
+  "one_minus_overlap": 2.5158592467137882e-08,
+  "infidelity": 5.0317184301320985e-08,
+  "naive_normalized_one_minus_overlap": 2.5158592653617973e-08,
+  "inside_sector_error": 5.0317184301320965e-08,
+  "outside_sector_error": 1.6145464086938596e-38,
+  "particle_number_leakage": 1.6130217959646734e-38,
+  "spin_sector_leakage": 1.6145464086938596e-38,
+  "conditional_sector_infidelity": 5.031718430132962e-08,
+  "exact_spin_leakage": 0.0,
+  "exact_norm_drift": 5.551115123125783e-16,
+  "trotter_norm_drift": 5.617728504603292e-13,
+  "below_analysis_floor": false
+}
