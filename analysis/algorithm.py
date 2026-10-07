@@ -60,6 +60,10 @@ class NewTextbookQPE(TextbookQPE):
     def from_num_phase_qubits(cls, unitary, num_phase_qubits):
         return cls(unitary, num_phase_qubits)
 
+    @property
+    def num_ancilla_qubits(self):
+        return self.m_bits
+
 # -------------------------------------------------------------------------------------------------
 
 # We define our own version of QubitizationQPE, in order to fix a bug
@@ -105,7 +109,7 @@ def build_qpe(qpe_class, config_algorithm: AlgorithmConfiguration, unitary, phas
                        f"probability of failure = {config_algorithm.probability_of_failure}")
         qpe = qpe_class.from_requirements(
                 unitary, phase_error, config_algorithm.probability_of_failure, **components)
-    logger.verbose(f"-- number of phase qubits = {qpe.m_bits}")
+    logger.verbose(f"-- number of phase qubits = {qpe.num_ancilla_qubits}")
     return qpe
 
 # -------------------------------------------------------------------------------------------------

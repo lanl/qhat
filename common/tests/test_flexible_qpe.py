@@ -128,12 +128,22 @@ class TestConstruction:
     def test_defaults_and_signature(self):
         u = small_trotterization()
         qpe = FlexibleQPE(u, 3)
-        assert qpe.m_bits == 3
+        assert qpe.num_ancilla_qubits == 3
         assert qpe.ancilla_prep == RectangularWindowState(3)
         assert qpe.qft_inv == QFTTextBook(3, with_reverse=True).adjoint()
         assert [reg.name for reg in qpe.signature] == ['qpe_reg', 'q']
         assert qpe.signature.n_qubits() == 3 + 2
         assert str(qpe) == 'FlexibleQPE[3]'
+
+    def test_qubit_counts(self):
+        qpe = FlexibleQPE(TwoQubitPlainBloq(), 3)
+        assert qpe.num_ancilla_qubits == 3
+        assert qpe.num_state_qubits == 2
+        assert qpe.num_total_qubits == qpe.signature.n_qubits() == 5
+
+    def test_num_ancilla_qubits_keyword(self):
+        u = small_trotterization()
+        assert FlexibleQPE(u, num_ancilla_qubits=3) == FlexibleQPE(u, 3)
 
     def test_explicit_components_equal_defaults(self):
         u = small_trotterization()
@@ -179,7 +189,7 @@ class TestConstruction:
             small_trotterization(), 0.1, 0.2, ancilla_prep=RecordingWindowState)
         assert calls == [(0.1, 0.2)]
         assert qpe.ancilla_prep == RecordingWindowState(2)
-        assert qpe.m_bits == 2
+        assert qpe.num_ancilla_qubits == 2
 
     def test_from_requirements_qft_inv_factory_receives_register_size(self):
         sizes = []
@@ -189,7 +199,7 @@ class TestConstruction:
             return QFTTextBook(m, with_reverse=True).adjoint()
 
         qpe = FlexibleQPE.from_requirements(small_trotterization(), 1 / 8, 0.1, qft_inv=factory)
-        assert sizes == [qpe.m_bits] == [6]
+        assert sizes == [qpe.num_ancilla_qubits] == [6]
 
     def test_from_num_phase_qubits(self):
         u = small_trotterization()

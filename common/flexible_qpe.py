@@ -1,11 +1,11 @@
 """
 Quantum phase estimation with a pluggable window state, unitary, and inverse QFT.
 
-`FlexibleQPE` is modeled on Qualtran's `TextbookQPE`. Its fields (`unitary`, `m_bits`, then
-phase-register components that default to textbook QPE) follow Qualtran 0.4.0, except that
-`ctrl_state_prep` is renamed `ancilla_prep` and is a window state, as in newer Qualtran releases.
-Its registers are `qpe_reg` plus the unitary's registers. It differs from Qualtran 0.4.0's
-`TextbookQPE` in that it:
+`FlexibleQPE` is modeled on Qualtran's `TextbookQPE`. Its fields (the unitary, the phase-register
+size, then phase-register components that default to textbook QPE) follow Qualtran 0.4.0, except
+that `m_bits` and `ctrl_state_prep` are renamed `num_ancilla_qubits` and `ancilla_prep`, and
+`ancilla_prep` is a window state, as in newer Qualtran releases. Its registers are `qpe_reg` plus
+the unitary's registers. It differs from Qualtran 0.4.0's `TextbookQPE` in that it:
 
 - decomposes natively as a Bloq, so it supports `decompose_bloq()` and `tensor_contract()` for
   unitaries that are plain Bloqs (0.4.0's cirq-based `cirq.pow` path fails for those);
@@ -58,44 +58,60 @@ class FlexibleQPE(GateWithRegisters):
 
     Args:
         unitary: Bloq (THRU registers only) whose eigenphases are estimated.
-        m_bits: Number of qubits in the phase register.
+        num_ancilla_qubits: Number of qubits in the phase (ancilla) register (Qualtran's
+            `m_bits`).
         ancilla_prep: Window state prepared on the phase register. Defaults to
-            `RectangularWindowState(m_bits)` (a Hadamard on each phase qubit).
+            `RectangularWindowState(num_ancilla_qubits)` (a Hadamard on each phase qubit).
         qft_inv: Inverse QFT on the phase register. Defaults to
-            `QFTTextBook(m_bits, with_reverse=True).adjoint()`.
+            `QFTTextBook(num_ancilla_qubits, with_reverse=True).adjoint()`.
 
     Registers:
-        qpe_reg: Phase register of type `QFxp(m_bits, m_bits)`; must start in |0...0>.
-        target registers: All registers of `unitary.signature`.
+        qpe_reg: Phase register of `num_ancilla_qubits` qubits, of type `QFxp(m, m)` with
+            `m = num_ancilla_qubits`; must start in |0...0>.
+        target registers: All registers of `unitary.signature` (`num_state_qubits` qubits).
     """
 
     unitary: Bloq
-    m_bits: SymbolicInt
+    num_ancilla_qubits: SymbolicInt
     ancilla_prep: QPEWindowStateBase = attrs.field()
     qft_inv: Bloq = attrs.field()
 
     @ancilla_prep.default
     def _default_ancilla_prep(self):
-        return RectangularWindowState(self.m_bits)
+        return RectangularWindowState(self.num_ancilla_qubits)
 
     @qft_inv.default
     def _default_inverse_qft(self):
-        return QFTTextBook(self.m_bits, with_reverse=True).adjoint()
+        return QFTTextBook(self.num_ancilla_qubits, with_reverse=True).adjoint()
 
     def __attrs_post_init__(self):
-        if not is_symbolic(self.m_bits):
-            if self.ancilla_prep.m_bits != self.m_bits:
+        if not is_symbolic(self.num_ancilla_qubits):
+            if self.ancilla_prep.m_bits != self.num_ancilla_qubits:
                 raise ValueError(
                     f"ancilla_prep acts on {self.ancilla_prep.m_bits} qubits but the phase "
-                    f"register has {self.m_bits}."
+                    f"register has {self.num_ancilla_qubits}."
                 )
-            if self.qft_inv.signature.n_qubits() != self.m_bits:
+            if self.qft_inv.signature.n_qubits() != self.num_ancilla_qubits:
                 raise ValueError(
                     f"qft_inv acts on {self.qft_inv.signature.n_qubits()} qubits but the phase "
-                    f"register has {self.m_bits}."
+                    f"register has {self.num_ancilla_qubits}."
                 )
         if any(reg.name == 'qpe_reg' for reg in self.unitary.signature):
             raise ValueError("The unitary may not have a register named 'qpe_reg'.")
+
+    @cached_property
+    def num_state_qubits(self) -> int:
+        """Number of qubits the unitary acts on (the state whose eigenphase is estimated)."""
+        return sum(reg.total_bits() for reg in self.target_registers)
+
+    @cached_property
+    def num_total_qubits(self) -> SymbolicInt:
+        """Total width of the registers, `num_ancilla_qubits + num_state_qubits`.
+
+        This excludes any scratch qubits allocated inside the unitary; for the peak number of
+        qubits in use, see `get_cost_value(qpe, QubitCount())`.
+        """
+        return self.num_ancilla_qubits + self.num_state_qubits
 
     @cached_property
     def target_registers(self) -> Tuple[Register, ...]:
@@ -110,7 +126,7 @@ class FlexibleQPE(GateWithRegisters):
         return Signature([*self.phase_registers, *self.target_registers])
 
     def __str__(self) -> str:
-        return f'FlexibleQPE[{self.m_bits}]'
+        return f'FlexibleQPE[{self.num_ancilla_qubits}]'
 
     @classmethod
     def from_requirements(
@@ -166,60 +182,63 @@ class FlexibleQPE(GateWithRegisters):
     def build_composite_bloq(
         self, bb: BloqBuilder, qpe_reg: SoquetT, **target_soqs: SoquetT
     ) -> Dict[str, SoquetT]:
-        if is_symbolic(self.m_bits):
-            raise NotImplementedError(f"Cannot decompose {self} with symbolic m_bits.")
+        m = self.num_ancilla_qubits
+        if is_symbolic(m):
+            raise NotImplementedError(
+                f"Cannot decompose {self} with symbolic num_ancilla_qubits.")
         qpe_reg = bb.add(self.ancilla_prep, qpe_reg=qpe_reg)
         qs = bb.split(qpe_reg)
         target_names = [reg.name for reg in self.target_registers]
-        for j in range(self.m_bits):
+        for j in range(m):
             # bb.split is big-endian, so the last qubit is the least significant bit.
             _, add_controlled = self.unitary_power(2**j).get_ctrl_system(CtrlSpec())
-            (qs[self.m_bits - 1 - j],), out_soqs = add_controlled(
-                bb, [qs[self.m_bits - 1 - j]], target_soqs
-            )
+            (qs[m - 1 - j],), out_soqs = add_controlled(bb, [qs[m - 1 - j]], target_soqs)
             target_soqs = dict(zip(target_names, out_soqs))
         qpe_reg = bb.join(qs, dtype=self.phase_registers[0].dtype)
         qpe_reg = bb.add(self.qft_inv, q=qpe_reg)
         return {'qpe_reg': qpe_reg, **target_soqs}
 
     def build_call_graph(self, ssa: 'SympySymbolAllocator') -> Set['BloqCountT']:
-        if is_symbolic(self.m_bits):
+        m = self.num_ancilla_qubits
+        if is_symbolic(m):
             # Assumes the unitary is not fast-forwardable.
             return {
                 (self.ancilla_prep, 1),
-                (self.unitary.controlled(), 2**self.m_bits - 1),
+                (self.unitary.controlled(), 2**m - 1),
                 (self.qft_inv, 1),
             }
         counts = Counter([self.ancilla_prep, self.qft_inv])
-        counts.update(self.controlled_power(j) for j in range(self.m_bits))
+        counts.update(self.controlled_power(j) for j in range(m))
         return set(counts.items())
 
     def my_static_costs(self, cost_key: 'CostKey'):
-        if not isinstance(cost_key, QubitCount) or is_symbolic(self.m_bits):
+        m = self.num_ancilla_qubits
+        if not isinstance(cost_key, QubitCount) or is_symbolic(m):
             return NotImplemented
-        n = sum(reg.total_bits() for reg in self.target_registers)
+        n = self.num_state_qubits
         widths = [
             get_cost_value(self.ancilla_prep, cost_key) + n,
             get_cost_value(self.qft_inv, cost_key) + n,
         ]
-        for j in range(self.m_bits):
+        for j in range(m):
             u_k = self.unitary_power(2**j)
             if isinstance(u_k, Power):
                 # Same width as a single controlled U; avoids decomposing 2^j copies.
                 u_k = self.unitary
-            widths.append(get_cost_value(u_k.controlled(), cost_key) + self.m_bits - 1)
+            widths.append(get_cost_value(u_k.controlled(), cost_key) + m - 1)
         return max(widths)
 
     def _phase_blocks(self) -> np.ndarray:
         """Return W with W[k] = (the matrix applied to the target when qpe_reg = |k>)."""
+        m = self.num_ancilla_qubits
         a = [self.unitary.tensor_contract()]
-        for j in range(1, self.m_bits):
+        for j in range(1, m):
             u_k = self.unitary_power(2**j)
             a.append(a[-1] @ a[-1] if isinstance(u_k, Power) else u_k.tensor_contract())
         d = a[0].shape[0]
-        w = np.empty((2**self.m_bits, d, d), dtype=np.complex128)
+        w = np.empty((2**m, d, d), dtype=np.complex128)
         w[0] = np.eye(d)
-        for k in range(1, 2**self.m_bits):
+        for k in range(1, 2**m):
             h = k.bit_length() - 1
             w[k] = a[h] @ w[k - 2**h]
         return w

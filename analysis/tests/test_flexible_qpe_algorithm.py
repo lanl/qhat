@@ -62,7 +62,7 @@ class TestRouting:
         config = make_config(method="QPE: qualtran textbook", num_phase_qubits=3)
         algorithm = build_algorithm(config, unitary)
         assert isinstance(algorithm, NewTextbookQPE)
-        assert algorithm.m_bits == 3
+        assert algorithm.num_ancilla_qubits == 3
 
 
 @pytest.mark.parametrize("method, qpe_class", [
@@ -77,14 +77,14 @@ class TestPhaseQubits:
                              probability_of_failure=1e-6)
         algorithm = build_algorithm(config, trotter)
         assert isinstance(algorithm, qpe_class)
-        assert algorithm.m_bits == 5
+        assert algorithm.num_ancilla_qubits == 5
 
     def test_from_energy_error_and_probability_of_failure(self, trotter, method, qpe_class):
         dE, p_fail = 0.05, 0.1
         algorithm = build_algorithm(
             make_config(method=method, energy_error=dE, probability_of_failure=p_fail), trotter)
         phase_error = dE * trotter.time / (2 * math.pi)
-        assert algorithm.m_bits == textbook_qubits(phase_error, p_fail)
+        assert algorithm.num_ancilla_qubits == textbook_qubits(phase_error, p_fail)
 
     def test_requires_probability_of_failure(self, trotter, method, qpe_class):
         with pytest.raises(ValueError, match="probability_of_failure"):
@@ -113,7 +113,7 @@ def test_driver_evolution_time_gives_P0_precision_bits(method, W, dE):
     u = Trotterization.from_method(
         pauli_terms=[("XZ", 0.5), ("ZY", 0.3)], method="second order", time=t, num_steps=1)
     algorithm = build_algorithm(config, u)
-    assert algorithm.m_bits == P0 + math.ceil(math.log2(2 + 1 / (2 * p_fail)))
+    assert algorithm.num_ancilla_qubits == P0 + math.ceil(math.log2(2 + 1 / (2 * p_fail)))
 
 
 def test_tensor_contract_shape(unitary):
