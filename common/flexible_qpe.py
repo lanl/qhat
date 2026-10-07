@@ -1,9 +1,10 @@
 """
 Quantum phase estimation with a pluggable window state, unitary, and inverse QFT.
 
-`FlexibleQPE` mirrors the interface of `TextbookQPE` in Qualtran releases newer than 0.4.0
-(fields `unitary`, `ctrl_state_prep`, `qft_inv`; registers `qpe_reg` + the unitary's registers),
-so QHAT can migrate to the upstream framework later. It differs from Qualtran 0.4.0's
+`FlexibleQPE` is modeled on Qualtran's `TextbookQPE`. Its fields (`unitary`, `m_bits`, then
+phase-register components that default to textbook QPE) follow Qualtran 0.4.0, except that
+`ctrl_state_prep` is renamed `ancilla_prep` and is a window state, as in newer Qualtran releases.
+Its registers are `qpe_reg` plus the unitary's registers. It differs from Qualtran 0.4.0's
 `TextbookQPE` in that it:
 
 - decomposes natively as a Bloq, so it supports `decompose_bloq()` and `tensor_contract()` for
@@ -43,7 +44,7 @@ class FlexibleQPE(GateWithRegisters):
       |0> -│         │-----------------------@------│         │---M--- [m1]:highest bit
            │         │                       |      │         │
       |0> -│         │-----------------@-----+------│         │---M--- [m2]
-           │CtrlState│                 |     |      │ QFT_inv │
+           │ Ancilla │                 |     |      │ QFT_inv │
       |0> -│  Prep   │-----------@-----+-----+------│         │---M--- [m3]
            │         │           |     |     |      │         │
       |0> -│         │-----@-----+-----+-----+------│         │---M--- [m4]:lowest bit
@@ -57,7 +58,9 @@ class FlexibleQPE(GateWithRegisters):
 
     Args:
         unitary: Bloq (THRU registers only) whose eigenphases are estimated.
-        ctrl_state_prep: Window state prepared on the phase register.
+        m_bits: Number of qubits in the phase register.
+        ancilla_prep: Window state prepared on the phase register. Defaults to
+            `RectangularWindowState(m_bits)` (a Hadamard on each phase qubit).
         qft_inv: Inverse QFT on the phase register. Defaults to
             `QFTTextBook(m_bits, with_reverse=True).adjoint()`.
 
@@ -67,25 +70,32 @@ class FlexibleQPE(GateWithRegisters):
     """
 
     unitary: Bloq
-    ctrl_state_prep: QPEWindowStateBase
+    m_bits: SymbolicInt
+    ancilla_prep: QPEWindowStateBase = attrs.field()
     qft_inv: Bloq = attrs.field()
+
+    @ancilla_prep.default
+    def _default_ancilla_prep(self):
+        return RectangularWindowState(self.m_bits)
 
     @qft_inv.default
     def _default_inverse_qft(self):
         return QFTTextBook(self.m_bits, with_reverse=True).adjoint()
 
     def __attrs_post_init__(self):
-        if not is_symbolic(self.m_bits) and self.qft_inv.signature.n_qubits() != self.m_bits:
-            raise ValueError(
-                f"qft_inv acts on {self.qft_inv.signature.n_qubits()} qubits but the phase "
-                f"register has {self.m_bits}."
-            )
+        if not is_symbolic(self.m_bits):
+            if self.ancilla_prep.m_bits != self.m_bits:
+                raise ValueError(
+                    f"ancilla_prep acts on {self.ancilla_prep.m_bits} qubits but the phase "
+                    f"register has {self.m_bits}."
+                )
+            if self.qft_inv.signature.n_qubits() != self.m_bits:
+                raise ValueError(
+                    f"qft_inv acts on {self.qft_inv.signature.n_qubits()} qubits but the phase "
+                    f"register has {self.m_bits}."
+                )
         if any(reg.name == 'qpe_reg' for reg in self.unitary.signature):
             raise ValueError("The unitary may not have a register named 'qpe_reg'.")
-
-    @cached_property
-    def m_bits(self) -> SymbolicInt:
-        return self.ctrl_state_prep.m_bits
 
     @cached_property
     def target_registers(self) -> Tuple[Register, ...]:
@@ -93,7 +103,7 @@ class FlexibleQPE(GateWithRegisters):
 
     @cached_property
     def phase_registers(self) -> Tuple[Register, ...]:
-        return tuple(self.ctrl_state_prep.signature)
+        return tuple(self.ancilla_prep.signature)
 
     @cached_property
     def signature(self) -> Signature:
@@ -109,15 +119,15 @@ class FlexibleQPE(GateWithRegisters):
         phase_error: float,
         probability_of_failure: float,
         *,
-        ctrl_state_prep: Type[QPEWindowStateBase] = RectangularWindowState,
+        ancilla_prep: Type[QPEWindowStateBase] = RectangularWindowState,
         qft_inv: Optional[Callable[[int], Bloq]] = None,
     ) -> 'FlexibleQPE':
         """Build a QPE meeting Pr[|phase estimate error| > phase_error] <= probability_of_failure.
 
-        Phases are in turns ([0, 1)). Sizing is delegated to the `ctrl_state_prep` class.
+        Phases are in turns ([0, 1)). Sizing is delegated to the `ancilla_prep` class.
         `qft_inv`, if given, maps the phase-register size to an inverse-QFT bloq.
         """
-        prep = ctrl_state_prep.from_requirements(phase_error, probability_of_failure)
+        prep = ancilla_prep.from_requirements(phase_error, probability_of_failure)
         return cls._from_window_state(unitary, prep, qft_inv)
 
     @classmethod
@@ -126,18 +136,18 @@ class FlexibleQPE(GateWithRegisters):
         unitary: Bloq,
         num_phase_qubits: int,
         *,
-        ctrl_state_prep: Type[QPEWindowStateBase] = RectangularWindowState,
+        ancilla_prep: Type[QPEWindowStateBase] = RectangularWindowState,
         qft_inv: Optional[Callable[[int], Bloq]] = None,
     ) -> 'FlexibleQPE':
         """Build a QPE with exactly `num_phase_qubits` phase qubits."""
-        prep = ctrl_state_prep.from_num_phase_qubits(num_phase_qubits)
+        prep = ancilla_prep.from_num_phase_qubits(num_phase_qubits)
         return cls._from_window_state(unitary, prep, qft_inv)
 
     @classmethod
     def _from_window_state(cls, unitary, prep, qft_inv):
         if qft_inv is None:
-            return cls(unitary, prep)
-        return cls(unitary, prep, qft_inv(prep.m_bits))
+            return cls(unitary, prep.m_bits, prep)
+        return cls(unitary, prep.m_bits, prep, qft_inv(prep.m_bits))
 
     def unitary_power(self, k: int) -> Bloq:
         """Return a bloq for U^k, fast-forwarded via `unitary.__pow__` if available."""
@@ -158,7 +168,7 @@ class FlexibleQPE(GateWithRegisters):
     ) -> Dict[str, SoquetT]:
         if is_symbolic(self.m_bits):
             raise NotImplementedError(f"Cannot decompose {self} with symbolic m_bits.")
-        qpe_reg = bb.add(self.ctrl_state_prep, qpe_reg=qpe_reg)
+        qpe_reg = bb.add(self.ancilla_prep, qpe_reg=qpe_reg)
         qs = bb.split(qpe_reg)
         target_names = [reg.name for reg in self.target_registers]
         for j in range(self.m_bits):
@@ -176,11 +186,11 @@ class FlexibleQPE(GateWithRegisters):
         if is_symbolic(self.m_bits):
             # Assumes the unitary is not fast-forwardable.
             return {
-                (self.ctrl_state_prep, 1),
+                (self.ancilla_prep, 1),
                 (self.unitary.controlled(), 2**self.m_bits - 1),
                 (self.qft_inv, 1),
             }
-        counts = Counter([self.ctrl_state_prep, self.qft_inv])
+        counts = Counter([self.ancilla_prep, self.qft_inv])
         counts.update(self.controlled_power(j) for j in range(self.m_bits))
         return set(counts.items())
 
@@ -189,7 +199,7 @@ class FlexibleQPE(GateWithRegisters):
             return NotImplemented
         n = sum(reg.total_bits() for reg in self.target_registers)
         widths = [
-            get_cost_value(self.ctrl_state_prep, cost_key) + n,
+            get_cost_value(self.ancilla_prep, cost_key) + n,
             get_cost_value(self.qft_inv, cost_key) + n,
         ]
         for j in range(self.m_bits):
@@ -234,7 +244,7 @@ class FlexibleQPE(GateWithRegisters):
             tensor_shape_from_signature,
         )
 
-        p = self.ctrl_state_prep.tensor_contract()
+        p = self.ancilla_prep.tensor_contract()
         q = self.qft_inv.tensor_contract()
         w = self._phase_blocks()
         data = np.einsum('ak,kij,kb->aibj', q, w, p, optimize=True)

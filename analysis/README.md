@@ -256,7 +256,7 @@ However, this section is still under development and currently has very limited 
   unitary's `__pow__` when available, and uses the structure of QPE to speed up tensor contraction
   and resource estimation.  It can be used to implement multiple QPE variations by customizing its
   components:
-  - `algorithm.ctrl_state_prep`: initial state of the phase register; defaults to "rectangular" (a
+  - `algorithm.ancilla_prep`: initial state of the phase register; defaults to "rectangular" (a
     Hadamard on each phase qubit, yielding "textbook" phase estimation);
   - `algorithm.qft_inv`: inverse quantum Fourier transform; defaults to "textbook".
 - Qubitized Phase Estimation: Setting `algorithm.method` to "QPE: pyliqtr qubitized" will embed the
@@ -286,7 +286,7 @@ as given.  But this can also be computed by the script by setting
 For textbook and flexible phase estimation, the unitary converts `algorithm.energy_error` into an
 error in the eigenphase (measured in turns, i.e. as a fraction of 2π), and each QPE method builds
 itself to meet that phase error with at most `algorithm.probability_of_failure` chance of failure.
-For flexible phase estimation the register size is determined by the `algorithm.ctrl_state_prep`
+For flexible phase estimation the register size is determined by the `algorithm.ancilla_prep`
 choice.  The qubitized methods size their registers from `algorithm.energy_error` and the
 block-encoding's normalization instead.
 

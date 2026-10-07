@@ -12,7 +12,6 @@ from qhat.analysis.algorithm import (
 from qhat.analysis.config_types import AlgorithmConfiguration
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.pauli_string_evolution import PauliStringEvolution
-from qhat.common.qpe_window_state import RectangularWindowState
 from qhat.common.trotter_flattened import Trotterization
 
 
@@ -43,17 +42,17 @@ class TestRouting:
 
     def test_defaults(self, unitary):
         algorithm = build_algorithm(make_config(num_phase_qubits=3), unitary)
-        assert algorithm == FlexibleQPE(unitary, RectangularWindowState(3))
+        assert algorithm == FlexibleQPE(unitary, 3)
 
     def test_explicit_components_case_insensitive(self, unitary):
-        config = make_config(num_phase_qubits=3, ctrl_state_prep="Rectangular", qft_inv="TextBook")
-        assert build_algorithm(config, unitary) == FlexibleQPE(unitary, RectangularWindowState(3))
+        config = make_config(num_phase_qubits=3, ancilla_prep="Rectangular", qft_inv="TextBook")
+        assert build_algorithm(config, unitary) == FlexibleQPE(unitary, 3)
 
     def test_method_case_insensitive(self, unitary):
         config = make_config(method="qpe: qhat FLEXIBLE", num_phase_qubits=2)
         assert isinstance(build_algorithm(config, unitary), FlexibleQPE)
 
-    @pytest.mark.parametrize("key", ["ctrl_state_prep", "qft_inv"])
+    @pytest.mark.parametrize("key", ["ancilla_prep", "qft_inv"])
     def test_unknown_component_raises(self, unitary, key):
         config = make_config(num_phase_qubits=3, **{key: "nonsense"})
         with pytest.raises(ValueError, match=key):

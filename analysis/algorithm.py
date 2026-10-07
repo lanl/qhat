@@ -171,7 +171,7 @@ def build_qpe_qualtran_textbook(
 
 # Config names for FlexibleQPE components.  A qft_inv entry maps the phase-register size to a bloq;
 # None selects FlexibleQPE's default (the textbook inverse QFT).
-CTRL_STATE_PREPS = {"rectangular": RectangularWindowState}
+ANCILLA_PREPS = {"rectangular": RectangularWindowState}
 INVERSE_QFTS = {"textbook": None}
 
 def build_qpe_qhat_flexible(
@@ -181,15 +181,15 @@ def build_qpe_qhat_flexible(
 
     logger.verbose("Build a QPE algorithm with QHAT's FlexibleQPE.")
 
-    ctrl_state_prep_name = (config_algorithm.ctrl_state_prep or "rectangular").lower()
-    if ctrl_state_prep_name not in CTRL_STATE_PREPS:
-        raise ValueError(f"Invalid QPE ctrl_state_prep \"{config_algorithm.ctrl_state_prep}\".")
+    ancilla_prep_name = (config_algorithm.ancilla_prep or "rectangular").lower()
+    if ancilla_prep_name not in ANCILLA_PREPS:
+        raise ValueError(f"Invalid QPE ancilla_prep \"{config_algorithm.ancilla_prep}\".")
     qft_inv_name = (config_algorithm.qft_inv or "textbook").lower()
     if qft_inv_name not in INVERSE_QFTS:
         raise ValueError(f"Invalid QPE qft_inv \"{config_algorithm.qft_inv}\".")
 
     return build_qpe(FlexibleQPE, config_algorithm, unitary, phase_error,
-                     ctrl_state_prep=CTRL_STATE_PREPS[ctrl_state_prep_name],
+                     ancilla_prep=ANCILLA_PREPS[ancilla_prep_name],
                      qft_inv=INVERSE_QFTS[qft_inv_name])
 
 # -------------------------------------------------------------------------------------------------
