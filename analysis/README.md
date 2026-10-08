@@ -256,11 +256,8 @@ However, this section is still under development and currently has very limited 
   "textbook" method (see, for example, Nielson and Chuang's "Quantum Computation and Quantum
   Information").
 - Flexible Phase Estimation: Setting `algorithm.method` to "QPE: QHAT flexible" builds the QPE
-  algorithm with QHAT's `FlexibleQPE` (`common/flexible_qpe.py`), which supports tensor contraction
-  (algorithm matrix output and numerical simulation) for all unitaries, implements U^(2^j) with the
-  unitary's `__pow__` when available, and uses the structure of QPE to speed up tensor contraction
-  and resource estimation.  It can be used to implement multiple QPE variations by customizing its
-  components:
+  algorithm with QHAT's `FlexibleQPE` (`common/flexible_qpe.py`), which can implement multiple QPE
+  variations by customizing its components:
   - `algorithm.ancilla_prep`: initial state of the phase register; defaults to "rectangular" (a
     Hadamard on each phase qubit, yielding "textbook" phase estimation);
   - `algorithm.qft_inv`: inverse quantum Fourier transform; defaults to "textbook".
