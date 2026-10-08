@@ -55,6 +55,7 @@ class FlexibleQPE(GateWithRegisters):
     U^(2^j) is `unitary ** 2**j` if the unitary defines `__pow__` (fast-forwarding), and
     otherwise `Power(unitary, 2**j)` (2^j repetitions). A unitary's `__pow__` must return a bloq
     implementing exactly U^k; e.g. `Trotterization.__pow__` scales both the step count and time.
+    `tensor_contract` relies on this: it squares U's matrix instead of contracting each U^(2^j).
 
     Args:
         unitary: Bloq (THRU registers only) whose eigenphases are estimated.
@@ -229,12 +230,22 @@ class FlexibleQPE(GateWithRegisters):
         return max(widths)
 
     def _phase_blocks(self) -> np.ndarray:
-        """Return W with W[k] = (the matrix applied to the target when qpe_reg = |k>)."""
+        """Return W with W[k] = U^k for k = 0, 1, ..., 2^m - 1, where m = `num_ancilla_qubits`.
+
+        `a` holds the powers of two, [U, U^2, U^4, ...]: the m controlled gates in the circuit.
+        `W` holds every power, [U^0, U^1, U^2, U^3, ...]: when the phase register is in |k>, the
+        gates for the set bits of k fire, applying U^k to the target. `tensor_contract` needs
+        every W[k] because the phase register holds a superposition of all |k>.
+
+        U is contracted once and `a` is built by squaring, rather than contracting each
+        U^(2^j) bloq, which assumes `unitary_power(k)` is exactly U^k.
+
+        Example (m = 2): a = [U, U^2] and W = [U^0, U^1, U^2, U^3], with U^3 = U^2 @ U.
+        """
         m = self.num_ancilla_qubits
         a = [self.unitary.tensor_contract()]
-        for j in range(1, m):
-            u_k = self.unitary_power(2**j)
-            a.append(a[-1] @ a[-1] if isinstance(u_k, Power) else u_k.tensor_contract())
+        for _ in range(1, m):
+            a.append(a[-1] @ a[-1])
         d = a[0].shape[0]
         w = np.empty((2**m, d, d), dtype=np.complex128)
         w[0] = np.eye(d)
@@ -242,6 +253,23 @@ class FlexibleQPE(GateWithRegisters):
             h = k.bit_length() - 1
             w[k] = a[h] @ w[k - 2**h]
         return w
+
+    def tensor_contract(self) -> np.ndarray:
+        """Return the dense matrix of this QPE, built from P = `ancilla_prep`,
+        W = `_phase_blocks()`, and Q = `qft_inv` instead of contracting the decomposition.
+
+        The output is filled one phase-register input column at a time, so peak memory is close
+        to the size of the output (16 * 4^(m + n) bytes for m phase and n target qubits).
+        """
+        p = self.ancilla_prep.tensor_contract()
+        q = self.qft_inv.tensor_contract()
+        w = self._phase_blocks()
+        num_phases, d, _ = w.shape
+        w_flat = w.reshape(num_phases, d * d)
+        out = np.empty((num_phases, d, num_phases, d), dtype=np.complex128)
+        for b in range(num_phases):
+            out[:, :, b, :] = (q @ (p[:, b, None] * w_flat)).reshape(num_phases, d, d)
+        return out.reshape(num_phases * d, num_phases * d)
 
     def add_my_tensors(
         self,
@@ -251,11 +279,8 @@ class FlexibleQPE(GateWithRegisters):
         incoming: Dict[str, SoquetT],
         outgoing: Dict[str, SoquetT],
     ):
-        """Add a single dense tensor built from the block-diagonal structure of QPE.
-
-        In the phase basis, the controlled powers act as U^k on the target when qpe_reg = |k>,
-        so the full matrix is (Q ⊗ I) · diag_k(W_k) · (P ⊗ I).
-        """
+        """Add `tensor_contract()` as a single dense tensor, so that a FlexibleQPE inside a
+        larger bloq also uses it instead of being decomposed."""
         import quimb.tensor as qtn
 
         from qualtran._infra.composite_bloq import _flatten_soquet_collection
@@ -263,11 +288,7 @@ class FlexibleQPE(GateWithRegisters):
             tensor_shape_from_signature,
         )
 
-        p = self.ancilla_prep.tensor_contract()
-        q = self.qft_inv.tensor_contract()
-        w = self._phase_blocks()
-        data = np.einsum('ak,kij,kb->aibj', q, w, p, optimize=True)
-        data = data.reshape(tensor_shape_from_signature(self.signature))
+        data = self.tensor_contract().reshape(tensor_shape_from_signature(self.signature))
 
         in_ind = _flatten_soquet_collection(incoming[reg.name] for reg in self.signature.lefts())
         out_ind = _flatten_soquet_collection(outgoing[reg.name] for reg in self.signature.rights())

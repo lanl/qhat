@@ -3,6 +3,7 @@ Tests for FlexibleQPE and the QPE window states.
 """
 
 from functools import cached_property
+from unittest import mock
 
 import attrs
 import numpy as np
@@ -43,7 +44,7 @@ def small_trotterization():
 
 
 def generic_tensor_contract(bloq):
-    """Contract the decomposition, bypassing the optimized add_my_tensors."""
+    """Contract the decomposition, bypassing the optimized tensor_contract."""
     return bloq.decompose_bloq().tensor_contract()
 
 
@@ -247,13 +248,32 @@ class TestTensorContraction:
             np.testing.assert_allclose(block, np.linalg.matrix_power(u, k), atol=1e-12)
 
     @pytest.mark.parametrize("combine_terms", [True, False])
-    def test_trotterization_qpe_blocks_are_unitary_powers(self, combine_terms):
-        """Fast-forwarded U^(2^j) from Trotterization.__pow__ must equal the matrix power."""
+    def test_trotterization_unitary_powers_are_matrix_powers(self, combine_terms):
+        """tensor_contract squares U's matrix, so Trotterization.__pow__ must give exactly U^k."""
         u = attrs.evolve(small_trotterization(), combine_terms=combine_terms)
         qpe = FlexibleQPE(u, 3)
         umat = u.tensor_contract()
-        for k, block in enumerate(phase_blocks(qpe)):
-            np.testing.assert_allclose(block, np.linalg.matrix_power(umat, k), atol=1e-10)
+        for j in range(3):
+            np.testing.assert_allclose(
+                qpe.unitary_power(2**j).tensor_contract(),
+                np.linalg.matrix_power(umat, 2**j), atol=1e-10)
+
+    def test_contracts_unitary_once(self):
+        """The U^(2^j) bloqs are not contracted; their matrices come from squaring U."""
+        qpe = FlexibleQPE(small_trotterization(), 4)
+        with mock.patch.object(
+                Trotterization, 'tensor_contract', autospec=True,
+                side_effect=Trotterization.tensor_contract) as contract:
+            qpe.tensor_contract()
+        assert contract.call_count == 1
+
+    def test_nested_uses_custom_tensor(self):
+        """Inside a larger bloq, FlexibleQPE adds its dense matrix rather than decomposing."""
+        qpe = FlexibleQPE(TwoQubitPlainBloq(), 3)
+        with mock.patch.object(FlexibleQPE, 'decompose_bloq',
+                               side_effect=AssertionError("decomposed")):
+            nested = qpe.as_composite_bloq().tensor_contract()
+        np.testing.assert_allclose(nested, generic_tensor_contract(qpe), atol=1e-12)
 
     def test_trotterization_matches_unoptimized_reference(self):
         """Full QPE matrix vs. (iQFT ⊗ I) · diag_k(U^k) · (H^⊗m ⊗ I) built from U's matrix."""
