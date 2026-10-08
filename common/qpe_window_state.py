@@ -46,31 +46,59 @@ def textbook_confidence_bits(probability_of_failure: float) -> int:
 
 @attrs.frozen
 class QPEWindowStateBase(Bloq, metaclass=abc.ABCMeta):
-    """Base class for window states prepared on the QPE control register `qpe_reg`."""
+    """Base class for window states prepared on the QPE phase register `qpe_reg`.
+
+    Subclasses define `m_bits` and `signature` (normally `Signature([self.m_register])`).
+
+    `m_bits`, `m_qdtype` and `m_register` match Qualtran 0.7.0's `QPEWindowStateBase`, except
+    that `m_register` is THRU here (see the module docstring). `from_requirements` and
+    `from_num_phase_qubits` are QHAT additions, used by `FlexibleQPE`'s constructors of the same
+    names.
+    """
 
     @cached_property
     def m_qdtype(self) -> QDType:
+        """Data type of `qpe_reg`: `QFxp(m_bits, m_bits)`, an unsigned fixed-point number with
+        all `m_bits` bits after the binary point.
+
+        The register value therefore reads directly as a phase in turns: with `m_bits = 3`, the
+        bits 101 mean 0.101 in binary, i.e. 5/8 of a turn.
+        """
         return QFxp(self.m_bits, self.m_bits)
 
     @cached_property
     def m_register(self) -> Register:
+        """The phase register: named `qpe_reg`, of type `m_qdtype`, and THRU (Qualtran 0.7.0 uses
+        RIGHT). `FlexibleQPE` takes its `qpe_reg` register from the window state's signature.
+        """
         return Register('qpe_reg', self.m_qdtype, side=Side.THRU)
 
     @property
     @abc.abstractmethod
-    def m_bits(self) -> SymbolicInt: ...
+    def m_bits(self) -> SymbolicInt:
+        """Number of qubits in the phase register; this is the "m" in `m_qdtype` and
+        `m_register`. `FlexibleQPE` requires `num_ancilla_qubits == m_bits`.
+        """
 
     @classmethod
     @abc.abstractmethod
     def from_requirements(
         cls, phase_error: float, probability_of_failure: float
     ) -> 'QPEWindowStateBase':
-        """Return the window state meeting the requirements (see the module docstring)."""
+        """Return a window state of this class for which QPE with the textbook inverse QFT has
+        Pr[|estimated phase - true phase| > phase_error] <= probability_of_failure.
+
+        `phase_error` is in turns. E.g. `RectangularWindowState.from_requirements(1/8, 0.1)` has
+        `m_bits = 6`: 3 bits for the precision plus 3 for the confidence.
+        """
 
     @classmethod
     @abc.abstractmethod
     def from_num_phase_qubits(cls, num_phase_qubits: int) -> 'QPEWindowStateBase':
-        """Return the window state on exactly `num_phase_qubits` qubits."""
+        """Return a window state of this class with `m_bits == num_phase_qubits`.
+
+        Subclasses that have other parameters (e.g. a Kaiser window's `alpha`) choose them here.
+        """
 
 
 @attrs.frozen
