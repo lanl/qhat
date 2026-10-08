@@ -86,10 +86,15 @@ class TestRectangularWindowState:
     def test_from_requirements(self, phase_error, p_fail, expected):
         assert RectangularWindowState.from_requirements(phase_error, p_fail).m_bits == expected
 
-    def test_from_requirements_tolerates_round_off(self):
-        """A phase error of 2^-n (up to round-off) needs exactly n precision bits."""
-        phase_error = (1 / 3) * (3 / 2**7)
-        assert RectangularWindowState.from_requirements(phase_error, 0.5).m_bits == 7 + 2
+    @pytest.mark.parametrize("phase_error, n", [
+        (0.49999999999999994, 1),
+        (0.24999999999999997, 2),
+        (0.12499999999999999, 3),
+    ])
+    def test_from_requirements_tolerates_round_off(self, phase_error, n):
+        """A phase error a few ulps below 2^-n (from round-off) still needs only n precision bits."""
+        assert phase_error < 2**-n  # guard: input must really be below 2^-n
+        assert RectangularWindowState.from_requirements(phase_error, 0.5).m_bits == n + 2
 
     @pytest.mark.parametrize("phase_error, p_fail", [(0.0, 0.1), (1.0, 0.1), (0.1, 0.0), (0.1, 1.0)])
     def test_from_requirements_rejects_out_of_range(self, phase_error, p_fail):

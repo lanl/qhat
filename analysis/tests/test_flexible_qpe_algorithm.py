@@ -114,10 +114,13 @@ class TestPhaseQubits:
 
 
 @pytest.mark.parametrize("method", ["QPE: QHAT flexible", "QPE: qualtran textbook"])
-@pytest.mark.parametrize("W, dE", [(3.0, 0.1), (4.0, 0.5), (2.0, 0.25)])
+@pytest.mark.parametrize("W, dE", [
+    (3.0, 0.1), (4.0, 0.5), (2.0, 0.25),
+    (1.0, 0.165),  # round-off: phase error comes out as 0.12499999999999999, just below 2^-3
+])
 def test_driver_evolution_time_gives_P0_precision_bits(method, W, dE):
-    """With the driver's t = 2 pi / (2^P0 dE), the phase error is 2^-P0, so the register is
-    P0 plus the textbook confidence bits."""
+    """With t = 2 pi / (2^P0 dE) (the driver's formula with phase_scale_factor = 1), the phase
+    error is 2^-P0, so the register is P0 plus the textbook confidence bits."""
     p_fail = 0.1
     config = make_config(method=method, energy_error=dE, probability_of_failure=p_fail)
     P0, Elo, Ehi = compute_initial_phase_qubits(config, -W / 2, W / 2)
