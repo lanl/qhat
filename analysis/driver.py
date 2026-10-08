@@ -67,8 +67,8 @@ def run():
         logger.verbose(f"-- phase scale factor = {phase_scale}")
         logger.verbose(f"-- preliminary evolution time = {tevol_hbar} * hbar")
 
-        # with algorithm.energy_error set, widen the energy range so that QPE phase bins are
-        # exactly energy_error wide
+        # Given that we need an integer number of phase qubits, adjust evolution time to use the
+        # full range provided by that number of phase qubits.
         Elo3, Ehi3 = qpe_energy_window(state.config_algorithm, Elo2, Ehi2)
         tevol_hbar = 2 * math.pi / (phase_scale * (Ehi3 - Elo3))
         logger.verbose(f"-- optimized evolution time = {tevol_hbar} * hbar")
