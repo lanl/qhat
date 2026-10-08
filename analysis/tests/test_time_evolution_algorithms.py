@@ -33,7 +33,7 @@ class TestAlgorithmRouting:
         config = AlgorithmConfiguration()
         config.method = "time evolution"
 
-        algorithm = build_algorithm(config, unitary, P0=None)
+        algorithm = build_algorithm(config, unitary)
 
         assert algorithm is unitary
 
@@ -44,7 +44,7 @@ class TestAlgorithmRouting:
         config.method = "controlled time evolution"
 
         original_qubits = unitary.num_qubits
-        algorithm = build_algorithm(config, unitary, P0=None)
+        algorithm = build_algorithm(config, unitary)
 
         assert algorithm is not unitary
         assert algorithm.signature.n_qubits() == original_qubits + 1
@@ -56,7 +56,7 @@ class TestAlgorithmRouting:
         for method in ["time evolution", "TIME EVOLUTION", "Time Evolution"]:
             config = AlgorithmConfiguration()
             config.method = method
-            algorithm = build_algorithm(config, unitary, P0=None)
+            algorithm = build_algorithm(config, unitary)
             assert algorithm is unitary
 
     def test_invalid_method_raises_error(self):
@@ -66,7 +66,7 @@ class TestAlgorithmRouting:
         config.method = "invalid method"
 
         with pytest.raises(ValueError, match="Invalid algorithm method"):
-            build_algorithm(config, unitary, P0=None)
+            build_algorithm(config, unitary)
 
 
 # =============================================================================
@@ -84,7 +84,7 @@ class TestMatrixCorrectness:
 
         config = AlgorithmConfiguration()
         config.method = "time evolution"
-        algorithm = build_algorithm(config, unitary, P0=None)
+        algorithm = build_algorithm(config, unitary)
 
         # Get actual matrix
         U_actual = algorithm.tensor_contract()
@@ -103,7 +103,7 @@ class TestMatrixCorrectness:
 
         config = AlgorithmConfiguration()
         config.method = "time evolution"
-        algorithm = build_algorithm(config, unitary, P0=None)
+        algorithm = build_algorithm(config, unitary)
 
         U_actual = algorithm.tensor_contract()
         U_expected = analytical_evolution("XY", coef, time)
@@ -118,7 +118,7 @@ class TestMatrixCorrectness:
 
         config = AlgorithmConfiguration()
         config.method = "time evolution"
-        algorithm = build_algorithm(config, unitary, P0=None)
+        algorithm = build_algorithm(config, unitary)
 
         U_actual = algorithm.tensor_contract()
         U_expected = analytical_evolution("XYZ", coef, time)
@@ -133,7 +133,7 @@ class TestMatrixCorrectness:
 
         config = AlgorithmConfiguration()
         config.method = "controlled time evolution"
-        algorithm = build_algorithm(config, unitary, P0=None)
+        algorithm = build_algorithm(config, unitary)
 
         # Get matrices
         U_controlled = algorithm.tensor_contract()
@@ -172,7 +172,7 @@ class TestMatrixCorrectness:
         # Test time evolution
         config_te = AlgorithmConfiguration()
         config_te.method = "time evolution"
-        algorithm_te = build_algorithm(config_te, unitary, P0=None)
+        algorithm_te = build_algorithm(config_te, unitary)
         U_te = algorithm_te.tensor_contract()
         U_te_dag_U = U_te.conj().T @ U_te
         assert np.allclose(U_te_dag_U, np.eye(U_te.shape[0])), \
@@ -181,7 +181,7 @@ class TestMatrixCorrectness:
         # Test controlled time evolution
         config_cte = AlgorithmConfiguration()
         config_cte.method = "controlled time evolution"
-        algorithm_cte = build_algorithm(config_cte, unitary, P0=None)
+        algorithm_cte = build_algorithm(config_cte, unitary)
         U_cte = algorithm_cte.tensor_contract()
         U_cte_dag_U = U_cte.conj().T @ U_cte
         assert np.allclose(U_cte_dag_U, np.eye(U_cte.shape[0])), \
@@ -195,7 +195,7 @@ class TestMatrixCorrectness:
 
         config = AlgorithmConfiguration()
         config.method = "time evolution"
-        algorithm = build_algorithm(config, unitary, P0=None)
+        algorithm = build_algorithm(config, unitary)
 
         U_actual = algorithm.tensor_contract()
         # exp(-i c t I) = exp(-i c t) * I (global phase)
@@ -217,7 +217,7 @@ class TestResourceEstimation:
 
         algorithm_config = AlgorithmConfiguration()
         algorithm_config.method = "time evolution"
-        algorithm = build_algorithm(algorithm_config, unitary, P0=None)
+        algorithm = build_algorithm(algorithm_config, unitary)
 
         analysis_config = AnalysisConfiguration()
         analysis_config.resource_estimator = "pyLIQTR"
@@ -240,7 +240,7 @@ class TestResourceEstimation:
 
         algorithm_config = AlgorithmConfiguration()
         algorithm_config.method = "controlled time evolution"
-        algorithm = build_algorithm(algorithm_config, unitary, P0=None)
+        algorithm = build_algorithm(algorithm_config, unitary)
 
         analysis_config = AnalysisConfiguration()
         analysis_config.resource_estimator = "pyLIQTR"
@@ -264,14 +264,14 @@ class TestResourceEstimation:
         # Time evolution resources
         config_te = AlgorithmConfiguration()
         config_te.method = "time evolution"
-        algorithm_te = build_algorithm(config_te, unitary, P0=None)
+        algorithm_te = build_algorithm(config_te, unitary)
         results_te = analyze_algorithm(analysis_config, algorithm_te, unitary_encoding="ramped trotter")
         resources_te = results_te["resource_estimates"]
 
         # Controlled time evolution resources
         config_cte = AlgorithmConfiguration()
         config_cte.method = "controlled time evolution"
-        algorithm_cte = build_algorithm(config_cte, unitary, P0=None)
+        algorithm_cte = build_algorithm(config_cte, unitary)
         results_cte = analyze_algorithm(analysis_config, algorithm_cte, unitary_encoding="ramped trotter")
         resources_cte = results_cte["resource_estimates"]
 
@@ -289,7 +289,7 @@ class TestResourceEstimation:
         # Test with a few different algorithm sizes
         for pauli_string in ["XY", "XYZ", "XYZI"]:
             unitary = PauliStringEvolution(pauli_string, coefficient=1.0, time=1.0)
-            algorithm = build_algorithm(algorithm_config, unitary, P0=None)
+            algorithm = build_algorithm(algorithm_config, unitary)
             results = analyze_algorithm(analysis_config, algorithm, unitary_encoding="ramped trotter")
 
             t_count = results["resource_estimates"]["pyliqtr"]["T_count"]
@@ -312,7 +312,7 @@ class TestEdgeCases:
         unitary = PauliStringEvolution("XY", coefficient=0.0, time=1.0)
         config = AlgorithmConfiguration()
         config.method = "time evolution"
-        algorithm = build_algorithm(config, unitary, P0=None)
+        algorithm = build_algorithm(config, unitary)
 
         U = algorithm.tensor_contract()
         # exp(-i * 0 * XY * t) = I
@@ -323,7 +323,7 @@ class TestEdgeCases:
         unitary = PauliStringEvolution("XY", coefficient=1.0, time=0.0)
         config = AlgorithmConfiguration()
         config.method = "time evolution"
-        algorithm = build_algorithm(config, unitary, P0=None)
+        algorithm = build_algorithm(config, unitary)
 
         U = algorithm.tensor_contract()
         assert np.allclose(U, np.eye(U.shape[0]))
@@ -335,7 +335,7 @@ class TestEdgeCases:
         unitary = PauliStringEvolution("Z", coefficient=coef, time=time)
         config = AlgorithmConfiguration()
         config.method = "time evolution"
-        algorithm = build_algorithm(config, unitary, P0=None)
+        algorithm = build_algorithm(config, unitary)
 
         U_actual = algorithm.tensor_contract()
         U_expected = analytical_evolution("Z", coef, time)

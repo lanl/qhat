@@ -184,16 +184,21 @@ class UnitaryConfiguration(ConfigurationBase):
 
 class AlgorithmConfiguration(ConfigurationBase):
     def __init__(self):
-        self.method = "qualtran textbook"
+        self.method = "QPE: qualtran textbook"
         self.num_phase_qubits = None
         self.probability_of_failure = None
         self.energy_error = None
+        # Components for "QPE: QHAT flexible"; `None` yields default options
+        self.ancilla_prep = None
+        self.qft_inv = None
     def _generate_TOML_table(self):
         table = tomlkit.table()
         table["method"] = self.method
         self.save_if_present(table, "num_phase_qubits")
         self.save_if_present(table, "probability_of_failure")
         self.save_if_present(table, "energy_error")
+        self.save_if_present(table, "ancilla_prep")
+        self.save_if_present(table, "qft_inv")
         return table
 
 # -------------------------------------------------------------------------------------------------

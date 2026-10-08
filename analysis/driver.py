@@ -9,7 +9,7 @@ import logging
 import math
 
 from qhat.common.logging_utils import configure_logging
-from qhat.analysis.algorithm import build_algorithm, compute_initial_phase_qubits
+from qhat.analysis.algorithm import build_algorithm, qpe_energy_window
 from qhat.analysis.analysis import analyze_algorithm
 from qhat.analysis.configuration import load_configuration
 from qhat.analysis.hamiltonian import get_physical_hamiltonian
@@ -45,7 +45,6 @@ def run():
     # Compute Trotterization parameters ___________________________________________________________
 
     tevol_hbar = None
-    P0 = None
 
     if state.config_unitary.method == "ramped trotter":
 
@@ -68,8 +67,9 @@ def run():
         logger.verbose(f"-- phase scale factor = {phase_scale}")
         logger.verbose(f"-- preliminary evolution time = {tevol_hbar} * hbar")
 
-        # preliminiary number of phase qubits, with upper bound correction
-        P0, Elo3, Ehi3 = compute_initial_phase_qubits(state.config_algorithm, Elo2, Ehi2)
+        # Given that we need an integer number of phase qubits, adjust evolution time to use the
+        # full range provided by that number of phase qubits.
+        Elo3, Ehi3 = qpe_energy_window(state.config_algorithm, Elo2, Ehi2)
         tevol_hbar = 2 * math.pi / (phase_scale * (Ehi3 - Elo3))
         logger.verbose(f"-- optimized evolution time = {tevol_hbar} * hbar")
 
@@ -89,8 +89,7 @@ def run():
 
     algorithm = build_algorithm(
             state.config_algorithm,
-            unitary_hamiltonian,
-            P0)
+            unitary_hamiltonian)
 
     # Analysis ____________________________________________________________________________________
 

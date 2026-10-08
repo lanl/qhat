@@ -37,6 +37,8 @@ from qualtran.bloqs.qubitization.qubitization_walk_operator import QubitizationW
 from pyLIQTR.qubitization.phase_estimation import QubitizedPhaseEstimation
 
 from qhat.analysis.config_types import AlgorithmConfiguration
+from qhat.common.flexible_qpe import FlexibleQPE
+from qhat.common.qpe_window_state import precision_bits, RectangularWindowState
 
 logger = logging.getLogger(__name__)
 
@@ -62,20 +64,34 @@ class NewQubitizationQPE(QubitizationQPE):
 
 # -------------------------------------------------------------------------------------------------
 
+def qpe_requirements(config_algorithm: AlgorithmConfiguration, phase_error):
+    """Check and return `(phase_error, probability_of_failure)` for sizing a non-qubitized QPE.
+
+    Used when `algorithm.num_phase_qubits` is not set. `phase_error` is in turns (see
+    `qpe_phase_error`).
+    """
+    if phase_error is None:
+        raise ValueError(
+            "QPE needs either algorithm.num_phase_qubits or algorithm.energy_error.")
+    probability_of_failure = config_algorithm.probability_of_failure
+    if probability_of_failure is None:
+        raise ValueError(
+            "QPE sized from algorithm.energy_error also needs algorithm.probability_of_failure.")
+    if not 0 < probability_of_failure < 1:
+        raise ValueError(
+            f"algorithm.probability_of_failure must be in (0, 1), got {probability_of_failure}.")
+    logger.verbose(f"-- target phase error = {phase_error} turns, "
+                   f"probability of failure = {probability_of_failure}")
+    return phase_error, probability_of_failure
+
+# -------------------------------------------------------------------------------------------------
+
 def build_qpe_qualtran_textbook(
         config_algorithm: AlgorithmConfiguration,
         unitary,
-        P0):
+        phase_error):
 
     logger.verbose("Build a QPE algorithm with Qualtran's \"textbook\" method.")
-
-    P = config_algorithm.num_phase_qubits
-    if P is None:
-        assert P0 is not None
-        assert config_algorithm.probability_of_failure is not None
-        Pextra = math.ceil(math.log2(2.0 + 0.5 / config_algorithm.probability_of_failure))
-        P = P0 + Pextra
-        logger.verbose(f"-- extending the phase register by {Pextra} qubits (total = {P})")
 
     # TODO: There is a note in the documentation (see link below) that a fast-forwardable unitary
     #       can lower the cost from (2^m - 1) * cost(C-U) to m * cost(C-U).  If we have a
@@ -125,7 +141,50 @@ def build_qpe_qualtran_textbook(
     #       compares the QPE performance with different window state objects.
     #       -- The RectangularWindowState isn't added until a later version of qualtran than the
     #          one I'm using.  The interface changes in later versions.
-    return TextbookQPE(unitary, P)
+    P = config_algorithm.num_phase_qubits
+    if P is not None:
+        logger.verbose(f"-- using user-specified number of phase qubits ({P})")
+        qpe = TextbookQPE(unitary, P)
+    else:
+        phase_error, probability_of_failure = qpe_requirements(config_algorithm, phase_error)
+        qpe = TextbookQPE.from_precision_and_delta(
+                unitary, precision_bits(phase_error), probability_of_failure)
+    logger.verbose(f"-- number of phase qubits = {qpe.m_bits}")
+    return qpe
+
+# -------------------------------------------------------------------------------------------------
+
+# Config names for FlexibleQPE components.  A qft_inv entry maps the phase-register size to a bloq;
+# None selects FlexibleQPE's default (the textbook inverse QFT).
+ANCILLA_PREPS = {"rectangular": RectangularWindowState}
+INVERSE_QFTS = {"textbook": None}
+
+def build_qpe_qhat_flexible(
+        config_algorithm: AlgorithmConfiguration,
+        unitary,
+        phase_error):
+
+    logger.verbose("Build a QPE algorithm with QHAT's FlexibleQPE.")
+
+    ancilla_prep_name = (config_algorithm.ancilla_prep or "rectangular").lower()
+    if ancilla_prep_name not in ANCILLA_PREPS:
+        raise ValueError(f"Invalid QPE ancilla_prep \"{config_algorithm.ancilla_prep}\".")
+    qft_inv_name = (config_algorithm.qft_inv or "textbook").lower()
+    if qft_inv_name not in INVERSE_QFTS:
+        raise ValueError(f"Invalid QPE qft_inv \"{config_algorithm.qft_inv}\".")
+
+    components = dict(ancilla_prep=ANCILLA_PREPS[ancilla_prep_name],
+                      qft_inv=INVERSE_QFTS[qft_inv_name])
+    P = config_algorithm.num_phase_qubits
+    if P is not None:
+        logger.verbose(f"-- using user-specified number of phase qubits ({P})")
+        qpe = FlexibleQPE.from_num_phase_qubits(unitary, P, **components)
+    else:
+        phase_error, probability_of_failure = qpe_requirements(config_algorithm, phase_error)
+        qpe = FlexibleQPE.from_requirements(
+                unitary, phase_error, probability_of_failure, **components)
+    logger.verbose(f"-- number of phase qubits = {qpe.num_ancilla_qubits}")
+    return qpe
 
 # -------------------------------------------------------------------------------------------------
 
@@ -187,15 +246,30 @@ def build_controlled_time_evolution(
 
 # -------------------------------------------------------------------------------------------------
 
+def qpe_phase_error(config_algorithm: AlgorithmConfiguration, unitary):
+    """Phase error (in turns) corresponding to algorithm.energy_error for this unitary."""
+    if config_algorithm.energy_error is None:
+        return None
+    if not hasattr(unitary, "phase_error_from_energy_error"):
+        raise ValueError(
+            f"Cannot size QPE from algorithm.energy_error: the unitary ({type(unitary).__name__}) "
+            "does not provide phase_error_from_energy_error().  Set algorithm.num_phase_qubits.")
+    return unitary.phase_error_from_energy_error(config_algorithm.energy_error)
+
+# -------------------------------------------------------------------------------------------------
+
 def build_algorithm(
         config_algorithm: AlgorithmConfiguration,
-        unitary,
-        P0):
+        unitary):
 
     logger.info("Beginning to construct quantum algorithm.")
 
     if config_algorithm.method.lower() in ("qpe: qualtran textbook",):
-        return build_qpe_qualtran_textbook(config_algorithm, unitary, P0)
+        return build_qpe_qualtran_textbook(
+                config_algorithm, unitary, qpe_phase_error(config_algorithm, unitary))
+    elif config_algorithm.method.lower() in ("qpe: qhat flexible",):
+        return build_qpe_qhat_flexible(
+                config_algorithm, unitary, qpe_phase_error(config_algorithm, unitary))
     elif config_algorithm.method.lower() in ("qpe: qualtran qubitization",):
         # TODO: This may be more specialized (for LCU only?), but I'm not yet sure of the details.
         return build_qpe_qualtran_qubitized(config_algorithm, unitary)
@@ -210,22 +284,23 @@ def build_algorithm(
 
 # -------------------------------------------------------------------------------------------------
 
-def compute_initial_phase_qubits(
-        config_algorithm: AlgorithmConfiguration,
-        Elo2, Ehi2):
+def qpe_energy_window(config_algorithm: AlgorithmConfiguration, Elo, Ehi):
+    """Energy window [lo, hi) to map onto one full phase turn (t = 2 pi / (hi - lo)).
 
-    logger.info("Computing initial phase qubits.")
+    With algorithm.energy_error set, the width is rounded up to 2**P0 * energy_error, so each bin
+    of a P0-bit phase register is exactly energy_error wide; the extra width is split evenly above
+    and below [Elo, Ehi).  Otherwise the window is [Elo, Ehi).  For example, [-1.5, 1.5) with
+    energy_error 0.1 gives P0 = 5 and [-1.6, 1.6).
+    """
+    logger.info("Computing the QPE energy window.")
 
-    if config_algorithm.energy_error is None:
-        Elo3 = Elo2
-        Ehi3 = Ehi2
-        P0 = None
-    else:
-        P0 = math.ceil(math.log2((Ehi2 - Elo2) / config_algorithm.energy_error))
-        logger.verbose(f"-- initial number of phase qubits = {P0}")
-        dE_new = 2**P0 * config_algorithm.energy_error
-        Elo3 = Elo2
-        Ehi3 = Elo3 + dE_new
-        logger.verbose(f"-- QPE-optimized bounds = [{Elo3}, {Ehi3})")
+    dE = config_algorithm.energy_error
+    if dE is None:
+        return (Elo, Ehi)
 
-    return (P0, Elo3, Ehi3)
+    P0 = math.ceil(math.log2((Ehi - Elo) / dE))
+    width = 2**P0 * dE
+    middle = (Elo + Ehi) / 2
+    lo, hi = middle - width / 2, middle + width / 2
+    logger.verbose(f"-- P0 = {P0} bits of {dE} each, window = [{lo}, {hi})")
+    return (lo, hi)

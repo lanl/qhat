@@ -255,12 +255,23 @@ However, this section is still under development and currently has very limited 
   unitary encoding of the Hamiltonian into a phase estimation algorithm that uses the classic
   "textbook" method (see, for example, Nielson and Chuang's "Quantum Computation and Quantum
   Information").
+- Flexible Phase Estimation: Setting `algorithm.method` to "QPE: QHAT flexible" builds the QPE
+  algorithm with QHAT's `FlexibleQPE` (`common/flexible_qpe.py`), which can implement multiple QPE
+  variations by customizing its components:
+  - `algorithm.ancilla_prep`: initial state of the phase register; defaults to "rectangular" (a
+    Hadamard on each phase qubit, yielding "textbook" phase estimation);
+  - `algorithm.qft_inv`: inverse quantum Fourier transform; defaults to "textbook".
 - Qubitized Phase Estimation: Setting `algorithm.method` to "QPE: pyliqtr qubitized" will embed the
   unitary encoding of the Hamiltonian into a phase estimation algorithm that uses pyLIQTR's
   qubitized phase estimation.  This uses only a single ancilla qubit for the phase, with multiple
   measurements to extract the necessary number of bits of information.  This method only works with
   qubitized encodings such as double-factorization.  The integration of this method into the larger
   workflow has not yet been verified, so use this method with caution.
+- Qualtran Qubitization Phase Estimation: Setting `algorithm.method` to "QPE: qualtran
+  qubitization" will embed the unitary encoding of the Hamiltonian into Qualtran's
+  `QubitizationQPE`, which applies phase estimation to the qubitization walk operator built from
+  the block encoding's select and prepare oracles.  Like the pyLIQTR method, this only works with
+  qubitized encodings, and its integration into the larger workflow has not yet been verified.
 - Time Evolution: Setting `algorithm.method` to "time evolution" will return the time evolution
   unitary operator.  This is useful for analyzing the resource requirements of the unitary itself
   or for building custom algorithms.
@@ -270,14 +281,21 @@ However, this section is still under development and currently has very limited 
   evolution operators (for example, when building phase estimation or iterative phase estimation
   algorithms manually).
 
-When performing phase estimation, it is necessary to set the number of phase qubits (which, in the
-qubitized method, translates to the number of measurements of the single phase qubit).  This can be
-controlled directly by the user by setting `algorithm.num_phase_qubits`.  But this can also be
-computed by the script by setting
+When performing phase estimation, it is necessary to set the number of phase qubits (which, in
+pyLIQTR's qubitized method, translates to the number of measurements of the single phase qubit).
+This can be controlled directly by the user by setting `algorithm.num_phase_qubits`, which is then
+used exactly as given.  But this can also be computed by the script by setting
 
 - `algorithm.energy_error`: The maximum energy error permitted from phase estimation.
 - `algorithm.probability_of_failure`: The maximum probability of measuring the wrong phase at the
-  end of the algorithm.
+  end of the algorithm (textbook and flexible phase estimation only).
+
+For textbook and flexible phase estimation, the unitary converts `algorithm.energy_error` into an
+error in the eigenphase (measured in turns, i.e. as a fraction of 2π), and each QPE method builds
+itself to meet that phase error with at most `algorithm.probability_of_failure` chance of failure.
+For flexible phase estimation the register size is determined by the `algorithm.ancilla_prep`
+choice.  The qubitized methods size their registers from `algorithm.energy_error` and the
+block-encoding's normalization instead.
 
 ### Analyzing an Algorithm
 

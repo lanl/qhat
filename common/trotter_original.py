@@ -13,7 +13,7 @@
 # =================================================================================================
 
 from functools import cached_property, reduce
-from math import cbrt
+from math import cbrt, pi
 from typing import Dict, Sequence
 
 import attrs
@@ -135,6 +135,13 @@ class RampedTrotterizedUnitary(Bloq):
         for n in range(self.numsteps):
             soqs |= bb.add_d(self._generate_step_(), **soqs)
         return soqs
+
+    def phase_error_from_energy_error(self, energy_error: float) -> float:
+        """Eigenphase error, in turns ([0, 1)), corresponding to an energy error.
+
+        timestep is the total evolution time t/hbar, so an energy E has phase E t / (2 pi hbar).
+        """
+        return energy_error * self.timestep / (2 * pi)
 
     def __pow__(self, exponent: int):
         # timestep is the total time, so scale it with numsteps to keep the per-step time fixed
