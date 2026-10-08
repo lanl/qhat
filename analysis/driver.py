@@ -9,7 +9,7 @@ import logging
 import math
 
 from qhat.common.logging_utils import configure_logging
-from qhat.analysis.algorithm import build_algorithm, compute_initial_phase_qubits
+from qhat.analysis.algorithm import build_algorithm, qpe_energy_window
 from qhat.analysis.analysis import analyze_algorithm
 from qhat.analysis.configuration import load_configuration
 from qhat.analysis.hamiltonian import get_physical_hamiltonian
@@ -67,8 +67,9 @@ def run():
         logger.verbose(f"-- phase scale factor = {phase_scale}")
         logger.verbose(f"-- preliminary evolution time = {tevol_hbar} * hbar")
 
-        # preliminiary number of phase qubits, with upper bound correction
-        _, Elo3, Ehi3 = compute_initial_phase_qubits(state.config_algorithm, Elo2, Ehi2)
+        # with algorithm.energy_error set, widen the energy range so that QPE phase bins are
+        # exactly energy_error wide
+        Elo3, Ehi3 = qpe_energy_window(state.config_algorithm, Elo2, Ehi2)
         tevol_hbar = 2 * math.pi / (phase_scale * (Ehi3 - Elo3))
         logger.verbose(f"-- optimized evolution time = {tevol_hbar} * hbar")
 

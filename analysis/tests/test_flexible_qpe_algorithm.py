@@ -8,7 +8,7 @@ import math
 import pytest
 from qualtran.bloqs.phase_estimation import TextbookQPE
 
-from qhat.analysis.algorithm import build_algorithm, compute_initial_phase_qubits
+from qhat.analysis.algorithm import build_algorithm, qpe_energy_window
 from qhat.analysis.config_types import AlgorithmConfiguration
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.pauli_string_evolution import PauliStringEvolution
@@ -113,6 +113,21 @@ class TestPhaseQubits:
             build_algorithm(config, unitary)
 
 
+class TestQPEEnergyWindow:
+
+    def test_without_energy_error_is_unchanged(self):
+        assert qpe_energy_window(make_config(), -1.5, 1.5) == (-1.5, 1.5)
+
+    @pytest.mark.parametrize("Elo, Ehi, dE, lo, hi", [
+        (-1.5, 1.5, 0.1, -1.6, 1.6),   # width 3 -> 2^5 * 0.1 = 3.2
+        (0.0, 3.0, 0.1, -0.1, 3.1),    # off-center range: same width, same middle
+        (-1.0, 1.0, 0.25, -1.0, 1.0),  # width 2 = 2^3 * 0.25 exactly: no widening
+    ])
+    def test_width_rounded_up_and_split_evenly(self, Elo, Ehi, dE, lo, hi):
+        window = qpe_energy_window(make_config(energy_error=dE), Elo, Ehi)
+        assert window == pytest.approx((lo, hi))
+
+
 @pytest.mark.parametrize("method", ["QPE: QHAT flexible", "QPE: qualtran textbook"])
 @pytest.mark.parametrize("W, dE", [
     (3.0, 0.1), (4.0, 0.5), (2.0, 0.25),
@@ -123,8 +138,9 @@ def test_driver_evolution_time_gives_P0_precision_bits(method, W, dE):
     error is 2^-P0, so the register is P0 plus the textbook confidence bits."""
     p_fail = 0.1
     config = make_config(method=method, energy_error=dE, probability_of_failure=p_fail)
-    P0, Elo, Ehi = compute_initial_phase_qubits(config, -W / 2, W / 2)
-    t = 2 * math.pi / (Ehi - Elo)
+    P0 = math.ceil(math.log2(W / dE))
+    lo, hi = qpe_energy_window(config, -W / 2, W / 2)
+    t = 2 * math.pi / (hi - lo)
     u = Trotterization.from_method(
         pauli_terms=[("XZ", 0.5), ("ZY", 0.3)], method="second order", time=t, num_steps=1)
     algorithm = build_algorithm(config, u)

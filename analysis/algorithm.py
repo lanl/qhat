@@ -284,22 +284,23 @@ def build_algorithm(
 
 # -------------------------------------------------------------------------------------------------
 
-def compute_initial_phase_qubits(
-        config_algorithm: AlgorithmConfiguration,
-        Elo2, Ehi2):
+def qpe_energy_window(config_algorithm: AlgorithmConfiguration, Elo, Ehi):
+    """Energy window [lo, hi) to map onto one full phase turn (t = 2 pi / (hi - lo)).
 
-    logger.info("Computing initial phase qubits.")
+    With algorithm.energy_error set, the width is rounded up to 2**P0 * energy_error, so each bin
+    of a P0-bit phase register is exactly energy_error wide; the extra width is split evenly above
+    and below [Elo, Ehi).  Otherwise the window is [Elo, Ehi).  For example, [-1.5, 1.5) with
+    energy_error 0.1 gives P0 = 5 and [-1.6, 1.6).
+    """
+    logger.info("Computing the QPE energy window.")
 
-    if config_algorithm.energy_error is None:
-        Elo3 = Elo2
-        Ehi3 = Ehi2
-        P0 = None
-    else:
-        P0 = math.ceil(math.log2((Ehi2 - Elo2) / config_algorithm.energy_error))
-        logger.verbose(f"-- initial number of phase qubits = {P0}")
-        dE_new = 2**P0 * config_algorithm.energy_error
-        Elo3 = Elo2
-        Ehi3 = Elo3 + dE_new
-        logger.verbose(f"-- QPE-optimized bounds = [{Elo3}, {Ehi3})")
+    dE = config_algorithm.energy_error
+    if dE is None:
+        return (Elo, Ehi)
 
-    return (P0, Elo3, Ehi3)
+    P0 = math.ceil(math.log2((Ehi - Elo) / dE))
+    width = 2**P0 * dE
+    middle = (Elo + Ehi) / 2
+    lo, hi = middle - width / 2, middle + width / 2
+    logger.verbose(f"-- P0 = {P0} bits of {dE} each, window = [{lo}, {hi})")
+    return (lo, hi)
