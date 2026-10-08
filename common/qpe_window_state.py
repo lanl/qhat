@@ -30,7 +30,9 @@ def precision_bits(phase_error: float) -> int:
     """Smallest n with 2**-n <= phase_error (tolerant of floating-point round-off)."""
     if not 0 < phase_error < 1:
         raise ValueError(f"phase_error must be in (0, 1), got {phase_error}.")
-    return max(0, math.ceil(math.log2(1 / phase_error) - 1e-9))
+    # Round-off can turn an intended 2**-n into e.g. 0.12499999999999999, making log2 a few ulps
+    # above n so that ceil adds a spurious bit; subtracting 1e-12 absorbs this.
+    return max(0, math.ceil(math.log2(1 / phase_error) - 1e-12))
 
 
 @attrs.frozen
