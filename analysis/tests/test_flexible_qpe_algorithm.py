@@ -6,9 +6,9 @@ Tests for QPE construction in analysis/algorithm.py: the "QPE: QHAT flexible" an
 import math
 
 import pytest
+from qualtran.bloqs.phase_estimation import TextbookQPE
 
-from qhat.analysis.algorithm import (
-    build_algorithm, compute_initial_phase_qubits, NewTextbookQPE)
+from qhat.analysis.algorithm import build_algorithm, compute_initial_phase_qubits
 from qhat.analysis.config_types import AlgorithmConfiguration
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.pauli_string_evolution import PauliStringEvolution
@@ -38,6 +38,13 @@ def textbook_qubits(phase_error, p_fail):
     return math.ceil(math.log2(1 / phase_error)) + math.ceil(math.log2(2 + 1 / (2 * p_fail)))
 
 
+def phase_qubits(algorithm):
+    """Phase-register size: TextbookQPE calls it m_bits, FlexibleQPE num_ancilla_qubits."""
+    if isinstance(algorithm, TextbookQPE):
+        return algorithm.m_bits
+    return algorithm.num_ancilla_qubits
+
+
 class TestRouting:
 
     def test_defaults(self, unitary):
@@ -60,35 +67,40 @@ class TestRouting:
 
     def test_qualtran_textbook(self, unitary):
         config = make_config(method="QPE: qualtran textbook", num_phase_qubits=3)
-        algorithm = build_algorithm(config, unitary)
-        assert isinstance(algorithm, NewTextbookQPE)
-        assert algorithm.num_ancilla_qubits == 3
+        assert build_algorithm(config, unitary) == TextbookQPE(unitary, 3)
 
 
 @pytest.mark.parametrize("method, qpe_class", [
     ("QPE: QHAT flexible", FlexibleQPE),
-    ("QPE: qualtran textbook", NewTextbookQPE),
+    ("QPE: qualtran textbook", TextbookQPE),
 ])
 class TestPhaseQubits:
-    """Both non-qubitized methods share the same sizing interface and results."""
+    """Both non-qubitized methods take the same config and give the same sizes."""
 
     def test_explicit_num_phase_qubits_is_used_as_given(self, trotter, method, qpe_class):
         config = make_config(method=method, num_phase_qubits=5, energy_error=1e-6,
                              probability_of_failure=1e-6)
         algorithm = build_algorithm(config, trotter)
         assert isinstance(algorithm, qpe_class)
-        assert algorithm.num_ancilla_qubits == 5
+        assert phase_qubits(algorithm) == 5
 
     def test_from_energy_error_and_probability_of_failure(self, trotter, method, qpe_class):
         dE, p_fail = 0.05, 0.1
         algorithm = build_algorithm(
             make_config(method=method, energy_error=dE, probability_of_failure=p_fail), trotter)
+        assert isinstance(algorithm, qpe_class)
         phase_error = dE * trotter.time / (2 * math.pi)
-        assert algorithm.num_ancilla_qubits == textbook_qubits(phase_error, p_fail)
+        assert phase_qubits(algorithm) == textbook_qubits(phase_error, p_fail)
 
     def test_requires_probability_of_failure(self, trotter, method, qpe_class):
         with pytest.raises(ValueError, match="probability_of_failure"):
             build_algorithm(make_config(method=method, energy_error=0.05), trotter)
+
+    @pytest.mark.parametrize("p_fail", [0.0, 1.0, 1.5, -0.1])
+    def test_probability_of_failure_out_of_range_raises(self, trotter, method, qpe_class, p_fail):
+        config = make_config(method=method, energy_error=0.05, probability_of_failure=p_fail)
+        with pytest.raises(ValueError, match="probability_of_failure"):
+            build_algorithm(config, trotter)
 
     def test_requires_energy_error_or_num_phase_qubits(self, trotter, method, qpe_class):
         with pytest.raises(ValueError, match="num_phase_qubits"):
@@ -113,7 +125,7 @@ def test_driver_evolution_time_gives_P0_precision_bits(method, W, dE):
     u = Trotterization.from_method(
         pauli_terms=[("XZ", 0.5), ("ZY", 0.3)], method="second order", time=t, num_steps=1)
     algorithm = build_algorithm(config, u)
-    assert algorithm.num_ancilla_qubits == P0 + math.ceil(math.log2(2 + 1 / (2 * p_fail)))
+    assert phase_qubits(algorithm) == P0 + math.ceil(math.log2(2 + 1 / (2 * p_fail)))
 
 
 def test_tensor_contract_shape(unitary):

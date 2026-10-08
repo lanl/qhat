@@ -38,31 +38,9 @@ from pyLIQTR.qubitization.phase_estimation import QubitizedPhaseEstimation
 
 from qhat.analysis.config_types import AlgorithmConfiguration
 from qhat.common.flexible_qpe import FlexibleQPE
-from qhat.common.qpe_window_state import RectangularWindowState
+from qhat.common.qpe_window_state import precision_bits, RectangularWindowState
 
 logger = logging.getLogger(__name__)
-
-# -------------------------------------------------------------------------------------------------
-
-# Our version of TextbookQPE, providing the QHAT QPE construction interface (see FlexibleQPE)
-class NewTextbookQPE(TextbookQPE):
-    @classmethod
-    def from_requirements(cls, unitary, phase_error, probability_of_failure):
-        """Build a QPE meeting Pr[|phase estimate error| > phase_error] <= probability_of_failure.
-
-        Phases are in turns ([0, 1)). TextbookQPE's phase register uses the rectangular window,
-        so the size comes from `RectangularWindowState.from_requirements`.
-        """
-        prep = RectangularWindowState.from_requirements(phase_error, probability_of_failure)
-        return cls(unitary, prep.m_bits)
-
-    @classmethod
-    def from_num_phase_qubits(cls, unitary, num_phase_qubits):
-        return cls(unitary, num_phase_qubits)
-
-    @property
-    def num_ancilla_qubits(self):
-        return self.m_bits
 
 # -------------------------------------------------------------------------------------------------
 
@@ -86,31 +64,25 @@ class NewQubitizationQPE(QubitizationQPE):
 
 # -------------------------------------------------------------------------------------------------
 
-def build_qpe(qpe_class, config_algorithm: AlgorithmConfiguration, unitary, phase_error,
-              **components):
-    """Build a non-qubitized QPE variant with the uniform QHAT QPE construction interface.
+def qpe_requirements(config_algorithm: AlgorithmConfiguration, phase_error):
+    """Check and return `(phase_error, probability_of_failure)` for sizing a non-qubitized QPE.
 
-    An explicit `num_phase_qubits` is used as given; otherwise the variant is sized to meet
-    `phase_error` (in turns) and `config_algorithm.probability_of_failure`.
+    Used when `algorithm.num_phase_qubits` is not set. `phase_error` is in turns (see
+    `qpe_phase_error`).
     """
-    P = config_algorithm.num_phase_qubits
-    if P is not None:
-        logger.verbose(f"-- using user-specified number of phase qubits ({P})")
-        qpe = qpe_class.from_num_phase_qubits(unitary, P, **components)
-    else:
-        if phase_error is None:
-            raise ValueError(
-                "QPE needs either algorithm.num_phase_qubits or algorithm.energy_error.")
-        if config_algorithm.probability_of_failure is None:
-            raise ValueError(
-                "QPE sized from algorithm.energy_error also needs "
-                "algorithm.probability_of_failure.")
-        logger.verbose(f"-- target phase error = {phase_error} turns, "
-                       f"probability of failure = {config_algorithm.probability_of_failure}")
-        qpe = qpe_class.from_requirements(
-                unitary, phase_error, config_algorithm.probability_of_failure, **components)
-    logger.verbose(f"-- number of phase qubits = {qpe.num_ancilla_qubits}")
-    return qpe
+    if phase_error is None:
+        raise ValueError(
+            "QPE needs either algorithm.num_phase_qubits or algorithm.energy_error.")
+    probability_of_failure = config_algorithm.probability_of_failure
+    if probability_of_failure is None:
+        raise ValueError(
+            "QPE sized from algorithm.energy_error also needs algorithm.probability_of_failure.")
+    if not 0 < probability_of_failure < 1:
+        raise ValueError(
+            f"algorithm.probability_of_failure must be in (0, 1), got {probability_of_failure}.")
+    logger.verbose(f"-- target phase error = {phase_error} turns, "
+                   f"probability of failure = {probability_of_failure}")
+    return phase_error, probability_of_failure
 
 # -------------------------------------------------------------------------------------------------
 
@@ -169,7 +141,16 @@ def build_qpe_qualtran_textbook(
     #       compares the QPE performance with different window state objects.
     #       -- The RectangularWindowState isn't added until a later version of qualtran than the
     #          one I'm using.  The interface changes in later versions.
-    return build_qpe(NewTextbookQPE, config_algorithm, unitary, phase_error)
+    P = config_algorithm.num_phase_qubits
+    if P is not None:
+        logger.verbose(f"-- using user-specified number of phase qubits ({P})")
+        qpe = TextbookQPE(unitary, P)
+    else:
+        phase_error, probability_of_failure = qpe_requirements(config_algorithm, phase_error)
+        qpe = TextbookQPE.from_precision_and_delta(
+                unitary, precision_bits(phase_error), probability_of_failure)
+    logger.verbose(f"-- number of phase qubits = {qpe.m_bits}")
+    return qpe
 
 # -------------------------------------------------------------------------------------------------
 
@@ -192,9 +173,18 @@ def build_qpe_qhat_flexible(
     if qft_inv_name not in INVERSE_QFTS:
         raise ValueError(f"Invalid QPE qft_inv \"{config_algorithm.qft_inv}\".")
 
-    return build_qpe(FlexibleQPE, config_algorithm, unitary, phase_error,
-                     ancilla_prep=ANCILLA_PREPS[ancilla_prep_name],
-                     qft_inv=INVERSE_QFTS[qft_inv_name])
+    components = dict(ancilla_prep=ANCILLA_PREPS[ancilla_prep_name],
+                      qft_inv=INVERSE_QFTS[qft_inv_name])
+    P = config_algorithm.num_phase_qubits
+    if P is not None:
+        logger.verbose(f"-- using user-specified number of phase qubits ({P})")
+        qpe = FlexibleQPE.from_num_phase_qubits(unitary, P, **components)
+    else:
+        phase_error, probability_of_failure = qpe_requirements(config_algorithm, phase_error)
+        qpe = FlexibleQPE.from_requirements(
+                unitary, phase_error, probability_of_failure, **components)
+    logger.verbose(f"-- number of phase qubits = {qpe.num_ancilla_qubits}")
+    return qpe
 
 # -------------------------------------------------------------------------------------------------
 
