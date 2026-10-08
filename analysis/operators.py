@@ -347,7 +347,8 @@ class OperatorRepresentation:
         [-dE, +dE] where dE is the one-norm bound. With tevol_hbar t/ℏ ≤ π/dE, this maps
         shifted eigenvalues to phases in [-π, +π], matching np.angle()'s output range
         directly. This eliminates the need for phase wrapping and correctly handles the
-        logarithm branch cut.
+        logarithm branch cut. (If t/ℏ = π/dE, eigenvalues exactly at ±dE both map to ±π
+        and cannot be distinguished.)
 
         Parameters
         ----------
@@ -412,9 +413,9 @@ class OperatorRepresentation:
 
         The Hamiltonian is energy-shifted to center eigenvalues around zero, placing
         them in the range [-dE, +dE] where dE is the one-norm bound. With tevol_hbar
-        t/ℏ ≤ π/dE, this maps eigenvalues to phases in [-π, +π], matching the output range
-        of np.angle() directly - no phase wrapping needed!  (Eigenvalues exactly at the
-        bounds with t/ℏ = π/dE map to ±π, which np.angle() cannot distinguish.)
+        t/ℏ ≤ π/dE, this maps eigenvalues to phases in [-π, +π]. This matches the output
+        range of np.angle() directly - no phase wrapping needed! (If t/ℏ = π/dE,
+        eigenvalues exactly at ±dE both map to ±π and cannot be distinguished.)
         """
         if self.tevol_hbar is None:
             raise ValueError(

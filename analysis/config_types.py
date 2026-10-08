@@ -137,8 +137,8 @@ class UnitaryConfiguration(ConfigurationBase):
         self.tensor_contraction_method = kwargs.get("tensor_contraction_method", None)
         if "phase_scale_factor" in kwargs:
             raise ValueError(
-                "phase_scale_factor has been removed; the evolution time now includes explicit "
-                "margins for the encoding and phase estimation energy errors.")
+                "phase_scale_factor has been removed; set timestep to choose the evolution time "
+                "directly.")
         # Validate trotter_steps
         if self.trotter_steps is not None:
             if not isinstance(self.trotter_steps, int) or self.trotter_steps < 1:
