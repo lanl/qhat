@@ -78,10 +78,6 @@ class TestRectangularWindowState:
         # m = n + ceil(log2(2 + 1/(2*delta)))
         assert RectangularWindowState.from_precision_and_delta(5, 0.01).m_bits == 5 + 6
 
-    def test_from_standard_deviation_eps(self):
-        # m = ceil(2*log2(pi/eps))
-        assert RectangularWindowState.from_standard_deviation_eps(0.1).m_bits == 10
-
     @pytest.mark.parametrize("phase_error, p_fail, expected", [
         (1 / 8, 0.1, 3 + 3),      # 2^-3 = 1/8 exactly; ceil(log2(2 + 5)) = 3
         (0.1, 0.1, 4 + 3),        # 2^-4 < 0.1 < 2^-3

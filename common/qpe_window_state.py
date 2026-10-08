@@ -23,7 +23,7 @@ import attrs
 
 from qualtran import Bloq, BloqBuilder, QDType, QFxp, Register, Side, Signature, SoquetT
 from qualtran.bloqs.basic_gates import Hadamard, OnEach
-from qualtran.symbolics import ceil, is_symbolic, log2, pi, SymbolicFloat, SymbolicInt
+from qualtran.symbolics import ceil, is_symbolic, log2, SymbolicFloat, SymbolicInt
 
 
 def precision_bits(phase_error: float) -> int:
@@ -132,15 +132,6 @@ class RectangularWindowState(QPEWindowStateBase):
         if not is_symbolic(delta) and not 0 < delta < 1:
             raise ValueError(f"probability of failure must be in (0, 1), got {delta}.")
         return cls(precision + ceil(log2(2 + 1 / (2 * delta))))
-
-    @classmethod
-    def from_standard_deviation_eps(cls, eps: SymbolicFloat):
-        r"""Bound the standard deviation of the estimated phase $\phi$ by $\epsilon$.
-
-        Textbook QPE has standard deviation at most $\pi / \sqrt{2^m}$, so
-        `m = ceil(2*log2(pi/eps))`.
-        """
-        return cls(ceil(2 * log2(pi(eps) / eps)))
 
     def build_composite_bloq(self, bb: BloqBuilder, qpe_reg: SoquetT) -> Dict[str, SoquetT]:
         qpe_reg = bb.add(OnEach(self.m_bits, Hadamard()), q=qpe_reg)
