@@ -23,7 +23,7 @@ import attrs
 
 from qualtran import Bloq, BloqBuilder, QDType, QFxp, Register, Side, Signature, SoquetT
 from qualtran.bloqs.basic_gates import Hadamard, OnEach
-from qualtran.symbolics import ceil, log2, pi, SymbolicFloat, SymbolicInt
+from qualtran.symbolics import ceil, is_symbolic, log2, pi, SymbolicFloat, SymbolicInt
 
 
 def precision_bits(phase_error: float) -> int:
@@ -31,17 +31,6 @@ def precision_bits(phase_error: float) -> int:
     if not 0 < phase_error < 1:
         raise ValueError(f"phase_error must be in (0, 1), got {phase_error}.")
     return max(0, math.ceil(math.log2(1 / phase_error) - 1e-9))
-
-
-def textbook_confidence_bits(probability_of_failure: float) -> int:
-    """Extra bits for textbook QPE to succeed with probability >= 1 - probability_of_failure.
-
-    Nielsen & Chuang Eq. 5.35: ceil(log2(2 + 1/(2*delta))).
-    """
-    if not 0 < probability_of_failure < 1:
-        raise ValueError(
-            f"probability_of_failure must be in (0, 1), got {probability_of_failure}.")
-    return math.ceil(math.log2(2 + 1 / (2 * probability_of_failure)))
 
 
 @attrs.frozen
@@ -124,9 +113,8 @@ class RectangularWindowState(QPEWindowStateBase):
 
     @classmethod
     def from_requirements(cls, phase_error: float, probability_of_failure: float):
-        """Precision bits for `phase_error` plus textbook confidence bits (N&C Eq. 5.35)."""
-        return cls(precision_bits(phase_error)
-                   + textbook_confidence_bits(probability_of_failure))
+        """`from_precision_and_delta`, with the precision in bits computed from `phase_error`."""
+        return cls.from_precision_and_delta(precision_bits(phase_error), probability_of_failure)
 
     @classmethod
     def from_num_phase_qubits(cls, num_phase_qubits: int):
@@ -136,8 +124,11 @@ class RectangularWindowState(QPEWindowStateBase):
     def from_precision_and_delta(cls, precision: SymbolicInt, delta: SymbolicFloat):
         r"""Estimate $\varphi$ to `precision` bits with probability of failure at most $\delta$.
 
-        Uses Eq. 5.35 of Nielsen & Chuang: `m = n + ceil(log2(2 + 1/(2*delta)))`.
+        Uses Eq. 5.35 of Nielsen & Chuang: `m = n + ceil(log2(2 + 1/(2*delta)))`. `delta` may be
+        a number, which must be in (0, 1), or a sympy expression.
         """
+        if not is_symbolic(delta) and not 0 < delta < 1:
+            raise ValueError(f"probability of failure must be in (0, 1), got {delta}.")
         return cls(precision + ceil(log2(2 + 1 / (2 * delta))))
 
     @classmethod

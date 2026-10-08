@@ -38,8 +38,7 @@ from pyLIQTR.qubitization.phase_estimation import QubitizedPhaseEstimation
 
 from qhat.analysis.config_types import AlgorithmConfiguration
 from qhat.common.flexible_qpe import FlexibleQPE
-from qhat.common.qpe_window_state import (
-    precision_bits, RectangularWindowState, textbook_confidence_bits)
+from qhat.common.qpe_window_state import RectangularWindowState
 
 logger = logging.getLogger(__name__)
 
@@ -51,10 +50,11 @@ class NewTextbookQPE(TextbookQPE):
     def from_requirements(cls, unitary, phase_error, probability_of_failure):
         """Build a QPE meeting Pr[|phase estimate error| > phase_error] <= probability_of_failure.
 
-        Phases are in turns ([0, 1)); uses Nielsen & Chuang Eq. 5.35.
+        Phases are in turns ([0, 1)). TextbookQPE's phase register uses the rectangular window,
+        so the size comes from `RectangularWindowState.from_requirements`.
         """
-        return cls(unitary, precision_bits(phase_error)
-                            + textbook_confidence_bits(probability_of_failure))
+        prep = RectangularWindowState.from_requirements(phase_error, probability_of_failure)
+        return cls(unitary, prep.m_bits)
 
     @classmethod
     def from_num_phase_qubits(cls, unitary, num_phase_qubits):
