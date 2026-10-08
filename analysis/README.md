@@ -267,6 +267,11 @@ However, this section is still under development and currently has very limited 
   measurements to extract the necessary number of bits of information.  This method only works with
   qubitized encodings such as double-factorization.  The integration of this method into the larger
   workflow has not yet been verified, so use this method with caution.
+- Qualtran Qubitization Phase Estimation: Setting `algorithm.method` to "QPE: qualtran
+  qubitization" will embed the unitary encoding of the Hamiltonian into Qualtran's
+  `QubitizationQPE`, which applies phase estimation to the qubitization walk operator built from
+  the block encoding's select and prepare oracles.  Like the pyLIQTR method, this only works with
+  qubitized encodings, and its integration into the larger workflow has not yet been verified.
 - Time Evolution: Setting `algorithm.method` to "time evolution" will return the time evolution
   unitary operator.  This is useful for analyzing the resource requirements of the unitary itself
   or for building custom algorithms.
@@ -276,10 +281,10 @@ However, this section is still under development and currently has very limited 
   evolution operators (for example, when building phase estimation or iterative phase estimation
   algorithms manually).
 
-When performing phase estimation, it is necessary to set the number of phase qubits (which, in the
-qubitized method, translates to the number of measurements of the single phase qubit).  This can be
-controlled directly by the user by setting `algorithm.num_phase_qubits`, which is then used exactly
-as given.  But this can also be computed by the script by setting
+When performing phase estimation, it is necessary to set the number of phase qubits (which, in
+pyLIQTR's qubitized method, translates to the number of measurements of the single phase qubit).
+This can be controlled directly by the user by setting `algorithm.num_phase_qubits`, which is then
+used exactly as given.  But this can also be computed by the script by setting
 
 - `algorithm.energy_error`: The maximum energy error permitted from phase estimation.
 - `algorithm.probability_of_failure`: The maximum probability of measuring the wrong phase at the

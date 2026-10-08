@@ -184,7 +184,7 @@ class UnitaryConfiguration(ConfigurationBase):
 
 class AlgorithmConfiguration(ConfigurationBase):
     def __init__(self):
-        self.method = "qualtran textbook"
+        self.method = "QPE: qualtran textbook"
         self.num_phase_qubits = None
         self.probability_of_failure = None
         self.energy_error = None

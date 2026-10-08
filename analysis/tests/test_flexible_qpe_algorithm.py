@@ -65,6 +65,11 @@ class TestRouting:
         with pytest.raises(ValueError, match=key):
             build_algorithm(config, unitary)
 
+    def test_default_method_is_valid(self, unitary):
+        config = AlgorithmConfiguration()
+        config.num_phase_qubits = 3
+        assert build_algorithm(config, unitary) == TextbookQPE(unitary, 3)
+
     def test_qualtran_textbook(self, unitary):
         config = make_config(method="QPE: qualtran textbook", num_phase_qubits=3)
         assert build_algorithm(config, unitary) == TextbookQPE(unitary, 3)
