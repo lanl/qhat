@@ -367,11 +367,6 @@ def load_fci(config_hamiltonian: HamiltonianConfiguration):
     logger.info(f"Loading second-quantization Hamiltonian from file \"{filename}\".")
     data = tools.fcidump.read(filename)
 
-    isym = data['ISYM']
-    if isym != 1:
-        raise ValueError(f"Unsupported value ISYM = {isym}. "
-                         f"Reader only supports ISYM = 1.")
-
     n = data['NORB']
     f0 = data['ECORE']
 
