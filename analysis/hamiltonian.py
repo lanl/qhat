@@ -14,6 +14,8 @@ from openfermion import (
     jordan_wigner,
 )
 
+from pyscf import ao2mo, tools
+
 from qhat.analysis.config_types import HamiltonianConfiguration
 from qhat.analysis.utils import value
 from qhat.common.bosons_binary import BosonicBinaryEncoding
@@ -360,6 +362,32 @@ def load_numpy(config_hamiltonian: HamiltonianConfiguration):
 
 # -------------------------------------------------------------------------------------------------
 
+def load_fci(config_hamiltonian: HamiltonianConfiguration):
+    filename = config_hamiltonian.filename
+    logger.info(f"Loading second-quantization Hamiltonian from file \"{filename}\".")
+    data = tools.fcidump.read(filename)
+
+    n = data['NORB']
+    f0 = data['ECORE']
+
+    # check that f1 has correct shape
+    f1 = data['H1']
+    if f1.shape != (n, n):
+        raise ValueError(f"Incorrect f1 shape {f1.shape}. "
+                         f"f1 shape should be ({n}, {n}).")
+
+    # reader returns a packed f2 - unpack it here
+    f2packed = data['H2']
+    f2 = ao2mo.restore('s1', f2packed, n)
+    # check that f2 has correct shape
+    if f2.shape != (n, n, n, n):
+        raise ValueError(f"Incorrect f2 shape {f2.shape}. "
+                         f"f2 shape should be ({n}, {n}, {n}, {n}).")
+
+    return _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, None, None)
+
+# -------------------------------------------------------------------------------------------------
+
 def load_hamlib_hdf5(config_hamiltonian: HamiltonianConfiguration):
     """
     Load Pauli string Hamiltonian from HamLib HDF5 file format.
@@ -599,5 +627,7 @@ def get_physical_hamiltonian(config_hamiltonian: HamiltonianConfiguration):
         return load_hdf5(config_hamiltonian)
     elif config_hamiltonian.source == "pauli":
         return load_pauli(config_hamiltonian)
+    elif config_hamiltonian.source == "fci":
+        return load_fci(config_hamiltonian)
     else:
         raise ValueError(f"Invalid Hamiltonian source \"{config_hamiltonian.source}\".")
