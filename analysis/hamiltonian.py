@@ -4,6 +4,8 @@ import json
 import logging
 import numpy as np
 import scipy.constants as sc
+from collections.abc import Mapping
+from typing import Any
 
 from openfermion import (
     InteractionOperator,
@@ -341,21 +343,38 @@ def load_hdf5(config_hamiltonian: HamiltonianConfiguration):
 
 # -------------------------------------------------------------------------------------------------
 
+_no_argument = object()
+
+def _get_any_of(data: Mapping[str, np.ndarray], keys: list[str], as_scalar: bool = False, default: Any = _no_argument) -> Any:
+    """Return data[k] for any k in keys for which that value is defined.
+    Raise KeyError on failure unless a default value is provided.  If
+    as_scalar is True, extract a scalar from a 0-D array."""
+
+    # Try each key in turn.
+    for k in keys:
+        try:
+            v = data[k]
+            return v[()] if as_scalar else v
+        except KeyError:
+            pass
+
+    # No keys were found.  Return None if the value is optional, otherwise
+    # a KeyError.
+    if default is not _no_argument:
+        return default
+    raise KeyError(f"failed to find any of the keys {keys}")
+
+# -------------------------------------------------------------------------------------------------
+
 def load_numpy(config_hamiltonian: HamiltonianConfiguration):
     filename = config_hamiltonian.filename
     logger.info(f"Loading second-quantization Hamiltonian from file \"{filename}\".")
     data = np.load(filename)
-    def get_optional_scalar(name, default_value):
-        x = data.get(name, None)
-        if x is None:
-            return default_value
-        else:
-            return x[()] # extract scalar from 0D NumPy array
-    f0 = get_optional_scalar("constant", 0)
-    f1 = data["one_body"]
-    f2 = data["two_body"]
-    bs = get_optional_scalar("bosonic_scalar", None)
-    fb = data.get("fb_interaction", None)
+    f0 = float(_get_any_of(data, ["constant", "ecore"], default=0))
+    f1 = _get_any_of(data, ["one_body", "h1e"])
+    f2 = _get_any_of(data, ["two_body", "eri"])
+    bs = _get_any_of(data, ["bosonic_scalar"], default=None)
+    fb = _get_any_of(data, ["fb_interaction"], default=None)
     return _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, bs, fb)
 
 # -------------------------------------------------------------------------------------------------
