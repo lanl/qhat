@@ -19,6 +19,8 @@ Classes:
   with `ExactStatePreparation` on all p qubits (2^p - 1 rotations).
 - `TruncatedDPSSWindowState`: the DPSS with only its 2K + 1 lowest frequencies kept (Sec. VII A),
   prepared with the paper's App. A circuit (2^m - 1 + m rotations plus a QFT).
+- `BandwidthOptimizedWindowState`: the best taper on those same 2K + 1 frequencies (Sec. VII B),
+  with the same circuit.
 """
 
 import abc
@@ -284,3 +286,49 @@ class TruncatedDPSSWindowState(BandLimitedWindowStateBase):
         r = np.real(spectrum[:k_max + 1] * np.exp(1j * np.pi * k * (n - 1) / n))
         return r / np.sqrt(r[0]**2 + 2 * np.sum(r[1:]**2))
 
+
+@attrs.frozen
+class BandwidthOptimizedWindowState(BandLimitedWindowStateBase):
+    """The taper on frequencies -K..K with the smallest average failure probability (paper
+    Sec. VII B): at least as good as `TruncatedDPSSWindowState`, with the same circuit.
+
+    Computed over symmetric tapers (the optimum is symmetric) as the smallest right singular
+    vector of G, where (G v)^2 summed over quadrature points is the out-of-band energy
+    int_{W < |f| < 1/2} |phihat(f)|^2 df of the taper with coefficients v. An SVD resolves this
+    energy down to about 1e-30; an eigensolver for the in-band energy 1 - energy stops near 1e-16.
+
+    Args and registers: see `TaperedWindowStateBase`.
+    """
+
+    def frequency_amplitudes(self) -> np.ndarray:
+        n, k_max = 2**self.m_bits, self.half_bandwidth
+        nodes, weights = np.polynomial.legendre.leggauss(8)
+        # u = N f, on half-unit panels covering the out-of-band frequencies [K + 1/2, N/2].
+        panel_starts = np.arange(2 * k_max + 1, n) / 2
+        r_factor = np.zeros((0, k_max + 1))
+        for chunk in np.array_split(panel_starts, max(1, len(panel_starts) // 4096)):
+            u = (chunk[:, None] + (nodes + 1) / 4).ravel()
+            g = np.sqrt(np.tile(weights, len(chunk)))[:, None] * self._spectra(u)
+            r_factor = np.linalg.qr(np.vstack([r_factor, g]), mode='r')
+        v = np.linalg.svd(r_factor)[2][-1]
+        r = np.concatenate([v[:1], v[1:] / np.sqrt(2)])
+        return r if r[0] > 0 else -r
+
+    def _spectra(self, u: np.ndarray) -> np.ndarray:
+        """|phihat(u/N)| (up to a common factor) of the orthonormal symmetric basis functions
+        1/sqrt(N) and sqrt(2/N) cos(2 pi k (n - s)/N), one column per k = 0..K.
+
+        Uses D(x) = sum_n cos(2 pi (n - s) x) = sin(pi N x)/sin(pi x), with sin(pi N x) computed
+        from the fractional part of u so it stays accurate for large N.
+        """
+        n, k_max = 2**self.m_bits, self.half_bandwidth
+        whole = np.floor(u)
+        sin_pi_u = np.where(whole % 2, -1.0, 1.0) * np.sin(np.pi * (u - whole))
+
+        def dirichlet(shift):  # D((u + shift)/N)
+            x = (u + shift) / n
+            return (-1)**shift * sin_pi_u / np.sin(np.pi * np.minimum(x, 1 - x))
+
+        columns = [dirichlet(0)]
+        columns += [(dirichlet(k) + dirichlet(-k)) / np.sqrt(2) for k in range(1, k_max + 1)]
+        return np.array(columns).T

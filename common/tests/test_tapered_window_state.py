@@ -24,16 +24,17 @@ from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.qpe_window_state import precision_bits, RectangularWindowState
 from qhat.common.tapered_window_state import (
     BandLimitedWindowStateBase,
+    BandwidthOptimizedWindowState,
     dpss_average_failure_bound,
     DPSSWindowState,
     half_bandwidth,
     TruncatedDPSSWindowState,
 )
 
-TAPERED = [DPSSWindowState, TruncatedDPSSWindowState]
-BAND_LIMITED = [TruncatedDPSSWindowState]
-TAPERED_IDS = ["dpss", "truncated"]
-BAND_LIMITED_IDS = ["truncated"]
+TAPERED = [DPSSWindowState, TruncatedDPSSWindowState, BandwidthOptimizedWindowState]
+BAND_LIMITED = [TruncatedDPSSWindowState, BandwidthOptimizedWindowState]
+TAPERED_IDS = ["dpss", "truncated", "bandwidth-optimized"]
+BAND_LIMITED_IDS = ["truncated", "bandwidth-optimized"]
 
 
 def window(prep):
@@ -130,12 +131,25 @@ class TestTapers:
         """m = 1 keeps only frequency 0 (K = 0)."""
         np.testing.assert_allclose(cls(3, 1).taper(), np.full(16, 0.25), atol=1e-15)
 
+    @pytest.mark.parametrize("l, m", [(0, 2), (1, 2), (2, 2), (3, 2)])
+    def test_bandwidth_optimized_matches_eigenvector_reference(self, l, m):
+        """Sec. VII B's eigenproblem: maximize in-band energy over the 2K + 1 kept frequencies.
+        (An eigensolver resolves 1 - energy only to ~1e-16, so this needs m = 2.)"""
+        n, k_max = 2**(l + m), half_bandwidth(m)
+        frequencies = np.r_[0:k_max + 1, n - k_max:n]
+        basis = np.exp(2j * np.pi * np.outer(np.arange(n), frequencies) / n) / np.sqrt(n)
+        form = basis.conj().T @ sinc_kernel(n, k_max) @ basis
+        reference = basis @ np.linalg.eigh(form)[1][:, -1]
+        reference *= np.exp(-1j * np.angle(reference.sum()))
+        np.testing.assert_allclose(BandwidthOptimizedWindowState(l, m).taper(), reference,
+                                   atol=1e-12)
+
     @pytest.mark.parametrize("l, m", [(0, 2), (2, 2), (1, 3), (3, 3)])
     def test_average_failure_ordering(self, l, m):
-        """DPSS <= truncated: the DPSS is optimal over all tapers."""
-        dpss_, trunc = (average_paper_failure(cls(l, m)) for cls in TAPERED)
+        """DPSS <= bandwidth-optimized <= truncated: each is optimal over a larger set."""
+        dpss_, trunc, bwopt = (average_paper_failure(cls(l, m)) for cls in TAPERED)
         tol = 1e-14  # round-off in 1 - w C w
-        assert dpss_ <= trunc + tol
+        assert dpss_ <= bwopt + tol and bwopt <= trunc + tol
         assert trunc <= 4 * dpss_  # eq. 110 (here eps(0) ~ average)
 
     def test_average_failure_is_out_of_band_energy(self):
@@ -250,7 +264,8 @@ class TestFailureProbability:
     @pytest.mark.parametrize("l, m", [(0, 2), (2, 2), (4, 2), (1, 3), (3, 3)])
     def test_truncation_bound_pointwise(self, cls, l, m):
         """Eq. 107 for the truncated DPSS: failure(theta) <= (sqrt(eps(0)) + sqrt(eps(theta)))^2,
-        eps being the DPSS's failure."""
+        eps being the DPSS's failure. The bandwidth-optimized taper is not covered by eq. 107;
+        here it meets the same bound."""
         k_max = half_bandwidth(m)
         w, w_dpss = window(cls(l, m)), DPSSWindowState(l, m).taper()
         eps0 = paper_failure(w_dpss, 0.0, k_max)
@@ -291,8 +306,8 @@ class TestSizing:
         assert m == 1 or factor * dpss_average_failure_bound(l, m - 1) > p_fail
 
     def test_confidence_qubits_example(self):
-        assert [cls.confidence_qubits(3, 1e-8) for cls in TAPERED] == [5, 6]
-        assert [cls.failure_bound_factor for cls in TAPERED] == [1, 4]
+        assert [cls.confidence_qubits(3, 1e-8) for cls in TAPERED] == [5, 6, 6]
+        assert [cls.failure_bound_factor for cls in TAPERED] == [1, 4, 4]
 
     @pytest.mark.parametrize("cls", TAPERED, ids=TAPERED_IDS)
     @pytest.mark.parametrize("phase_error, l", [
@@ -306,7 +321,7 @@ class TestSizing:
 
     def test_from_requirements_beats_rectangular(self):
         """Module docstring example: delta = 1/16 with p_fail 1e-8."""
-        assert [cls.from_requirements(1 / 16, 1e-8).m_bits for cls in TAPERED] == [8, 9]
+        assert [cls.from_requirements(1 / 16, 1e-8).m_bits for cls in TAPERED] == [8, 9, 9]
         assert RectangularWindowState.from_requirements(1 / 16, 1e-8).m_bits == 4 + 26
 
     @pytest.mark.parametrize("cls", TAPERED, ids=TAPERED_IDS)
@@ -447,6 +462,7 @@ class TestResources:
     @pytest.mark.parametrize("cls, method", [
         (DPSSWindowState, "taper"),
         (TruncatedDPSSWindowState, "frequency_amplitudes"),
+        (BandwidthOptimizedWindowState, "frequency_amplitudes"),
     ], ids=TAPERED_IDS)
     def test_large_windows_are_costed_without_computing_taper(self, cls, method):
         prep = cls(40, 4)
