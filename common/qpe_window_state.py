@@ -93,7 +93,7 @@ class QPEWindowStateBase(Bloq, metaclass=abc.ABCMeta):
         """Return a window state of this class with `m_bits == num_phase_qubits`.
 
         Subclasses that have other parameters (e.g. a Kaiser window's `alpha`) choose them here,
-        or raise a ValueError if the total alone is not enough.
+        or raise a ValueError if the total alone is not enough (e.g. the tapered windows).
         """
 
     @classmethod
@@ -102,8 +102,8 @@ class QPEWindowStateBase(Bloq, metaclass=abc.ABCMeta):
     ) -> 'QPEWindowStateBase':
         """Return a window state with `num_precision_qubits` + `num_confidence_qubits` qubits.
 
-        By default only the total matters (`from_num_phase_qubits`); windows whose shape depends
-        on the split override this.
+        By default only the total matters (`from_num_phase_qubits`); the tapered windows use the
+        split (see `tapered_window_state.py`).
         """
         return cls.from_num_phase_qubits(num_precision_qubits + num_confidence_qubits)
 

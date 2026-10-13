@@ -173,8 +173,8 @@ class FlexibleQPE(GateWithRegisters):
     ) -> 'FlexibleQPE':
         """Build a QPE from explicit qubit counts; see `QPEWindowStateBase.from_qubit_counts`.
 
-        E.g. `from_qubit_counts(u, num_precision_qubits=3, num_confidence_qubits=2)` has 5 phase
-        qubits.
+        E.g. `from_qubit_counts(u, num_precision_qubits=3, num_confidence_qubits=2,
+        ancilla_prep=DPSSWindowState)` has 5 phase qubits.
         """
         prep = ancilla_prep.from_qubit_counts(
             num_phase_qubits, num_precision_qubits, num_confidence_qubits)
