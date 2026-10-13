@@ -258,8 +258,15 @@ However, this section is still under development and currently has very limited 
 - Flexible Phase Estimation: Setting `algorithm.method` to "QPE: QHAT flexible" builds the QPE
   algorithm with QHAT's `FlexibleQPE` (`common/flexible_qpe.py`), which can implement multiple QPE
   variations by customizing its components:
-  - `algorithm.ancilla_prep`: initial state of the phase register; defaults to "rectangular" (a
-    Hadamard on each phase qubit, yielding "textbook" phase estimation);
+  - `algorithm.ancilla_prep`: initial state of the phase register (case-insensitive); one of
+    - "rectangular" (default): a Hadamard on each phase qubit, yielding "textbook" phase
+      estimation;
+    - "dpss", "truncated dpss" and "bandwidth-optimized": tapered window states from Patel et al.,
+      "Optimal coherent quantum phase estimation via tapering" (arXiv:2403.18927), which need far
+      fewer phase qubits for a small probability of failure (`common/tapered_window_state.py`).
+      "dpss" prepares the exact DPSS taper (2^P - 1 rotations for P phase qubits); the other two
+      keep only its lowest frequencies, so they need about 4 times more failure probability budget
+      but far fewer gates (about 2^m rotations plus a QFT, see below);
   - `algorithm.qft_inv`: inverse quantum Fourier transform; defaults to "textbook".
 - Qubitized Phase Estimation: Setting `algorithm.method` to "QPE: pyliqtr qubitized" will embed the
   unitary encoding of the Hamiltonian into a phase estimation algorithm that uses pyLIQTR's
@@ -296,6 +303,25 @@ itself to meet that phase error with at most `algorithm.probability_of_failure` 
 For flexible phase estimation the register size is determined by the `algorithm.ancilla_prep`
 choice.  The qubitized methods size their registers from `algorithm.energy_error` and the
 block-encoding's normalization instead.
+
+The tapered `algorithm.ancilla_prep` choices split the P phase qubits into l precision qubits
+(success means the phase estimate is within 2^-(l+1) turns) and m confidence qubits (these set
+the probability of failure).  For example, l = 3 and m = 3 give a phase error of 1/16 turn with a
+probability of failure of about 1e-8, where the rectangular window would need 26 more qubits.  For
+these, the total P alone does not determine the window, so set either
+`algorithm.energy_error` and `algorithm.probability_of_failure`, or two of
+
+- `algorithm.num_phase_qubits` (P = l + m),
+- `algorithm.num_precision_qubits` (l),
+- `algorithm.num_confidence_qubits` (m, at least 1),
+
+e.g. `num_precision_qubits = 3` with `num_confidence_qubits = 3`, or `num_phase_qubits = 6` with
+`num_confidence_qubits = 3`.  Setting all three is allowed if they are consistent; any other
+combination is an error.  "rectangular" accepts `algorithm.num_phase_qubits` alone (and uses
+only the total if the split is also given).  When sizing from the error, m is chosen from the
+paper's Theorem 1 (a bound on the failure probability averaged over phases); this rule is
+expected to change.  `num_precision_qubits` and `num_confidence_qubits` apply only to "QPE: QHAT
+flexible".
 
 ### Analyzing an Algorithm
 
