@@ -13,14 +13,14 @@ real taper `phi` in place of the rectangular window. Its size has two parts:
 Example: l = 3, m = 3 uses 6 phase qubits and gives delta = 1/16 with probability of failure about
 1e-8; the rectangular window needs 26 extra qubits for that.
 
-Classes:
+Classes (config names in `qhat.analysis.algorithm.ANCILLA_PREPS`):
 
-- `DPSSWindowState`: the exact discrete prolate spheroidal sequence (paper Sec. IV C), prepared
-  with `ExactStatePreparation` on all p qubits (2^p - 1 rotations).
-- `TruncatedDPSSWindowState`: the DPSS with only its 2K + 1 lowest frequencies kept (Sec. VII A),
-  prepared with the paper's App. A circuit (2^m - 1 + m rotations plus a QFT).
-- `BandwidthOptimizedWindowState`: the best taper on those same 2K + 1 frequencies (Sec. VII B),
-  with the same circuit.
+- `DPSSWindowState` ("dpss"): the exact discrete prolate spheroidal sequence (paper Sec. IV C),
+  prepared with `ExactStatePreparation` on all p qubits (2^p - 1 rotations).
+- `TruncatedDPSSWindowState` ("truncated dpss"): the DPSS with only its 2K + 1 lowest frequencies
+  kept (Sec. VII A), prepared with the paper's App. A circuit (2^m - 1 + m rotations plus a QFT).
+- `BandwidthOptimizedWindowState` ("bandwidth-optimized"): the best taper on those same 2K + 1
+  frequencies (Sec. VII B), with the same circuit.
 """
 
 import abc

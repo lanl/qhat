@@ -40,6 +40,11 @@ from qhat.analysis.config_types import AlgorithmConfiguration
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.hermiticity import require_real_scalar
 from qhat.common.qpe_window_state import precision_bits, RectangularWindowState
+from qhat.common.tapered_window_state import (
+    BandwidthOptimizedWindowState,
+    DPSSWindowState,
+    TruncatedDPSSWindowState,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +175,12 @@ def build_qpe_qualtran_textbook(
 
 # Config names for FlexibleQPE components.  A qft_inv entry maps the phase-register size to a bloq;
 # None selects FlexibleQPE's default (the textbook inverse QFT).
-ANCILLA_PREPS = {"rectangular": RectangularWindowState}
+ANCILLA_PREPS = {
+    "rectangular": RectangularWindowState,
+    "dpss": DPSSWindowState,
+    "truncated dpss": TruncatedDPSSWindowState,
+    "bandwidth-optimized": BandwidthOptimizedWindowState,
+}
 INVERSE_QFTS = {"textbook": None}
 
 def build_qpe_qhat_flexible(
@@ -188,10 +198,20 @@ def build_qpe_qhat_flexible(
 
     components = dict(ancilla_prep=ANCILLA_PREPS[ancilla_prep_name],
                       qft_inv=INVERSE_QFTS[qft_inv_name])
-    P = config_algorithm.num_phase_qubits
-    if P is not None:
-        logger.verbose(f"-- using user-specified number of phase qubits ({P})")
-        qpe = FlexibleQPE.from_num_phase_qubits(unitary, P, **components)
+    counts = dict(num_phase_qubits=config_algorithm.num_phase_qubits,
+                  num_precision_qubits=config_algorithm.num_precision_qubits,
+                  num_confidence_qubits=config_algorithm.num_confidence_qubits)
+    if any(count is not None for count in counts.values()):
+        given = ", ".join(f"{name} = {count}" for name, count in counts.items()
+                          if count is not None)
+        logger.verbose(f"-- using user-specified qubit counts ({given})")
+        try:
+            qpe = FlexibleQPE.from_qubit_counts(unitary, **counts, **components)
+        except ValueError as error:
+            raise ValueError(
+                f"algorithm.ancilla_prep = \"{ancilla_prep_name}\" with {given}: {error} Or set "
+                "algorithm.energy_error and algorithm.probability_of_failure, and no qubit "
+                "counts.") from error
     else:
         phase_error, probability_of_failure = qpe_requirements(config_algorithm, unitary)
         qpe = FlexibleQPE.from_requirements(

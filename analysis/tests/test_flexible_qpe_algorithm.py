@@ -22,6 +22,9 @@ from qhat.analysis.resource_estimation import estimate_resources
 from qhat.analysis.unitary import encode_as_unitary
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.pauli_string_evolution import PauliStringEvolution
+from qhat.common.qpe_window_state import precision_bits
+from qhat.common.tapered_window_state import (
+    BandwidthOptimizedWindowState, DPSSWindowState, TruncatedDPSSWindowState)
 from qhat.common.trotter_flattened import Trotterization
 
 PAULIS = {"I": np.eye(2), "X": np.array([[0, 1], [1, 0]]),
@@ -94,6 +97,73 @@ class TestRouting:
     def test_qualtran_textbook(self, unitary):
         config = make_config(method="QPE: qualtran textbook", num_phase_qubits=3)
         assert build_algorithm(config, unitary) == TextbookQPE(unitary, 3)
+
+
+TAPERED = {
+    "dpss": DPSSWindowState,
+    "truncated dpss": TruncatedDPSSWindowState,
+    "bandwidth-optimized": BandwidthOptimizedWindowState,
+}
+
+
+class TestTaperedWindows:
+
+    @pytest.mark.parametrize("name, cls", [
+        ("DPSS", DPSSWindowState),
+        ("Truncated DPSS", TruncatedDPSSWindowState),
+        ("Bandwidth-Optimized", BandwidthOptimizedWindowState),
+    ])
+    def test_routing_case_insensitive(self, unitary, name, cls):
+        config = make_config(ancilla_prep=name, num_precision_qubits=2, num_confidence_qubits=3)
+        assert build_algorithm(config, unitary) == FlexibleQPE(unitary, 5, cls(2, 3))
+
+    @pytest.mark.parametrize("name, cls", TAPERED.items())
+    @pytest.mark.parametrize("counts", [
+        dict(num_phase_qubits=5, num_confidence_qubits=3),
+        dict(num_phase_qubits=5, num_precision_qubits=2),
+        dict(num_phase_qubits=5, num_precision_qubits=2, num_confidence_qubits=3),
+    ], ids=["p, m", "p, l", "p, l, m"])
+    def test_num_phase_qubits_may_replace_one_count(self, unitary, name, cls, counts):
+        config = make_config(ancilla_prep=name, **counts)
+        assert build_algorithm(config, unitary).ancilla_prep == cls(2, 3)
+
+    def test_counts_take_precedence_over_requirements(self, trotter):
+        config = make_config(ancilla_prep="dpss", num_precision_qubits=2, num_confidence_qubits=3,
+                             energy_error=1e-6, probability_of_failure=1e-6)
+        assert build_algorithm(config, trotter).ancilla_prep == DPSSWindowState(2, 3)
+
+    @pytest.mark.parametrize("name", TAPERED)
+    def test_num_phase_qubits_alone_raises(self, unitary, name):
+        config = make_config(ancilla_prep=name, num_phase_qubits=5)
+        with pytest.raises(ValueError, match=f'"{name}" with num_phase_qubits = 5: .*'
+                           "cannot be sized from num_phase_qubits alone.*energy_error"):
+            build_algorithm(config, unitary)
+
+    @pytest.mark.parametrize("name", ["rectangular", *TAPERED])
+    @pytest.mark.parametrize("counts, match", [
+        (dict(num_precision_qubits=3), r"Cannot size .*\['num_precision_qubits'\]"),
+        (dict(num_confidence_qubits=3), r"Cannot size .*\['num_confidence_qubits'\]"),
+        (dict(num_phase_qubits=5, num_precision_qubits=3, num_confidence_qubits=3),
+         "must equal"),
+    ], ids=["l", "m", "inconsistent"])
+    def test_invalid_counts_raise(self, unitary, name, counts, match):
+        with pytest.raises(ValueError, match=match):
+            build_algorithm(make_config(ancilla_prep=name, **counts), unitary)
+
+    def test_rectangular_accepts_a_split(self, unitary):
+        config = make_config(num_precision_qubits=2, num_confidence_qubits=3)
+        assert build_algorithm(config, unitary) == FlexibleQPE(unitary, 5)
+
+    @pytest.mark.parametrize("name, cls", TAPERED.items())
+    def test_from_energy_error_and_probability_of_failure(self, trotter, name, cls):
+        dE, p_fail = 0.05, 1e-6
+        config = make_config(ancilla_prep=name, energy_error=dE, probability_of_failure=p_fail)
+        phase_error = dE * trotter.time / (2 * math.pi)
+        qpe = build_algorithm(config, trotter)
+        assert qpe.ancilla_prep == cls.from_requirements(phase_error, p_fail)
+        # One fewer precision bit than the rectangular window, and far fewer confidence bits.
+        assert qpe.ancilla_prep.num_precision_qubits == precision_bits(phase_error) - 1
+        assert qpe.num_ancilla_qubits < textbook_qubits(phase_error, p_fail)
 
 
 @pytest.mark.parametrize("method, qpe_class", [
@@ -289,6 +359,45 @@ def test_simulation_reads_exact_phases_from_pauli_file(
         out, np.kron(np.eye(2**m)[int(expected_bits, 2)], target_state), atol=1e-10)
 
 
+@pytest.mark.parametrize("ancilla_prep", ["dpss", "truncated dpss", "bandwidth-optimized"])
+def test_tapered_qpe_meets_requirements_through_pauli_file(tmp_path, ancilla_prep):
+    """End to end with a tapered window sized from (energy_error, probability_of_failure).
+
+    U has off-grid eigenphases on the computational basis states (see
+    `test_simulation_reads_exact_phases_from_pauli_file`). Here energy_error 0.2 is a phase error
+    of 0.2 / 1.7 = 0.118 turns, so l = 3 (delta = 1/16); p_fail = 1e-3 gives m = 4 (DPSS) or 5.
+    For each eigenstate, Pr[estimate more than 0.118 turns from the phase] <= 1e-3.
+    """
+    phases = [0.1234, 0.377, 0.6021, 0.871]
+    energy_scale, dE, p_fail = 1.7, 0.2, 1e-3
+    pauli_file = tmp_path / "hamiltonian.txt"
+    write_diagonal_pauli_file(pauli_file, phases, energy_scale)
+    settings = dict(time=2 * math.pi / energy_scale, num_trotter_steps=3)
+
+    qpe = qpe_from_pauli_file(pauli_file, ancilla_prep=ancilla_prep, energy_error=dE,
+                              probability_of_failure=p_fail, **settings)
+    m = qpe.num_ancilla_qubits
+    assert qpe.ancilla_prep.num_precision_qubits == 3 and m in (7, 8)
+    # Guard: a rectangular window of the same size misses the target, so the taper matters.
+    rectangular = qpe_from_pauli_file(pauli_file, num_phase_qubits=m, **settings)
+
+    phase_error = dE / energy_scale
+    k = np.arange(2**m)
+    for qpe_, meets_target in [(qpe, True), (rectangular, False)]:
+        mat = compute_unitary_matrix(qpe_)
+        failures = []
+        for j, phase in enumerate(phases):
+            input_file = str(tmp_path / f"input_{j}.npy")
+            save_state(input_file, np.kron(np.eye(2**m)[0], np.eye(4)[j]))
+            result = numerical_simulation(input_file, qpe_, mat)
+            out = load_state(result["simulations"][0]["output_file"])
+            probs = np.sum(np.abs(out.reshape(2**m, -1))**2, axis=1)
+            distance = np.abs(k / 2**m - phase)
+            distance = np.minimum(distance, 1 - distance)
+            failures.append(probs[distance > phase_error].sum())
+        assert (max(failures) <= p_fail) == meets_target
+
+
 class TestConfigurationAndResources:
 
     def test_toml_saves_flexible_components(self):
@@ -298,8 +407,13 @@ class TestConfigurationAndResources:
 
     def test_toml_omits_unset_components(self):
         table = make_config()._generate_TOML_table()
-        assert "ancilla_prep" not in table
-        assert "qft_inv" not in table
+        for key in ("ancilla_prep", "qft_inv", "num_precision_qubits", "num_confidence_qubits"):
+            assert key not in table
+
+    def test_toml_saves_qubit_split(self):
+        config = make_config(ancilla_prep="dpss", num_precision_qubits=3, num_confidence_qubits=2)
+        table = config._generate_TOML_table()
+        assert (table["num_precision_qubits"], table["num_confidence_qubits"]) == (3, 2)
 
     @pytest.mark.parametrize("estimator", ["pyLIQTR", "qualtran"])
     def test_resource_estimators_accept_flexible_qpe(self, trotter, estimator):
@@ -307,3 +421,16 @@ class TestConfigurationAndResources:
         resources = estimate_resources(estimator, algorithm)[estimator.lower()]
         assert resources["qubit_count"] == 3 + 2
         assert resources["T_count"] > 0
+
+    @pytest.mark.parametrize("name", TAPERED)
+    def test_pyliqtr_counts_the_window_state(self, trotter, name):
+        """A tapered QPE costs the rectangular one plus its window circuit (the Hadamards of the
+        rectangular window cost no T gates)."""
+        def t_count(bloq):
+            return estimate_resources("pyLIQTR", bloq)["pyliqtr"]["T_count"]
+        config = make_config(ancilla_prep=name, num_precision_qubits=2, num_confidence_qubits=3)
+        tapered = build_algorithm(config, trotter)
+        rectangular = build_algorithm(make_config(num_phase_qubits=5), trotter)
+        assert t_count(tapered.ancilla_prep) > 0
+        assert t_count(tapered) == t_count(rectangular) + t_count(tapered.ancilla_prep)
+        assert estimate_resources("pyLIQTR", tapered)["pyliqtr"]["qubit_count"] == 5 + 2
