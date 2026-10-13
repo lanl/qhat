@@ -1,6 +1,6 @@
 """
-Tapered (DPSS-family) window states for QPE, from Patel, O'Gorman, Gidney et al.,
-"Optimal coherent quantum phase estimation via tapering", arXiv:2403.18927.
+Tapered (DPSS-family) window states for QPE, from Patel, Tan, Subasi and Sornborger,
+"Optimal Coherent Quantum Phase Estimation via Tapering", arXiv:2403.18927.
 
 A tapered window state is `sum_n phi[n] |n>` on p = l + m phase qubits (N = 2^p), with a smooth
 real taper `phi` in place of the rectangular window. Its size has two parts:
