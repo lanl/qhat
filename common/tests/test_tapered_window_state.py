@@ -12,6 +12,7 @@ from unittest import mock
 
 import numpy as np
 import pytest
+from scipy.signal.windows import dpss
 
 from qualtran.bloqs.basic_gates import CNOT, Ry, ZPowGate
 from qualtran.bloqs.qft.qft_text_book import QFTTextBook
@@ -22,13 +23,17 @@ from qhat.common.exact_state_preparation import ExactStatePreparation
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.qpe_window_state import precision_bits, RectangularWindowState
 from qhat.common.tapered_window_state import (
+    BandLimitedWindowStateBase,
     dpss_average_failure_bound,
     DPSSWindowState,
     half_bandwidth,
+    TruncatedDPSSWindowState,
 )
 
-TAPERED = [DPSSWindowState]
-TAPERED_IDS = ["dpss"]
+TAPERED = [DPSSWindowState, TruncatedDPSSWindowState]
+BAND_LIMITED = [TruncatedDPSSWindowState]
+TAPERED_IDS = ["dpss", "truncated"]
+BAND_LIMITED_IDS = ["truncated"]
 
 
 def window(prep):
@@ -102,6 +107,52 @@ class TestTapers:
         top = vectors[:, -1] * np.sign(vectors[:, -1].sum())
         np.testing.assert_allclose(DPSSWindowState(l, m).taper(), top, atol=1e-8)
 
+    @pytest.mark.parametrize("l, m", [(0, 2), (2, 2), (1, 3), (3, 3), (2, 4)])
+    def test_truncated_is_dpss_with_high_frequencies_removed(self, l, m):
+        """Paper eq. 92: keep DFT coefficients -K..K of the DPSS, renormalize."""
+        n, k_max = 2**(l + m), half_bandwidth(m)
+        spectrum = np.fft.fft(dpss(n, k_max + 0.5, norm=2))
+        frequency = np.fft.fftfreq(n, 1 / n)
+        expected = np.fft.ifft(np.where(np.abs(frequency) <= k_max, spectrum, 0))
+        expected /= np.linalg.norm(expected) * np.sign(expected.real.sum())
+        np.testing.assert_allclose(TruncatedDPSSWindowState(l, m).taper(), expected, atol=1e-14)
+
+    @pytest.mark.parametrize("cls", BAND_LIMITED, ids=BAND_LIMITED_IDS)
+    @pytest.mark.parametrize("l, m", [(0, 1), (2, 2), (1, 3), (3, 4)])
+    def test_band_limited_tapers_have_only_low_frequencies(self, cls, l, m):
+        w = cls(l, m).taper()
+        frequency = np.fft.fftfreq(len(w), 1 / len(w))
+        high = np.abs(frequency) > half_bandwidth(m)
+        np.testing.assert_allclose(np.fft.fft(w)[high], 0, atol=1e-12)
+
+    @pytest.mark.parametrize("cls", BAND_LIMITED, ids=BAND_LIMITED_IDS)
+    def test_one_confidence_qubit_is_rectangular(self, cls):
+        """m = 1 keeps only frequency 0 (K = 0)."""
+        np.testing.assert_allclose(cls(3, 1).taper(), np.full(16, 0.25), atol=1e-15)
+
+    @pytest.mark.parametrize("l, m", [(0, 2), (2, 2), (1, 3), (3, 3)])
+    def test_average_failure_ordering(self, l, m):
+        """DPSS <= truncated: the DPSS is optimal over all tapers."""
+        dpss_, trunc = (average_paper_failure(cls(l, m)) for cls in TAPERED)
+        tol = 1e-14  # round-off in 1 - w C w
+        assert dpss_ <= trunc + tol
+        assert trunc <= 4 * dpss_  # eq. 110 (here eps(0) ~ average)
+
+    def test_average_failure_is_out_of_band_energy(self):
+        """The paper's failure, averaged over phases, is 1 - w^T C w (what the tapers optimize)."""
+        prep = TruncatedDPSSWindowState(2, 2)
+        w, n = prep.taper(), 16
+        # Midpoint rule; the integrand jumps only at theta = 1/(2N), a cell boundary here.
+        theta = (np.arange(2000) + 0.5) / (2000 * n)
+        average = np.mean([paper_failure(w, t, prep.half_bandwidth) for t in theta])
+        assert average == pytest.approx(average_paper_failure(prep), rel=1e-6)
+
+    def test_frequency_amplitudes_normalization(self):
+        for cls in BAND_LIMITED:
+            r = cls(2, 4).frequency_amplitudes()
+            assert len(r) == half_bandwidth(4) + 1 and r[0] > 0
+            assert r[0]**2 + 2 * np.sum(r[1:]**2) == pytest.approx(1.0)
+
 
 # -------------------------------------------------------------------------------------------------
 # Circuits
@@ -123,6 +174,30 @@ class TestCircuits:
         assert reg.name == 'qpe_reg' and reg.total_bits() == 5
         assert prep.m_bits == 5 and prep.half_bandwidth == 3
 
+    def test_frequency_state_layout(self):
+        """r[|k|] at index k mod 2^m; index 2^(m-1) is empty."""
+        prep = TruncatedDPSSWindowState(2, 3)
+        r = prep.frequency_amplitudes()
+        np.testing.assert_array_equal(prep.frequency_state(),
+                                      [r[0], r[1], r[2], r[3], 0, r[3], r[2], r[1]])
+        assert np.linalg.norm(prep.frequency_state()) == pytest.approx(1.0)
+
+    def test_phase_ramp_example(self):
+        assert TruncatedDPSSWindowState(1, 2).phase_ramp_exponents() == (-0.25, -0.875)
+
+    @pytest.mark.parametrize("cls", BAND_LIMITED, ids=BAND_LIMITED_IDS)
+    @pytest.mark.parametrize("l, m", [(0, 1), (1, 2), (3, 3), (2, 4)])
+    def test_phase_ramp_centres_frequencies(self, cls, l, m):
+        """The ZPowGates give the m-bit value with signed value k the phase e^{-i pi k (N-1)/N}."""
+        exponents = cls(l, m).phase_ramp_exponents()
+        assert len(exponents) == m and all(-1 < t <= 1 for t in exponents)
+        n = 2**(l + m)
+        for value in range(2**m):
+            bits = [(value >> (m - 1 - j)) & 1 for j in range(m)]  # most significant first
+            k = value - 2**m if bits[0] else value
+            phase = np.exp(1j * np.pi * np.dot(exponents, bits))
+            assert phase == pytest.approx(np.exp(-1j * np.pi * k * (n - 1) / n))
+
     @pytest.mark.parametrize("cls", TAPERED, ids=TAPERED_IDS)
     @pytest.mark.parametrize("theta", [0.3141, 0.8])
     def test_flexible_qpe_outcomes_match_window(self, cls, theta):
@@ -131,6 +206,11 @@ class TestCircuits:
         mat = FlexibleQPE(ZPowGate(exponent=2 * theta), 5, prep).tensor_contract()
         probs = np.abs(mat[:, 1].reshape(32, 2)[:, 1])**2  # qpe_reg = |0>, target = |1>
         np.testing.assert_allclose(probs, outcome_probs(prep.taper(), theta), atol=1e-13)
+
+    def test_flexible_qpe_tensor_contract_matches_decomposition(self):
+        qpe = FlexibleQPE(ZPowGate(exponent=0.47), 3, TruncatedDPSSWindowState(1, 2))
+        np.testing.assert_allclose(qpe.tensor_contract(),
+                                   qpe.decompose_bloq().tensor_contract(), atol=1e-12)
 
 
 # -------------------------------------------------------------------------------------------------
@@ -166,6 +246,18 @@ class TestFailureProbability:
         for t in thetas(len(w), 9):
             assert qhat_failure(w, t, 2**-(l + 1)) <= paper_failure(w, t, half_bandwidth(m)) + 1e-15
 
+    @pytest.mark.parametrize("cls", BAND_LIMITED, ids=BAND_LIMITED_IDS)
+    @pytest.mark.parametrize("l, m", [(0, 2), (2, 2), (4, 2), (1, 3), (3, 3)])
+    def test_truncation_bound_pointwise(self, cls, l, m):
+        """Eq. 107 for the truncated DPSS: failure(theta) <= (sqrt(eps(0)) + sqrt(eps(theta)))^2,
+        eps being the DPSS's failure."""
+        k_max = half_bandwidth(m)
+        w, w_dpss = window(cls(l, m)), DPSSWindowState(l, m).taper()
+        eps0 = paper_failure(w_dpss, 0.0, k_max)
+        for t in thetas(len(w), 17):
+            bound = (np.sqrt(eps0) + np.sqrt(paper_failure(w_dpss, t, k_max)))**2
+            assert paper_failure(w, t, k_max) <= bound * (1 + 1e-9) + 1e-15
+
     @pytest.mark.parametrize("l, m", [(0, 3), (1, 3), (3, 3), (1, 4), (6, 4)])
     def test_theorem_1_bounds_dpss_average(self, l, m):
         assert average_paper_failure(DPSSWindowState(l, m)) <= dpss_average_failure_bound(l, m)
@@ -199,8 +291,8 @@ class TestSizing:
         assert m == 1 or factor * dpss_average_failure_bound(l, m - 1) > p_fail
 
     def test_confidence_qubits_example(self):
-        assert [cls.confidence_qubits(3, 1e-8) for cls in TAPERED] == [5]
-        assert [cls.failure_bound_factor for cls in TAPERED] == [1]
+        assert [cls.confidence_qubits(3, 1e-8) for cls in TAPERED] == [5, 6]
+        assert [cls.failure_bound_factor for cls in TAPERED] == [1, 4]
 
     @pytest.mark.parametrize("cls", TAPERED, ids=TAPERED_IDS)
     @pytest.mark.parametrize("phase_error, l", [
@@ -214,7 +306,7 @@ class TestSizing:
 
     def test_from_requirements_beats_rectangular(self):
         """Module docstring example: delta = 1/16 with p_fail 1e-8."""
-        assert [cls.from_requirements(1 / 16, 1e-8).m_bits for cls in TAPERED] == [8]
+        assert [cls.from_requirements(1 / 16, 1e-8).m_bits for cls in TAPERED] == [8, 9]
         assert RectangularWindowState.from_requirements(1 / 16, 1e-8).m_bits == 4 + 26
 
     @pytest.mark.parametrize("cls", TAPERED, ids=TAPERED_IDS)
@@ -283,6 +375,15 @@ class TestFromQubitCounts:
                                             ancilla_prep=DPSSWindowState)
         assert qpe == FlexibleQPE(u, 5, DPSSWindowState(3, 2))
 
+    def test_flexible_qpe_from_qubit_counts_with_qft_inv(self):
+        u = ZPowGate(exponent=0.47)
+        qft_inv = lambda m: QFTTextBook(m, with_reverse=False).adjoint()  # noqa: E731
+        qpe = FlexibleQPE.from_qubit_counts(u, num_phase_qubits=5, num_confidence_qubits=2,
+                                            ancilla_prep=TruncatedDPSSWindowState,
+                                            qft_inv=qft_inv)
+        assert qpe.ancilla_prep == TruncatedDPSSWindowState(3, 2)
+        assert qpe.qft_inv == qft_inv(5)
+
     @pytest.mark.parametrize("cls", TAPERED, ids=TAPERED_IDS)
     def test_flexible_qpe_from_requirements(self, cls):
         qpe = FlexibleQPE.from_requirements(ZPowGate(exponent=0.47), 1 / 16, 1e-8,
@@ -323,14 +424,47 @@ class TestResources:
         assert t_complexity(DPSSWindowState(l, m)) == TComplexity(rotations=2**p - 1,
                                                                   clifford=2**p - 2)
 
-    def test_large_windows_are_costed_without_computing_taper(self):
-        prep = DPSSWindowState(40, 4)
-        with mock.patch.object(DPSSWindowState, "taper",
-                               side_effect=AssertionError("taper computed")):
+    @pytest.mark.parametrize("cls", BAND_LIMITED, ids=BAND_LIMITED_IDS)
+    @pytest.mark.parametrize("l, m", [(0, 2), (1, 2), (2, 3), (3, 3), (1, 4)])
+    def test_band_limited_t_complexity_is_sum_over_gates(self, cls, l, m):
+        """The kept-frequency angles are generic here, so gate-by-gate costs match exactly."""
+        prep = cls(l, m)
+        cbloq = prep.decompose_bloq().flatten(
+            lambda b: isinstance(b.bloq, ExactStatePreparation))
+        total = TComplexity()
+        for binst in cbloq.bloq_instances:
+            if isinstance(binst.bloq, (Ry, CNOT, ZPowGate, QFTTextBook)):
+                total += t_complexity(binst.bloq)
+        assert t_complexity(prep) == total
+
+    def test_band_limited_cost_example(self):
+        """(3, 3): 7 Ry + 3 ramp rotations + 15 in the 6-qubit QFT; 6 + 3 CNOTs + 9 in the QFT."""
+        assert t_complexity(QFTTextBook(6, with_reverse=True)) == TComplexity(rotations=15,
+                                                                            clifford=9)
+        for cls in BAND_LIMITED:
+            assert t_complexity(cls(3, 3)) == TComplexity(rotations=25, clifford=18)
+
+    @pytest.mark.parametrize("cls, method", [
+        (DPSSWindowState, "taper"),
+        (TruncatedDPSSWindowState, "frequency_amplitudes"),
+    ], ids=TAPERED_IDS)
+    def test_large_windows_are_costed_without_computing_taper(self, cls, method):
+        prep = cls(40, 4)
+        with mock.patch.object(cls, method, side_effect=AssertionError("taper computed")):
             assert get_cost_value(prep, QubitCount()) == 44
-            assert t_complexity(prep).rotations == 2**44 - 1
+            cost = t_complexity(prep)
+        if cls is DPSSWindowState:
+            assert cost.rotations == 2**44 - 1
+        else:
+            # 15 Ry + 4 ramp rotations (none a Clifford or T here) + the 44-qubit QFT.
+            qft = t_complexity(QFTTextBook(44, with_reverse=True))
+            assert cost.rotations == 15 + 4 + qft.rotations
 
     @pytest.mark.parametrize("cls", TAPERED, ids=TAPERED_IDS)
     def test_flexible_qpe_qubit_count(self, cls):
         qpe = FlexibleQPE(ZPowGate(exponent=0.47), 5, cls(2, 3))
         assert get_cost_value(qpe, QubitCount()) == 5 + 1
+
+    def test_band_limited_base_is_abstract(self):
+        with pytest.raises(TypeError):
+            BandLimitedWindowStateBase(2, 3)

@@ -17,18 +17,24 @@ Classes:
 
 - `DPSSWindowState`: the exact discrete prolate spheroidal sequence (paper Sec. IV C), prepared
   with `ExactStatePreparation` on all p qubits (2^p - 1 rotations).
+- `TruncatedDPSSWindowState`: the DPSS with only its 2K + 1 lowest frequencies kept (Sec. VII A),
+  prepared with the paper's App. A circuit (2^m - 1 + m rotations plus a QFT).
 """
 
 import abc
 import itertools
 import math
+from collections import Counter
+from fractions import Fraction
 from functools import cached_property
-from typing import ClassVar, Dict, Set, TYPE_CHECKING
+from typing import ClassVar, Dict, Set, Tuple, TYPE_CHECKING
 
 import attrs
 import numpy as np
 
-from qualtran import BloqBuilder, Signature, SoquetT
+from qualtran import BloqBuilder, QAny, Signature, SoquetT
+from qualtran.bloqs.basic_gates import CNOT, ZPowGate
+from qualtran.bloqs.qft.qft_text_book import QFTTextBook
 from qualtran.resource_counting import QubitCount
 
 from qhat.common.exact_state_preparation import (
@@ -108,8 +114,8 @@ class TaperedWindowStateBase(QPEWindowStateBase):
 
         The smallest m with `failure_bound_factor * dpss_average_failure_bound(l, m)` <=
         `probability_of_failure`. Theorem 1 bounds the average over phases; tests check that the
-        worst case also meets the target. The factor is 1 for the DPSS. E.g. l = 3,
-        p_fail = 1e-8: m = 5.
+        worst case also meets the target. The factor is 1 for the DPSS and 4 for the band-limited
+        tapers (paper eq. 107). E.g. l = 3, p_fail = 1e-8: m = 5 for the DPSS, 6 for the others.
         """
         return next(m for m in itertools.count(1)
                     if cls.failure_bound_factor * dpss_average_failure_bound(
@@ -174,3 +180,107 @@ class DPSSWindowState(TaperedWindowStateBase):
     def build_call_graph(self, ssa: 'SympySymbolAllocator') -> Set['BloqCountT']:
         # From the circuit's structure, so the taper is not computed.
         return state_preparation_call_graph(self.m_bits, True, ssa)
+
+
+@attrs.frozen
+class BandLimitedWindowStateBase(TaperedWindowStateBase):
+    """Base for tapers made of the 2K + 1 frequencies -K..K only, prepared with the paper's
+    App. A circuit:
+
+    1. `ExactStatePreparation` of the real frequency amplitudes on the m low qubits;
+       frequency k sits at k mod 2^m (two's complement) and 2^(m-1) is left empty;
+    2. a Z rotation on each of those m qubits, giving frequency k the phase e^{-i pi k (N-1)/N}
+       that centres the taper at n = (N - 1)/2 (otherwise it wraps around n = 0 and fails);
+    3. CNOTs from the m-register's top bit to the l high qubits (sign extension to p bits);
+    4. `QFTTextBook(l + m, with_reverse=True)`.
+
+    Cost: 2^m - 1 Ry, m Z rotations, 2^m - 2 + l CNOTs and one QFT; no scratch qubits.
+    Subclasses define `frequency_amplitudes()`.
+
+    Args and registers: see `TaperedWindowStateBase`.
+    """
+
+    # Eq. 107: truncating to 2K + 1 frequencies at most quadruples the DPSS failure probability.
+    failure_bound_factor: ClassVar[float] = 4.0
+
+    @abc.abstractmethod
+    def frequency_amplitudes(self) -> np.ndarray:
+        """The K + 1 real amplitudes r[0..K] of the centred taper; frequency -k also gets r[k].
+        Normalized as r[0]^2 + 2 sum_{k>0} r[k]^2 = 1, with r[0] > 0.
+
+        The taper is phi[n] = (r[0] + 2 sum_{k>0} r[k] cos(2 pi k (n - s) / N)) / sqrt(N) with
+        s = (N - 1)/2. E.g. m = 1 (K = 0) gives r = [1], the rectangular window.
+        """
+
+    def taper(self) -> np.ndarray:
+        n = 2**self.m_bits
+        r = self.frequency_amplitudes()
+        k = np.arange(1, len(r))
+        cosines = np.cos(2 * np.pi * np.outer(np.arange(n) - (n - 1) / 2, k) / n)
+        return (r[0] + 2 * cosines @ r[1:]) / np.sqrt(n)
+
+    def frequency_state(self) -> np.ndarray:
+        """The 2^m amplitudes prepared in step 1: r[|k|] at index k mod 2^m for k = -K..K, and 0
+        at index 2^(m-1). E.g. m = 2: [r0, r1, 0, r1]."""
+        m = self.num_confidence_qubits
+        r = self.frequency_amplitudes()
+        state = np.zeros(2**m)
+        state[:len(r)] = r
+        if len(r) > 1:
+            state[-(len(r) - 1):] = r[:0:-1]
+        return state
+
+    def phase_ramp_exponents(self) -> Tuple[float, ...]:
+        """ZPowGate exponents for step 2, one per m-register qubit (most significant first).
+
+        Bit j of the m-bit value has weight c_j (-2^(m-1) for the sign bit, 2^j otherwise) and
+        gets ZPowGate(-c_j (N - 1)/N), reduced to (-1, 1]. E.g. l = 1, m = 2: (-1/4, -7/8).
+        """
+        m, n = self.num_confidence_qubits, 2**self.m_bits
+        weights = [-2**(m - 1)] + [2**j for j in reversed(range(m - 1))]
+        exponents = []
+        for c in weights:
+            t = Fraction(-c * (n - 1), n) % 2
+            exponents.append(float(t - 2 if t > 1 else t))
+        return tuple(exponents)
+
+    def build_composite_bloq(self, bb: BloqBuilder, qpe_reg: SoquetT) -> Dict[str, SoquetT]:
+        l, m = self.num_precision_qubits, self.num_confidence_qubits
+        qs = bb.split(qpe_reg)  # big-endian: qs[0] is the most significant bit
+        low = bb.join(qs[l:], dtype=QAny(m))
+        low = bb.add(ExactStatePreparation(self.frequency_state()), q=low)
+        low_qs = bb.split(low)
+        for j, exponent in enumerate(self.phase_ramp_exponents()):
+            low_qs[j] = bb.add(ZPowGate(exponent=exponent), q=low_qs[j])
+        qs[l:] = low_qs
+        for i in range(l):
+            qs[l], qs[i] = bb.add(CNOT(), ctrl=qs[l], target=qs[i])
+        qpe_reg = bb.join(qs, dtype=self.m_qdtype)
+        qpe_reg = bb.add(QFTTextBook(self.m_bits, with_reverse=True), q=qpe_reg)
+        return {'qpe_reg': qpe_reg}
+
+    def build_call_graph(self, ssa: 'SympySymbolAllocator') -> Set['BloqCountT']:
+        # From the circuit's structure, so the taper is not computed.
+        counts = Counter(dict(state_preparation_call_graph(self.num_confidence_qubits, True, ssa)))
+        counts.update(ZPowGate(exponent=t) for t in self.phase_ramp_exponents())
+        counts[CNOT()] += self.num_precision_qubits
+        counts[QFTTextBook(self.m_bits, with_reverse=True)] += 1
+        return {(bloq, count) for bloq, count in counts.items() if count > 0}
+
+
+@attrs.frozen
+class TruncatedDPSSWindowState(BandLimitedWindowStateBase):
+    """The DPSS taper with only its 2K + 1 lowest frequencies kept, renormalized (paper eq. 92).
+    Failure probability at most 4x the DPSS's (eq. 107), for far fewer gates when l is large.
+
+    Args and registers: see `TaperedWindowStateBase`.
+    """
+
+    def frequency_amplitudes(self) -> np.ndarray:
+        n, k_max = 2**self.m_bits, self.half_bandwidth
+        k = np.arange(k_max + 1)
+        spectrum = np.fft.fft(dpss_taper(self.num_precision_qubits, self.num_confidence_qubits))
+        # Undo the linear phase of a taper centred at (N - 1)/2; what remains is real.
+        r = np.real(spectrum[:k_max + 1] * np.exp(1j * np.pi * k * (n - 1) / n))
+        return r / np.sqrt(r[0]**2 + 2 * np.sum(r[1:]**2))
+
