@@ -16,8 +16,9 @@ measured in turns, i.e. in [0, 1), and distances are taken modulo 1.
 
 import abc
 import math
+import numbers
 from functools import cached_property
-from typing import Dict
+from typing import Dict, Optional
 
 import attrs
 
@@ -91,8 +92,66 @@ class QPEWindowStateBase(Bloq, metaclass=abc.ABCMeta):
     def from_num_phase_qubits(cls, num_phase_qubits: int) -> 'QPEWindowStateBase':
         """Return a window state of this class with `m_bits == num_phase_qubits`.
 
-        Subclasses that have other parameters (e.g. a Kaiser window's `alpha`) choose them here.
+        Subclasses that have other parameters (e.g. a Kaiser window's `alpha`) choose them here,
+        or raise a ValueError if the total alone is not enough.
         """
+
+    @classmethod
+    def from_precision_and_confidence(
+        cls, num_precision_qubits: int, num_confidence_qubits: int
+    ) -> 'QPEWindowStateBase':
+        """Return a window state with `num_precision_qubits` + `num_confidence_qubits` qubits.
+
+        By default only the total matters (`from_num_phase_qubits`); windows whose shape depends
+        on the split override this.
+        """
+        return cls.from_num_phase_qubits(num_precision_qubits + num_confidence_qubits)
+
+    @classmethod
+    def from_qubit_counts(
+        cls,
+        num_phase_qubits: Optional[int] = None,
+        num_precision_qubits: Optional[int] = None,
+        num_confidence_qubits: Optional[int] = None,
+    ) -> 'QPEWindowStateBase':
+        """Return a window state from explicit qubit counts, where
+        num_phase_qubits = num_precision_qubits + num_confidence_qubits.
+
+        Give `num_phase_qubits` alone (`from_num_phase_qubits`), or any two of the three counts
+        (`from_precision_and_confidence`). E.g. `from_qubit_counts(6, num_confidence_qubits=2)`
+        is `from_precision_and_confidence(4, 2)`.
+        """
+        given = {'num_phase_qubits': num_phase_qubits,
+                 'num_precision_qubits': num_precision_qubits,
+                 'num_confidence_qubits': num_confidence_qubits}
+        given = {name: value for name, value in given.items() if value is not None}
+        for name, value in given.items():
+            if isinstance(value, bool) or not isinstance(value, numbers.Integral) or value < 0:
+                raise ValueError(f"{name} must be a non-negative integer, got {value!r}.")
+        if set(given) == {'num_phase_qubits'}:
+            return cls.from_num_phase_qubits(num_phase_qubits)
+        if len(given) == 3:
+            if num_precision_qubits + num_confidence_qubits != num_phase_qubits:
+                raise ValueError(
+                    f"num_phase_qubits ({num_phase_qubits}) must equal num_precision_qubits "
+                    f"({num_precision_qubits}) + num_confidence_qubits "
+                    f"({num_confidence_qubits}).")
+        elif len(given) != 2:
+            raise ValueError(
+                f"Cannot size {cls.__name__} from {sorted(given) or 'no qubit counts'}. Give two "
+                "of num_phase_qubits, num_precision_qubits and num_confidence_qubits; some "
+                "window states (e.g. RectangularWindowState) also accept num_phase_qubits alone.")
+        elif num_phase_qubits is not None:
+            other = 'num_precision_qubits' if num_confidence_qubits is None else \
+                'num_confidence_qubits'
+            if given[other] > num_phase_qubits:
+                raise ValueError(f"{other} ({given[other]}) exceeds num_phase_qubits "
+                                 f"({num_phase_qubits}).")
+            if num_precision_qubits is None:
+                num_precision_qubits = num_phase_qubits - num_confidence_qubits
+            else:
+                num_confidence_qubits = num_phase_qubits - num_precision_qubits
+        return cls.from_precision_and_confidence(num_precision_qubits, num_confidence_qubits)
 
 
 @attrs.frozen

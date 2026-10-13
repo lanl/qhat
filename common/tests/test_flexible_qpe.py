@@ -173,6 +173,58 @@ class TestRectangularWindowState:
         assert probs[dist > phase_error].sum() <= p_fail
 
 
+class TestFromQubitCounts:
+    """`QPEWindowStateBase.from_qubit_counts`, through the rectangular window (only the total
+    matters for it, so a split is accepted and summed)."""
+
+    @pytest.mark.parametrize("counts", [
+        dict(num_phase_qubits=5),
+        dict(num_precision_qubits=2, num_confidence_qubits=3),
+        dict(num_phase_qubits=5, num_confidence_qubits=3),
+        dict(num_phase_qubits=5, num_precision_qubits=2),
+        dict(num_phase_qubits=5, num_precision_qubits=2, num_confidence_qubits=3),
+        dict(num_phase_qubits=np.int64(5), num_precision_qubits=np.int64(2)),
+    ], ids=["p", "l, m", "p, m", "p, l", "p, l, m", "numpy ints"])
+    def test_combinations(self, counts):
+        assert RectangularWindowState.from_qubit_counts(**counts) == RectangularWindowState(5)
+
+    @pytest.mark.parametrize("counts, match", [
+        (dict(), "no qubit counts"),
+        (dict(num_precision_qubits=2), r"Cannot size .* \['num_precision_qubits'\]"),
+        (dict(num_confidence_qubits=3), r"Cannot size .* \['num_confidence_qubits'\]"),
+        (dict(num_phase_qubits=5, num_precision_qubits=3, num_confidence_qubits=1),
+         r"num_phase_qubits \(5\) must equal num_precision_qubits \(3\) \+ "
+         r"num_confidence_qubits \(1\)"),
+        (dict(num_phase_qubits=3, num_confidence_qubits=4),
+         r"num_confidence_qubits \(4\) exceeds num_phase_qubits \(3\)"),
+        (dict(num_phase_qubits=3, num_precision_qubits=4),
+         r"num_precision_qubits \(4\) exceeds num_phase_qubits \(3\)"),
+        (dict(num_phase_qubits=-1), "num_phase_qubits must be a non-negative integer"),
+        (dict(num_precision_qubits=2.0, num_confidence_qubits=3),
+         "num_precision_qubits must be a non-negative integer, got 2.0"),
+        (dict(num_precision_qubits=2, num_confidence_qubits=True),
+         "num_confidence_qubits must be a non-negative integer, got True"),
+    ], ids=["none", "l", "m", "inconsistent", "m > p", "l > p", "negative", "float", "bool"])
+    def test_invalid_counts_raise(self, counts, match):
+        with pytest.raises(ValueError, match=match):
+            RectangularWindowState.from_qubit_counts(**counts)
+
+    def test_split_reaches_from_precision_and_confidence(self):
+        calls = []
+
+        @attrs.frozen
+        class RecordingWindowState(RectangularWindowState):
+            @classmethod
+            def from_precision_and_confidence(cls, num_precision_qubits, num_confidence_qubits):
+                calls.append((num_precision_qubits, num_confidence_qubits))
+                return cls(num_precision_qubits + num_confidence_qubits)
+
+        RecordingWindowState.from_qubit_counts(num_phase_qubits=6, num_confidence_qubits=2)
+        RecordingWindowState.from_qubit_counts(num_phase_qubits=6, num_precision_qubits=1)
+        RecordingWindowState.from_qubit_counts(num_phase_qubits=6)
+        assert calls == [(4, 2), (1, 5)]
+
+
 # -------------------------------------------------------------------------------------------------
 # FlexibleQPE construction
 # -------------------------------------------------------------------------------------------------
@@ -267,6 +319,19 @@ class TestConstruction:
     def test_from_num_phase_qubits(self):
         u = small_trotterization()
         assert FlexibleQPE.from_num_phase_qubits(u, 4) == FlexibleQPE(u, 4)
+
+    def test_from_qubit_counts(self):
+        u = small_trotterization()
+        assert FlexibleQPE.from_qubit_counts(u, 4) == FlexibleQPE(u, 4)
+        assert FlexibleQPE.from_qubit_counts(
+            u, num_precision_qubits=3, num_confidence_qubits=2) == FlexibleQPE(u, 5)
+
+    def test_from_qubit_counts_with_qft_inv(self):
+        qft_inv = lambda m: QFTTextBook(m, with_reverse=False).adjoint()  # noqa: E731
+        qpe = FlexibleQPE.from_qubit_counts(small_trotterization(), num_phase_qubits=5,
+                                            num_confidence_qubits=2, qft_inv=qft_inv)
+        assert qpe.ancilla_prep == RectangularWindowState(5)
+        assert qpe.qft_inv == qft_inv(5)
 
 
 # -------------------------------------------------------------------------------------------------

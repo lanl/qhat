@@ -161,6 +161,26 @@ class FlexibleQPE(GateWithRegisters):
         return cls._from_window_state(unitary, prep, qft_inv)
 
     @classmethod
+    def from_qubit_counts(
+        cls,
+        unitary: Bloq,
+        num_phase_qubits: Optional[int] = None,
+        num_precision_qubits: Optional[int] = None,
+        num_confidence_qubits: Optional[int] = None,
+        *,
+        ancilla_prep: Type[QPEWindowStateBase] = RectangularWindowState,
+        qft_inv: Optional[Callable[[int], Bloq]] = None,
+    ) -> 'FlexibleQPE':
+        """Build a QPE from explicit qubit counts; see `QPEWindowStateBase.from_qubit_counts`.
+
+        E.g. `from_qubit_counts(u, num_precision_qubits=3, num_confidence_qubits=2)` has 5 phase
+        qubits.
+        """
+        prep = ancilla_prep.from_qubit_counts(
+            num_phase_qubits, num_precision_qubits, num_confidence_qubits)
+        return cls._from_window_state(unitary, prep, qft_inv)
+
+    @classmethod
     def _from_window_state(cls, unitary, prep, qft_inv):
         if qft_inv is None:
             return cls(unitary, prep.m_bits, prep)
