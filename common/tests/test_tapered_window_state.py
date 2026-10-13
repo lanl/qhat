@@ -61,10 +61,11 @@ def qhat_failure(w, theta, phase_error):
 
 
 def paper_failure(w, theta, k_max):
-    """1 - probability of the 2K + 1 estimates closest to theta (paper eq. 15)."""
+    """Probability of any estimate but the 2K + 1 closest to theta (paper eq. 15). Summed directly:
+    1 - (probability of the closest) can round to below 0, e.g. -2e-16 for N = 4 at theta = 0."""
     probs = outcome_probs(w, theta)
     closest = np.argsort(distances(len(w), theta), kind="stable")[:2 * k_max + 1]
-    return 1 - probs[closest].sum()
+    return np.delete(probs, closest).sum()
 
 
 def thetas(num_outcomes, count=33):
