@@ -219,8 +219,9 @@ def diagonal_as_pauli_terms(diagonal):
     return terms
 
 
-def qpe_from_pauli_file(path, num_phase_qubits, time, num_trotter_steps):
-    """Load a Pauli file, encode it with first-order Trotter, and build FlexibleQPE.
+def qpe_from_pauli_file(path, time, num_trotter_steps, **algorithm):
+    """Load a Pauli file, encode it with first-order Trotter, and build FlexibleQPE configured by
+    the `algorithm` settings (e.g. num_phase_qubits=2).
 
     These are the driver's steps without its energy shift and choice of time, so the caller controls
     the eigenphases exactly.
@@ -231,7 +232,16 @@ def qpe_from_pauli_file(path, num_phase_qubits, time, num_trotter_steps):
     config_unitary.encode_ramped_trotter(
         trotter_order="first order", trotter_steps=num_trotter_steps)
     unitary = encode_as_unitary(config_unitary, get_physical_hamiltonian(config_hamiltonian), time)
-    return build_algorithm(make_config(num_phase_qubits=num_phase_qubits), unitary)
+    return build_algorithm(make_config(**algorithm), unitary)
+
+
+def write_diagonal_pauli_file(path, phases, energy_scale):
+    """Write H = -energy_scale diag(phases) as a Pauli file. With t = 2 pi / energy_scale,
+    U = exp(-i H t) has eigenphase phases[j] (in turns) on basis state j."""
+    hamiltonian = -energy_scale * np.diag(phases)
+    terms = diagonal_as_pauli_terms(np.diag(hamiltonian))
+    np.testing.assert_allclose(hamiltonian_matrix(terms), hamiltonian)  # guard: conversion
+    path.write_text("".join(f"{c:.17g} {s}\n" for s, c in terms))
 
 
 @pytest.mark.parametrize("phases, target_state, expected_bits", [
@@ -256,15 +266,12 @@ def test_simulation_reads_exact_phases_from_pauli_file(
     commute) check that each step evolves for t / 3.
     """
     energy_scale = 1.7
-    hamiltonian = -energy_scale * np.diag(phases)
-    terms = diagonal_as_pauli_terms(np.diag(hamiltonian))
-    np.testing.assert_allclose(hamiltonian_matrix(terms), hamiltonian)  # guard: conversion
     pauli_file = tmp_path / "hamiltonian.txt"
-    pauli_file.write_text("".join(f"{c:.17g} {s}\n" for s, c in terms))
+    write_diagonal_pauli_file(pauli_file, phases, energy_scale)
 
     m = len(expected_bits)
-    qpe = qpe_from_pauli_file(pauli_file, num_phase_qubits=m, time=2 * math.pi / energy_scale,
-                              num_trotter_steps=3)
+    qpe = qpe_from_pauli_file(pauli_file, time=2 * math.pi / energy_scale, num_trotter_steps=3,
+                              num_phase_qubits=m)
     if contraction == "tensor_contract":
         mat = compute_unitary_matrix(qpe)  # what QHAT's numerical simulation uses
     else:
