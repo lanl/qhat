@@ -25,6 +25,8 @@ dependencies = [
     "optuna",
     # Dependencies for fast Trotter error estimation
     "numba>=0.56.0",  # JIT compilation for jkg_utils_fast.py
+    # Imported directly (sparse matrices, linear algebra, signal windows), not only via qualtran
+    "scipy",
 ]
 
 [tool.setuptools]
