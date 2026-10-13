@@ -117,7 +117,7 @@ class ExactStatePreparation(Bloq):
 
         Each angle sends the probability of prefix c to its two children: Ry(alpha)|0> =
         cos(alpha/2)|0> + sin(alpha/2)|1>. Example: amplitudes (0.6, 0, 0, 0.8) give
-        ry_angles = [[2 atan2(0.8, 0.6)], [0, 0]].
+        ry_angles = [[2 atan2(0.8, 0.6)], [0, pi]].
         """
         a = np.asarray(self.amplitudes)
         weights = [np.abs(a)**2]  # weights[j]: probability of each prefix of n - j bits
