@@ -2,23 +2,25 @@
 Tapered (DPSS-family) window states for QPE, from Patel, Tan, Subasi and Sornborger,
 "Optimal Coherent Quantum Phase Estimation via Tapering", arXiv:2403.18927.
 
-A tapered window state is `sum_n phi[n] |n>` on p = l + m phase qubits (N = 2^p), with a smooth
-real taper `phi` in place of the rectangular window. Its size has two parts:
+A tapered window state is `sum_n phi[n] |n>` on the N = 2^m_bits basis states of the phase
+register, with a smooth real taper `phi` in place of the rectangular window. The phase qubits
+split into two groups, `m_bits = num_precision_qubits + num_confidence_qubits`:
 
-- l = `num_precision_qubits`: success means the estimate is within delta = 2^-(l+1) of the true
-  phase (in turns, modulo 1).
-- m = `num_confidence_qubits`: sets the taper's bandwidth (K = 2^(m-1) - 1) and so how often the
-  estimate misses delta.
+- `num_precision_qubits`: success means the estimate is within
+  delta = 2^-(num_precision_qubits + 1) of the true phase (in turns, modulo 1).
+- `num_confidence_qubits`: sets the taper's half-bandwidth K = 2^(num_confidence_qubits - 1) - 1,
+  and so how often the estimate misses delta.
 
-Example: l = 3, m = 3 uses 6 phase qubits and gives delta = 1/16 with probability of failure about
+Example: 3 precision and 3 confidence qubits give delta = 1/16 with probability of failure about
 1e-8; the rectangular window needs 26 extra qubits for that.
 
 Classes (config names in `qhat.analysis.algorithm.ANCILLA_PREPS`):
 
 - `DPSSWindowState` ("dpss"): the exact discrete prolate spheroidal sequence (paper Sec. IV C),
-  prepared with `ExactStatePreparation` on all p qubits (2^p - 1 rotations).
+  prepared with `ExactStatePreparation` on all phase qubits (N - 1 rotations).
 - `TruncatedDPSSWindowState` ("truncated dpss"): the DPSS with only its 2K + 1 lowest frequencies
-  kept (Sec. VII A), prepared with the paper's App. A circuit (2^m - 1 + m rotations plus a QFT).
+  kept (Sec. VII A), prepared with the paper's App. A circuit (2K + 1 state-preparation rotations,
+  one Z rotation per confidence qubit, and a QFT).
 - `BandwidthOptimizedWindowState` ("bandwidth-optimized"): the best taper on those same 2K + 1
   frequencies (Sec. VII B), with the same circuit.
 """
@@ -50,13 +52,15 @@ if TYPE_CHECKING:
 
 
 def half_bandwidth(num_confidence_qubits: int) -> int:
-    """K = 2^(m-1) - 1: the taper keeps the 2K + 1 frequencies -K..K. E.g. m = 3 gives K = 3."""
+    """K = 2^(num_confidence_qubits - 1) - 1: the taper keeps the 2K + 1 frequencies -K..K.
+    E.g. 3 confidence qubits give K = 3."""
     return 2**(num_confidence_qubits - 1) - 1
 
 
 def dpss_average_failure_bound(num_precision_qubits: int, num_confidence_qubits: int) -> float:
     """Theorem 1 of the paper: bound on the DPSS failure probability, averaged over the offset of
-    the true phase from the N-point grid. E.g. l = 3, m = 5 gives about 8.6e-9.
+    the true phase from the N-point grid. E.g. 3 precision and 5 confidence qubits give about
+    8.6e-9.
     """
     n = 2**(num_precision_qubits + num_confidence_qubits)
     k = half_bandwidth(num_confidence_qubits)
@@ -67,17 +71,21 @@ def dpss_average_failure_bound(num_precision_qubits: int, num_confidence_qubits:
 
 @attrs.frozen
 class TaperedWindowStateBase(QPEWindowStateBase):
-    """Base for window states `sum_n taper()[n] |n>` on l + m qubits (see the module docstring).
+    """Base for window states `sum_n taper()[n] |n>` on the phase register (see the module
+    docstring).
 
     Subclasses define `taper()`, the circuit, and `failure_bound_factor` (used by
     `confidence_qubits`).
 
     Args:
-        num_precision_qubits: l >= 0; success means |estimate - phase| <= 2^-(l+1).
-        num_confidence_qubits: m >= 1; the taper keeps frequencies -K..K, K = 2^(m-1) - 1.
+        num_precision_qubits: At least 0; success means
+            |estimate - phase| <= 2^-(num_precision_qubits + 1).
+        num_confidence_qubits: At least 1; the taper keeps frequencies -K..K, where
+            K = 2^(num_confidence_qubits - 1) - 1.
 
     Registers:
-        qpe_reg: An (l + m)-qubit THRU register of type `QFxp(l + m, l + m)`.
+        qpe_reg: A THRU register of `m_bits = num_precision_qubits + num_confidence_qubits`
+            qubits, of type `QFxp(m_bits, m_bits)`.
     """
 
     num_precision_qubits: int
@@ -107,40 +115,42 @@ class TaperedWindowStateBase(QPEWindowStateBase):
 
     @abc.abstractmethod
     def taper(self) -> np.ndarray:
-        """The 2^(l+m) real amplitudes phi[n] of the window state (unit norm, sum > 0); n is the
-        integer value of `qpe_reg`, and the taper is symmetric about n = (N - 1)/2."""
+        """The N = 2^m_bits real amplitudes phi[n] of the window state (unit norm, sum > 0); n is
+        the integer value of `qpe_reg`, and the taper is symmetric about n = (N - 1)/2."""
 
     @classmethod
     def confidence_qubits(cls, num_precision_qubits: int, probability_of_failure: float) -> int:
-        """Number of confidence qubits m for `from_requirements`.
+        """Number of confidence qubits for `from_requirements`.
 
-        The smallest m with `failure_bound_factor * dpss_average_failure_bound(l, m)` <=
-        `probability_of_failure`. Theorem 1 bounds the average over phases; tests check that the
-        worst case also meets the target. The factor is 1 for the DPSS and 4 for the band-limited
-        tapers (paper eq. 107). E.g. l = 3, p_fail = 1e-8: m = 5 for the DPSS, 6 for the others.
+        The smallest number for which `failure_bound_factor * dpss_average_failure_bound(...)` is
+        at most `probability_of_failure`. Theorem 1 bounds the average over phases; tests check
+        that the worst case also meets the target. The factor is 1 for the DPSS and 4 for the
+        band-limited tapers (paper eq. 107). E.g. 3 precision qubits and p_fail = 1e-8 need 5
+        confidence qubits for the DPSS, 6 for the others.
         """
-        return next(m for m in itertools.count(1)
+        return next(num_confidence for num_confidence in itertools.count(1)
                     if cls.failure_bound_factor * dpss_average_failure_bound(
-                        num_precision_qubits, m) <= probability_of_failure)
+                        num_precision_qubits, num_confidence) <= probability_of_failure)
 
     @classmethod
     def from_requirements(cls, phase_error: float, probability_of_failure: float):
-        """l from delta = 2^-(l+1) <= phase_error (one bit fewer than the rectangular window,
-        whose guarantee is |error| < 2^-l), then m from `confidence_qubits`.
+        """`precision_bits(phase_error) - 1` precision qubits, the fewest with
+        delta = 2^-(num_precision_qubits + 1) <= phase_error (one fewer than the rectangular
+        window needs), then confidence qubits from `confidence_qubits`.
         """
         if not 0 < probability_of_failure < 1:
             raise ValueError(
                 f"probability of failure must be in (0, 1), got {probability_of_failure}.")
-        l = precision_bits(phase_error) - 1
-        return cls(l, cls.confidence_qubits(l, probability_of_failure))
+        num_precision = precision_bits(phase_error) - 1
+        return cls(num_precision, cls.confidence_qubits(num_precision, probability_of_failure))
 
     @classmethod
     def from_num_phase_qubits(cls, num_phase_qubits: int):
         raise ValueError(
             f"{cls.__name__} cannot be sized from num_phase_qubits alone: the taper depends on "
-            "how the phase qubits split into precision qubits l and confidence qubits m. Give "
+            "how the phase qubits split into precision and confidence qubits. Give "
             "num_precision_qubits and num_confidence_qubits (either one may be replaced by "
-            "num_phase_qubits = l + m).")
+            "num_phase_qubits, their sum).")
 
     @classmethod
     def from_precision_and_confidence(cls, num_precision_qubits: int,
@@ -155,8 +165,8 @@ class TaperedWindowStateBase(QPEWindowStateBase):
 
 
 def dpss_taper(num_precision_qubits: int, num_confidence_qubits: int) -> np.ndarray:
-    """The DPSS of length N = 2^(l+m) and half-bandwidth W = (2K+1)/(2N), with unit norm and
-    positive sum (scipy's `dpss(N, NW=K + 1/2)`)."""
+    """The DPSS of length N = 2^(num_precision_qubits + num_confidence_qubits) and half-bandwidth
+    W = (2K+1)/(2N), with unit norm and positive sum (scipy's `dpss(N, NW=K + 1/2)`)."""
     from scipy.signal.windows import dpss
 
     n = 2**(num_precision_qubits + num_confidence_qubits)
@@ -167,8 +177,8 @@ def dpss_taper(num_precision_qubits: int, num_confidence_qubits: int) -> np.ndar
 @attrs.frozen
 class DPSSWindowState(TaperedWindowStateBase):
     """Window state with the exact DPSS taper (paper Sec. IV C), the taper with the smallest
-    average failure probability. Prepared with `ExactStatePreparation` on all l + m qubits,
-    i.e. 2^(l+m) - 1 Ry rotations and 2^(l+m) - 2 CNOTs.
+    average failure probability. Prepared with `ExactStatePreparation` on all phase qubits,
+    i.e. N - 1 Ry rotations and N - 2 CNOTs for N = 2^m_bits.
 
     Args and registers: see `TaperedWindowStateBase`.
     """
@@ -189,15 +199,17 @@ class BandLimitedWindowStateBase(TaperedWindowStateBase):
     """Base for tapers made of the 2K + 1 frequencies -K..K only, prepared with the paper's
     App. A circuit:
 
-    1. `ExactStatePreparation` of the real frequency amplitudes on the m low qubits;
-       frequency k sits at k mod 2^m (two's complement) and 2^(m-1) is left empty;
-    2. a Z rotation on each of those m qubits, giving frequency k the phase e^{-i pi k (N-1)/N}
+    1. `ExactStatePreparation` of the real frequency amplitudes on the `num_confidence_qubits`
+       low qubits; frequency k sits at k mod 2(K + 1) (two's complement), and index K + 1 (the
+       most negative value) is left empty;
+    2. a Z rotation on each of those qubits, giving frequency k the phase e^{-i pi k (N-1)/N}
        that centres the taper at n = (N - 1)/2 (otherwise it wraps around n = 0 and fails);
-    3. CNOTs from the m-register's top bit to the l high qubits (sign extension to p bits);
-    4. `QFTTextBook(l + m, with_reverse=True)`.
+    3. CNOTs from the top low qubit to each of the `num_precision_qubits` high qubits (sign
+       extension to the whole register);
+    4. `QFTTextBook(m_bits, with_reverse=True)`.
 
-    Cost: 2^m - 1 Ry, m Z rotations, 2^m - 2 + l CNOTs and one QFT; no scratch qubits.
-    Subclasses define `frequency_amplitudes()`.
+    Cost: 2K + 1 Ry, one Z rotation per confidence qubit, 2K + `num_precision_qubits` CNOTs and
+    one QFT; no scratch qubits. Subclasses define `frequency_amplitudes()`.
 
     Args and registers: see `TaperedWindowStateBase`.
     """
@@ -211,7 +223,7 @@ class BandLimitedWindowStateBase(TaperedWindowStateBase):
         Normalized as r[0]^2 + 2 sum_{k>0} r[k]^2 = 1, with r[0] > 0.
 
         The taper is phi[n] = (r[0] + 2 sum_{k>0} r[k] cos(2 pi k (n - s) / N)) / sqrt(N) with
-        s = (N - 1)/2. E.g. m = 1 (K = 0) gives r = [1], the rectangular window.
+        s = (N - 1)/2. E.g. one confidence qubit (K = 0) gives r = [1], the rectangular window.
         """
 
     def taper(self) -> np.ndarray:
@@ -222,24 +234,24 @@ class BandLimitedWindowStateBase(TaperedWindowStateBase):
         return (r[0] + 2 * cosines @ r[1:]) / np.sqrt(n)
 
     def frequency_state(self) -> np.ndarray:
-        """The 2^m amplitudes prepared in step 1: r[|k|] at index k mod 2^m for k = -K..K, and 0
-        at index 2^(m-1). E.g. m = 2: [r0, r1, 0, r1]."""
-        m = self.num_confidence_qubits
+        """The 2(K + 1) amplitudes prepared in step 1: r[|k|] at index k mod 2(K + 1) for
+        k = -K..K, and 0 at index K + 1. E.g. 2 confidence qubits: [r0, r1, 0, r1]."""
         r = self.frequency_amplitudes()
-        state = np.zeros(2**m)
+        state = np.zeros(2**self.num_confidence_qubits)
         state[:len(r)] = r
         if len(r) > 1:
             state[-(len(r) - 1):] = r[:0:-1]
         return state
 
     def phase_ramp_exponents(self) -> Tuple[float, ...]:
-        """ZPowGate exponents for step 2, one per m-register qubit (most significant first).
+        """ZPowGate exponents for step 2, one per confidence qubit (most significant first).
 
-        Bit j of the m-bit value has weight c_j (-2^(m-1) for the sign bit, 2^j otherwise) and
-        gets ZPowGate(-c_j (N - 1)/N), reduced to (-1, 1]. E.g. l = 1, m = 2: (-1/4, -7/8).
+        Bit j (0 = least significant) of the low qubits' two's-complement value has weight c_j
+        (-(K + 1) for the sign bit, 2^j otherwise) and gets ZPowGate(-c_j (N - 1)/N), reduced to
+        (-1, 1]. E.g. 1 precision and 2 confidence qubits: (-1/4, -7/8).
         """
-        m, n = self.num_confidence_qubits, 2**self.m_bits
-        weights = [-2**(m - 1)] + [2**j for j in reversed(range(m - 1))]
+        num_confidence, n = self.num_confidence_qubits, 2**self.m_bits
+        weights = [-2**(num_confidence - 1)] + [2**j for j in reversed(range(num_confidence - 1))]
         exponents = []
         for c in weights:
             t = Fraction(-c * (n - 1), n) % 2
@@ -247,16 +259,16 @@ class BandLimitedWindowStateBase(TaperedWindowStateBase):
         return tuple(exponents)
 
     def build_composite_bloq(self, bb: BloqBuilder, qpe_reg: SoquetT) -> Dict[str, SoquetT]:
-        l, m = self.num_precision_qubits, self.num_confidence_qubits
+        num_precision = self.num_precision_qubits
         qs = bb.split(qpe_reg)  # big-endian: qs[0] is the most significant bit
-        low = bb.join(qs[l:], dtype=QAny(m))
+        low = bb.join(qs[num_precision:], dtype=QAny(self.num_confidence_qubits))
         low = bb.add(ExactStatePreparation(self.frequency_state()), q=low)
         low_qs = bb.split(low)
         for j, exponent in enumerate(self.phase_ramp_exponents()):
             low_qs[j] = bb.add(ZPowGate(exponent=exponent), q=low_qs[j])
-        qs[l:] = low_qs
-        for i in range(l):
-            qs[l], qs[i] = bb.add(CNOT(), ctrl=qs[l], target=qs[i])
+        qs[num_precision:] = low_qs
+        for i in range(num_precision):  # sign extension from the top low qubit
+            qs[num_precision], qs[i] = bb.add(CNOT(), ctrl=qs[num_precision], target=qs[i])
         qpe_reg = bb.join(qs, dtype=self.m_qdtype)
         qpe_reg = bb.add(QFTTextBook(self.m_bits, with_reverse=True), q=qpe_reg)
         return {'qpe_reg': qpe_reg}
@@ -273,7 +285,8 @@ class BandLimitedWindowStateBase(TaperedWindowStateBase):
 @attrs.frozen
 class TruncatedDPSSWindowState(BandLimitedWindowStateBase):
     """The DPSS taper with only its 2K + 1 lowest frequencies kept, renormalized (paper eq. 92).
-    Failure probability at most 4x the DPSS's (eq. 107), for far fewer gates when l is large.
+    Failure probability at most 4x the DPSS's (eq. 107), for far fewer gates when there are many
+    precision qubits.
 
     Args and registers: see `TaperedWindowStateBase`.
     """

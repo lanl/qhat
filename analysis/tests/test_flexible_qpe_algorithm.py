@@ -122,7 +122,7 @@ class TestTaperedWindows:
         dict(num_phase_qubits=5, num_confidence_qubits=3),
         dict(num_phase_qubits=5, num_precision_qubits=2),
         dict(num_phase_qubits=5, num_precision_qubits=2, num_confidence_qubits=3),
-    ], ids=["p, m", "p, l", "p, l, m"])
+    ], ids=["phase, confidence", "phase, precision", "all three"])
     def test_num_phase_qubits_may_replace_one_count(self, unitary, name, cls, counts):
         config = make_config(ancilla_prep=name, **counts)
         assert build_algorithm(config, unitary).ancilla_prep == cls(2, 3)
@@ -145,7 +145,7 @@ class TestTaperedWindows:
         (dict(num_confidence_qubits=3), r"Cannot size .*\['num_confidence_qubits'\]"),
         (dict(num_phase_qubits=5, num_precision_qubits=3, num_confidence_qubits=3),
          "must equal"),
-    ], ids=["l", "m", "inconsistent"])
+    ], ids=["precision only", "confidence only", "inconsistent"])
     def test_invalid_counts_raise(self, unitary, name, counts, match):
         with pytest.raises(ValueError, match=match):
             build_algorithm(make_config(ancilla_prep=name, **counts), unitary)
@@ -365,7 +365,8 @@ def test_tapered_qpe_meets_requirements_through_pauli_file(tmp_path, ancilla_pre
 
     U has off-grid eigenphases on the computational basis states (see
     `test_simulation_reads_exact_phases_from_pauli_file`). Here energy_error 0.2 is a phase error
-    of 0.2 / 1.7 = 0.118 turns, so l = 3 (delta = 1/16); p_fail = 1e-3 gives m = 4 (DPSS) or 5.
+    of 0.2 / 1.7 = 0.118 turns, so 3 precision qubits (delta = 1/16); p_fail = 1e-3 gives 4
+    confidence qubits (DPSS) or 5.
     For each eigenstate, Pr[estimate more than 0.118 turns from the phase] <= 1e-3.
     """
     phases = [0.1234, 0.377, 0.6021, 0.871]
@@ -376,23 +377,23 @@ def test_tapered_qpe_meets_requirements_through_pauli_file(tmp_path, ancilla_pre
 
     qpe = qpe_from_pauli_file(pauli_file, ancilla_prep=ancilla_prep, energy_error=dE,
                               probability_of_failure=p_fail, **settings)
-    m = qpe.num_ancilla_qubits
-    assert qpe.ancilla_prep.num_precision_qubits == 3 and m in (7, 8)
+    num_phase = qpe.num_ancilla_qubits
+    assert qpe.ancilla_prep.num_precision_qubits == 3 and num_phase in (7, 8)
     # Guard: a rectangular window of the same size misses the target, so the taper matters.
-    rectangular = qpe_from_pauli_file(pauli_file, num_phase_qubits=m, **settings)
+    rectangular = qpe_from_pauli_file(pauli_file, num_phase_qubits=num_phase, **settings)
 
     phase_error = dE / energy_scale
-    k = np.arange(2**m)
+    k = np.arange(2**num_phase)
     for qpe_, meets_target in [(qpe, True), (rectangular, False)]:
         mat = compute_unitary_matrix(qpe_)
         failures = []
         for j, phase in enumerate(phases):
             input_file = str(tmp_path / f"input_{j}.npy")
-            save_state(input_file, np.kron(np.eye(2**m)[0], np.eye(4)[j]))
+            save_state(input_file, np.kron(np.eye(2**num_phase)[0], np.eye(4)[j]))
             result = numerical_simulation(input_file, qpe_, mat)
             out = load_state(result["simulations"][0]["output_file"])
-            probs = np.sum(np.abs(out.reshape(2**m, -1))**2, axis=1)
-            distance = np.abs(k / 2**m - phase)
+            probs = np.sum(np.abs(out.reshape(2**num_phase, -1))**2, axis=1)
+            distance = np.abs(k / 2**num_phase - phase)
             distance = np.minimum(distance, 1 - distance)
             failures.append(probs[distance > phase_error].sum())
         assert (max(failures) <= p_fail) == meets_target

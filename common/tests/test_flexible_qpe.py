@@ -184,7 +184,8 @@ class TestFromQubitCounts:
         dict(num_phase_qubits=5, num_precision_qubits=2),
         dict(num_phase_qubits=5, num_precision_qubits=2, num_confidence_qubits=3),
         dict(num_phase_qubits=np.int64(5), num_precision_qubits=np.int64(2)),
-    ], ids=["p", "l, m", "p, m", "p, l", "p, l, m", "numpy ints"])
+    ], ids=["phase", "precision, confidence", "phase, confidence", "phase, precision",
+            "all three", "numpy ints"])
     def test_combinations(self, counts):
         assert RectangularWindowState.from_qubit_counts(**counts) == RectangularWindowState(5)
 
@@ -204,7 +205,8 @@ class TestFromQubitCounts:
          "num_precision_qubits must be a non-negative integer, got 2.0"),
         (dict(num_precision_qubits=2, num_confidence_qubits=True),
          "num_confidence_qubits must be a non-negative integer, got True"),
-    ], ids=["none", "l", "m", "inconsistent", "m > p", "l > p", "negative", "float", "bool"])
+    ], ids=["none", "precision only", "confidence only", "inconsistent", "confidence > phase",
+            "precision > phase", "negative", "float", "bool"])
     def test_invalid_counts_raise(self, counts, match):
         with pytest.raises(ValueError, match=match):
             RectangularWindowState.from_qubit_counts(**counts)
@@ -327,7 +329,7 @@ class TestConstruction:
             u, num_precision_qubits=3, num_confidence_qubits=2) == FlexibleQPE(u, 5)
 
     def test_from_qubit_counts_with_qft_inv(self):
-        qft_inv = lambda m: QFTTextBook(m, with_reverse=False).adjoint()  # noqa: E731
+        qft_inv = lambda bitsize: QFTTextBook(bitsize, with_reverse=False).adjoint()  # noqa: E731
         qpe = FlexibleQPE.from_qubit_counts(small_trotterization(), num_phase_qubits=5,
                                             num_confidence_qubits=2, qft_inv=qft_inv)
         assert qpe.ancilla_prep == RectangularWindowState(5)
