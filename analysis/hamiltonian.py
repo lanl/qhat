@@ -5,6 +5,7 @@ import logging
 import numpy as np
 import scipy.constants as sc
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 from openfermion import (
@@ -517,12 +518,12 @@ def load_hamlib_hdf5(config_hamiltonian: HamiltonianConfiguration):
 def load_pauli(config_hamiltonian: HamiltonianConfiguration):
     filename = config_hamiltonian.filename
     logger.info(f"Loading Pauli string Hamiltonian from file \"{filename}\".")
-    extension = filename[filename.rfind('.')+1:]
+    extension = Path(filename).suffix[1:].lower()  # Remove leading dot
 
     # Check for HamLib HDF5 format
     if extension in ["h5", "hdf5"]:
         return load_hamlib_hdf5(config_hamiltonian)
-    elif extension in [ "txt", "dat" ]:
+    elif extension in ["txt", "dat"]:
         fmt = None
         numq = 0
         pauli_dict = dict()

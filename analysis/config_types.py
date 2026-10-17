@@ -3,6 +3,7 @@ import logging
 import os
 import subprocess
 import tomlkit
+from pathlib import Path
 from tomlkit.toml_file import TOMLFile
 
 from qhat.common.git_utils import get_git_hash
@@ -17,6 +18,8 @@ class ConfigurationBase:
         if hasattr(self, name):
             value = getattr(self, name)
             if value is not None:
+                if isinstance(value, Path):
+                    value = str(value)
                 table[name] = value
 
 # -------------------------------------------------------------------------------------------------
@@ -78,11 +81,12 @@ class HamiltonianConfiguration(ConfigurationBase):
         self._only_once()
         self.filename = filename
         # Auto-detect file format based on extension
-        if filename.endswith('.h5') or filename.endswith('.hdf5'):
+        suffix = Path(filename).suffix.lower()
+        if suffix in ('.h5', '.hdf5'):
             self.source = "hdf5"
-        elif filename.endswith('.npy') or filename.endswith('.npz'):
+        elif suffix in ('.npy', '.npz'):
             self.source = "numpy"
-        elif filename.endswith('.fci'):
+        elif suffix == '.fci':
             self.source = "fci"
         else:
             raise ValueError(f"Unable to determine file format from extension: {filename}. "
@@ -323,11 +327,11 @@ class AnalysisConfiguration(ConfigurationBase):
             )
 
         # Validate filename
-        if not isinstance(filename, str):
-            raise TypeError(f"filename must be a string, got {type(filename)}")
+        if not isinstance(filename, (str, Path)):
+            raise TypeError(f"filename must be a string or Path, got {type(filename)}")
 
         supported_exts = ('.npz', '.h5', '.hdf5', '.txt')
-        if not filename.endswith(supported_exts):
+        if Path(filename).suffix not in supported_exts:
             logger.warning(
                 f"Filename '{filename}' has unusual extension. "
                 f"Supported: {', '.join(supported_exts)}"
@@ -406,7 +410,7 @@ class GeneralConfiguration:
         table["logfile"] = self.logfile
         table["loglevel"] = self.loglevel
         if self.output_directory:
-            table["output_directory"] = self.output_directory
+            table["output_directory"] = str(self.output_directory)
         table["git_hash"] = self.git_hash
         return table
 
