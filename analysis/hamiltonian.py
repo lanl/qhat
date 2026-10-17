@@ -518,7 +518,7 @@ def load_hamlib_hdf5(config_hamiltonian: HamiltonianConfiguration):
 def load_pauli(config_hamiltonian: HamiltonianConfiguration):
     filename = config_hamiltonian.filename
     logger.info(f"Loading Pauli string Hamiltonian from file \"{filename}\".")
-    extension = Path(filename).suffix[1:].lower()  # Remove leading dot
+    extension = Path(filename).suffix[1:]  # Remove leading dot.
 
     # Check for HamLib HDF5 format
     if extension in ["h5", "hdf5"]:

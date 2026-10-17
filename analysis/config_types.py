@@ -81,7 +81,7 @@ class HamiltonianConfiguration(ConfigurationBase):
         self._only_once()
         self.filename = filename
         # Auto-detect file format based on extension
-        suffix = Path(filename).suffix.lower()
+        suffix = Path(filename).suffix
         if suffix in ('.h5', '.hdf5'):
             self.source = "hdf5"
         elif suffix in ('.npy', '.npz'):
