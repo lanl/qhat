@@ -200,6 +200,11 @@ class AlgorithmConfiguration(ConfigurationBase):
         # Components for "QPE: QHAT flexible"; `None` yields default options
         self.ancilla_prep = None
         self.qft_inv = None
+        # Multi-run sizing for tapered ancilla_prep choices ("QPE: QHAT flexible" only): assumed
+        # overlap of the initial state with the target eigenstate (default 0.5), and whether to
+        # report the smallest of the runs' estimates (default False: the sizing picks which)
+        self.overlap = None
+        self.force_lowest_estimate = None
     def _generate_TOML_table(self):
         table = tomlkit.table()
         table["method"] = self.method
@@ -210,6 +215,8 @@ class AlgorithmConfiguration(ConfigurationBase):
         self.save_if_present(table, "energy_error")
         self.save_if_present(table, "ancilla_prep")
         self.save_if_present(table, "qft_inv")
+        self.save_if_present(table, "overlap")
+        self.save_if_present(table, "force_lowest_estimate")
         return table
 
 # -------------------------------------------------------------------------------------------------
