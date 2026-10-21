@@ -5,10 +5,12 @@ Tests for QPE construction in analysis/algorithm.py: the "QPE: QHAT flexible" an
 
 import functools
 import itertools
+import logging
 import math
 
 import numpy as np
 import pytest
+import tomlkit
 from qualtran.bloqs.phase_estimation import TextbookQPE
 
 from qhat.analysis.algorithm import build_algorithm, qpe_energy_window
@@ -23,6 +25,7 @@ from qhat.analysis.unitary import encode_as_unitary
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.pauli_string_evolution import PauliStringEvolution
 from qhat.common.qpe_window_state import precision_bits
+from qhat.common.tapered_qpe_sizing import fewest_runs, per_run_qpe_failure, size_tapered_qpe
 from qhat.common.tapered_window_state import (
     BandwidthOptimizedWindowState, DPSSWindowState, TruncatedDPSSWindowState)
 from qhat.common.trotter_flattened import Trotterization
@@ -155,15 +158,22 @@ class TestTaperedWindows:
         assert build_algorithm(config, unitary) == FlexibleQPE(unitary, 5)
 
     @pytest.mark.parametrize("name, cls", TAPERED.items())
-    def test_from_energy_error_and_probability_of_failure(self, trotter, name, cls):
+    @pytest.mark.parametrize("overlap", [None, 0.3, 1.0])
+    def test_from_energy_error_and_probability_of_failure(self, trotter, name, cls, overlap):
         dE, p_fail = 0.05, 1e-6
-        config = make_config(ancilla_prep=name, energy_error=dE, probability_of_failure=p_fail)
+        config = make_config(ancilla_prep=name, energy_error=dE, probability_of_failure=p_fail,
+                             overlap=overlap)
         phase_error = dE * trotter.time / (2 * math.pi)
         qpe = build_algorithm(config, trotter)
-        assert qpe.ancilla_prep == cls.from_requirements(phase_error, p_fail)
-        # One fewer precision bit than the rectangular window, and far fewer confidence bits.
+        plan = size_tapered_qpe(cls, phase_error, p_fail, 0.5 if overlap is None else overlap)
+        assert qpe == FlexibleQPE(
+            trotter, plan.num_phase_qubits,
+            cls(plan.num_precision_qubits, plan.num_confidence_qubits))
+        # One fewer precision bit than the rectangular window.
         assert qpe.ancilla_prep.num_precision_qubits == precision_bits(phase_error) - 1
-        assert qpe.num_ancilla_qubits < textbook_qubits(phase_error, p_fail)
+        if overlap == 1.0:  # a single run: the single-run rule, with far fewer confidence bits
+            assert qpe.ancilla_prep == cls.from_requirements(phase_error, p_fail)
+            assert qpe.num_ancilla_qubits < textbook_qubits(phase_error, p_fail)
 
 
 @pytest.mark.parametrize("method, qpe_class", [
@@ -361,7 +371,8 @@ def test_simulation_reads_exact_phases_from_pauli_file(
 
 @pytest.mark.parametrize("ancilla_prep", ["dpss", "truncated dpss", "bandwidth-optimized"])
 def test_tapered_qpe_meets_requirements_through_pauli_file(tmp_path, ancilla_prep):
-    """End to end with a tapered window sized from (energy_error, probability_of_failure).
+    """End to end with a tapered window sized from (energy_error, probability_of_failure) for an
+    initial state that is the target eigenstate (overlap 1), so a single run.
 
     U has off-grid eigenphases on the computational basis states (see
     `test_simulation_reads_exact_phases_from_pauli_file`). Here energy_error 0.2 is a phase error
@@ -376,7 +387,7 @@ def test_tapered_qpe_meets_requirements_through_pauli_file(tmp_path, ancilla_pre
     settings = dict(time=2 * math.pi / energy_scale, num_trotter_steps=3)
 
     qpe = qpe_from_pauli_file(pauli_file, ancilla_prep=ancilla_prep, energy_error=dE,
-                              probability_of_failure=p_fail, **settings)
+                              probability_of_failure=p_fail, overlap=1.0, **settings)
     num_phase = qpe.num_ancilla_qubits
     assert qpe.ancilla_prep.num_precision_qubits == 3 and num_phase in (7, 8)
     # Guard: a rectangular window of the same size misses the target, so the taper matters.
@@ -399,7 +410,252 @@ def test_tapered_qpe_meets_requirements_through_pauli_file(tmp_path, ancilla_pre
         assert (max(failures) <= p_fail) == meets_target
 
 
+# The diagonal test problem: H = -1.7 diag(PHASES), t = 2 pi / 1.7, so energies are -1.7 x PHASES
+# (in [-1.7, 0)) and the ground state is basis state 3, at -1.48. energy_error 0.2 is a phase error
+# of 0.118 turns.
+PHASES = [0.1234, 0.377, 0.6021, 0.871]
+ENERGY_SCALE = 1.7
+SETTINGS = dict(time=2 * math.pi / ENERGY_SCALE, num_trotter_steps=3)
+
+
+@pytest.fixture
+def pauli_file(tmp_path):
+    path = tmp_path / "hamiltonian.txt"
+    write_diagonal_pauli_file(path, PHASES, ENERGY_SCALE)
+    return path
+
+
+def direct_multi_run_failure(n, k, p_under, p_over):
+    """P(the k-th smallest of n estimates is an under- or overestimate), as binomial sums: at
+    least k underestimates, or at least n - k + 1 overestimates."""
+    def at_least(j_min, q):
+        return sum(math.comb(n, j) * q**j * (1 - q)**(n - j) for j in range(j_min, n + 1))
+    return at_least(k, p_under) + at_least(n - k + 1, p_over)
+
+
+@pytest.mark.parametrize("ancilla_prep, cls", TAPERED.items())
+def test_tapered_qpe_multi_run_plan_through_pauli_file(tmp_path, pauli_file, ancilla_prep, cls):
+    """End to end at the default overlap 0.5: the circuit is sized for N runs, reporting the K-th
+    smallest energy estimate, with energy_error 0.2 and p_fail 1e-3 (3 precision and 4 confidence
+    qubits; 14 runs for the DPSS, 15 otherwise; K = 2).
+
+    The initial state has weight 0.5 on the ground state and 0.2, 0.3 on two excited states. From
+    the simulated distribution of one run's energy estimate, the N-run failure is computed
+    directly; it must be within the sizing's bound and p_fail.
+    """
+    dE, p_fail = 0.2, 1e-3
+    qpe = qpe_from_pauli_file(pauli_file, ancilla_prep=ancilla_prep, energy_error=dE,
+                              probability_of_failure=p_fail, **SETTINGS)
+    plan = size_tapered_qpe(cls, dE / ENERGY_SCALE, p_fail, 0.5)
+    assert qpe.ancilla_prep == cls(3, 4)
+    assert (plan.num_precision_qubits, plan.num_confidence_qubits) == (3, 4)
+    assert plan.num_runs == (14 if cls is DPSSWindowState else 15) and plan.quantile == 2
+
+    m = qpe.num_ancilla_qubits
+    input_file = str(tmp_path / "input.npy")
+    save_state(input_file, np.kron(np.eye(2**m)[0], np.sqrt([0.2, 0.3, 0.0, 0.5])))
+    result = numerical_simulation(input_file, qpe, compute_unitary_matrix(qpe))
+    out = load_state(result["simulations"][0]["output_file"])
+    probs = np.sum(np.abs(out.reshape(2**m, -1))**2, axis=1)
+
+    # U = exp(-i H t): register value k decodes to the energy in [-1.7, 0) congruent to
+    # -1.7 k / 2^m.
+    estimates = -ENERGY_SCALE + np.mod(-ENERGY_SCALE * np.arange(2**m) / 2**m, ENERGY_SCALE)
+    ground = -ENERGY_SCALE * PHASES[3]
+    p_under = probs[estimates < ground - dE].sum()
+    p_over = probs[estimates > ground + dE].sum()
+    u = per_run_qpe_failure(cls, 3, 4)
+    assert p_under <= u and 1 - p_under - p_over >= 0.5 * (1 - u)
+    failure = direct_multi_run_failure(plan.num_runs, plan.quantile, p_under, p_over)
+    assert failure <= plan.multi_run_failure <= p_fail
+    # Guard: a single run fails about half the time.
+    assert p_over > 0.45
+
+
+@pytest.fixture
+def qhat_log(caplog):
+    """caplog for qhat's info-level records (the "qhat" logger does not propagate to root)."""
+    qhat_logger = logging.getLogger("qhat")
+    level = qhat_logger.level
+    qhat_logger.addHandler(caplog.handler)
+    qhat_logger.setLevel(logging.INFO)
+    caplog.handler.setLevel(logging.INFO)
+    yield caplog
+    qhat_logger.removeHandler(caplog.handler)
+    qhat_logger.setLevel(level)
+
+
+def algorithm_messages(caplog, level=logging.INFO):
+    return [r.getMessage() for r in caplog.records
+            if r.name == "qhat.analysis.algorithm" and r.levelno == level]
+
+
+TABLE_HEADER = "--     overlap   probability of failure"
+NOTE = "-- NOTE: the analyses below report on a single run of the algorithm."
+
+
+class TestMultiRunSizing:
+    """The tapered path of "QPE: QHAT flexible" with the multi-run sizing, through a Pauli file."""
+
+    def test_default_log_block(self, pauli_file, qhat_log):
+        qpe = qpe_from_pauli_file(pauli_file, ancilla_prep="dpss", energy_error=0.2,
+                                  probability_of_failure=1e-3, **SETTINGS)
+        assert qpe.ancilla_prep == DPSSWindowState(3, 4)
+        info = algorithm_messages(qhat_log)
+        start = info.index("-- overlap with target eigenstate = 0.5 (default)")
+        table = [f"--     {p:<9.2f} <= {f}" for p, f in zip(
+            [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+            ["9.92e-01", "5.85e-01", "1.98e-01", "4.75e-02", "8.11e-03", "9.19e-04", "6.56e-05",
+             "8.40e-06", "6.80e-06", "6.79e-06", "6.79e-06"])]
+        assert info[start:] == [
+            "-- overlap with target eigenstate = 0.5 (default)",
+            "-- report the K-th smallest of N runs: K chosen by sizing (default)",
+            "-- tapered QPE sizing: 3 precision + 4 confidence qubits = 7 phase qubits",
+            "-- if you run the circuit 1 time:",
+            "--     probability of failure <= 5.00e-01, energy error <= 0.2",
+            "-- if you run the circuit 14 times and take the 2nd-smallest estimate:",
+            "--     probability of failure <= 9.19e-04, energy error <= 0.2",
+            "-- if the true overlap differs from 0.5 (same 14 runs, 2nd-smallest estimate; "
+            "energy error <= 0.2 in every row):",
+            TABLE_HEADER,
+            *table,
+            NOTE,
+        ]
+        assert not algorithm_messages(qhat_log, logging.WARNING)
+
+    def test_user_specified_options(self, pauli_file, qhat_log):
+        qpe = qpe_from_pauli_file(pauli_file, ancilla_prep="truncated dpss", energy_error=0.2,
+                                  probability_of_failure=1e-3, overlap=0.9,
+                                  force_lowest_estimate=True, **SETTINGS)
+        plan = size_tapered_qpe(TruncatedDPSSWindowState, 0.2 / ENERGY_SCALE, 1e-3, 0.9, True)
+        assert plan.quantile == 1
+        assert qpe.ancilla_prep == TruncatedDPSSWindowState(plan.num_precision_qubits,
+                                                            plan.num_confidence_qubits)
+        info = algorithm_messages(qhat_log)
+        assert "-- overlap with target eigenstate = 0.9 (user-specified)" in info
+        assert ("-- report the smallest of N runs (K = 1): forced by "
+                "algorithm.force_lowest_estimate (user-specified)") in info
+        assert (f"-- if you run the circuit {plan.num_runs} times and take the smallest "
+                "estimate:") in info
+
+    def test_force_false_is_user_specified(self, pauli_file, qhat_log):
+        qpe_from_pauli_file(pauli_file, ancilla_prep="dpss", energy_error=0.2,
+                            probability_of_failure=1e-3, force_lowest_estimate=False, **SETTINGS)
+        assert ("-- report the K-th smallest of N runs: K chosen by sizing (user-specified)"
+                in algorithm_messages(qhat_log))
+
+    @pytest.mark.parametrize("overlap, error", [
+        (0.0, ValueError), (-0.2, ValueError), (1.5, ValueError), (math.nan, ValueError),
+        (0.5 + 0.1j, ValueError), ("0.5", TypeError), (True, TypeError),
+    ])
+    def test_invalid_overlap_raises(self, pauli_file, overlap, error):
+        with pytest.raises(error, match="overlap"):
+            qpe_from_pauli_file(pauli_file, ancilla_prep="dpss", energy_error=0.2,
+                                probability_of_failure=1e-3, overlap=overlap, **SETTINGS)
+
+    @pytest.mark.parametrize("force", ["yes", 1, None])
+    def test_invalid_force_lowest_estimate_raises(self, pauli_file, force):
+        config = dict(ancilla_prep="dpss", energy_error=0.2, probability_of_failure=1e-3,
+                      force_lowest_estimate=force)
+        if force is None:  # unset is fine
+            qpe_from_pauli_file(pauli_file, **config, **SETTINGS)
+            return
+        with pytest.raises(TypeError, match="force_lowest_estimate"):
+            qpe_from_pauli_file(pauli_file, **config, **SETTINGS)
+
+    def test_overlap_one_is_the_single_run_rule(self, pauli_file, qhat_log):
+        qpe = qpe_from_pauli_file(pauli_file, ancilla_prep="bandwidth-optimized",
+                                  energy_error=0.2, probability_of_failure=1e-3, overlap=1.0,
+                                  **SETTINGS)
+        assert qpe.ancilla_prep == BandwidthOptimizedWindowState.from_requirements(
+            0.2 / ENERGY_SCALE, 1e-3)
+        assert "-- if you run the circuit 1 time and take the smallest estimate:" in \
+            algorithm_messages(qhat_log)
+
+    def test_fallback_when_no_plan(self, pauli_file, qhat_log):
+        qpe = qpe_from_pauli_file(pauli_file, ancilla_prep="dpss", energy_error=0.2,
+                                  probability_of_failure=1e-3, overlap=1e-17, **SETTINGS)
+        assert qpe.ancilla_prep == DPSSWindowState.from_requirements(0.2 / ENERGY_SCALE, 1e-3)
+        errors = algorithm_messages(qhat_log, logging.ERROR)
+        assert len(errors) == 1 and "FALLBACK" in errors[0] and "1e-17" in errors[0]
+        info = algorithm_messages(qhat_log)
+        assert ("-- FALLBACK tapered QPE sizing: 3 precision + 4 confidence qubits = 7 phase "
+                "qubits") in info
+        assert TABLE_HEADER not in info and info[-1] == NOTE
+
+    @pytest.mark.parametrize("probability_of_failure", [1e-3, None])
+    def test_given_counts(self, pauli_file, qhat_log, probability_of_failure):
+        qpe = qpe_from_pauli_file(pauli_file, ancilla_prep="dpss", num_precision_qubits=3,
+                                  num_confidence_qubits=5, overlap=0.4,
+                                  probability_of_failure=probability_of_failure, **SETTINGS)
+        assert qpe == qpe_from_pauli_file(pauli_file, ancilla_prep="dpss",
+                                          num_phase_qubits=8, num_confidence_qubits=5, **SETTINGS)
+        info = algorithm_messages(qhat_log)
+        assert ("-- tapered QPE: user-specified 3 precision + 5 confidence qubits = 8 phase "
+                "qubits") in info
+        assert info[-1] == NOTE
+        warnings = algorithm_messages(qhat_log, logging.WARNING)
+        if probability_of_failure is None:
+            assert TABLE_HEADER not in info
+            assert any("skipping the number of runs" in message for message in info)
+            assert len(warnings) == 1 and "algorithm.overlap is ignored" in warnings[0]
+            return
+        plan = fewest_runs(DPSSWindowState, 3, 5, probability_of_failure, 0.4)
+        # The bound comes from the precision qubits: 2^-4 turns is 1.7 / 16 = 0.106 in energy.
+        assert (f"--     probability of failure <= {plan.multi_run_failure:.2e}, energy error "
+                "<= 0.106") in info
+        assert (f"-- if you run the circuit {plan.num_runs} times and take the "
+                f"{'smallest' if plan.quantile == 1 else '2nd-smallest'} estimate:") in info
+        assert plan.quantile in (1, 2)
+        assert TABLE_HEADER in info and not warnings
+
+    @pytest.mark.parametrize("energy_error, warns", [(0.2, False), (0.1, True)])
+    def test_given_counts_warn_if_energy_error_unmet(self, pauli_file, qhat_log, energy_error,
+                                                     warns):
+        # 3 precision qubits bound the energy error by 0.106.
+        qpe_from_pauli_file(pauli_file, ancilla_prep="dpss", num_precision_qubits=3,
+                            num_confidence_qubits=4, energy_error=energy_error,
+                            probability_of_failure=1e-3, **SETTINGS)
+        warnings = algorithm_messages(qhat_log, logging.WARNING)
+        assert len(warnings) == warns
+        if warns:
+            assert "0.106" in warnings[0] and "energy_error = 0.1" in warnings[0]
+
+    def test_given_counts_with_no_plan(self, pauli_file, qhat_log):
+        # One confidence qubit: no bound on a run's failure, so no number of runs works.
+        qpe = qpe_from_pauli_file(pauli_file, ancilla_prep="dpss", num_precision_qubits=3,
+                                  num_confidence_qubits=1, probability_of_failure=1e-3,
+                                  **SETTINGS)
+        assert qpe.ancilla_prep == DPSSWindowState(3, 1)
+        errors = algorithm_messages(qhat_log, logging.ERROR)
+        assert len(errors) == 1 and "No number of runs" in errors[0]
+        info = algorithm_messages(qhat_log)
+        assert TABLE_HEADER not in info and info[-1] == NOTE
+
+    @pytest.mark.parametrize("config", [
+        dict(ancilla_prep="rectangular", energy_error=0.2, probability_of_failure=1e-3),
+        dict(num_phase_qubits=4),
+        dict(method="QPE: qualtran textbook", num_phase_qubits=4),
+    ], ids=["rectangular from requirements", "rectangular from counts", "textbook"])
+    def test_unused_options_warn(self, pauli_file, qhat_log, config):
+        qpe_from_pauli_file(pauli_file, overlap=0.3, force_lowest_estimate=True, **config,
+                            **SETTINGS)
+        warnings = algorithm_messages(qhat_log, logging.WARNING)
+        assert len(warnings) == 2
+        assert "algorithm.overlap is ignored" in warnings[0]
+        assert "algorithm.force_lowest_estimate is ignored" in warnings[1]
+        assert NOTE not in algorithm_messages(qhat_log)
+
+
 class TestConfigurationAndResources:
+
+    def test_toml_saves_multi_run_options(self):
+        config = make_config(ancilla_prep="dpss", overlap=0.25, force_lowest_estimate=True)
+        table = tomlkit.parse(tomlkit.dumps({"algorithm": config._generate_TOML_table()}))
+        assert table["algorithm"]["overlap"] == 0.25
+        assert table["algorithm"]["force_lowest_estimate"] is True
+        table = make_config(ancilla_prep="dpss")._generate_TOML_table()
+        assert "overlap" not in table and "force_lowest_estimate" not in table
 
     def test_toml_saves_flexible_components(self):
         table = make_config(ancilla_prep="rectangular", qft_inv="textbook")._generate_TOML_table()
