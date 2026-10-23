@@ -375,7 +375,9 @@ def encode_ramped_trotter(
     # Import the appropriate implementation
     # TODO: This should be handled by the file readers (with options to switch between different
     #       types of terms based on what data is available in the input file and what types of
-    #       terms are available in QHAT.
+    #       terms are available in QHAT.  However, doing that means that terms need to support all
+    #       of the operations used in reorder_paulis, which isn't yet the case, so that
+    #       reorder_paulis can be rewritten to the term interface.
     hamiltonian_terms = [SinglePauliTerm(*term) for term in pauli_strings.items()]
     if trotter_impl == 'flattened':
         from qhat.common.trotter_flattened import build_ramped_trotterized_unitary
