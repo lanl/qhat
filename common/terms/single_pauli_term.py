@@ -12,8 +12,11 @@ class SinglePauliTerm:
 
     def __init__(self, pauli_string, coefficient):
         # Verify and store Pauli string
-        # TODO: Should we allow any representation that PauliString understands?
-        self.pauli_string = PauliString.from_dense(pauli_string)
+        if isinstance(pauli_string, str):
+            self.pauli_string = PauliString.from_dense(pauli_string)
+        else:
+            # PauliString.from_sparse will flag any invalid formats for us
+            self.pauli_string = PauliString.from_sparse(pauli_string)
         # Ensure coefficient is real (else Hamiltonian cannot be Hermitian) and force to a real
         # data type before storing
         self.coefficient = require_real_scalar(f"coefficient of {pauli_string}", coefficient)
