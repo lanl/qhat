@@ -25,6 +25,7 @@ from qhat.analysis.config_types import UnitaryConfiguration
 from qhat.analysis.ordering import reorder_paulis
 from qhat.analysis.utils import value
 from qhat.common.hermiticity import DEFAULT_RTOL, max_relative_imaginary, require_real_scalar
+from qhat.common.terms.single_pauli_term import SinglePauliTerm
 
 logger = logging.getLogger(__name__)
 
@@ -372,12 +373,18 @@ def encode_ramped_trotter(
     pauli_strings = reorder_paulis(pauli_strings, config_unitary.ordering_method)
 
     # Import the appropriate implementation
+    # TODO: This should be handled by the file readers (with options to switch between different
+    #       types of terms based on what data is available in the input file and what types of
+    #       terms are available in QHAT.  However, doing that means that terms need to support all
+    #       of the operations used in reorder_paulis, which isn't yet the case, so that
+    #       reorder_paulis can be rewritten to the term interface.
+    hamiltonian_terms = [SinglePauliTerm(*term) for term in pauli_strings.items()]
     if trotter_impl == 'flattened':
         from qhat.common.trotter_flattened import build_ramped_trotterized_unitary
         # Pass combine_terms and tensor_contraction_method parameters only for flattened implementation
         tensor_contraction_method = getattr(config_unitary, 'tensor_contraction_method', None)
         return build_ramped_trotterized_unitary(
-                pauli_strings.items(),
+                hamiltonian_terms,
                 method,
                 tevol_hbar,
                 Nsteps,
@@ -387,7 +394,7 @@ def encode_ramped_trotter(
         from qhat.common.trotter_original import build_ramped_trotterized_unitary
         # Original implementation doesn't support combine_terms or tensor_contraction_method parameters
         return build_ramped_trotterized_unitary(
-                pauli_strings.items(),
+                hamiltonian_terms,
                 method,
                 tevol_hbar,
                 Nsteps)
