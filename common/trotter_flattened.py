@@ -9,7 +9,7 @@ same Pauli string are combined for efficiency.
 import logging
 from functools import cached_property
 from math import cbrt
-from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import attrs
 import numpy as np
@@ -509,20 +509,8 @@ class Trotterization(Bloq):
 
         # Apply each term in the expanded sequence
         for term_idx, coeff in self.expanded_sequence:
-            # TODO: This will eventually be replaced with something like
-            #       `op = self.pauli_terms[term_idx].generate_evolution_operator(dt, hbar)`
-            pauli_string = self.pauli_terms[term_idx].dense_string()
-            h_i = self.pauli_terms[term_idx].coefficient
-
-            # Create CommutingPauliStringEvolution for this term
-            # The effective evolution is exp(-i * h_i * P_i * coeff * dt / hbar)
-            # Currently wraps a single term, but enables future grouping of commuting terms
-            cpse = CommutingPauliStringEvolution(
-                pauli_terms=((pauli_string, h_i * coeff),),
-                time=dt,
-                hbar=self.hbar
-            )
-            register = bb.add(cpse, q=register)
+            op = self.pauli_terms[term_idx].generate_evolution_operator(dt, self.hbar)
+            register = bb.add(op, q=register)
 
         return {reg_name: register}
 
@@ -555,18 +543,9 @@ class Trotterization(Bloq):
         total_complexity = TComplexity()
 
         for term_idx, count in term_counts.items():
-            # TODO: This will eventually be replaced with something like
-            #       `op = self.pauli_terms[term_idx].generate_evolution_operator(dt, hbar)`
-            pauli_string = self.pauli_terms[term_idx].dense_string()
-            h_i = self.pauli_terms[term_idx].coefficient
-            # Coefficient and time don't affect T-complexity, so use dummy values
-            # Use CommutingPauliStringEvolution to match build_composite_bloq
-            cpse = CommutingPauliStringEvolution(
-                pauli_terms=((pauli_string, 1.0),),  # Dummy coefficient
-                time=1.0,         # Dummy value - doesn't affect complexity
-                hbar=1.0
-            )
-            term_complexity = t_complexity(cpse)
+            # dummy values for t and hbar, because they don't affect complexity
+            op = self.pauli_terms[term_idx].generate_evolution_operator(1.0, 1.0)
+            term_complexity = t_complexity(op)
             total_complexity += count * term_complexity
 
         return total_complexity
@@ -704,18 +683,8 @@ class Trotterization(Bloq):
         dt = self.time / self.num_steps
 
         for term_idx, coeff in terms:
-            # TODO: This will eventually be replaced with something like
-            #       `op = self.pauli_terms[term_idx].generate_evolution_operator(dt, hbar)`
-            pauli_string = self.pauli_terms[term_idx].dense_string()
-            h_i = self.pauli_terms[term_idx].coefficient
-
-            cpse = CommutingPauliStringEvolution(
-                pauli_terms=((pauli_string, h_i * coeff),),
-                time=dt,
-                hbar=self.hbar
-            )
-
-            U_term = cpse.tensor_contract()
+            op = self.pauli_terms[term_idx].generate_evolution_operator(dt, self.hbar)
+            U_term = op.tensor_contract()
             U = U_term @ U
 
         return U
@@ -817,7 +786,7 @@ class Trotterization(Bloq):
 # =================================================================================================
 
 def build_ramped_trotterized_unitary(
-    hamiltonian_terms: Union[Sequence[SinglePauliTerm], 'Iterable[SinglePauliTerm]'],
+    hamiltonian_terms: Iterable[SinglePauliTerm],
     method,
     timestep: float,
     numsteps: int,

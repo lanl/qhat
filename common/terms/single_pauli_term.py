@@ -1,5 +1,7 @@
 from qhat.common.hermiticity import require_real_scalar
 from qhat.common.pauli_string import PauliString
+# TODO: Should I move the evolution Bloqs into the terms/ directory?
+from qhat.common.pauli_string_evolution import PauliStringEvolution
 from qhat.common.pauli_utils import validate_pauli_string
 
 class SinglePauliTerm:
@@ -27,3 +29,7 @@ class SinglePauliTerm:
 
     def __repr__(self) -> str:
         return f"SinglePauliTerm({self.dense_string()}, {self.coefficient})"
+
+    def generate_evolution_operator(self, t: float, hbar: float = 1.0):
+        return PauliStringEvolution(self.dense_string(), self.coefficient, t, hbar)
+
