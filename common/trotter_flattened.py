@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     import quimb.tensor as qtn
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
 
-from qhat.common.terms.single_pauli_term import SinglePauliTerm
+from qhat.common.terms.base_term import BaseTerm
 from qhat.common.commuting_pauli_string_evolution import CommutingPauliStringEvolution
 from qhat.common.hermiticity import require_real_scalar
 from qhat.common.pauli_utils import validate_pauli_string
@@ -297,18 +297,16 @@ class Trotterization(Bloq):
         ... )
     """
 
-    # TODO: Nemotron tells me there are multiple ways to allow any kind of term, and I haven't read
-    #       it through in detail yet.  Same for repetition lists below.
-    pauli_terms: Tuple[SinglePauliTerm, ...]
+    pauli_terms: Tuple[BaseTerm, ...]
     coefficients: Tuple[float, ...]
     time: float
     num_steps: int
     hbar: float = 1.0
     combine_terms: bool = True
-    _prologue: Tuple[SinglePauliTerm, ...] = ()
-    _epilogue: Tuple[SinglePauliTerm, ...] = ()
-    _repeat_core: Tuple[SinglePauliTerm, ...] = ()
-    _repeat_bridge: Tuple[SinglePauliTerm, ...] = ()
+    _prologue: Tuple[BaseTerm, ...] = ()
+    _epilogue: Tuple[BaseTerm, ...] = ()
+    _repeat_core: Tuple[BaseTerm, ...] = ()
+    _repeat_bridge: Tuple[BaseTerm, ...] = ()
     _symmetric_bookends: bool = True
     tensor_contraction_method: Optional[str] = None
 
@@ -420,7 +418,7 @@ class Trotterization(Bloq):
     @classmethod
     def from_method(
         cls,
-        pauli_terms: Sequence[SinglePauliTerm],
+        pauli_terms: Sequence[BaseTerm],
         method,
         time: float,
         num_steps: int,
@@ -786,7 +784,7 @@ class Trotterization(Bloq):
 # =================================================================================================
 
 def build_ramped_trotterized_unitary(
-    hamiltonian_terms: Iterable[SinglePauliTerm],
+    hamiltonian_terms: Iterable[BaseTerm],
     method,
     timestep: float,
     numsteps: int,
@@ -799,7 +797,7 @@ def build_ramped_trotterized_unitary(
     used by QPE code in the analysis/ directory.
 
     Args:
-        hamiltonian_terms: Iterable of SinglePauliTerm instances
+        hamiltonian_terms: Iterable of BaseTerm instances
             Example: [("XYZ", 0.5), ("ZZI", 0.3)]
         method: Trotterization method name or int (e.g., "second order", 2)
         timestep: Time step for evolution

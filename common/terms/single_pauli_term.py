@@ -3,8 +3,9 @@ from qhat.common.pauli_string import PauliString
 # TODO: Should I move the evolution Bloqs into the terms/ directory?
 from qhat.common.pauli_string_evolution import PauliStringEvolution
 from qhat.common.pauli_utils import validate_pauli_string
+from qhat.common.terms.base_term import BaseTerm
 
-class SinglePauliTerm:
+class SinglePauliTerm(BaseTerm):
     """A single Pauli string as a term in a Hamiltonian."""
 
     pauli_string: PauliString
@@ -24,6 +25,9 @@ class SinglePauliTerm:
     def num_qubits(self) -> int:
         return self.pauli_string.num_qubits
 
+    def generate_evolution_operator(self, t: float, hbar: float = 1.0):
+        return PauliStringEvolution(self.dense_string(), self.coefficient, t, hbar)
+
     def dense_string(self) -> str:
         return self.pauli_string.to_dense()
 
@@ -32,7 +36,4 @@ class SinglePauliTerm:
 
     def __repr__(self) -> str:
         return f"SinglePauliTerm({self.dense_string()}, {self.coefficient})"
-
-    def generate_evolution_operator(self, t: float, hbar: float = 1.0):
-        return PauliStringEvolution(self.dense_string(), self.coefficient, t, hbar)
 
