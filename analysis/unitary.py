@@ -229,6 +229,14 @@ def encode_ramped_trotter(
         hamiltonian,
         tevol_hbar):
 
+    # TODO: This should be handled by the file readers (with options to switch between different
+    #       types of terms based on what data is available in the input file and what types of
+    #       terms are available in QHAT.  However, doing that means that terms need to support all
+    #       of the operations used in reorder_paulis, which isn't yet the case, so that
+    #       reorder_paulis can be rewritten to the term interface.
+    hamiltonian_terms = [SinglePauliTerm(*term) for
+                         term in hamiltonian.get_all_pauli_strings(return_as='strings').items()]
+
     # Get the implementation choice from config
     trotter_impl = config_unitary.trotter_implementation
 
@@ -369,16 +377,21 @@ def encode_ramped_trotter(
         logger.info(f"-- Trotter recommendation: use {method} formula with {Nsteps} steps ({Nsteps0})")
         logger.verbose(f"-- unoptimized ramp count = {Nsteps * ramps_per_step}")
 
-    pauli_strings = hamiltonian.get_all_pauli_strings(return_as='strings')
-    pauli_strings = reorder_paulis(pauli_strings, config_unitary.ordering_method)
+    # TODO: This is a temporary patch.  We need to write a new ordering method that isn't
+    #       hard-coded to Pauli strings, and then implement appropriate operations on terms.
+    if all(isinstance(term, SinglePauliTerm) for term in hamiltonian_terms):
+        # Extract all the terms as {pauli_string: coefficient}
+        pauli_strings = {term.dense_string(): term.coefficient for term in hamiltonian_terms}
+        # Sort terms
+        pauli_strings = reorder_paulis(pauli_strings, config_unitary.ordering_method)
+        # Repack terms back to SinglePauliTerm
+        hamiltonian_terms = [SinglePauliTerm(*term) for term in pauli_strings.items()]
+    else:
+        logger.warning("***TERM ORDERING WARNING***\nNot all Hamiltonian terms are of type "
+                       "SinglePauliTerm.  Unable to sort terms.  Term ordering controls are "
+                       "ignored, and default order from Hamiltonian reader is used.")
 
     # Import the appropriate implementation
-    # TODO: This should be handled by the file readers (with options to switch between different
-    #       types of terms based on what data is available in the input file and what types of
-    #       terms are available in QHAT.  However, doing that means that terms need to support all
-    #       of the operations used in reorder_paulis, which isn't yet the case, so that
-    #       reorder_paulis can be rewritten to the term interface.
-    hamiltonian_terms = [SinglePauliTerm(*term) for term in pauli_strings.items()]
     if trotter_impl == 'flattened':
         from qhat.common.trotter_flattened import build_ramped_trotterized_unitary
         # Pass combine_terms and tensor_contraction_method parameters only for flattened implementation
@@ -394,7 +407,7 @@ def encode_ramped_trotter(
         from qhat.common.trotter_original import build_ramped_trotterized_unitary
         # Original implementation doesn't support combine_terms or tensor_contraction_method parameters
         return build_ramped_trotterized_unitary(
-                hamiltonian_terms,
+                {term.dense_string(): term.coefficient for term in hamiltonian_terms},
                 method,
                 tevol_hbar,
                 Nsteps)
