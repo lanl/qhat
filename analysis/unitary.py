@@ -407,7 +407,7 @@ def encode_ramped_trotter(
         from qhat.common.trotter_original import build_ramped_trotterized_unitary
         # Original implementation doesn't support combine_terms or tensor_contraction_method parameters
         return build_ramped_trotterized_unitary(
-                {term.dense_string(): term.coefficient for term in hamiltonian_terms},
+                ((term.dense_string(), term.coefficient) for term in hamiltonian_terms),
                 method,
                 tevol_hbar,
                 Nsteps)
