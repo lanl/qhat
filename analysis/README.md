@@ -320,10 +320,44 @@ qubits alone does not determine the window, so set either `algorithm.energy_erro
 e.g. `num_precision_qubits = 3` with `num_confidence_qubits = 3`, or `num_phase_qubits = 6` with
 `num_confidence_qubits = 3`.  Setting all three is allowed if they are consistent; any other
 combination is an error.  "rectangular" accepts `algorithm.num_phase_qubits` alone (and uses
-only the total if the split is also given).  When sizing from the error, the number of
-confidence qubits is chosen from the paper's Theorem 1 (a bound on the failure probability
-averaged over phases); this rule is expected to change.  `num_precision_qubits` and
-`num_confidence_qubits` apply only to "QPE: QHAT flexible".
+only the total if the split is also given).  `num_precision_qubits` and `num_confidence_qubits`
+apply only to "QPE: QHAT flexible".
+
+#### Sizing tapered QPE for several runs
+
+The initial state usually overlaps the target eigenstate (e.g. the ground state) only partly, so a
+single run of QPE often returns some other eigenvalue.  For the tapered `algorithm.ancilla_prep`
+choices, QHAT therefore plans N runs of the circuit, of which the K-th smallest energy estimate is
+reported.  This uses the multi-run analysis by Yigit Subasi and Alan Bu (unpublished),
+implemented in `common/tapered_qpe_sizing.py`.  Two options control it:
+
+- `algorithm.overlap`: the assumed overlap (probability) of the initial state with the target
+  eigenstate, with 0 < overlap <= 1; default 0.5.  The overlap is with an eigenstate of the
+  implemented unitary (e.g. the Trotterized one); its error from the exact time evolution belongs
+  in the separate unitary error budget.
+- `algorithm.force_lowest_estimate`: if true, report the smallest estimate (K = 1); default false,
+  which lets the sizing choose K.
+
+When sizing from `algorithm.energy_error` and `algorithm.probability_of_failure`, the precision
+qubits are the fewest that meet the energy error, and the confidence qubits, N and K are those of
+lowest cost N x 2^(number of phase qubits) for which the reported estimate fails with probability
+at most `algorithm.probability_of_failure`.  The log reports the probability of failure for one
+run and for the N runs, and a table of the N-run failure if the true overlap were 0.01, 0.1, 0.2,
+..., 1.0.  With an overlap of 1, a single run suffices and the sizing reduces to one run's failure
+bound.  For example, energy error 0.2 (a phase error of 0.118 turns) and probability of failure
+1e-3 with the default overlap 0.5 give 3 precision and 4 confidence qubits, run 14 times
+("dpss"), reporting the 2nd-smallest estimate; a single run fails with probability 0.5.
+
+The circuit and all analyses (resource estimates, simulations) are for a **single** run; nothing
+is multiplied by N.  If no plan costs at most 1e18, QHAT logs an error and falls back to the
+single-run sizing (as if the overlap were 1).  If qubit counts are given, the circuit uses them,
+and if `algorithm.probability_of_failure` is set the log reports the fewest runs that meet it;
+the energy error bound then comes from the number of precision qubits.
+
+The probabilities of failure use the paper's Theorem 1, a bound on one run's failure averaged over
+where the true phase lies relative to the QPE grid (times 4 for "truncated dpss" and
+"bandwidth-optimized").  The paper's random phase shift (Sec. VI) would make this a worst-case
+bound, but QHAT does not apply it.
 
 ### Analyzing an Algorithm
 
