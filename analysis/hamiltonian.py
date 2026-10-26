@@ -31,6 +31,7 @@ from qhat.common.hermiticity import (
 )
 from qhat.common.MixedFermionBosonOperator import MixedFermionBosonOperator
 from qhat.common.pauli_string import PauliString
+from qhat.common.terms.single_pauli_term import SinglePauliTerm
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +183,11 @@ class Hamiltonian:
                 "The value of return_as must be \"tuples\", \"strings\", or \"objects\".",
                 f"Unable to return result as \"{return_as}\".",
                 ]))
+    def terms(self):
+        return [SinglePauliTerm(*term)
+                for term in self.get_all_pauli_strings(return_as='strings').items()]
+    # TODO: Given that we're now switching to the terms framework, is get_grouped_terms still
+    #       useful or is it replaced by the construction of the terms?
     def get_grouped_terms(self):
         # Returns all Pauli strings as a list of QubitOperator instances..
         # TODO: I think a QubitOperator can hold a sum of terms, so presumably this structure would

@@ -229,14 +229,6 @@ def encode_ramped_trotter(
         hamiltonian,
         tevol_hbar):
 
-    # TODO: This should be handled by the file readers (with options to switch between different
-    #       types of terms based on what data is available in the input file and what types of
-    #       terms are available in QHAT.  However, doing that means that terms need to support all
-    #       of the operations used in reorder_paulis, which isn't yet the case, so that
-    #       reorder_paulis can be rewritten to the term interface.
-    hamiltonian_terms = [SinglePauliTerm(*term) for
-                         term in hamiltonian.get_all_pauli_strings(return_as='strings').items()]
-
     # Get the implementation choice from config
     trotter_impl = config_unitary.trotter_implementation
 
@@ -377,6 +369,8 @@ def encode_ramped_trotter(
         logger.info(f"-- Trotter recommendation: use {method} formula with {Nsteps} steps ({Nsteps0})")
         logger.verbose(f"-- unoptimized ramp count = {Nsteps * ramps_per_step}")
 
+    # Sort Hamiltonian terms
+    hamiltonian_terms = hamiltonian.terms()
     # TODO: This is a temporary patch.  We need to write a new ordering method that isn't
     #       hard-coded to Pauli strings, and then implement appropriate operations on terms.
     if all(isinstance(term, SinglePauliTerm) for term in hamiltonian_terms):
