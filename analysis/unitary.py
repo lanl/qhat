@@ -25,7 +25,6 @@ from qhat.analysis.config_types import UnitaryConfiguration
 from qhat.analysis.ordering import reorder_paulis
 from qhat.analysis.utils import value
 from qhat.common.hermiticity import DEFAULT_RTOL, max_relative_imaginary, require_real_scalar
-from qhat.common.terms.single_pauli_term import SinglePauliTerm
 
 logger = logging.getLogger(__name__)
 
@@ -373,6 +372,7 @@ def encode_ramped_trotter(
     hamiltonian_terms = hamiltonian.terms()
     # TODO: This is a temporary patch.  We need to write a new ordering method that isn't
     #       hard-coded to Pauli strings, and then implement appropriate operations on terms.
+    from qhat.common.terms.single_pauli_term import SinglePauliTerm
     if all(isinstance(term, SinglePauliTerm) for term in hamiltonian_terms):
         # Extract all the terms as {pauli_string: coefficient}
         pauli_strings = {term.dense_string(): term.coefficient for term in hamiltonian_terms}
