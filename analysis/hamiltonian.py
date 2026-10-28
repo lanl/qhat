@@ -186,28 +186,6 @@ class Hamiltonian:
     def terms(self):
         return [SinglePauliTerm(*term)
                 for term in self.get_all_pauli_strings(return_as='strings').items()]
-    # TODO: Given that we're now switching to the terms framework, is get_grouped_terms still
-    #       useful or is it replaced by the construction of the terms?
-    def get_grouped_terms(self):
-        # Returns all Pauli strings as a list of QubitOperator instances..
-        # TODO: I think a QubitOperator can hold a sum of terms, so presumably this structure would
-        #       still work for grouped terms.
-        # TODO: Should this be cached?
-        # TODO: If get_all_pauli_strings is used to transform the Hamiltonian into Pauli strings,
-        #       then it can't be based on get_grouped terms.  Can get_grouped_terms be based on
-        #       get_all_pauli_strings?  My concern is that we don't want to carry multiple copies
-        #       of all the Pauli strings if we don't need to, but we also don't want to add lots of
-        #       indirection.  Instead of using functools.cache, I may have to manually cache and
-        #       check for (a) if the list exists, use it; (b) if the grouped structure exists,
-        #       present it in a flattened way; (c) otherwise compute.  And then get_grouped_terms
-        #       would have to do (a) if the list doesn't exist, call get_all_pauli_strings; (b) if
-        #       the list exists, process it into the grouped data structure, save that, delete the
-        #       list.  This is the sort of clean-up / optimization stuff that I should put off
-        #       until later, because right now I just need to get it working.
-        groups = list()
-        for pauli, coef in self.get_all_pauli_strings().items():
-            groups.append(QubitOperator(pauli, coef))
-        return groups
     def to_matrix(self, memory_threshold_gb, force_dense=None, force_sparse=None):
         """
         Convert the Hamiltonian to its exact matrix representation.
