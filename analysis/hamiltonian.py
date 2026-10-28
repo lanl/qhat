@@ -31,6 +31,7 @@ from qhat.common.hermiticity import (
 )
 from qhat.common.MixedFermionBosonOperator import MixedFermionBosonOperator
 from qhat.common.pauli_string import PauliString
+from qhat.common.terms.single_pauli_term import SinglePauliTerm
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +139,18 @@ class Hamiltonian:
             return self._H.num_qubits()
         else:
             raise TypeError("Unable to determine the number of qubits.")
-    def get_all_pauli_strings(self, return_as="tuples"):
+    # TODO: The next step is to get rid of _get_all_pauli_strings and switch the internal
+    #       representation here in the Hamiltonian object to be a collection of terms, and to do
+    #       appropriate operations on those terms to meet the other interfaces.
+    #       -- I'm wondering if the Hamiltonian or the file readers or a translation layer between
+    #          the two of them?  For example, NumPy and HDF5 and FCIDUMP can give you
+    #          second-quantization tensors, and translating that to terms is the same after it's
+    #          read from the data file.  So it could be that the file readers get the tensors and
+    #          then call a standard translator to terms and return a Hamiltonian, or they could
+    #          return the tensors and have a translation layer to terms that get loaded into the
+    #          Hamiltonian, or there could be multiple "constructors" that do the translation from
+    #          the tensors to the terms.
+    def _get_all_pauli_strings(self, return_as="tuples"):
         # Returns all Pauli strings as a flat data structure, specifically a dictionary where the
         # key is the Pauli string and the value is the coefficient.
         # -- If return_as == "tuples": The Pauli string is encoded as a tuple of tuples, where each
@@ -168,12 +180,12 @@ class Hamiltonian:
                 raise TypeError(
                     f"Unable to generate Pauli strings from object of type \"{type(self._H)}\".")
         elif return_as == "strings":
-            as_objects = self.get_all_pauli_strings(return_as="objects")
+            as_objects = self._get_all_pauli_strings(return_as="objects")
             return {pauli.to_dense() : coef for pauli, coef in as_objects.items()}
         elif return_as == "objects":
             if isinstance(self._H, LinearCombinationOfPauliStrings):
                 return self._H.get_pauli_strings()
-            as_tuples = self.get_all_pauli_strings(return_as="tuples")
+            as_tuples = self._get_all_pauli_strings(return_as="tuples")
             Nq = self.num_qubits()
             return {PauliString.from_sparse(pauli, Nq) : coef
                     for pauli, coef in as_tuples.items()}
@@ -182,26 +194,9 @@ class Hamiltonian:
                 "The value of return_as must be \"tuples\", \"strings\", or \"objects\".",
                 f"Unable to return result as \"{return_as}\".",
                 ]))
-    def get_grouped_terms(self):
-        # Returns all Pauli strings as a list of QubitOperator instances..
-        # TODO: I think a QubitOperator can hold a sum of terms, so presumably this structure would
-        #       still work for grouped terms.
-        # TODO: Should this be cached?
-        # TODO: If get_all_pauli_strings is used to transform the Hamiltonian into Pauli strings,
-        #       then it can't be based on get_grouped terms.  Can get_grouped_terms be based on
-        #       get_all_pauli_strings?  My concern is that we don't want to carry multiple copies
-        #       of all the Pauli strings if we don't need to, but we also don't want to add lots of
-        #       indirection.  Instead of using functools.cache, I may have to manually cache and
-        #       check for (a) if the list exists, use it; (b) if the grouped structure exists,
-        #       present it in a flattened way; (c) otherwise compute.  And then get_grouped_terms
-        #       would have to do (a) if the list doesn't exist, call get_all_pauli_strings; (b) if
-        #       the list exists, process it into the grouped data structure, save that, delete the
-        #       list.  This is the sort of clean-up / optimization stuff that I should put off
-        #       until later, because right now I just need to get it working.
-        groups = list()
-        for pauli, coef in self.get_all_pauli_strings().items():
-            groups.append(QubitOperator(pauli, coef))
-        return groups
+    def terms(self):
+        return [SinglePauliTerm(*term)
+                for term in self._get_all_pauli_strings(return_as='strings').items()]
     def to_matrix(self, memory_threshold_gb, force_dense=None, force_sparse=None):
         """
         Convert the Hamiltonian to its exact matrix representation.
@@ -229,7 +224,7 @@ class Hamiltonian:
         from qhat.analysis.matrix_operations import create_hamiltonian_operator
 
         # Get Pauli strings as dense format (full string per term)
-        pauli_dict = self.get_all_pauli_strings(return_as="strings")
+        pauli_dict = self._get_all_pauli_strings(return_as="strings")
         num_qubits = self.num_qubits()
 
         logger.verbose(f"Converting Hamiltonian to matrix for {num_qubits} qubits")
@@ -274,7 +269,7 @@ class Hamiltonian:
             self,
             config_hamiltonian: HamiltonianConfiguration):
         logger.info("Computing initial energy bounds.")
-        pauli_sum = self.get_all_pauli_strings()
+        pauli_sum = self._get_all_pauli_strings()
         logger.verbose(f"-- number of Pauli strings = {len(pauli_sum)}")
         energy_shift = pauli_sum.get(tuple(), 0.0) # identity term (may not exist in all formats)
         dE = sum(abs(coefficient) for coefficient in pauli_sum.values()) - abs(energy_shift)
