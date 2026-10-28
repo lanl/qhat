@@ -139,6 +139,17 @@ class Hamiltonian:
             return self._H.num_qubits()
         else:
             raise TypeError("Unable to determine the number of qubits.")
+    # TODO: The next step is to get rid of _get_all_pauli_strings and switch the internal
+    #       representation here in the Hamiltonian object to be a collection of terms, and to do
+    #       appropriate operations on those terms to meet the other interfaces.
+    #       -- I'm wondering if the Hamiltonian or the file readers or a translation layer between
+    #          the two of them?  For example, NumPy and HDF5 and FCIDUMP can give you
+    #          second-quantization tensors, and translating that to terms is the same after it's
+    #          read from the data file.  So it could be that the file readers get the tensors and
+    #          then call a standard translator to terms and return a Hamiltonian, or they could
+    #          return the tensors and have a translation layer to terms that get loaded into the
+    #          Hamiltonian, or there could be multiple "constructors" that do the translation from
+    #          the tensors to the terms.
     def _get_all_pauli_strings(self, return_as="tuples"):
         # Returns all Pauli strings as a flat data structure, specifically a dictionary where the
         # key is the Pauli string and the value is the coefficient.
