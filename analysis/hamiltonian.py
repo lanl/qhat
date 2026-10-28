@@ -139,7 +139,7 @@ class Hamiltonian:
             return self._H.num_qubits()
         else:
             raise TypeError("Unable to determine the number of qubits.")
-    def get_all_pauli_strings(self, return_as="tuples"):
+    def _get_all_pauli_strings(self, return_as="tuples"):
         # Returns all Pauli strings as a flat data structure, specifically a dictionary where the
         # key is the Pauli string and the value is the coefficient.
         # -- If return_as == "tuples": The Pauli string is encoded as a tuple of tuples, where each
@@ -169,12 +169,12 @@ class Hamiltonian:
                 raise TypeError(
                     f"Unable to generate Pauli strings from object of type \"{type(self._H)}\".")
         elif return_as == "strings":
-            as_objects = self.get_all_pauli_strings(return_as="objects")
+            as_objects = self._get_all_pauli_strings(return_as="objects")
             return {pauli.to_dense() : coef for pauli, coef in as_objects.items()}
         elif return_as == "objects":
             if isinstance(self._H, LinearCombinationOfPauliStrings):
                 return self._H.get_pauli_strings()
-            as_tuples = self.get_all_pauli_strings(return_as="tuples")
+            as_tuples = self._get_all_pauli_strings(return_as="tuples")
             Nq = self.num_qubits()
             return {PauliString.from_sparse(pauli, Nq) : coef
                     for pauli, coef in as_tuples.items()}
@@ -185,7 +185,7 @@ class Hamiltonian:
                 ]))
     def terms(self):
         return [SinglePauliTerm(*term)
-                for term in self.get_all_pauli_strings(return_as='strings').items()]
+                for term in self._get_all_pauli_strings(return_as='strings').items()]
     def to_matrix(self, memory_threshold_gb, force_dense=None, force_sparse=None):
         """
         Convert the Hamiltonian to its exact matrix representation.
@@ -213,7 +213,7 @@ class Hamiltonian:
         from qhat.analysis.matrix_operations import create_hamiltonian_operator
 
         # Get Pauli strings as dense format (full string per term)
-        pauli_dict = self.get_all_pauli_strings(return_as="strings")
+        pauli_dict = self._get_all_pauli_strings(return_as="strings")
         num_qubits = self.num_qubits()
 
         logger.verbose(f"Converting Hamiltonian to matrix for {num_qubits} qubits")
@@ -258,7 +258,7 @@ class Hamiltonian:
             self,
             config_hamiltonian: HamiltonianConfiguration):
         logger.info("Computing initial energy bounds.")
-        pauli_sum = self.get_all_pauli_strings()
+        pauli_sum = self._get_all_pauli_strings()
         logger.verbose(f"-- number of Pauli strings = {len(pauli_sum)}")
         energy_shift = pauli_sum.get(tuple(), 0.0) # identity term (may not exist in all formats)
         dE = sum(abs(coefficient) for coefficient in pauli_sum.values()) - abs(energy_shift)
