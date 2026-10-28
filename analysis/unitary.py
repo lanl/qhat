@@ -34,9 +34,13 @@ class PauliStringLCU(LCUBlockEncoding):
 
     def __init__(self, hamiltonian, prepare_type=None, energy_error=None, **kwargs):
 
-        pauli_terms = [cirq.DensePauliString(term[0],coefficient=term[1])
-                          for term in hamiltonian.get_all_pauli_strings(return_as='strings').items()
-                      ]
+        for term in hamiltonian.terms():
+            if not isinstance(term, PauliStringTerm):
+                raise ValueError("When using the PauliStringLCU block encoding, the Hamiltonian "
+                                 "needs to be decomposed into single Pauli string terms.  Got a "
+                                 f"term of type {type(term)}: {term}.")
+        pauli_terms = [cirq.DensePauliString(term.dense_string(), coefficient=term.coefficients)
+                       for term in hamiltonian.terms]
 
         ##  n_terms   :   Number of problem terms
         ##  n_pad     :   Number of padding terms
