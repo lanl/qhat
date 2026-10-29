@@ -62,10 +62,10 @@ def test_toy_fci_file():
                     jp = j + 1
                     kp = k + 1
                     lp = l + 1
-                    ij = (max(ip, jp), min(ip, jp))
-                    kl = (max(kp, lp), min(kp, lp))
+                    il = (max(ip, lp), min(ip, lp))
+                    jk = (max(jp, kp), min(jp, kp))
                     d = np.empty(4)
-                    d[[0,1]], d[[2,3]] = (max(ij, kl), min(ij, kl))
+                    d[[0,1]], d[[2,3]] = (max(il, jk), min(il, jk))
                     val = 1000. * d[0] + 100. * d[1] + 10. * d[2] + d[3]
                     assert val == h2[i, j, k, l]
 
@@ -109,9 +109,9 @@ def test_real_fci_file():
     assert h2.shape == (7,7,7,7)
     # spot-check a few values
     # note:  this code is 0-based, but indices in file are 1-based!
-    assert h2[0,0,0,0] == 0.6441135284888211
-    assert h2[0,1,2,3] == 0.003581801198784521
-    assert h2[6,6,6,6] == 0.2684082267201577
+    assert h2[0,0,0,0] == 0.32205676424441054
+    assert h2[0,1,2,3] == -0.006295966101239615
+    assert h2[6,6,6,6] == 0.13420411336007884
     # check that all values are filled (nonzero)
     assert np.min(np.fabs(h2)) > 0.0
 

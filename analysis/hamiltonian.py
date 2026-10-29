@@ -419,7 +419,10 @@ def load_fci(config_hamiltonian: HamiltonianConfiguration):
 
     # reader returns a packed f2 - unpack it here
     f2packed = data['H2']
-    f2 = ao2mo.restore('s1', f2packed, n)
+    f2eri = ao2mo.restore('s1', f2packed, n)
+    # now transform from FCI conventions to QHAT conventions:
+    # absorb factor of 0.5 and reorder indices chemist -> OpenFermion
+    f2 = 0.5 * f2eri.transpose(0, 2, 3, 1)
     # check that f2 has correct shape
     if f2.shape != (n, n, n, n):
         raise ValueError(f"Incorrect f2 shape {f2.shape}. "
