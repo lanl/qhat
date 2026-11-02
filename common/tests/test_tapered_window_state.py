@@ -260,10 +260,14 @@ class TestFailureProbability:
 
     @pytest.mark.parametrize("cls", TAPERED, ids=TAPERED_IDS)
     @pytest.mark.parametrize("num_precision, num_confidence",
-                             [(0, 3), (1, 3), (3, 3), (1, 4), (3, 4)])
+                             [(0, 3), (1, 3), (3, 3), (1, 4), (3, 4), (8, 3), (6, 4), (6, 5),
+                              (8, 2)])
     def test_worst_case_meets_sizing_bound(self, cls, num_precision, num_confidence):
-        """Sizing uses factor * Thm 1, a bound on the average; check it holds for the worst case."""
-        w = window(cls(num_precision, num_confidence))
+        """Sizing uses factor * Thm 1, a bound on the average; check it holds for the worst case.
+        Up to 8 + 5 qubits the worst case is below 0.3% of the bound. Large windows use the taper
+        directly (the circuits are checked against it in TestCircuits)."""
+        prep = cls(num_precision, num_confidence)
+        w = window(prep) if prep.m_bits <= 7 else prep.taper()
         delta = 2**-(num_precision + 1)
         worst = max(qhat_failure(w, t, delta) for t in thetas(len(w)))
         bound = dpss_average_failure_bound(num_precision, num_confidence)
@@ -296,6 +300,26 @@ class TestFailureProbability:
     def test_theorem_1_bounds_dpss_average(self, num_precision, num_confidence):
         average = average_paper_failure(DPSSWindowState(num_precision, num_confidence))
         assert average <= dpss_average_failure_bound(num_precision, num_confidence)
+
+    @pytest.mark.parametrize("num_precision, num_confidence",
+                             [(1, 2), (6, 2), (1, 3), (3, 3), (6, 3), (2, 4), (6, 4)])
+    def test_dpss_failure_at_zero_offset_within_theorem_1(self, num_precision, num_confidence):
+        """Eq. 110 bounds the truncated DPSS's average failure by 4 max(eps(0), eps_DPSS), where
+        eps(0) is the DPSS's failure at phase offset 0. Sizing uses 4 x Theorem 1, a bound on
+        eps_DPSS only, so it also needs eps(0) <= Theorem 1. The paper does not prove this; here
+        eps(0) is below 1e-3 of Theorem 1."""
+        w = DPSSWindowState(num_precision, num_confidence).taper()
+        eps0 = paper_failure(w, 0.0, half_bandwidth(num_confidence))
+        assert eps0 <= 1e-3 * dpss_average_failure_bound(num_precision, num_confidence)
+
+    @pytest.mark.parametrize("num_precision, num_confidence", [(1, 2), (3, 2), (1, 3), (3, 3)])
+    def test_bandwidth_optimized_average_at_most_truncated(self, num_precision, num_confidence):
+        """The bandwidth-optimized taper maximizes the average success over band-limited tapers,
+        which include the truncated DPSS, so the factor 4 of eq. 110 covers it too."""
+        optimized = average_paper_failure(
+            BandwidthOptimizedWindowState(num_precision, num_confidence))
+        truncated = average_paper_failure(TruncatedDPSSWindowState(num_precision, num_confidence))
+        assert optimized <= truncated * (1 + 1e-9)
 
 
 # -------------------------------------------------------------------------------------------------
