@@ -25,6 +25,7 @@ from qhat.analysis.unitary import encode_as_unitary
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.pauli_string_evolution import PauliStringEvolution
 from qhat.common.qpe_window_state import precision_bits
+from qhat.common import textbook_qpe_sizing
 from qhat.common.tapered_qpe_sizing import fewest_runs, per_run_qpe_failure, size_tapered_qpe
 from qhat.common.tapered_window_state import (
     BandwidthOptimizedWindowState, DPSSWindowState, TruncatedDPSSWindowState)
@@ -196,12 +197,18 @@ class TestPhaseQubits:
         assert phase_qubits(build_algorithm(config, unitary)) == 3
 
     def test_from_energy_error_and_probability_of_failure(self, trotter, method, qpe_class):
+        """Qualtran's textbook QPE uses the single-run Nielsen & Chuang rule; the flexible
+        method's rectangular window uses the multi-run sizing at the default overlap 0.5."""
         dE, p_fail = 0.05, 0.1
         algorithm = build_algorithm(
             make_config(method=method, energy_error=dE, probability_of_failure=p_fail), trotter)
         assert isinstance(algorithm, qpe_class)
         phase_error = dE * trotter.time / (2 * math.pi)
-        assert phase_qubits(algorithm) == textbook_qubits(phase_error, p_fail)
+        if qpe_class is TextbookQPE:
+            assert phase_qubits(algorithm) == textbook_qubits(phase_error, p_fail)
+        else:
+            plan = textbook_qpe_sizing.size_textbook_qpe(phase_error, p_fail, 0.5)
+            assert phase_qubits(algorithm) == plan.num_phase_qubits
 
     def test_requires_probability_of_failure(self, trotter, method, qpe_class):
         with pytest.raises(ValueError, match="probability_of_failure"):
@@ -239,16 +246,16 @@ class TestQPEEnergyWindow:
         assert window == pytest.approx((lo, hi))
 
 
-@pytest.mark.parametrize("method", ["QPE: QHAT flexible", "QPE: qualtran textbook"])
 @pytest.mark.parametrize("W, dE", [
     (3.0, 0.1), (4.0, 0.5), (2.0, 0.25),
     (1.0, 0.165),  # round-off: phase error comes out as 0.12499999999999999, just below 2^-3
 ])
-def test_driver_evolution_time_gives_P0_precision_bits(method, W, dE):
+def test_driver_evolution_time_gives_P0_precision_bits(W, dE):
     """With t = 2 pi / (2^P0 dE) (the driver's formula with phase_scale_factor = 1), the phase
-    error is 2^-P0, so the register is P0 plus the textbook confidence bits."""
+    error is 2^-P0, so Qualtran's textbook register is P0 plus the textbook confidence bits."""
     p_fail = 0.1
-    config = make_config(method=method, energy_error=dE, probability_of_failure=p_fail)
+    config = make_config(method="QPE: qualtran textbook", energy_error=dE,
+                         probability_of_failure=p_fail)
     P0 = math.ceil(math.log2(W / dE))
     lo, hi = qpe_energy_window(config, -W / 2, W / 2)
     t = 2 * math.pi / (hi - lo)
@@ -263,8 +270,9 @@ def test_driver_evolution_time_gives_P0_precision_bits(method, W, dE):
 def test_energy_estimates_meet_requirements(Elo, Ehi, dE, p_fail):
     """End to end: window, t = 2 pi / (hi - lo), QPE sized from (dE, p_fail), decoded energies.
 
-    For each eigenstate, Pr[|E_est - E| > dE] <= p_fail. U = exp(-i H t), so a phase-register
-    value k decodes to the energy in [lo, hi) congruent to -(k / 2^m) (hi - lo).
+    For each eigenstate, one run has Pr[|E_est - E| > dE] <= u, the per-run bound the multi-run
+    sizing used. U = exp(-i H t), so a phase-register value k decodes to the energy in [lo, hi)
+    congruent to -(k / 2^m) (hi - lo).
     """
     config = make_config(energy_error=dE, probability_of_failure=p_fail)
     lo, hi = qpe_energy_window(config, Elo, Ehi)
@@ -276,13 +284,15 @@ def test_energy_estimates_meet_requirements(Elo, Ehi, dE, p_fail):
     energies, states = np.linalg.eigh(hamiltonian_matrix(BELL_TERMS))
     assert Elo <= energies.min() and energies.max() < Ehi  # guard: test Hamiltonian fits
 
+    u = textbook_qpe_sizing.per_run_qpe_failure(dE / (hi - lo), m)
+    assert u < 1  # guard: the bound is informative
     k = np.arange(2**m)
     estimates = lo + np.mod(-k / 2**m * (hi - lo) - lo, hi - lo)
     mat = qpe.tensor_contract()
     for E, psi in zip(energies, states.T):
         out = mat @ np.kron(np.eye(2**m)[0], psi)  # qpe_reg starts in |0>
         probs = np.sum(np.abs(out.reshape(2**m, 2**n))**2, axis=1)
-        assert probs[np.abs(estimates - E) > dE].sum() <= p_fail
+        assert probs[np.abs(estimates - E) > dE].sum() <= u
 
 
 def diagonal_as_pauli_terms(diagonal):
@@ -633,11 +643,10 @@ class TestMultiRunSizing:
         assert TABLE_HEADER not in info and info[-1] == NOTE
 
     @pytest.mark.parametrize("config", [
-        dict(ancilla_prep="rectangular", energy_error=0.2, probability_of_failure=1e-3),
-        dict(num_phase_qubits=4),
         dict(method="QPE: qualtran textbook", num_phase_qubits=4),
-    ], ids=["rectangular from requirements", "rectangular from counts", "textbook"])
-    def test_unused_options_warn(self, pauli_file, qhat_log, config):
+        dict(method="QPE: qualtran textbook", energy_error=0.2, probability_of_failure=1e-3),
+    ], ids=["from counts", "from requirements"])
+    def test_unused_options_warn_for_qualtran_textbook(self, pauli_file, qhat_log, config):
         qpe_from_pauli_file(pauli_file, overlap=0.3, force_lowest_estimate=True, **config,
                             **SETTINGS)
         warnings = algorithm_messages(qhat_log, logging.WARNING)
@@ -645,6 +654,157 @@ class TestMultiRunSizing:
         assert "algorithm.overlap is ignored" in warnings[0]
         assert "algorithm.force_lowest_estimate is ignored" in warnings[1]
         assert NOTE not in algorithm_messages(qhat_log)
+
+
+def test_textbook_qpe_multi_run_plan_through_pauli_file(tmp_path, pauli_file):
+    """End to end at the default overlap 0.5 with the rectangular window: energy_error 0.2 and
+    p_fail 1e-3 give 5 phase qubits, 38 runs and the 9th-smallest estimate.
+
+    Same initial state as the tapered test. From the simulated distribution of one run's
+    estimate, the N-run failure is computed directly; it must be within the bound and p_fail.
+    """
+    dE, p_fail = 0.2, 1e-3
+    qpe = qpe_from_pauli_file(pauli_file, energy_error=dE, probability_of_failure=p_fail,
+                              **SETTINGS)
+    plan = textbook_qpe_sizing.size_textbook_qpe(dE / ENERGY_SCALE, p_fail, 0.5)
+    assert (plan.num_phase_qubits, plan.num_runs, plan.quantile) == (5, 38, 9)
+    assert qpe == qpe_from_pauli_file(pauli_file, num_phase_qubits=5, **SETTINGS)
+
+    m = qpe.num_ancilla_qubits
+    input_file = str(tmp_path / "input.npy")
+    save_state(input_file, np.kron(np.eye(2**m)[0], np.sqrt([0.2, 0.3, 0.0, 0.5])))
+    result = numerical_simulation(input_file, qpe, compute_unitary_matrix(qpe))
+    out = load_state(result["simulations"][0]["output_file"])
+    probs = np.sum(np.abs(out.reshape(2**m, -1))**2, axis=1)
+
+    estimates = -ENERGY_SCALE + np.mod(-ENERGY_SCALE * np.arange(2**m) / 2**m, ENERGY_SCALE)
+    ground = -ENERGY_SCALE * PHASES[3]
+    p_under = probs[estimates < ground - dE].sum()
+    p_over = probs[estimates > ground + dE].sum()
+    u = textbook_qpe_sizing.per_run_qpe_failure(dE / ENERGY_SCALE, 5)
+    assert p_under <= u and 1 - p_under - p_over >= 0.5 * (1 - u)
+    failure = direct_multi_run_failure(plan.num_runs, plan.quantile, p_under, p_over)
+    assert failure <= plan.multi_run_failure <= p_fail
+    # Guard: a single run fails about half the time.
+    assert p_over > 0.45
+
+
+class TestTextbookMultiRunSizing:
+    """The rectangular path of "QPE: QHAT flexible" with the multi-run sizing, through a Pauli
+    file."""
+
+    def test_default_log_block(self, pauli_file, qhat_log):
+        qpe = qpe_from_pauli_file(pauli_file, energy_error=0.2, probability_of_failure=1e-3,
+                                  **SETTINGS)
+        assert qpe.num_ancilla_qubits == 5
+        info = algorithm_messages(qhat_log)
+        start = info.index("-- overlap with target eigenstate = 0.5 (default)")
+        table = [f"--     {p:<9.2f} <= {f}" for p, f in zip(
+            [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+            ["1.00e+00", "9.93e-01", "7.25e-01", "2.17e-01", "2.35e-02", "8.88e-04", "4.05e-04",
+             "4.04e-04", "4.04e-04", "4.04e-04", "4.04e-04"])]
+        assert info[start:] == [
+            "-- overlap with target eigenstate = 0.5 (default)",
+            "-- report the K-th smallest of N runs: K chosen by sizing (default)",
+            "-- textbook QPE sizing: 5 phase qubits",
+            "-- if you run the circuit 1 time:",
+            "--     probability of failure <= 5.31e-01, energy error <= 0.2",
+            "-- if you run the circuit 38 times and take the 9th-smallest estimate:",
+            "--     probability of failure <= 8.88e-04, energy error <= 0.2",
+            "-- if the true overlap differs from 0.5 (same 38 runs, 9th-smallest estimate; "
+            "energy error <= 0.2 in every row):",
+            TABLE_HEADER,
+            *table,
+            NOTE,
+        ]
+        assert not algorithm_messages(qhat_log, logging.WARNING)
+
+    def test_user_specified_options(self, pauli_file, qhat_log):
+        qpe = qpe_from_pauli_file(pauli_file, ancilla_prep="rectangular", energy_error=0.2,
+                                  probability_of_failure=1e-3, overlap=0.9,
+                                  force_lowest_estimate=True, **SETTINGS)
+        plan = textbook_qpe_sizing.size_textbook_qpe(0.2 / ENERGY_SCALE, 1e-3, 0.9, True)
+        assert (plan.num_phase_qubits, plan.num_runs, plan.quantile) == (13, 4, 1)
+        assert qpe.num_ancilla_qubits == 13
+        info = algorithm_messages(qhat_log)
+        assert "-- overlap with target eigenstate = 0.9 (user-specified)" in info
+        assert ("-- report the smallest of N runs (K = 1): forced by "
+                "algorithm.force_lowest_estimate (user-specified)") in info
+        assert "-- if you run the circuit 4 times and take the smallest estimate:" in info
+
+    def test_fallback_when_no_plan(self, pauli_file, qhat_log):
+        qpe = qpe_from_pauli_file(pauli_file, energy_error=0.2, probability_of_failure=1e-3,
+                                  overlap=1e-17, **SETTINGS)
+        # Nielsen & Chuang for a single run: 4 + 9 qubits.
+        assert qpe.num_ancilla_qubits == 13
+        errors = algorithm_messages(qhat_log, logging.ERROR)
+        assert len(errors) == 1 and "FALLBACK" in errors[0] and "1e-17" in errors[0]
+        info = algorithm_messages(qhat_log)
+        assert "-- FALLBACK textbook QPE sizing: 13 phase qubits" in info
+        assert TABLE_HEADER not in info and info[-1] == NOTE
+
+    def test_given_num_phase_qubits(self, pauli_file, qhat_log):
+        qpe = qpe_from_pauli_file(pauli_file, num_phase_qubits=7, energy_error=0.2,
+                                  probability_of_failure=1e-3, overlap=0.4, **SETTINGS)
+        assert qpe.num_ancilla_qubits == 7
+        plan = textbook_qpe_sizing.fewest_runs(0.2 / ENERGY_SCALE, 7, 1e-3, 0.4)
+        assert (plan.num_runs, plan.quantile) == (30, 4)
+        info = algorithm_messages(qhat_log)
+        assert "-- textbook QPE: user-specified 7 phase qubits" in info
+        assert "-- if you run the circuit 30 times and take the 4th-smallest estimate:" in info
+        assert (f"--     probability of failure <= {plan.multi_run_failure:.2e}, energy error "
+                "<= 0.2") in info
+        assert TABLE_HEADER in info and info[-1] == NOTE
+        assert not algorithm_messages(qhat_log, logging.WARNING)
+
+    def test_given_split_uses_the_total(self, pauli_file, qhat_log):
+        qpe = qpe_from_pauli_file(pauli_file, num_precision_qubits=4, num_confidence_qubits=3,
+                                  energy_error=0.2, probability_of_failure=1e-3, overlap=0.4,
+                                  **SETTINGS)
+        assert qpe == qpe_from_pauli_file(pauli_file, num_phase_qubits=7, **SETTINGS)
+        info = algorithm_messages(qhat_log)
+        assert ("-- rectangular window: num_precision_qubits and num_confidence_qubits are "
+                "combined into 7 phase qubits; the split does not affect textbook QPE.") in info
+        assert "-- if you run the circuit 30 times and take the 4th-smallest estimate:" in info
+
+    def test_given_counts_without_probability_of_failure(self, pauli_file, qhat_log):
+        qpe_from_pauli_file(pauli_file, num_phase_qubits=7, energy_error=0.2, overlap=0.4,
+                            **SETTINGS)
+        info = algorithm_messages(qhat_log)
+        assert any("probability_of_failure is not set: skipping" in message for message in info)
+        assert TABLE_HEADER not in info and info[-1] == NOTE
+        warnings = algorithm_messages(qhat_log, logging.WARNING)
+        assert len(warnings) == 1 and "algorithm.overlap is ignored" in warnings[0]
+
+    def test_given_counts_without_energy_error(self, pauli_file, qhat_log):
+        qpe_from_pauli_file(pauli_file, num_phase_qubits=7, probability_of_failure=1e-3,
+                            overlap=0.4, force_lowest_estimate=False, **SETTINGS)
+        info = algorithm_messages(qhat_log)
+        assert any("energy_error is not set: the error bound of textbook QPE is not defined"
+                   in message for message in info)
+        assert TABLE_HEADER not in info and info[-1] == NOTE
+        warnings = algorithm_messages(qhat_log, logging.WARNING)
+        assert len(warnings) == 3
+        assert "algorithm.overlap is ignored" in warnings[0]
+        assert "algorithm.force_lowest_estimate is ignored" in warnings[1]
+        assert "algorithm.probability_of_failure is ignored" in warnings[2]
+
+    def test_given_counts_with_no_plan(self, pauli_file, qhat_log):
+        # 3 qubits: u = 0.36 is not below the hit probability 0.5 (1 - u) = 0.32.
+        qpe = qpe_from_pauli_file(pauli_file, num_phase_qubits=3, energy_error=0.2,
+                                  probability_of_failure=1e-3, **SETTINGS)
+        assert qpe.num_ancilla_qubits == 3
+        errors = algorithm_messages(qhat_log, logging.ERROR)
+        assert len(errors) == 1 and "No number of runs" in errors[0]
+        info = algorithm_messages(qhat_log)
+        assert TABLE_HEADER not in info and info[-1] == NOTE
+
+    def test_given_counts_with_unconvertible_unitary(self, unitary, qhat_log):
+        build_algorithm(make_config(num_phase_qubits=5, energy_error=0.1,
+                                    probability_of_failure=1e-3), unitary)
+        warnings = algorithm_messages(qhat_log, logging.WARNING)
+        assert any("cannot convert algorithm.energy_error" in message for message in warnings)
+        assert algorithm_messages(qhat_log)[-1] == NOTE
 
 
 class TestConfigurationAndResources:

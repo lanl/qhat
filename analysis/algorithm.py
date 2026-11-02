@@ -40,12 +40,8 @@ from qhat.analysis.config_types import AlgorithmConfiguration
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.hermiticity import require_real_scalar
 from qhat.common.qpe_window_state import precision_bits, RectangularWindowState
-from qhat.common.tapered_qpe_sizing import (
-    COST_CEILING,
-    fewest_runs,
-    multi_run_failure,
-    size_tapered_qpe,
-)
+from qhat.common.multi_run_qpe_sizing import COST_CEILING
+from qhat.common import tapered_qpe_sizing, textbook_qpe_sizing
 from qhat.common.tapered_window_state import (
     BandwidthOptimizedWindowState,
     DPSSWindowState,
@@ -190,7 +186,8 @@ ANCILLA_PREPS = {
 }
 INVERSE_QFTS = {"textbook": None}
 
-# Multi-run sizing of tapered windows (see qhat.common.tapered_qpe_sizing).
+# Multi-run sizing of the tapered and rectangular windows of "QPE: QHAT flexible" (see
+# qhat.common.multi_run_qpe_sizing).
 DEFAULT_OVERLAP = 0.5
 OVERLAP_TABLE = (0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
 MULTI_RUN_OPTIONS = ("overlap", "force_lowest_estimate")
@@ -202,8 +199,8 @@ def warn_unused_multi_run_options(config_algorithm: AlgorithmConfiguration, wher
         if getattr(config_algorithm, name) is not None:
             logger.warning(
                 f"algorithm.{name} is ignored with {where}: it applies only to \"QPE: QHAT "
-                "flexible\" with a tapered ancilla_prep (\"dpss\", \"truncated dpss\" or "
-                "\"bandwidth-optimized\") and algorithm.probability_of_failure.")
+                "flexible\" with algorithm.probability_of_failure (and, for the rectangular "
+                "ancilla_prep, algorithm.energy_error).")
 
 
 def multi_run_options(config_algorithm: AlgorithmConfiguration):
@@ -250,9 +247,10 @@ def smallest(k: int) -> str:
     return f"{k}{suffix}-smallest"
 
 
-def log_multi_run_plan(window_cls, plan, error_bound: str):
+def log_multi_run_plan(plan, failure_at, error_bound: str):
     """Log the failure probability for 1 run and for the plan's N runs, then for N runs at the
-    overlaps in OVERLAP_TABLE. `error_bound` is e.g. "energy error <= 0.2"."""
+    overlaps in OVERLAP_TABLE. `failure_at(overlap)` gives the N-run failure at another overlap;
+    `error_bound` is e.g. "energy error <= 0.2"."""
     runs, which = plan.num_runs, smallest(plan.quantile)
     times = "1 time" if runs == 1 else f"{runs} times"
     logger.info("-- if you run the circuit 1 time:")
@@ -263,9 +261,18 @@ def log_multi_run_plan(window_cls, plan, error_bound: str):
                 f"estimate; {error_bound} in every row):")
     logger.info("--     overlap   probability of failure")
     for overlap in OVERLAP_TABLE:
-        failure = multi_run_failure(window_cls, plan.num_precision_qubits,
-                                    plan.num_confidence_qubits, runs, plan.quantile, overlap)
-        logger.info(f"--     {overlap:<9.2f} <= {failure:.2e}")
+        logger.info(f"--     {overlap:<9.2f} <= {failure_at(overlap):.2e}")
+
+
+def tapered_failure_at(window_cls, plan):
+    return lambda overlap: tapered_qpe_sizing.multi_run_failure(
+        window_cls, plan.num_precision_qubits, plan.num_confidence_qubits, plan.num_runs,
+        plan.quantile, overlap)
+
+
+def textbook_failure_at(phase_error, plan):
+    return lambda overlap: textbook_qpe_sizing.multi_run_failure(
+        phase_error, plan.num_phase_qubits, plan.num_runs, plan.quantile, overlap)
 
 
 def counts_text(num_precision, num_confidence):
@@ -279,7 +286,8 @@ def size_tapered_window(config_algorithm, window_cls, phase_error, probability_o
     single run, as if the overlap were 1)."""
     overlap, overlap_is_default, force, force_is_default = multi_run_options(config_algorithm)
     log_multi_run_options(overlap, overlap_is_default, force, force_is_default)
-    plan = size_tapered_qpe(window_cls, phase_error, probability_of_failure, overlap, force)
+    plan = tapered_qpe_sizing.size_tapered_qpe(window_cls, phase_error, probability_of_failure,
+                                               overlap, force)
     if plan is None:
         fallback = window_cls.from_requirements(phase_error, probability_of_failure)
         logger.error(
@@ -293,7 +301,8 @@ def size_tapered_window(config_algorithm, window_cls, phase_error, probability_o
         return fallback.num_precision_qubits, fallback.num_confidence_qubits
     logger.info("-- tapered QPE sizing: "
                 + counts_text(plan.num_precision_qubits, plan.num_confidence_qubits))
-    log_multi_run_plan(window_cls, plan, f"energy error <= {config_algorithm.energy_error:.3g}")
+    log_multi_run_plan(plan, tapered_failure_at(window_cls, plan),
+                       f"energy error <= {config_algorithm.energy_error:.3g}")
     logger.info(SINGLE_RUN_NOTE)
     return plan.num_precision_qubits, plan.num_confidence_qubits
 
@@ -323,12 +332,10 @@ def report_given_tapered_counts(config_algorithm, unitary, window_cls, window):
                     "and the overlap table.")
         logger.info(SINGLE_RUN_NOTE)
         return
-    if not 0 < probability_of_failure < 1:
-        raise ValueError(
-            f"algorithm.probability_of_failure must be in (0, 1), got {probability_of_failure}.")
+    check_probability_of_failure(probability_of_failure)
     log_multi_run_options(overlap, overlap_is_default, force, force_is_default)
-    plan = fewest_runs(window_cls, num_precision, num_confidence, probability_of_failure, overlap,
-                       force)
+    plan = tapered_qpe_sizing.fewest_runs(window_cls, num_precision, num_confidence,
+                                          probability_of_failure, overlap, force)
     if plan is None:
         logger.error(
             f"No number of runs of the tapered QPE with {num_precision} precision and "
@@ -336,7 +343,88 @@ def report_given_tapered_counts(config_algorithm, unitary, window_cls, window):
             f"{probability_of_failure} at overlap {overlap:g} with cost N x 2^(phase qubits) <= "
             f"{COST_CEILING:g}; the number of runs and the overlap table are skipped.")
     else:
-        log_multi_run_plan(window_cls, plan, error_bound)
+        log_multi_run_plan(plan, tapered_failure_at(window_cls, plan), error_bound)
+    logger.info(SINGLE_RUN_NOTE)
+
+
+def check_probability_of_failure(probability_of_failure):
+    if not 0 < probability_of_failure < 1:
+        raise ValueError(
+            f"algorithm.probability_of_failure must be in (0, 1), got {probability_of_failure}.")
+
+
+def size_textbook_window(config_algorithm, phase_error, probability_of_failure) -> int:
+    """Number of phase qubits from the multi-run sizing of the rectangular window, logging the
+    plan. If no plan exists, logs an error and falls back on
+    `RectangularWindowState.from_requirements` (a single run, as if the overlap were 1)."""
+    overlap, overlap_is_default, force, force_is_default = multi_run_options(config_algorithm)
+    log_multi_run_options(overlap, overlap_is_default, force, force_is_default)
+    plan = textbook_qpe_sizing.size_textbook_qpe(phase_error, probability_of_failure, overlap,
+                                                 force)
+    if plan is None:
+        fallback = RectangularWindowState.from_requirements(phase_error, probability_of_failure)
+        logger.error(
+            f"Textbook QPE sizing found no plan meeting probability of failure "
+            f"{probability_of_failure} at overlap {overlap:g} with cost N x 2^(phase qubits) <= "
+            f"{COST_CEILING:g}. FALLBACK: sizing for a single run with overlap 1; the number of "
+            "runs and the overlap table are skipped.")
+        logger.info(f"-- FALLBACK textbook QPE sizing: {fallback.m_bits} phase qubits")
+        logger.info(SINGLE_RUN_NOTE)
+        return fallback.m_bits
+    logger.info(f"-- textbook QPE sizing: {plan.num_phase_qubits} phase qubits")
+    log_multi_run_plan(plan, textbook_failure_at(phase_error, plan),
+                       f"energy error <= {config_algorithm.energy_error:.3g}")
+    logger.info(SINGLE_RUN_NOTE)
+    return plan.num_phase_qubits
+
+
+def report_given_textbook_counts(config_algorithm, unitary, num_phase_qubits, split_given):
+    """Log the multi-run plan for a user-given rectangular window of `num_phase_qubits`: the
+    fewest runs meeting algorithm.probability_of_failure at the overlap, with the error bound
+    algorithm.energy_error. Skipped (with a note) if either is unset."""
+    if split_given:
+        logger.info("-- rectangular window: num_precision_qubits and num_confidence_qubits are "
+                    f"combined into {num_phase_qubits} phase qubits; the split does not affect "
+                    "textbook QPE.")
+    logger.info(f"-- textbook QPE: user-specified {num_phase_qubits} phase qubits")
+    overlap, overlap_is_default, force, force_is_default = multi_run_options(config_algorithm)
+    probability_of_failure = config_algorithm.probability_of_failure
+    if config_algorithm.energy_error is None:
+        warn_unused_multi_run_options(config_algorithm, "no algorithm.energy_error")
+        if probability_of_failure is not None:
+            logger.warning("algorithm.probability_of_failure is ignored with no "
+                           "algorithm.energy_error: textbook QPE has no error bound without it.")
+        logger.info("-- algorithm.energy_error is not set: the error bound of textbook QPE is not "
+                    "defined, so the number of runs and the overlap table are skipped.")
+        logger.info(SINGLE_RUN_NOTE)
+        return
+    if probability_of_failure is None:
+        warn_unused_multi_run_options(config_algorithm, "no algorithm.probability_of_failure")
+        logger.info("-- algorithm.probability_of_failure is not set: skipping the number of runs "
+                    "and the overlap table.")
+        logger.info(SINGLE_RUN_NOTE)
+        return
+    check_probability_of_failure(probability_of_failure)
+    if not hasattr(unitary, "phase_error_from_energy_error"):
+        warn_unused_multi_run_options(config_algorithm, f"a {type(unitary).__name__} unitary")
+        logger.warning(
+            f"The {type(unitary).__name__} unitary cannot convert algorithm.energy_error to a "
+            "phase error, so the number of runs and the overlap table are skipped.")
+        logger.info(SINGLE_RUN_NOTE)
+        return
+    phase_error = qpe_phase_error(config_algorithm, unitary)
+    log_multi_run_options(overlap, overlap_is_default, force, force_is_default)
+    plan = textbook_qpe_sizing.fewest_runs(phase_error, num_phase_qubits, probability_of_failure,
+                                           overlap, force)
+    if plan is None:
+        logger.error(
+            f"No number of runs of the textbook QPE with {num_phase_qubits} phase qubits meets "
+            f"probability of failure {probability_of_failure} at overlap {overlap:g} with cost "
+            f"N x 2^(phase qubits) <= {COST_CEILING:g}; the number of runs and the overlap table "
+            "are skipped.")
+    else:
+        log_multi_run_plan(plan, textbook_failure_at(phase_error, plan),
+                           f"energy error <= {config_algorithm.energy_error:.3g}")
     logger.info(SINGLE_RUN_NOTE)
 
 
@@ -355,9 +443,6 @@ def build_qpe_qhat_flexible(
 
     window_cls = ANCILLA_PREPS[ancilla_prep_name]
     tapered = issubclass(window_cls, TaperedWindowStateBase)
-    if not tapered:
-        warn_unused_multi_run_options(
-            config_algorithm, f"algorithm.ancilla_prep = \"{ancilla_prep_name}\"")
     components = dict(ancilla_prep=window_cls, qft_inv=INVERSE_QFTS[qft_inv_name])
     counts = dict(num_phase_qubits=config_algorithm.num_phase_qubits,
                   num_precision_qubits=config_algorithm.num_precision_qubits,
@@ -375,6 +460,11 @@ def build_qpe_qhat_flexible(
                 "counts.") from error
         if tapered:
             report_given_tapered_counts(config_algorithm, unitary, window_cls, qpe.ancilla_prep)
+        elif window_cls is RectangularWindowState:
+            split_given = (counts["num_precision_qubits"] is not None
+                           or counts["num_confidence_qubits"] is not None)
+            report_given_textbook_counts(config_algorithm, unitary, qpe.num_ancilla_qubits,
+                                         split_given)
     elif tapered:
         phase_error, probability_of_failure = qpe_requirements(config_algorithm, unitary)
         num_precision, num_confidence = size_tapered_window(
@@ -384,8 +474,10 @@ def build_qpe_qhat_flexible(
             **components)
     else:
         phase_error, probability_of_failure = qpe_requirements(config_algorithm, unitary)
-        qpe = FlexibleQPE.from_requirements(
-                unitary, phase_error, probability_of_failure, **components)
+        num_phase_qubits = size_textbook_window(config_algorithm, phase_error,
+                                                probability_of_failure)
+        qpe = FlexibleQPE.from_qubit_counts(unitary, num_phase_qubits=num_phase_qubits,
+                                            **components)
     logger.verbose(f"-- number of phase qubits = {qpe.num_ancilla_qubits}")
     return qpe
 
