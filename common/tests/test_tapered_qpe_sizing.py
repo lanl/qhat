@@ -12,6 +12,7 @@ import math
 import mpmath
 import numpy as np
 import pytest
+from scipy.stats import binom
 
 from qhat.common.tapered_qpe_sizing import (
     COST_CEILING,
@@ -237,3 +238,72 @@ class TestFewestRuns:
         plan = fewest_runs(DPSSWindowState, num_precision, num_confidence, 1e-9, 1e-11)
         assert plan.num_runs * 2**(num_precision + num_confidence) <= COST_CEILING
         assert fewest_runs(DPSSWindowState, num_precision, num_confidence, 1e-9, 1e-14) is None
+
+
+def outcome_probs(window, phase):
+    """QPE outcome probabilities for a window state and a phase (turns): |QFT^-1 (w e^{2 pi i n
+    phase})|^2."""
+    n = np.arange(len(window))
+    return np.abs(np.fft.fft(window * np.exp(2j * np.pi * n * phase)))**2 / len(window)
+
+
+def simulated_multi_run_failure(window, phases, weights, phase_error, num_runs, quantile):
+    """Exact failure of reporting the `quantile`-th smallest of `num_runs` runs, for an initial
+    state with weights `weights[j]` on eigenphases `phases[j]`; phases[0] is the target (lowest).
+    """
+    num_outcomes = len(window)
+    probs = sum(c * outcome_probs(window, phase) for c, phase in zip(weights, phases))
+    estimates = np.arange(num_outcomes) / num_outcomes
+    distance = np.abs(estimates - phases[0])
+    accepted = np.minimum(distance, 1 - distance) <= phase_error
+    under = ~accepted & (estimates < phases[0])
+    p_under, p_over = probs[under].sum(), probs[~accepted & ~under].sum()
+    # At least `quantile` underestimates, or at least num_runs - quantile + 1 overestimates.
+    return (binom.sf(quantile - 1, num_runs, p_under)
+            + binom.sf(num_runs - quantile, num_runs, p_over))
+
+
+class TestModelAgainstQPE:
+    """The multi-run bound against exact QPE outcome distributions for random spectra and initial
+    states, with every eigenphase at least the phase error from the window edges."""
+
+    @pytest.mark.parametrize("window_cls", TAPERED, ids=TAPERED_IDS)
+    def test_bound_holds_for_random_spectra(self, window_cls):
+        rng = np.random.default_rng(7)
+        for _ in range(40):
+            num_precision = int(rng.integers(1, 4))
+            num_confidence = int(rng.integers(2, 5))
+            overlap = float(rng.uniform(0.05, 1.0))
+            probability_of_failure = 10**rng.uniform(-6, -1)
+            plan = fewest_runs(window_cls, num_precision, num_confidence, probability_of_failure,
+                               overlap)
+            if plan is None:
+                continue
+            phase_error = 2.0**-(num_precision + 1)
+            num_excited = int(rng.integers(0, 6))
+            phases = np.sort(rng.uniform(phase_error, 1 - phase_error, num_excited + 1))
+            weights = np.concatenate(
+                [[overlap], rng.dirichlet(np.ones(num_excited)) * (1 - overlap)
+                 if num_excited else []])
+            if num_excited == 0:
+                weights = np.array([1.0])
+            window = window_cls(num_precision, num_confidence).taper()
+            failure = simulated_multi_run_failure(window, phases, weights, phase_error,
+                                                  plan.num_runs, plan.quantile)
+            assert failure <= plan.multi_run_failure * (1 + 1e-9)
+
+    def test_bound_needs_margin_below_phase_one(self):
+        # An excited state within the phase error of phase 1: its correct estimates wrap to
+        # near 0 and count as underestimates, so the bound fails by a factor of about 27. This
+        # is the window-edge margin the driver does not yet guarantee.
+        num_precision, num_confidence, overlap = 3, 4, 0.5
+        phase_error = 2.0**-(num_precision + 1)
+        plan = fewest_runs(DPSSWindowState, num_precision, num_confidence, 1e-3, overlap)
+        window = DPSSWindowState(num_precision, num_confidence).taper()
+        weights = [overlap, 1 - overlap]
+        inside = simulated_multi_run_failure(window, [0.3, 0.6], weights, phase_error,
+                                             plan.num_runs, plan.quantile)
+        near_edge = simulated_multi_run_failure(window, [0.3, 1 - 0.3 * phase_error], weights,
+                                                phase_error, plan.num_runs, plan.quantile)
+        assert inside <= plan.multi_run_failure
+        assert near_edge > 20 * plan.multi_run_failure
