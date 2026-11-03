@@ -8,7 +8,7 @@ This applies the multi-run analysis by Yigit Subasi and Alan Bu (unpublished; se
 Per-run bound: with phase error W (turns) and h = W 2^m, one run of textbook QPE misses the true
 phase by more than W with probability less than (2/pi^2) psi'(h), psi' being the trigamma
 function. This holds for every true phase, so no random phase shift is needed. E.g. W = 0.2/1.7
-and m = 5 (h = 3.76): 6.2e-2. Nielsen & Chuang Eq. 5.35 is 2.5-6.6x larger.
+and m = 5 (h = 3.76): 6.2e-2. Nielsen & Chuang Eq. 5.35 is about 2.5-6x larger.
 
 Why: the outcome d grid steps from the phase has probability
 sin^2(pi f) / pi^2 * sum_k 1/(d - k 2^m - f)^2 (f = offset of the phase from the grid). A
@@ -112,8 +112,9 @@ def size_textbook_qpe(phase_error: float, probability_of_failure: float, overlap
 
 
 def _check_phase_error(phase_error: float):
-    if not 0 < phase_error < 0.5:
-        raise ValueError(f"phase error must be in (0, 0.5) turns, got {phase_error}.")
+    # The bound holds for any h > 0; from W = 1/2 on, no estimate is ever rejected.
+    if not 0 < phase_error < 1:
+        raise ValueError(f"phase error must be in (0, 1) turns, got {phase_error}.")
 
 
 def _plan(phase_error, num_phase_qubits, target, overlap, force_lowest_estimate,

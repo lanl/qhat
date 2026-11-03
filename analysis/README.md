@@ -383,8 +383,8 @@ Per-run failure bounds:
   "bandwidth-optimized").  The paper's random phase shift (Sec. VI) would make this a worst-case
   bound, but QHAT does not apply it.
 - "rectangular": (2/pi^2) psi'(h), with psi' the trigamma function and h the energy error in
-  phase-grid steps.  It holds for every true phase, and is 2.5-6.6 times tighter than Nielsen &
-  Chuang's rule once it has a few confidence bits.
+  phase-grid steps.  It holds for every true phase, and is about 2.5-6 times tighter than
+  Nielsen & Chuang's rule.
 
 The analysis of both windows assumes the energy window leaves at least the energy error of
 margin at both ends: above the highest eigenvalue, so that a correct estimate of it cannot wrap

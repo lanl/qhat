@@ -10,6 +10,7 @@ import math
 import mpmath
 import numpy as np
 import pytest
+from scipy.stats import binom
 
 from qhat.common.multi_run_qpe_sizing import COST_CEILING, worst_failure
 from qhat.common.qpe_window_state import precision_bits, RectangularWindowState
@@ -81,10 +82,19 @@ class TestPerRunBound:
     def test_capped_at_one(self):
         assert per_run_qpe_failure(0.2, 1) == 1.0
 
-    @pytest.mark.parametrize("phase_error", [0.0, -0.1, 0.5, 0.7])
+    @pytest.mark.parametrize("phase_error", [0.0, -0.1, 1.0, 1.3])
     def test_rejects_phase_error(self, phase_error):
         with pytest.raises(ValueError, match="phase error"):
             per_run_qpe_failure(phase_error, 5)
+
+    @pytest.mark.parametrize("phase_error", [0.5, 0.7, 0.99])
+    def test_large_phase_error(self, phase_error):
+        # From W = 1/2 on nothing is rejected. The driver reaches W near 1 when energy_error is
+        # the whole spectrum width; the old single-run rule accepted it, so the sizing must too.
+        assert worst_exact_failure(phase_error, 3, points=101) == 0.0
+        assert per_run_qpe_failure(phase_error, 3) < 0.06
+        plan = size_textbook_qpe(phase_error, 1e-3, 0.5)
+        assert plan.multi_run_failure <= 1e-3
 
 
 class TestSizeTextbookQPE:
@@ -195,3 +205,48 @@ class TestFewestRuns:
         assert math.isclose(
             multi_run_failure(PHASE_ERROR, plan.num_phase_qubits, plan.num_runs, plan.quantile,
                               0.5), plan.multi_run_failure, rel_tol=1e-12)
+
+
+class TestModelAgainstQPE:
+    """The multi-run bound against exact textbook QPE for random spectra and initial states, with
+    every eigenphase at least the phase error from the window edges."""
+
+    def test_bound_holds_for_random_spectra(self):
+        rng = np.random.default_rng(11)
+        checked = 0
+        for _ in range(60):
+            phase_error = float(rng.uniform(0.02, 0.2))
+            overlap = float(rng.uniform(0.05, 1.0))
+            probability_of_failure = 10**rng.uniform(-6, -1)
+            plan = size_textbook_qpe(phase_error, probability_of_failure, overlap)
+            if plan is None or plan.num_phase_qubits > 12:
+                continue
+            num_excited = int(rng.integers(0, 6))
+            phases = np.sort(rng.uniform(phase_error, 1 - phase_error, num_excited + 1))
+            weights = [1.0] if num_excited == 0 else np.concatenate(
+                [[overlap], rng.dirichlet(np.ones(num_excited)) * (1 - overlap)])
+            m = 2**plan.num_phase_qubits
+            offsets = np.arange(m)
+            probs = 0
+            for c, phase in zip(weights, phases):
+                probs = probs + c * np.array(
+                    [exact_failure_outcome(plan.num_phase_qubits, phase, d) for d in offsets])
+            estimates = offsets / m
+            distance = np.abs(estimates - phases[0])
+            accepted = np.minimum(distance, 1 - distance) <= phase_error
+            under = ~accepted & (estimates < phases[0])
+            failure = (binom.sf(plan.quantile - 1, plan.num_runs, probs[under].sum())
+                       + binom.sf(plan.num_runs - plan.quantile, plan.num_runs,
+                                  probs[~accepted & ~under].sum()))
+            assert failure <= plan.multi_run_failure * (1 + 1e-9)
+            checked += 1
+        assert checked >= 30
+
+
+def exact_failure_outcome(num_phase_qubits, phase, outcome):
+    """Probability that textbook QPE with `num_phase_qubits` returns `outcome` for `phase`."""
+    m = 2**num_phase_qubits
+    x = phase * m - outcome
+    if abs(np.sin(np.pi * x / m)) < 1e-15:
+        return 1.0
+    return float(np.sin(np.pi * x)**2 / (m**2 * np.sin(np.pi * x / m)**2))
