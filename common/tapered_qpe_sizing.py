@@ -27,7 +27,7 @@ offset of the true phase from the QPE grid. The paper's random phase shift (arXi
 Sec. VI) would make it a worst-case bound; qhat does not apply that shift.
 """
 
-from typing import Optional, Type
+from typing import Optional, Tuple, Type
 
 import attrs
 
@@ -38,6 +38,9 @@ from qhat.common.multi_run_qpe_sizing import (
     fewest_runs_for_failure,
     worst_failure,
 )
+# The cost is looked up through the module so that it is defined in one place
+# (see `multi_run_qpe_sizing.controlled_unitary_cost`).
+from qhat.common import multi_run_qpe_sizing
 from qhat.common.qpe_window_state import precision_bits
 from qhat.common.tapered_window_state import TaperedWindowStateBase, dpss_average_failure_bound
 
@@ -65,6 +68,31 @@ class TaperedQPESizing:
     @property
     def num_phase_qubits(self) -> int:
         return self.num_precision_qubits + self.num_confidence_qubits
+
+    @property
+    def controlled_unitary_cost(self) -> int:
+        """`controlled_unitary_cost` of the plan, e.g. 14 runs of 7 phase qubits: 1778."""
+        return multi_run_qpe_sizing.controlled_unitary_cost(self.num_phase_qubits,
+                                                            self.num_runs)
+
+
+def split_phase_qubits(phase_error: float, num_phase_qubits: int) -> Tuple[int, int]:
+    """(precision, confidence) qubits for a given total: the fewest precision qubits that meet
+    `phase_error` (turns), and the rest for confidence. E.g. 0.2/1.7 turns and 9 phase qubits:
+    (3, 6).
+
+    At a fixed total each run costs the same, and every precision qubit beyond the fewest takes a
+    confidence qubit away, which raises the per-run failure bound and so cannot lower the runs
+    needed. Raises a ValueError if fewer than one confidence qubit is left.
+    """
+    num_precision = precision_bits(phase_error) - 1
+    num_confidence = num_phase_qubits - num_precision
+    if num_confidence < 1:
+        raise ValueError(
+            f"{num_phase_qubits} phase qubits cannot meet a phase error of {phase_error:.3g} "
+            f"turns with a tapered window: that needs {num_precision} precision qubits plus at "
+            "least 1 confidence qubit.")
+    return num_precision, num_confidence
 
 
 def per_run_qpe_failure(window_cls: Type[TaperedWindowStateBase], num_precision_qubits: int,
@@ -105,20 +133,20 @@ def size_tapered_qpe(window_cls: Type[TaperedWindowStateBase], phase_error: floa
     reported estimate of N runs), or None if none costs at most `COST_CEILING`.
 
     Precision qubits: the fewest with 2^-(num_precision_qubits + 1) <= phase_error. Confidence
-    qubits (MIN_CONFIDENCE_QUBITS to MAX_CONFIDENCE_QUBITS), N and K minimize the cost
-    N * 2^(number of phase qubits); ties go to fewer qubits. K = 1 if `force_lowest_estimate`.
+    qubits (MIN_CONFIDENCE_QUBITS to MAX_CONFIDENCE_QUBITS), N and K minimize
+    `controlled_unitary_cost`; ties go to fewer qubits. K = 1 if `force_lowest_estimate`.
     """
     check_targets(probability_of_failure, overlap)
     num_precision = precision_bits(phase_error) - 1
     best, limit = None, COST_CEILING
     for num_confidence in range(MIN_CONFIDENCE_QUBITS, MAX_CONFIDENCE_QUBITS + 1):
-        if 2.0**(num_precision + num_confidence) > limit:
+        if multi_run_qpe_sizing.controlled_unitary_cost(num_precision + num_confidence) > limit:
             break
         plan = _plan(window_cls, num_precision, num_confidence, probability_of_failure, overlap,
                      force_lowest_estimate, limit)
         if plan is None:
             continue
-        cost = plan.num_runs * 2.0**plan.num_phase_qubits
+        cost = plan.controlled_unitary_cost
         if best is None or cost < limit:
             best, limit = plan, cost
     return best
@@ -128,7 +156,7 @@ def _plan(window_cls, num_precision, num_confidence, target, overlap, force_lowe
           cost_limit) -> Optional[TaperedQPESizing]:
     u = per_run_qpe_failure(window_cls, num_precision, num_confidence)
     hit = overlap * (1 - u)  # smallest probability that a run is accepted
-    max_runs = int(cost_limit // 2.0**(num_precision + num_confidence))
+    max_runs = multi_run_qpe_sizing.max_runs_within(cost_limit, num_precision + num_confidence)
     found = fewest_runs_for_failure(u, hit, target, force_lowest_estimate, max_runs)
     if found is None:
         return None

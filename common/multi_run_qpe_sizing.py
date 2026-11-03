@@ -31,7 +31,7 @@ from typing import Callable, Optional, Tuple
 
 from scipy.special import betainc, betaincc
 
-# Largest cost N * 2^(number of phase qubits) considered.
+# Largest cost (`controlled_unitary_cost`) considered.
 COST_CEILING = 1e18
 # With no answer yet, stop trying larger K after this many in a row fail to get closer.
 _QUANTILE_PATIENCE = 24
@@ -40,6 +40,32 @@ _QUANTILE_GUARD = 2
 # The K loop starts this far below the first K that looks useful (see
 # `_smallest_useful_quantile`): integer rounding makes usefulness jitter near the switch.
 _QUANTILE_BACKOFF = 64
+
+
+def controlled_unitary_cost(num_phase_qubits: int, num_runs: int = 1) -> int:
+    """Cost of a plan: controlled-U invocations over all runs, N (2^m - 1). One QPE run with m
+    phase qubits applies controlled U^(2^j) for j = 0..m-1, i.e. 2^m - 1 controlled U. E.g.
+    5 phase qubits, 38 runs: 1178.
+
+    This is the only place the cost is defined: the sizing searches, the cost ceiling and the
+    window selection all use it. It assumes the controlled-U invocations dominate, the way ramp
+    counts stand in for Trotter cost. It ignores per-run overhead (preparing the initial state,
+    the window state and the inverse QFT; measuring) and window-state preparation cost (e.g. the
+    DPSS's 2^m - 1 rotations). Other cost functions for specific cases are planned.
+
+    Fast-forwarding would come in here. It assumes U^(2^j) costs 2^j U, true for every QHAT
+    encoding today (a Trotterization's U^k has k times the steps). For a unitary whose U^k costs
+    far less than k U, sum a per-power cost instead, e.g. an optional `power_cost(k)` on the
+    unitary (default k) over j = 0..m-1.
+    """
+    return num_runs * (2**num_phase_qubits - 1)
+
+
+def max_runs_within(cost_limit: float, num_phase_qubits: int) -> int:
+    """Most runs whose `controlled_unitary_cost` is at most `cost_limit`. E.g. limit 1178 with 5
+    phase qubits: 38."""
+    per_run = controlled_unitary_cost(num_phase_qubits)
+    return int(cost_limit // per_run) if per_run > 0 else 0
 
 
 def check_targets(probability_of_failure: float, overlap: float):
@@ -64,8 +90,9 @@ def worst_failure(num_runs: int, quantile: int, u: float, hit: float) -> float:
                _failure(num_runs, quantile, u, min(1.0, u + hit)))
 
 
-def fewest_runs_for_failure(u: float, hit: float, probability_of_failure: float,
-                            force_lowest_estimate: bool, max_runs: int) -> Optional[Tuple[int, int]]:
+def fewest_runs_for_failure(
+        u: float, hit: float, probability_of_failure: float, force_lowest_estimate: bool,
+        max_runs: int) -> Optional[Tuple[int, int]]:
     """(N, K): the fewest runs N <= `max_runs` with `worst_failure(N, K, u, hit)` at most
     `probability_of_failure`, and the K with the smallest failure at that N (K = 1 if
     `force_lowest_estimate`). None if no N works. E.g. u = 2.7e-4, hit = 0.49986, target 1e-3:

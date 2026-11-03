@@ -9,8 +9,17 @@ import math
 import numpy as np
 import pytest
 
+from qhat.common import tapered_qpe_sizing, textbook_qpe_sizing
+from qhat.common.tapered_window_state import (
+    BandwidthOptimizedWindowState, DPSSWindowState, TruncatedDPSSWindowState)
+from qhat.common.trotter_flattened import Trotterization
+
+from qhat.common import multi_run_qpe_sizing
+from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.multi_run_qpe_sizing import (
     check_targets,
+    controlled_unitary_cost,
+    max_runs_within,
     fewest_runs_for_failure,
     worst_failure,
 )
@@ -111,3 +120,50 @@ class TestCheckTargets:
     def test_rejects_overlap(self, overlap):
         with pytest.raises(ValueError, match="overlap"):
             check_targets(1e-3, overlap)
+
+
+class TestControlledUnitaryCost:
+    """The plan cost, N (2^m - 1) controlled-U invocations, defined in one place."""
+
+    @pytest.mark.parametrize("num_phase_qubits, num_runs, cost",
+                             [(1, 1, 1), (5, 38, 1178), (7, 14, 1778), (10, 3, 3069)])
+    def test_values(self, num_phase_qubits, num_runs, cost):
+        assert controlled_unitary_cost(num_phase_qubits, num_runs) == cost
+
+    @pytest.mark.parametrize("window", [
+        None, DPSSWindowState(2, 3), TruncatedDPSSWindowState(2, 3),
+        BandwidthOptimizedWindowState(2, 3)], ids=["rectangular", "dpss", "truncated", "bo"])
+    def test_matches_flexible_qpe_call_graph(self, window):
+        # The Trotterization fast-forwards U^(2^j) as 2^j times the steps, so the call graph's
+        # controlled Trotterizations add up to the number of controlled U.
+        u = Trotterization.from_method(pauli_terms=[("XZ", 0.5), ("ZY", 0.3)],
+                                       method="first order", time=0.4, num_steps=3)
+        qpe = FlexibleQPE(u, 5) if window is None else FlexibleQPE(u, 5, window)
+        total = sum(count * bloq.subbloq.num_steps // u.num_steps
+                    for bloq, count in qpe.build_call_graph(None)
+                    if isinstance(getattr(bloq, "subbloq", None), Trotterization))
+        assert total == controlled_unitary_cost(5)
+
+    @pytest.mark.parametrize("limit, num_phase_qubits, runs",
+                             [(1178, 5, 38), (1177, 5, 37), (30, 5, 0),
+                              (1e18, 10, 977517106549364)])
+    def test_max_runs_within(self, limit, num_phase_qubits, runs):
+        assert max_runs_within(limit, num_phase_qubits) == runs
+
+    def test_sizing_uses_the_one_cost_function(self, monkeypatch):
+        # Make one extra phase qubit cost almost nothing: if every sizing path uses
+        # controlled_unitary_cost, both searches then pick the most qubits allowed.
+        def flat_cost(num_phase_qubits, num_runs=1):
+            return num_runs * (1000 + num_phase_qubits)
+
+        textbook = textbook_qpe_sizing.size_textbook_qpe(0.2 / 1.7, 1e-3, 0.5)
+        tapered = tapered_qpe_sizing.size_tapered_qpe(DPSSWindowState, 0.2 / 1.7, 1e-3, 0.5)
+        monkeypatch.setattr(multi_run_qpe_sizing, "controlled_unitary_cost", flat_cost)
+        textbook_flat = textbook_qpe_sizing.size_textbook_qpe(0.2 / 1.7, 1e-3, 0.5)
+        tapered_flat = tapered_qpe_sizing.size_tapered_qpe(DPSSWindowState, 0.2 / 1.7, 1e-3, 0.5)
+        assert textbook_flat.num_phase_qubits > textbook.num_phase_qubits
+        assert textbook_flat.controlled_unitary_cost == flat_cost(textbook_flat.num_phase_qubits,
+                                                                  textbook_flat.num_runs)
+        assert tapered_flat.num_confidence_qubits > tapered.num_confidence_qubits
+        assert tapered_flat.controlled_unitary_cost == flat_cost(tapered_flat.num_phase_qubits,
+                                                                 tapered_flat.num_runs)

@@ -197,7 +197,8 @@ class AlgorithmConfiguration(ConfigurationBase):
         self.num_confidence_qubits = None
         self.probability_of_failure = None
         self.energy_error = None
-        # Components for "QPE: QHAT flexible"; `None` yields default options
+        # Components for "QPE: QHAT flexible"; `None` yields default options (ancilla_prep "auto":
+        # the window with the fewest controlled-U invocations; qft_inv "textbook")
         self.ancilla_prep = None
         self.qft_inv = None
         # Multi-run sizing ("QPE: QHAT flexible" only, any ancilla_prep): assumed overlap of the

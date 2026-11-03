@@ -31,6 +31,9 @@ from qhat.common.multi_run_qpe_sizing import (
     fewest_runs_for_failure,
     worst_failure,
 )
+# The cost is looked up through the module so that it is defined in one place
+# (see `multi_run_qpe_sizing.controlled_unitary_cost`).
+from qhat.common import multi_run_qpe_sizing
 
 # Relative margin on the computed bound, covering floating-point error in polygamma.
 _ROUNDOFF_MARGIN = 1e-12
@@ -50,6 +53,12 @@ class TextbookQPESizing:
     multi_run_failure: float
     overlap: float
     force_lowest_estimate: bool
+
+    @property
+    def controlled_unitary_cost(self) -> int:
+        """`controlled_unitary_cost` of the plan, e.g. 38 runs of 5 phase qubits: 1178."""
+        return multi_run_qpe_sizing.controlled_unitary_cost(self.num_phase_qubits,
+                                                            self.num_runs)
 
 
 def per_run_qpe_failure(phase_error: float, num_phase_qubits: int) -> float:
@@ -87,8 +96,8 @@ def size_textbook_qpe(phase_error: float, probability_of_failure: float, overlap
     """The cheapest plan meeting `phase_error` (turns) and `probability_of_failure` (for the
     reported estimate of N runs), or None if none costs at most `COST_CEILING`.
 
-    The phase qubits m, N and K minimize the cost N * 2^m; ties go to fewer qubits. K = 1 if
-    `force_lowest_estimate`.
+    The phase qubits m, N and K minimize `controlled_unitary_cost`; ties go to fewer qubits.
+    K = 1 if `force_lowest_estimate`.
     """
     _check_phase_error(phase_error)
     check_targets(probability_of_failure, overlap)
@@ -96,7 +105,7 @@ def size_textbook_qpe(phase_error: float, probability_of_failure: float, overlap
     # Most qubits first: those plans need few runs and are quick to find, so the cost limit is
     # tight by the time the search reaches qubit counts that would need very many runs.
     for num_phase_qubits in range(int(math.log2(COST_CEILING)), 0, -1):
-        if 2.0**num_phase_qubits > limit:
+        if multi_run_qpe_sizing.controlled_unitary_cost(num_phase_qubits) > limit:
             continue
         u = per_run_qpe_failure(phase_error, num_phase_qubits)
         if u >= overlap * (1 - u) and probability_of_failure < 0.5:
@@ -105,7 +114,7 @@ def size_textbook_qpe(phase_error: float, probability_of_failure: float, overlap
                      force_lowest_estimate, limit)
         if plan is None:
             continue
-        cost = plan.num_runs * 2.0**plan.num_phase_qubits
+        cost = plan.controlled_unitary_cost
         if best is None or cost <= limit:
             best, limit = plan, cost
     return best
@@ -121,7 +130,7 @@ def _plan(phase_error, num_phase_qubits, target, overlap, force_lowest_estimate,
           cost_limit) -> Optional[TextbookQPESizing]:
     u = per_run_qpe_failure(phase_error, num_phase_qubits)
     hit = overlap * (1 - u)  # smallest probability that a run is accepted
-    max_runs = int(cost_limit // 2.0**num_phase_qubits)
+    max_runs = multi_run_qpe_sizing.max_runs_within(cost_limit, num_phase_qubits)
     found = fewest_runs_for_failure(u, hit, target, force_lowest_estimate, max_runs)
     if found is None:
         return None

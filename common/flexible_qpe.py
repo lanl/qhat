@@ -9,7 +9,7 @@ the unitary's registers. It differs from Qualtran 0.4.0's `TextbookQPE` in that 
 
 - decomposes natively as a Bloq, so it supports `decompose_bloq()` and `tensor_contract()` for
   unitaries that are plain Bloqs (0.4.0's cirq-based `cirq.pow` path fails for those);
-- fast-forwards U^(2^j) via the unitary's `__pow__` when available;
+- builds U^(2^j) as one bloq via the unitary's `__pow__` when available, instead of 2^j copies;
 - uses the structure of QPE to speed up tensor contraction, call graphs, and qubit counts.
 
 See `qpe_window_state.py` for the one intentional deviation from upstream (THRU `qpe_reg`).
@@ -52,9 +52,12 @@ class FlexibleQPE(GateWithRegisters):
     |Psi> -----------------U-----U^2---U^4---U^8---------------------- |Psi>
     ```
 
-    U^(2^j) is `unitary ** 2**j` if the unitary defines `__pow__` (fast-forwarding), and
-    otherwise `Power(unitary, 2**j)` (2^j repetitions). A unitary's `__pow__` must return a bloq
+    U^(2^j) is `unitary ** 2**j` if the unitary defines `__pow__`, and otherwise
+    `Power(unitary, 2**j)` (2^j repetitions). A unitary's `__pow__` must return a bloq
     implementing exactly U^k; e.g. `Trotterization.__pow__` scales both the step count and time.
+    That is one bloq for U^k, not a cheaper circuit: its cost still grows with k. A unitary that
+    can truly be fast-forwarded (U^k costing far less than k U) could return a cheaper bloq
+    here, and resource estimates would count it.
     `tensor_contract` relies on this: it squares U's matrix instead of contracting each U^(2^j).
 
     Args:
@@ -187,7 +190,7 @@ class FlexibleQPE(GateWithRegisters):
         return cls(unitary, prep.m_bits, prep, qft_inv(prep.m_bits))
 
     def unitary_power(self, k: int) -> Bloq:
-        """Return a bloq for U^k, fast-forwarded via `unitary.__pow__` if available."""
+        """Return a bloq for U^k: `unitary.__pow__(k)` if available, else `Power(unitary, k)`."""
         if k == 1:
             return self.unitary
         if hasattr(type(self.unitary), '__pow__'):
