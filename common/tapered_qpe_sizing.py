@@ -27,7 +27,7 @@ offset of the true phase from the QPE grid. The paper's random phase shift (arXi
 Sec. VI) would make it a worst-case bound; qhat does not apply that shift.
 """
 
-from typing import Optional, Type
+from typing import Optional, Tuple, Type
 
 import attrs
 
@@ -74,6 +74,25 @@ class TaperedQPESizing:
         """`controlled_unitary_cost` of the plan, e.g. 14 runs of 7 phase qubits: 1778."""
         return multi_run_qpe_sizing.controlled_unitary_cost(self.num_phase_qubits,
                                                             self.num_runs)
+
+
+def split_phase_qubits(phase_error: float, num_phase_qubits: int) -> Tuple[int, int]:
+    """(precision, confidence) qubits for a given total: the fewest precision qubits that meet
+    `phase_error` (turns), and the rest for confidence. E.g. 0.2/1.7 turns and 9 phase qubits:
+    (3, 6).
+
+    At a fixed total each run costs the same, and every precision qubit beyond the fewest takes a
+    confidence qubit away, which raises the per-run failure bound and so cannot lower the runs
+    needed. Raises a ValueError if fewer than one confidence qubit is left.
+    """
+    num_precision = precision_bits(phase_error) - 1
+    num_confidence = num_phase_qubits - num_precision
+    if num_confidence < 1:
+        raise ValueError(
+            f"{num_phase_qubits} phase qubits cannot meet a phase error of {phase_error:.3g} "
+            f"turns with a tapered window: that needs {num_precision} precision qubits plus at "
+            "least 1 confidence qubit.")
+    return num_precision, num_confidence
 
 
 def per_run_qpe_failure(window_cls: Type[TaperedWindowStateBase], num_precision_qubits: int,

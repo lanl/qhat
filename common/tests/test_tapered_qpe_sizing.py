@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 from scipy.stats import binom
 
+from qhat.common.qpe_window_state import precision_bits
 from qhat.common.tapered_qpe_sizing import (
     COST_CEILING,
     fewest_runs,
@@ -22,6 +23,7 @@ from qhat.common.tapered_qpe_sizing import (
     multi_run_failure,
     per_run_qpe_failure,
     size_tapered_qpe,
+    split_phase_qubits,
 )
 from qhat.common.tapered_window_state import (
     BandwidthOptimizedWindowState,
@@ -306,3 +308,38 @@ class TestModelAgainstQPE:
                                                 phase_error, plan.num_runs, plan.quantile)
         assert inside <= plan.multi_run_failure
         assert near_edge > 20 * plan.multi_run_failure
+
+
+class TestSplitPhaseQubits:
+    """The cheapest split of a given total: the fewest precision qubits, the rest confidence."""
+
+    @pytest.mark.parametrize("phase_error, num_phase_qubits, split",
+                             [(PHASE_ERROR, 9, (3, 6)), (PHASE_ERROR, 4, (3, 1)),
+                              (FINE_PHASE_ERROR, 14, (10, 4)), (0.3, 5, (1, 4))])
+    def test_values(self, phase_error, num_phase_qubits, split):
+        assert split_phase_qubits(phase_error, num_phase_qubits) == split
+
+    @pytest.mark.parametrize("window_cls", TAPERED, ids=TAPERED_IDS)
+    @pytest.mark.parametrize("phase_error", [PHASE_ERROR, 0.03, FINE_PHASE_ERROR])
+    @pytest.mark.parametrize("extra", [2, 4, 7])
+    @pytest.mark.parametrize("overlap, probability_of_failure", [(1.0, 1e-6), (0.5, 1e-2),
+                                                                 (0.1, 1e-6)])
+    def test_cheapest_split(self, window_cls, phase_error, extra, overlap,
+                            probability_of_failure):
+        # Every split meeting the phase error costs the same per run, so the cheapest needs the
+        # fewest runs; none needs fewer than the minimal-precision split.
+        num_precision, num_confidence = split_phase_qubits(
+            phase_error, precision_bits(phase_error) - 1 + extra)
+        total = num_precision + num_confidence
+        best = fewest_runs(window_cls, num_precision, num_confidence, probability_of_failure,
+                           overlap)
+        for more_precision in range(num_precision + 1, total):
+            other = fewest_runs(window_cls, more_precision, total - more_precision,
+                                probability_of_failure, overlap)
+            if other is not None:
+                assert best is not None and best.num_runs <= other.num_runs
+
+    def test_too_few_qubits(self):
+        # 0.2/1.7 turns needs 3 precision qubits, so 3 in total leaves no confidence qubit.
+        with pytest.raises(ValueError, match="3 phase qubits cannot meet"):
+            split_phase_qubits(PHASE_ERROR, 3)

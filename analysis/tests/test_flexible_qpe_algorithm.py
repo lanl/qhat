@@ -137,7 +137,7 @@ class TestTaperedWindows:
         assert build_algorithm(config, trotter).ancilla_prep == DPSSWindowState(2, 3)
 
     @pytest.mark.parametrize("name", TAPERED)
-    def test_num_phase_qubits_alone_raises(self, unitary, name):
+    def test_num_phase_qubits_alone_raises_without_energy_error(self, unitary, name):
         config = make_config(ancilla_prep=name, num_phase_qubits=5)
         with pytest.raises(ValueError, match=f'"{name}" with num_phase_qubits = 5: .*'
                            "cannot be sized from num_phase_qubits alone.*energy_error"):
@@ -687,6 +687,31 @@ def test_textbook_qpe_multi_run_plan_through_pauli_file(tmp_path, pauli_file):
     assert failure <= plan.multi_run_failure <= p_fail
     # Guard: a single run fails about half the time.
     assert p_over > 0.45
+
+
+class TestTaperedTotalSplit:
+    """A tapered ancilla_prep given only num_phase_qubits: with algorithm.energy_error the total
+    is split as the fewest precision qubits (3 for 0.2 on a spectrum of 1.7) plus the rest."""
+
+    @pytest.mark.parametrize("name, cls", TAPERED.items())
+    def test_split(self, pauli_file, qhat_log, name, cls):
+        qpe = qpe_from_pauli_file(pauli_file, ancilla_prep=name, num_phase_qubits=8,
+                                  energy_error=0.2, probability_of_failure=1e-3, **SETTINGS)
+        assert qpe.ancilla_prep == cls(3, 5)
+        assert qpe == qpe_from_pauli_file(pauli_file, ancilla_prep=name, num_precision_qubits=3,
+                                          num_confidence_qubits=5, **SETTINGS)
+        info = algorithm_messages(qhat_log)
+        assert ("-- num_phase_qubits = 8 split for the energy error: 3 precision + 5 confidence "
+                "qubits = 8 phase qubits") in info
+        plan = fewest_runs(cls, 3, 5, 1e-3, 0.5)
+        assert (f"--     probability of failure <= {plan.multi_run_failure:.2e}, energy error "
+                "<= 0.106") in info
+
+    def test_too_few_qubits(self, pauli_file):
+        with pytest.raises(ValueError, match="num_phase_qubits = 3 with algorithm.energy_error = "
+                           "0.2: 3 phase qubits cannot meet"):
+            qpe_from_pauli_file(pauli_file, ancilla_prep="dpss", num_phase_qubits=3,
+                                energy_error=0.2, **SETTINGS)
 
 
 class TestTextbookMultiRunSizing:

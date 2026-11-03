@@ -347,6 +347,24 @@ def report_given_tapered_counts(config_algorithm, unitary, window_cls, window):
     logger.info(SINGLE_RUN_NOTE)
 
 
+def split_tapered_total(config_algorithm, unitary, num_phase_qubits):
+    """Qubit counts for a tapered window given only `num_phase_qubits`: the fewest precision
+    qubits that meet algorithm.energy_error, and the rest for confidence (the cheapest split; see
+    `tapered_qpe_sizing.split_phase_qubits`)."""
+    phase_error = qpe_phase_error(config_algorithm, unitary)
+    try:
+        num_precision, num_confidence = tapered_qpe_sizing.split_phase_qubits(
+            phase_error, num_phase_qubits)
+    except ValueError as error:
+        raise ValueError(
+            f"algorithm.num_phase_qubits = {num_phase_qubits} with algorithm.energy_error = "
+            f"{config_algorithm.energy_error}: {error}") from error
+    logger.info(f"-- num_phase_qubits = {num_phase_qubits} split for the energy error: "
+                + counts_text(num_precision, num_confidence))
+    return dict(num_phase_qubits=None, num_precision_qubits=num_precision,
+                num_confidence_qubits=num_confidence)
+
+
 def check_probability_of_failure(probability_of_failure):
     if not 0 < probability_of_failure < 1:
         raise ValueError(
@@ -451,6 +469,11 @@ def build_qpe_qhat_flexible(
         given = ", ".join(f"{name} = {count}" for name, count in counts.items()
                           if count is not None)
         logger.verbose(f"-- using user-specified qubit counts ({given})")
+        only_total = (counts["num_phase_qubits"] is not None
+                      and counts["num_precision_qubits"] is None
+                      and counts["num_confidence_qubits"] is None)
+        if tapered and only_total and config_algorithm.energy_error is not None:
+            counts = split_tapered_total(config_algorithm, unitary, counts["num_phase_qubits"])
         try:
             qpe = FlexibleQPE.from_qubit_counts(unitary, **counts, **components)
         except ValueError as error:
