@@ -31,7 +31,7 @@ from typing import Callable, Optional, Tuple
 
 from scipy.special import betainc, betaincc
 
-# Largest cost N * 2^(number of phase qubits) considered.
+# Largest cost (`controlled_unitary_cost`) considered.
 COST_CEILING = 1e18
 # With no answer yet, stop trying larger K after this many in a row fail to get closer.
 _QUANTILE_PATIENCE = 24
@@ -40,6 +40,28 @@ _QUANTILE_GUARD = 2
 # The K loop starts this far below the first K that looks useful (see
 # `_smallest_useful_quantile`): integer rounding makes usefulness jitter near the switch.
 _QUANTILE_BACKOFF = 64
+
+
+def controlled_unitary_cost(num_phase_qubits: int, num_runs: int = 1) -> int:
+    """Cost of a plan: controlled-U invocations over all runs, N (2^m - 1). One QPE run with m
+    phase qubits applies controlled U^(2^j) for j = 0..m-1, i.e. 2^m - 1 controlled U. E.g.
+    5 phase qubits, 38 runs: 1178.
+
+    This is the only place the cost is defined: the sizing searches, the cost ceiling and the
+    window selection all use it. It assumes the controlled-U invocations dominate, the way ramp
+    counts stand in for Trotter cost. It ignores per-run overhead (preparing the initial state,
+    the window state and the inverse QFT; measuring), window-state preparation cost (e.g. the
+    DPSS's 2^m - 1 rotations), and fast-forwardable unitaries, whose U^(2^j) can cost far less
+    than 2^j U. Other cost functions for specific cases are planned.
+    """
+    return num_runs * (2**num_phase_qubits - 1)
+
+
+def max_runs_within(cost_limit: float, num_phase_qubits: int) -> int:
+    """Most runs whose `controlled_unitary_cost` is at most `cost_limit`. E.g. limit 1178 with 5
+    phase qubits: 38."""
+    per_run = controlled_unitary_cost(num_phase_qubits)
+    return int(cost_limit // per_run) if per_run > 0 else 0
 
 
 def check_targets(probability_of_failure: float, overlap: float):

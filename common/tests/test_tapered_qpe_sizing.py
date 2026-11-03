@@ -148,20 +148,19 @@ class TestSizeTaperedQPE:
         dpss = size_tapered_qpe(DPSSWindowState, PHASE_ERROR, 1e-6, 0.3)
         for window_cls in TAPERED[1:]:
             other = size_tapered_qpe(window_cls, PHASE_ERROR, 1e-6, 0.3)
-            assert (other.num_runs * 2**other.num_phase_qubits
-                    >= dpss.num_runs * 2**dpss.num_phase_qubits)
+            assert other.controlled_unitary_cost >= dpss.controlled_unitary_cost
 
     @pytest.mark.parametrize("overlap, probability_of_failure", [(0.5, 1e-3), (0.07, 1e-5)])
     @pytest.mark.parametrize("force", [False, True])
     def test_cheapest_over_confidence_qubits(self, overlap, probability_of_failure, force):
         plan = size_tapered_qpe(TruncatedDPSSWindowState, PHASE_ERROR, probability_of_failure,
                                 overlap, force)
-        cost = plan.num_runs * 2**plan.num_phase_qubits
+        cost = plan.controlled_unitary_cost
         for num_confidence in range(MIN_CONFIDENCE_QUBITS, MAX_CONFIDENCE_QUBITS + 1):
             other = fewest_runs(TruncatedDPSSWindowState, 3, num_confidence,
                                 probability_of_failure, overlap, force)
             if other is not None:
-                assert other.num_runs * 2**other.num_phase_qubits >= cost
+                assert other.controlled_unitary_cost >= cost
 
     @pytest.mark.parametrize("overlap, probability_of_failure, runs, quantile", [
         (1e-5, 1e-6, 1383365, 1),
@@ -236,7 +235,7 @@ class TestFewestRuns:
     def test_respects_cost_ceiling(self):
         num_precision, num_confidence = 10, 6
         plan = fewest_runs(DPSSWindowState, num_precision, num_confidence, 1e-9, 1e-11)
-        assert plan.num_runs * 2**(num_precision + num_confidence) <= COST_CEILING
+        assert plan.controlled_unitary_cost <= COST_CEILING
         assert fewest_runs(DPSSWindowState, num_precision, num_confidence, 1e-9, 1e-14) is None
 
 

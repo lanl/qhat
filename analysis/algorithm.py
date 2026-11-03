@@ -292,7 +292,7 @@ def size_tapered_window(config_algorithm, window_cls, phase_error, probability_o
         fallback = window_cls.from_requirements(phase_error, probability_of_failure)
         logger.error(
             f"Tapered QPE sizing found no plan meeting probability of failure "
-            f"{probability_of_failure} at overlap {overlap:g} with cost N x 2^(phase qubits) <= "
+            f"{probability_of_failure} at overlap {overlap:g} with cost N x (2^(phase qubits) - 1) <= "
             f"{COST_CEILING:g}. FALLBACK: sizing for a single run with overlap 1; the number of "
             "runs and the overlap table are skipped.")
         logger.info("-- FALLBACK tapered QPE sizing: " + counts_text(
@@ -340,7 +340,7 @@ def report_given_tapered_counts(config_algorithm, unitary, window_cls, window):
         logger.error(
             f"No number of runs of the tapered QPE with {num_precision} precision and "
             f"{num_confidence} confidence qubits meets probability of failure "
-            f"{probability_of_failure} at overlap {overlap:g} with cost N x 2^(phase qubits) <= "
+            f"{probability_of_failure} at overlap {overlap:g} with cost N x (2^(phase qubits) - 1) <= "
             f"{COST_CEILING:g}; the number of runs and the overlap table are skipped.")
     else:
         log_multi_run_plan(plan, tapered_failure_at(window_cls, plan), error_bound)
@@ -365,7 +365,7 @@ def size_textbook_window(config_algorithm, phase_error, probability_of_failure) 
         fallback = RectangularWindowState.from_requirements(phase_error, probability_of_failure)
         logger.error(
             f"Textbook QPE sizing found no plan meeting probability of failure "
-            f"{probability_of_failure} at overlap {overlap:g} with cost N x 2^(phase qubits) <= "
+            f"{probability_of_failure} at overlap {overlap:g} with cost N x (2^(phase qubits) - 1) <= "
             f"{COST_CEILING:g}. FALLBACK: sizing for a single run with overlap 1; the number of "
             "runs and the overlap table are skipped.")
         logger.info(f"-- FALLBACK textbook QPE sizing: {fallback.m_bits} phase qubits")
@@ -420,7 +420,7 @@ def report_given_textbook_counts(config_algorithm, unitary, num_phase_qubits, sp
         logger.error(
             f"No number of runs of the textbook QPE with {num_phase_qubits} phase qubits meets "
             f"probability of failure {probability_of_failure} at overlap {overlap:g} with cost "
-            f"N x 2^(phase qubits) <= {COST_CEILING:g}; the number of runs and the overlap table "
+            f"N x (2^(phase qubits) - 1) <= {COST_CEILING:g}; the number of runs and the overlap table "
             "are skipped.")
     else:
         log_multi_run_plan(plan, textbook_failure_at(phase_error, plan),

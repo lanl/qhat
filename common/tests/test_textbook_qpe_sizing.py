@@ -12,7 +12,8 @@ import numpy as np
 import pytest
 from scipy.stats import binom
 
-from qhat.common.multi_run_qpe_sizing import COST_CEILING, worst_failure
+from qhat.common.multi_run_qpe_sizing import (
+    controlled_unitary_cost, COST_CEILING, worst_failure)
 from qhat.common.qpe_window_state import precision_bits, RectangularWindowState
 from qhat.common.textbook_qpe_sizing import (
     fewest_runs,
@@ -123,12 +124,12 @@ class TestSizeTextbookQPE:
     @pytest.mark.parametrize("force", [False, True])
     def test_cheapest_over_phase_qubits(self, phase_error, probability_of_failure, overlap, force):
         plan = size_textbook_qpe(phase_error, probability_of_failure, overlap, force)
-        cost = plan.num_runs * 2**plan.num_phase_qubits
+        cost = plan.controlled_unitary_cost
         for num_phase_qubits in range(1, 40):
             other = fewest_runs(phase_error, num_phase_qubits, probability_of_failure, overlap,
                                 force)
             if other is not None:
-                assert other.num_runs * 2**num_phase_qubits >= cost
+                assert other.controlled_unitary_cost >= cost
 
     def test_fewest_runs_matches_brute_force(self):
         # The plans above are the fewest runs at their qubit counts.
@@ -150,7 +151,7 @@ class TestSizeTextbookQPE:
         # At overlap 1 the multi-run plan beats today's single-run rule.
         plan = size_textbook_qpe(FINE_PHASE_ERROR, 1e-6, 1.0)
         single = RectangularWindowState.from_requirements(FINE_PHASE_ERROR, 1e-6)
-        assert plan.num_runs * 2**plan.num_phase_qubits < 2**single.m_bits
+        assert plan.controlled_unitary_cost < controlled_unitary_cost(single.m_bits)
 
     def test_qubits_below_nielsen_and_chuang_minimum_allowed(self):
         # Rare (10 of 882 cases surveyed, all with a loose target at overlap 1): one run with one
@@ -164,7 +165,7 @@ class TestSizeTextbookQPE:
         # Took 88 s when the K search stepped one K at a time.
         plan = size_textbook_qpe(FINE_PHASE_ERROR, 1e-9, 1e-3)
         assert (plan.num_phase_qubits, plan.num_runs, plan.quantile) == (20, 115883, 58)
-        assert plan.num_runs * 2**plan.num_phase_qubits <= COST_CEILING
+        assert plan.controlled_unitary_cost <= COST_CEILING
 
     def test_infeasible_within_cost_ceiling(self):
         assert size_textbook_qpe(FINE_PHASE_ERROR, 1e-9, 1e-14) is None
