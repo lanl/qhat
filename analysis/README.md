@@ -359,6 +359,11 @@ where the true phase lies relative to the QPE grid (times 4 for "truncated dpss"
 "bandwidth-optimized").  The paper's random phase shift (Sec. VI) would make this a worst-case
 bound, but QHAT does not apply it.
 
+The analysis also assumes the energy window leaves at least the energy error of margin at both
+ends: above the highest eigenvalue, so that a correct estimate of it cannot wrap around to a low
+energy, and below the target, so that its own estimates cannot wrap around to a high one.  The
+driver does not yet guarantee this margin.
+
 ### Analyzing an Algorithm
 
 There are many details of the algorithm that may be worth analyzing. The available analyses are
