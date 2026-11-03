@@ -259,8 +259,9 @@ However, this section is still under development and currently has very limited 
   algorithm with QHAT's `FlexibleQPE` (`common/flexible_qpe.py`), which can implement multiple QPE
   variations by customizing its components:
   - `algorithm.ancilla_prep`: initial state of the phase register (case-insensitive); one of
-    - "rectangular" (default): a Hadamard on each phase qubit, yielding "textbook" phase
-      estimation;
+    - "auto" (default, also used when unset): QHAT sizes each of the windows below and builds the
+      cheapest (see "Choosing the window by cost" below);
+    - "rectangular": a Hadamard on each phase qubit, yielding "textbook" phase estimation;
     - "dpss", "truncated dpss" and "bandwidth-optimized": tapered window states from Patel et al.,
       "Optimal Coherent Quantum Phase Estimation via Tapering" (arXiv:2403.18927), which need far
       fewer phase qubits for a small probability of failure (`common/tapered_window_state.py`).
@@ -318,10 +319,13 @@ qubits alone does not determine the window, so set either `algorithm.energy_erro
 - `algorithm.num_confidence_qubits` (at least 1),
 
 e.g. `num_precision_qubits = 3` with `num_confidence_qubits = 3`, or `num_phase_qubits = 6` with
-`num_confidence_qubits = 3`.  Setting all three is allowed if they are consistent; any other
-combination is an error.  "rectangular" accepts `algorithm.num_phase_qubits` alone (and uses
-only the total if the split is also given).  `num_precision_qubits` and `num_confidence_qubits`
-apply only to "QPE: QHAT flexible".
+`num_confidence_qubits = 3`.  Setting all three is allowed if they are consistent.  A tapered
+window also accepts `algorithm.num_phase_qubits` alone if `algorithm.energy_error` is set: the
+total is split into the fewest precision qubits that meet the energy error and the rest for
+confidence, the cheapest split for that total.  Any other combination is an error.
+"rectangular" accepts `algorithm.num_phase_qubits` alone (and uses only the total if the split is
+also given).  `num_precision_qubits` and `num_confidence_qubits` apply only to "QPE: QHAT
+flexible".
 
 #### Sizing flexible QPE for several runs
 
@@ -341,8 +345,10 @@ control it:
   which lets the sizing choose K.
 
 When sizing from `algorithm.energy_error` and `algorithm.probability_of_failure`, the qubit
-counts, N and K are those of lowest cost N x 2^(number of phase qubits) for which the reported
-estimate fails with probability at most `algorithm.probability_of_failure`:
+counts, N and K are those of lowest cost for which the reported estimate fails with probability
+at most `algorithm.probability_of_failure`.  The cost is the number of controlled-U invocations,
+N x (2^m - 1) for N runs with m phase qubits (each run applies controlled U^(2^j) for j = 0 to
+m - 1):
 
 - tapered windows: the precision qubits are the fewest that meet the energy error; the sizing
   chooses the confidence qubits;
@@ -356,10 +362,14 @@ phase error of 0.118 turns) and probability of failure 1e-3 with the default ove
 - "dpss": 3 precision and 4 confidence qubits, run 14 times, reporting the 2nd-smallest estimate;
 - "rectangular": 5 phase qubits, run 38 times, reporting the 9th-smallest estimate.
 
-The cost N x 2^(number of phase qubits) counts controlled-U applications only; it ignores per-run
-overhead such as preparing the initial state, the window state, the inverse QFT and measurement.
-Textbook plans tend to use more, shorter runs than tapered ones, so if the initial state is
-expensive to prepare, compare total costs with that in mind.
+The cost counts controlled-U invocations only, assuming they dominate, much as ramp counts stand
+in for the cost of a Trotter formula.  It ignores per-run overhead such as preparing the initial
+state, the window state, the inverse QFT and measurement, and it treats U^(2^j) as 2^j uses of U
+even for unitaries that can be fast-forwarded.  Textbook plans tend to use more, shorter runs
+than tapered ones, so if the initial state is expensive to prepare, compare total costs with that
+in mind.  The cost is defined in one place (`controlled_unitary_cost` in
+`common/multi_run_qpe_sizing.py`); other cost functions for specific cases are planned, so it may
+change in future versions.
 
 The circuit and all analyses (resource estimates, simulations) are for a **single** run; nothing
 is multiplied by N.  If no plan costs at most 1e18, QHAT logs an error and falls back to the
@@ -390,6 +400,45 @@ The analysis of both windows assumes the energy window leaves at least the energ
 margin at both ends: above the highest eigenvalue, so that a correct estimate of it cannot wrap
 around to a low energy, and below the target, so that its own estimates cannot wrap around to a
 high one.  The driver does not yet guarantee this margin.
+
+#### Choosing the window by cost
+
+With `algorithm.ancilla_prep` unset or "auto", QHAT sizes every window ("rectangular", "dpss",
+"truncated dpss", "bandwidth-optimized") as above, logs the comparison, and builds the one with the
+fewest controlled-U invocations.  This works like the Trotter order selection, which compares
+ramp counts.  Ties go to the window that is cheaper to prepare: "rectangular", then
+"bandwidth-optimized", then "truncated dpss", then "dpss".  For the example above the log shows
+
+```
+-- QPE window comparison (algorithm.ancilla_prep not set; cost = runs x (2^m - 1) controlled-U):
+--     window                 phase qubits      runs    K    failure      controlled-U
+--     rectangular            5                   38    9    <= 8.88e-04  1178
+--     dpss                   3 + 4 = 7           14    2    <= 9.19e-04  1778
+--     bandwidth-optimized    3 + 4 = 7           15    2    <= 6.06e-04  1905
+--     truncated dpss         3 + 4 = 7           15    2    <= 6.06e-04  1905
+-- QPE window recommendation: use rectangular (5 phase qubits, 38 runs, 9th-smallest estimate):
+--     1178 controlled-U invocations
+```
+
+followed by the usual block for the chosen window.  Rows are sorted cheapest first, with ties in
+the order above, and a window with no plan is listed last as "no plan".  The choice is only
+logged; the TOML summary records the settings as given.  Because the cost is a proxy, it can
+occasionally pick a window that full resource estimation would not.  To check, set
+`algorithm.ancilla_prep` explicitly and compare the resource estimates.
+
+With qubit counts given and `algorithm.ancilla_prep` unset or "auto":
+
+- `algorithm.num_phase_qubits` alone, with `algorithm.energy_error` and
+  `algorithm.probability_of_failure` set: the windows are compared at that total (each run then
+  costs the same, so the fewest runs wins), with the tapered ones split as described above;
+- `algorithm.num_precision_qubits` and/or `algorithm.num_confidence_qubits`, with
+  `algorithm.probability_of_failure` set: the windows are compared at that split's total;
+  "rectangular" takes part only if `algorithm.energy_error` is set;
+- otherwise (`algorithm.probability_of_failure` unset, or `algorithm.energy_error` unset with only
+  `algorithm.num_phase_qubits`): QHAT builds "rectangular", as before, and logs that the window
+  was not chosen by cost;
+- if no window has a plan with the given counts, QHAT builds "rectangular" with them and logs an
+  error.
 
 ### Analyzing an Algorithm
 

@@ -455,6 +455,7 @@ def report_given_textbook_counts(config_algorithm, unitary, num_phase_qubits, sp
     logger.info(SINGLE_RUN_NOTE)
 
 
+# algorithm.ancilla_prep value (also the default) for choosing the window by cost.
 AUTO_ANCILLA_PREP = "auto"
 
 
@@ -518,11 +519,16 @@ def log_window_comparison(ranked, trigger):
 
 
 def select_window(config_algorithm, unitary, counts, trigger):
-    """Choose the cheapest window for "auto" (rows A1, A3 and A5 of the plan) and log the
-    comparison. Returns `(name, counts)` for the build: `counts` as given, or with a given total
-    split for a tapered window. Returns `(None, None)` if `algorithm.probability_of_failure` or
-    (for a total alone) `algorithm.energy_error` is missing, so the caller falls back to
-    rectangular. `(None, counts)` means no window has a plan."""
+    """Choose the window with the fewest controlled-U invocations for ancilla_prep "auto" and log
+    the comparison (see the README, "Choosing the window by cost").
+
+    Returns `(name, counts)` for the build:
+    - `counts` is None when QHAT sized the counts, or the chosen window's counts when they were
+      given (a total alone is split for a tapered window), e.g. `("dpss", {...: 3, ...: 4})`;
+    - `(None, None)`: counts were given but `algorithm.probability_of_failure`, or (for a total
+      alone) a convertible `algorithm.energy_error`, is missing, so nothing was compared;
+    - `(None, counts)`: no window has a plan.
+    """
     probability_of_failure = config_algorithm.probability_of_failure
     energy_error = config_algorithm.energy_error
     given = any(count is not None for count in counts.values())
@@ -549,6 +555,8 @@ def select_window(config_algorithm, unitary, counts, trigger):
             spec = dict(total=counts["num_phase_qubits"])
     log_multi_run_options(overlap, overlap_is_default, force, force_is_default)
     plans = {}
+    # Each plan's controlled_unitary_cost decides the ranking; a different cost function belongs
+    # in multi_run_qpe_sizing.controlled_unitary_cost, not here.
     for name in ANCILLA_PREPS:
         if name == AUTO_ANCILLA_PREP:
             continue
