@@ -311,7 +311,7 @@ confidence qubits (these set the probability of failure).  For example, 3 precis
 confidence qubits give a phase error of 1/16 turn with a probability of failure of about 1e-8,
 where the rectangular window would need 26 more qubits.  For these, the total number of phase
 qubits alone does not determine the window, so set either `algorithm.energy_error` and
-`algorithm.probability_of_failure`, or two of
+`algorithm.probability_of_failure` (sized for several runs; see below), or two of
 
 - `algorithm.num_phase_qubits` (the total),
 - `algorithm.num_precision_qubits`,
@@ -323,13 +323,15 @@ combination is an error.  "rectangular" accepts `algorithm.num_phase_qubits` alo
 only the total if the split is also given).  `num_precision_qubits` and `num_confidence_qubits`
 apply only to "QPE: QHAT flexible".
 
-#### Sizing tapered QPE for several runs
+#### Sizing flexible QPE for several runs
 
 The initial state usually overlaps the target eigenstate (e.g. the ground state) only partly, so a
-single run of QPE often returns some other eigenvalue.  For the tapered `algorithm.ancilla_prep`
-choices, QHAT therefore plans N runs of the circuit, of which the K-th smallest energy estimate is
-reported.  This uses the multi-run analysis by Yigit Subasi and Alan Bu (unpublished),
-implemented in `common/tapered_qpe_sizing.py`.  Two options control it:
+single run of QPE often returns some other eigenvalue.  For every `algorithm.ancilla_prep` of
+"QPE: QHAT flexible", QHAT therefore plans N runs of the circuit, of which the K-th smallest energy
+estimate is reported.  This uses the multi-run analysis by Yigit Subasi and Alan Bu
+(unpublished), implemented in `common/multi_run_qpe_sizing.py`, with a per-run failure bound for
+each window (`common/tapered_qpe_sizing.py`, `common/textbook_qpe_sizing.py`).  Two options
+control it:
 
 - `algorithm.overlap`: the assumed overlap (probability) of the initial state with the target
   eigenstate, with 0 < overlap <= 1; default 0.5.  The overlap is with an eigenstate of the
@@ -338,31 +340,56 @@ implemented in `common/tapered_qpe_sizing.py`.  Two options control it:
 - `algorithm.force_lowest_estimate`: if true, report the smallest estimate (K = 1); default false,
   which lets the sizing choose K.
 
-When sizing from `algorithm.energy_error` and `algorithm.probability_of_failure`, the precision
-qubits are the fewest that meet the energy error, and the confidence qubits, N and K are those of
-lowest cost N x 2^(number of phase qubits) for which the reported estimate fails with probability
-at most `algorithm.probability_of_failure`.  The log reports the probability of failure for one
-run and for the N runs, and a table of the N-run failure if the true overlap were 0.01, 0.1, 0.2,
-..., 1.0.  With an overlap of 1, a single run suffices and the sizing reduces to one run's failure
-bound.  For example, energy error 0.2 (a phase error of 0.118 turns) and probability of failure
-1e-3 with the default overlap 0.5 give 3 precision and 4 confidence qubits, run 14 times
-("dpss"), reporting the 2nd-smallest estimate; a single run fails with probability 0.5.
+When sizing from `algorithm.energy_error` and `algorithm.probability_of_failure`, the qubit
+counts, N and K are those of lowest cost N x 2^(number of phase qubits) for which the reported
+estimate fails with probability at most `algorithm.probability_of_failure`:
+
+- tapered windows: the precision qubits are the fewest that meet the energy error; the sizing
+  chooses the confidence qubits;
+- "rectangular" (textbook QPE): the sizing chooses the number of phase qubits; it can be below the
+  single-run rule's minimum.
+
+The log reports the probability of failure for one run and for the N runs, and a table of the
+N-run failure if the true overlap were 0.01, 0.1, 0.2, ..., 1.0.  For example, energy error 0.2 (a
+phase error of 0.118 turns) and probability of failure 1e-3 with the default overlap 0.5 give:
+
+- "dpss": 3 precision and 4 confidence qubits, run 14 times, reporting the 2nd-smallest estimate;
+- "rectangular": 5 phase qubits, run 38 times, reporting the 9th-smallest estimate.
+
+The cost N x 2^(number of phase qubits) counts controlled-U applications only; it ignores per-run
+overhead such as preparing the initial state, the window state, the inverse QFT and measurement.
+Textbook plans tend to use more, shorter runs than tapered ones, so if the initial state is
+expensive to prepare, compare total costs with that in mind.
 
 The circuit and all analyses (resource estimates, simulations) are for a **single** run; nothing
 is multiplied by N.  If no plan costs at most 1e18, QHAT logs an error and falls back to the
 single-run sizing (as if the overlap were 1).  If qubit counts are given, the circuit uses them,
-and if `algorithm.probability_of_failure` is set the log reports the fewest runs that meet it;
-the energy error bound then comes from the number of precision qubits.
+and if `algorithm.probability_of_failure` is set the log reports the fewest runs that meet it.
+The error bound then comes from:
 
-The probabilities of failure use the paper's Theorem 1, a bound on one run's failure averaged over
-where the true phase lies relative to the QPE grid (times 4 for "truncated dpss" and
-"bandwidth-optimized").  The paper's random phase shift (Sec. VI) would make this a worst-case
-bound, but QHAT does not apply it.
+- tapered windows: the number of precision qubits;
+- "rectangular": `algorithm.energy_error`.  Without it textbook QPE has no error bound, so the
+  number of runs and the table are skipped.  A given precision/confidence split is combined into
+  its total.
 
-The analysis also assumes the energy window leaves at least the energy error of margin at both
-ends: above the highest eigenvalue, so that a correct estimate of it cannot wrap around to a low
-energy, and below the target, so that its own estimates cannot wrap around to a high one.  The
-driver does not yet guarantee this margin.
+"QPE: qualtran textbook" is unchanged: it sizes a single run with Nielsen & Chuang's rule and
+ignores both options (with a warning).  So "QPE: qualtran textbook" and "QPE: QHAT flexible" with
+"rectangular" now size differently from the same requirements.
+
+Per-run failure bounds:
+
+- tapered windows: the paper's Theorem 1, a bound on one run's failure averaged over where the
+  true phase lies relative to the QPE grid (times 4 for "truncated dpss" and
+  "bandwidth-optimized").  The paper's random phase shift (Sec. VI) would make this a worst-case
+  bound, but QHAT does not apply it.
+- "rectangular": (2/pi^2) psi'(h), with psi' the trigamma function and h the energy error in
+  phase-grid steps.  It holds for every true phase, and is about 2.5-6 times tighter than
+  Nielsen & Chuang's rule.
+
+The analysis of both windows assumes the energy window leaves at least the energy error of
+margin at both ends: above the highest eigenvalue, so that a correct estimate of it cannot wrap
+around to a low energy, and below the target, so that its own estimates cannot wrap around to a
+high one.  The driver does not yet guarantee this margin.
 
 ### Analyzing an Algorithm
 
