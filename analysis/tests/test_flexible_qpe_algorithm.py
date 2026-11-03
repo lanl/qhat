@@ -24,8 +24,9 @@ from qhat.analysis.resource_estimation import estimate_resources
 from qhat.analysis.unitary import encode_as_unitary
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.pauli_string_evolution import PauliStringEvolution
-from qhat.common.qpe_window_state import precision_bits
+from qhat.common.qpe_window_state import precision_bits, RectangularWindowState
 from qhat.common import textbook_qpe_sizing
+from qhat.common.qpe_window_selection import TIE_BREAK_ORDER
 from qhat.common.tapered_qpe_sizing import fewest_runs, per_run_qpe_failure, size_tapered_qpe
 from qhat.common.tapered_window_state import (
     BandwidthOptimizedWindowState, DPSSWindowState, TruncatedDPSSWindowState)
@@ -656,6 +657,11 @@ class TestMultiRunSizing:
         assert NOTE not in algorithm_messages(qhat_log)
 
 
+def rectangular_qpe(pauli_file, **algorithm):
+    """`qpe_from_pauli_file` with ancilla_prep = "rectangular" unless another is given."""
+    return qpe_from_pauli_file(pauli_file, **{"ancilla_prep": "rectangular", **algorithm})
+
+
 def test_textbook_qpe_multi_run_plan_through_pauli_file(tmp_path, pauli_file):
     """End to end at the default overlap 0.5 with the rectangular window: energy_error 0.2 and
     p_fail 1e-3 give 5 phase qubits, 38 runs and the 9th-smallest estimate.
@@ -664,11 +670,11 @@ def test_textbook_qpe_multi_run_plan_through_pauli_file(tmp_path, pauli_file):
     estimate, the N-run failure is computed directly; it must be within the bound and p_fail.
     """
     dE, p_fail = 0.2, 1e-3
-    qpe = qpe_from_pauli_file(pauli_file, energy_error=dE, probability_of_failure=p_fail,
+    qpe = rectangular_qpe(pauli_file, energy_error=dE, probability_of_failure=p_fail,
                               **SETTINGS)
     plan = textbook_qpe_sizing.size_textbook_qpe(dE / ENERGY_SCALE, p_fail, 0.5)
     assert (plan.num_phase_qubits, plan.num_runs, plan.quantile) == (5, 38, 9)
-    assert qpe == qpe_from_pauli_file(pauli_file, num_phase_qubits=5, **SETTINGS)
+    assert qpe == rectangular_qpe(pauli_file, num_phase_qubits=5, **SETTINGS)
 
     m = qpe.num_ancilla_qubits
     input_file = str(tmp_path / "input.npy")
@@ -695,10 +701,10 @@ class TestTaperedTotalSplit:
 
     @pytest.mark.parametrize("name, cls", TAPERED.items())
     def test_split(self, pauli_file, qhat_log, name, cls):
-        qpe = qpe_from_pauli_file(pauli_file, ancilla_prep=name, num_phase_qubits=8,
+        qpe = rectangular_qpe(pauli_file, ancilla_prep=name, num_phase_qubits=8,
                                   energy_error=0.2, probability_of_failure=1e-3, **SETTINGS)
         assert qpe.ancilla_prep == cls(3, 5)
-        assert qpe == qpe_from_pauli_file(pauli_file, ancilla_prep=name, num_precision_qubits=3,
+        assert qpe == rectangular_qpe(pauli_file, ancilla_prep=name, num_precision_qubits=3,
                                           num_confidence_qubits=5, **SETTINGS)
         info = algorithm_messages(qhat_log)
         assert ("-- num_phase_qubits = 8 split for the energy error: 3 precision + 5 confidence "
@@ -710,7 +716,7 @@ class TestTaperedTotalSplit:
     def test_too_few_qubits(self, pauli_file):
         with pytest.raises(ValueError, match="num_phase_qubits = 3 with algorithm.energy_error = "
                            "0.2: 3 phase qubits cannot meet"):
-            qpe_from_pauli_file(pauli_file, ancilla_prep="dpss", num_phase_qubits=3,
+            rectangular_qpe(pauli_file, ancilla_prep="dpss", num_phase_qubits=3,
                                 energy_error=0.2, **SETTINGS)
 
 
@@ -719,7 +725,7 @@ class TestTextbookMultiRunSizing:
     file."""
 
     def test_default_log_block(self, pauli_file, qhat_log):
-        qpe = qpe_from_pauli_file(pauli_file, energy_error=0.2, probability_of_failure=1e-3,
+        qpe = rectangular_qpe(pauli_file, energy_error=0.2, probability_of_failure=1e-3,
                                   **SETTINGS)
         assert qpe.num_ancilla_qubits == 5
         info = algorithm_messages(qhat_log)
@@ -745,7 +751,7 @@ class TestTextbookMultiRunSizing:
         assert not algorithm_messages(qhat_log, logging.WARNING)
 
     def test_user_specified_options(self, pauli_file, qhat_log):
-        qpe = qpe_from_pauli_file(pauli_file, ancilla_prep="rectangular", energy_error=0.2,
+        qpe = rectangular_qpe(pauli_file, ancilla_prep="rectangular", energy_error=0.2,
                                   probability_of_failure=1e-3, overlap=0.9,
                                   force_lowest_estimate=True, **SETTINGS)
         plan = textbook_qpe_sizing.size_textbook_qpe(0.2 / ENERGY_SCALE, 1e-3, 0.9, True)
@@ -758,7 +764,7 @@ class TestTextbookMultiRunSizing:
         assert "-- if you run the circuit 4 times and take the smallest estimate:" in info
 
     def test_fallback_when_no_plan(self, pauli_file, qhat_log):
-        qpe = qpe_from_pauli_file(pauli_file, energy_error=0.2, probability_of_failure=1e-3,
+        qpe = rectangular_qpe(pauli_file, energy_error=0.2, probability_of_failure=1e-3,
                                   overlap=1e-17, **SETTINGS)
         # Nielsen & Chuang for a single run: 4 + 9 qubits.
         assert qpe.num_ancilla_qubits == 13
@@ -769,7 +775,7 @@ class TestTextbookMultiRunSizing:
         assert TABLE_HEADER not in info and info[-1] == NOTE
 
     def test_given_num_phase_qubits(self, pauli_file, qhat_log):
-        qpe = qpe_from_pauli_file(pauli_file, num_phase_qubits=7, energy_error=0.2,
+        qpe = rectangular_qpe(pauli_file, num_phase_qubits=7, energy_error=0.2,
                                   probability_of_failure=1e-3, overlap=0.4, **SETTINGS)
         assert qpe.num_ancilla_qubits == 7
         plan = textbook_qpe_sizing.fewest_runs(0.2 / ENERGY_SCALE, 7, 1e-3, 0.4)
@@ -783,17 +789,17 @@ class TestTextbookMultiRunSizing:
         assert not algorithm_messages(qhat_log, logging.WARNING)
 
     def test_given_split_uses_the_total(self, pauli_file, qhat_log):
-        qpe = qpe_from_pauli_file(pauli_file, num_precision_qubits=4, num_confidence_qubits=3,
+        qpe = rectangular_qpe(pauli_file, num_precision_qubits=4, num_confidence_qubits=3,
                                   energy_error=0.2, probability_of_failure=1e-3, overlap=0.4,
                                   **SETTINGS)
-        assert qpe == qpe_from_pauli_file(pauli_file, num_phase_qubits=7, **SETTINGS)
+        assert qpe == rectangular_qpe(pauli_file, num_phase_qubits=7, **SETTINGS)
         info = algorithm_messages(qhat_log)
         assert ("-- rectangular window: num_precision_qubits and num_confidence_qubits are "
                 "combined into 7 phase qubits; the split does not affect textbook QPE.") in info
         assert "-- if you run the circuit 30 times and take the 4th-smallest estimate:" in info
 
     def test_given_counts_without_probability_of_failure(self, pauli_file, qhat_log):
-        qpe_from_pauli_file(pauli_file, num_phase_qubits=7, energy_error=0.2, overlap=0.4,
+        rectangular_qpe(pauli_file, num_phase_qubits=7, energy_error=0.2, overlap=0.4,
                             **SETTINGS)
         info = algorithm_messages(qhat_log)
         assert any("probability_of_failure is not set: skipping" in message for message in info)
@@ -802,7 +808,7 @@ class TestTextbookMultiRunSizing:
         assert len(warnings) == 1 and "algorithm.overlap is ignored" in warnings[0]
 
     def test_given_counts_without_energy_error(self, pauli_file, qhat_log):
-        qpe_from_pauli_file(pauli_file, num_phase_qubits=7, probability_of_failure=1e-3,
+        rectangular_qpe(pauli_file, num_phase_qubits=7, probability_of_failure=1e-3,
                             overlap=0.4, force_lowest_estimate=False, **SETTINGS)
         info = algorithm_messages(qhat_log)
         assert any("energy_error is not set: the error bound of textbook QPE is not defined"
@@ -816,7 +822,7 @@ class TestTextbookMultiRunSizing:
 
     def test_given_counts_with_no_plan(self, pauli_file, qhat_log):
         # 3 qubits: u = 0.36 is not below the hit probability 0.5 (1 - u) = 0.32.
-        qpe = qpe_from_pauli_file(pauli_file, num_phase_qubits=3, energy_error=0.2,
+        qpe = rectangular_qpe(pauli_file, num_phase_qubits=3, energy_error=0.2,
                                   probability_of_failure=1e-3, **SETTINGS)
         assert qpe.num_ancilla_qubits == 3
         errors = algorithm_messages(qhat_log, logging.ERROR)
@@ -825,11 +831,206 @@ class TestTextbookMultiRunSizing:
         assert TABLE_HEADER not in info and info[-1] == NOTE
 
     def test_given_counts_with_unconvertible_unitary(self, unitary, qhat_log):
-        build_algorithm(make_config(num_phase_qubits=5, energy_error=0.1,
-                                    probability_of_failure=1e-3), unitary)
+        build_algorithm(make_config(ancilla_prep="rectangular", num_phase_qubits=5,
+                                    energy_error=0.1, probability_of_failure=1e-3), unitary)
         warnings = algorithm_messages(qhat_log, logging.WARNING)
         assert any("cannot convert algorithm.energy_error" in message for message in warnings)
         assert algorithm_messages(qhat_log)[-1] == NOTE
+
+
+COMPARISON_HEADER = ("-- QPE window comparison (algorithm.ancilla_prep not set; cost = runs x "
+                     "(2^m - 1) controlled-U):")
+NOT_CHOSEN = "-- QPE window: rectangular, not chosen by cost"
+
+
+def window_rows(info):
+    """The comparison table's rows, as (window name, rest of the row)."""
+    start = next(i for i, message in enumerate(info) if message.startswith("-- QPE window comp"))
+    rows = []
+    for message in info[start + 2:]:
+        if not message.startswith("--     "):
+            break
+        name = message[7:30].strip()
+        rows.append((name, message[30:].strip()))
+    return rows
+
+
+def cheapest_by_brute_force(plans):
+    """Name of the cheapest plan, ties broken by TIE_BREAK_ORDER, computed independently."""
+    best = None
+    for name in TIE_BREAK_ORDER:
+        plan = plans.get(name)
+        if plan is None:
+            continue
+        if best is None or plan.controlled_unitary_cost < plans[best].controlled_unitary_cost:
+            best = name
+    return best
+
+
+WINDOW_CLASSES = {"rectangular": RectangularWindowState, **TAPERED}
+
+
+class TestWindowSelection:
+    """"QPE: QHAT flexible" with ancilla_prep unset or "auto": the window is chosen by cost
+    (controlled-U invocations), through a Pauli file."""
+
+    def test_default_log_block(self, pauli_file, qhat_log):
+        qpe = qpe_from_pauli_file(pauli_file, energy_error=0.2, probability_of_failure=1e-3,
+                                  **SETTINGS)
+        assert qpe == rectangular_qpe(pauli_file, num_phase_qubits=5, **SETTINGS)
+        info = algorithm_messages(qhat_log)
+        start = info.index("-- overlap with target eigenstate = 0.5 (default)")
+        assert info[start:start + 13] == [
+            "-- overlap with target eigenstate = 0.5 (default)",
+            "-- report the K-th smallest of N runs: K chosen by sizing (default)",
+            COMPARISON_HEADER,
+            "--     window                 phase qubits      runs    K    failure      "
+            "controlled-U",
+            "--     rectangular            5                   38    9    <= 8.88e-04  1178",
+            "--     dpss                   3 + 4 = 7           14    2    <= 9.19e-04  1778",
+            "--     bandwidth-optimized    3 + 4 = 7           15    2    <= 6.06e-04  1905",
+            "--     truncated dpss         3 + 4 = 7           15    2    <= 6.06e-04  1905",
+            "-- QPE window recommendation: use rectangular (5 phase qubits, 38 runs, "
+            "9th-smallest estimate):",
+            "--     1178 controlled-U invocations",
+            "-- textbook QPE sizing: 5 phase qubits",
+            "-- if you run the circuit 1 time:",
+            "--     probability of failure <= 5.31e-01, energy error <= 0.2",
+        ]
+        assert info.count("-- overlap with target eigenstate = 0.5 (default)") == 1
+        assert info[-1] == NOTE
+        assert not algorithm_messages(qhat_log, logging.WARNING)
+
+    @pytest.mark.parametrize("overlap, probability_of_failure, force", [
+        (0.5, 1e-3, False), (0.9, 1e-6, False), (0.1, 1e-2, False), (0.5, 1e-3, True),
+        (1.0, 1e-9, False)])
+    def test_selection_is_cheapest(self, pauli_file, qhat_log, overlap, probability_of_failure,
+                                   force):
+        phase_error = 0.2 / ENERGY_SCALE
+        plans = {"rectangular": textbook_qpe_sizing.size_textbook_qpe(
+            phase_error, probability_of_failure, overlap, force)}
+        for name, cls in TAPERED.items():
+            plans[name] = size_tapered_qpe(cls, phase_error, probability_of_failure, overlap,
+                                           force)
+        expected = cheapest_by_brute_force(plans)
+        qpe = qpe_from_pauli_file(pauli_file, energy_error=0.2,
+                                  probability_of_failure=probability_of_failure, overlap=overlap,
+                                  force_lowest_estimate=force, **SETTINGS)
+        explicit = qpe_from_pauli_file(pauli_file, ancilla_prep=expected, energy_error=0.2,
+                                       probability_of_failure=probability_of_failure,
+                                       overlap=overlap, force_lowest_estimate=force, **SETTINGS)
+        assert qpe == explicit
+        rows = window_rows(algorithm_messages(qhat_log))
+        assert rows[0][0] == expected
+        costs = [plans[name].controlled_unitary_cost for name, _ in rows]
+        ranks = [TIE_BREAK_ORDER.index(name) for name, _ in rows]
+        assert list(zip(costs, ranks)) == sorted(zip(costs, ranks))
+
+    def test_auto_equals_unset(self, pauli_file, qhat_log):
+        config = dict(energy_error=0.2, probability_of_failure=1e-3, **SETTINGS)
+        unset = qpe_from_pauli_file(pauli_file, **config)
+        for spelling in ("auto", "AUTO", "Auto"):
+            assert qpe_from_pauli_file(pauli_file, ancilla_prep=spelling, **config) == unset
+        assert any(message.startswith('-- QPE window comparison (algorithm.ancilla_prep = '
+                                      '"auto";') for message in algorithm_messages(qhat_log))
+
+    def test_tie_goes_to_cheaper_preparation(self, pauli_file, qhat_log):
+        # With 3 + 5 qubits all tapered windows need 10 runs: bandwidth-optimized wins the tie.
+        qpe = qpe_from_pauli_file(pauli_file, num_phase_qubits=8, energy_error=0.2,
+                                  probability_of_failure=1e-3, **SETTINGS)
+        assert qpe.ancilla_prep == BandwidthOptimizedWindowState(3, 5)
+        rows = window_rows(algorithm_messages(qhat_log))
+        assert [name for name, _ in rows] == ["bandwidth-optimized", "truncated dpss", "dpss",
+                                              "rectangular"]
+        assert len({rest for _, rest in rows[:3]}) == 1  # identical plans
+
+    def test_given_total(self, pauli_file, qhat_log):
+        qpe_from_pauli_file(pauli_file, num_phase_qubits=8, energy_error=0.2,
+                            probability_of_failure=1e-3, **SETTINGS)
+        info = algorithm_messages(qhat_log)
+        assert COMPARISON_HEADER in info
+        assert ("--     rectangular            8                   18    3    <= 8.37e-04  4590"
+                in info)
+        assert "-- tapered QPE: user-specified 3 precision + 5 confidence qubits = 8 phase qubits" \
+            in info
+
+    @pytest.mark.parametrize("config", [
+        dict(num_phase_qubits=8, energy_error=0.2),
+        dict(num_phase_qubits=8, probability_of_failure=1e-3),
+        dict(num_precision_qubits=3, num_confidence_qubits=4, energy_error=0.2),
+    ], ids=["no probability_of_failure", "no energy_error", "split, no probability_of_failure"])
+    def test_missing_requirements_fall_back_to_rectangular(self, pauli_file, qhat_log, config):
+        qpe = qpe_from_pauli_file(pauli_file, **config, **SETTINGS)
+        assert isinstance(qpe.ancilla_prep, RectangularWindowState)
+        info = algorithm_messages(qhat_log)
+        assert any(message.startswith(NOT_CHOSEN) for message in info)
+        assert COMPARISON_HEADER not in info
+
+    def test_given_split_compares_at_total(self, pauli_file, qhat_log):
+        qpe = qpe_from_pauli_file(pauli_file, num_precision_qubits=3, num_confidence_qubits=4,
+                                  energy_error=0.2, probability_of_failure=1e-3, **SETTINGS)
+        assert qpe.ancilla_prep == DPSSWindowState(3, 4)
+        rows = window_rows(algorithm_messages(qhat_log))
+        assert [name for name, _ in rows] == ["dpss", "bandwidth-optimized", "truncated dpss",
+                                              "rectangular"]
+        assert rows[-1][1].startswith("7 ")  # rectangular at the total
+
+    def test_given_split_without_energy_error_skips_rectangular(self, pauli_file, qhat_log):
+        qpe = qpe_from_pauli_file(pauli_file, num_precision_qubits=3, num_confidence_qubits=4,
+                                  probability_of_failure=1e-3, **SETTINGS)
+        assert qpe.ancilla_prep == DPSSWindowState(3, 4)
+        assert "rectangular" not in [name for name, _ in window_rows(algorithm_messages(qhat_log))]
+
+    def test_given_split_warns_if_energy_error_unmet(self, pauli_file, qhat_log):
+        # 3 precision qubits bound the energy error by 0.106.
+        qpe_from_pauli_file(pauli_file, num_precision_qubits=3, num_confidence_qubits=4,
+                            energy_error=0.1, probability_of_failure=1e-3, **SETTINGS)
+        warnings = algorithm_messages(qhat_log, logging.WARNING)
+        assert len(warnings) == 1 and "0.106" in warnings[0]
+
+    def test_given_counts_with_no_plan(self, pauli_file, qhat_log):
+        qpe = qpe_from_pauli_file(pauli_file, num_phase_qubits=3, energy_error=0.2,
+                                  probability_of_failure=1e-3, **SETTINGS)
+        assert qpe == rectangular_qpe(pauli_file, num_phase_qubits=3, **SETTINGS)
+        info = algorithm_messages(qhat_log)
+        assert all(rest == "no plan" for _, rest in window_rows(info))
+        assert "-- QPE window: no window has a plan with the given qubit counts; building the " \
+            "rectangular window with them" in info
+        errors = algorithm_messages(qhat_log, logging.ERROR)
+        assert len(errors) == 1 and "No number of runs" in errors[0]
+
+    def test_fallback_when_no_plan(self, pauli_file, qhat_log):
+        qpe = qpe_from_pauli_file(pauli_file, energy_error=0.2, probability_of_failure=1e-3,
+                                  overlap=1e-17, **SETTINGS)
+        assert qpe.num_ancilla_qubits == 13  # Nielsen & Chuang, single run
+        info = algorithm_messages(qhat_log)
+        assert all(rest == "no plan" for _, rest in window_rows(info))
+        assert "-- FALLBACK textbook QPE sizing: 13 phase qubits" in info
+        errors = algorithm_messages(qhat_log, logging.ERROR)
+        assert len(errors) == 1 and "FALLBACK" in errors[0]
+
+    def test_requires_requirements_without_counts(self, pauli_file):
+        with pytest.raises(ValueError, match="num_phase_qubits or algorithm.energy_error"):
+            qpe_from_pauli_file(pauli_file, probability_of_failure=1e-3, **SETTINGS)
+        with pytest.raises(ValueError, match="probability_of_failure"):
+            qpe_from_pauli_file(pauli_file, energy_error=0.2, **SETTINGS)
+
+    def test_explicit_window_skips_selection(self, pauli_file, qhat_log):
+        qpe = qpe_from_pauli_file(pauli_file, ancilla_prep="truncated dpss", energy_error=0.2,
+                                  probability_of_failure=1e-3, **SETTINGS)
+        assert isinstance(qpe.ancilla_prep, TruncatedDPSSWindowState)
+        assert not any(message.startswith("-- QPE window") for message in
+                       algorithm_messages(qhat_log))
+
+    def test_unconvertible_unitary_falls_back(self, unitary, qhat_log):
+        qpe = build_algorithm(make_config(num_phase_qubits=5, energy_error=0.1,
+                                          probability_of_failure=1e-3), unitary)
+        assert qpe == FlexibleQPE(unitary, 5)
+        assert any(message.startswith(NOT_CHOSEN) for message in algorithm_messages(qhat_log))
+
+    def test_toml_saves_auto_only_when_set(self):
+        assert make_config(ancilla_prep="auto")._generate_TOML_table()["ancilla_prep"] == "auto"
+        assert "ancilla_prep" not in make_config()._generate_TOML_table()
 
 
 class TestConfigurationAndResources:
