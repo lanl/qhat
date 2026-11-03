@@ -86,8 +86,9 @@ def worst_failure(num_runs: int, quantile: int, u: float, hit: float) -> float:
                _failure(num_runs, quantile, u, min(1.0, u + hit)))
 
 
-def fewest_runs_for_failure(u: float, hit: float, probability_of_failure: float,
-                            force_lowest_estimate: bool, max_runs: int) -> Optional[Tuple[int, int]]:
+def fewest_runs_for_failure(
+        u: float, hit: float, probability_of_failure: float, force_lowest_estimate: bool,
+        max_runs: int) -> Optional[Tuple[int, int]]:
     """(N, K): the fewest runs N <= `max_runs` with `worst_failure(N, K, u, hit)` at most
     `probability_of_failure`, and the K with the smallest failure at that N (K = 1 if
     `force_lowest_estimate`). None if no N works. E.g. u = 2.7e-4, hit = 0.49986, target 1e-3:

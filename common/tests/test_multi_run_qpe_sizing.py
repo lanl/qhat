@@ -145,7 +145,8 @@ class TestControlledUnitaryCost:
         assert total == controlled_unitary_cost(5)
 
     @pytest.mark.parametrize("limit, num_phase_qubits, runs",
-                             [(1178, 5, 38), (1177, 5, 37), (30, 5, 0), (1e18, 10, 977517106549364)])
+                             [(1178, 5, 38), (1177, 5, 37), (30, 5, 0),
+                              (1e18, 10, 977517106549364)])
     def test_max_runs_within(self, limit, num_phase_qubits, runs):
         assert max_runs_within(limit, num_phase_qubits) == runs
 
