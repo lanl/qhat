@@ -50,9 +50,13 @@ def controlled_unitary_cost(num_phase_qubits: int, num_runs: int = 1) -> int:
     This is the only place the cost is defined: the sizing searches, the cost ceiling and the
     window selection all use it. It assumes the controlled-U invocations dominate, the way ramp
     counts stand in for Trotter cost. It ignores per-run overhead (preparing the initial state,
-    the window state and the inverse QFT; measuring), window-state preparation cost (e.g. the
-    DPSS's 2^m - 1 rotations), and fast-forwardable unitaries, whose U^(2^j) can cost far less
-    than 2^j U. Other cost functions for specific cases are planned.
+    the window state and the inverse QFT; measuring) and window-state preparation cost (e.g. the
+    DPSS's 2^m - 1 rotations). Other cost functions for specific cases are planned.
+
+    Fast-forwarding would come in here. It assumes U^(2^j) costs 2^j U, true for every QHAT
+    encoding today (a Trotterization's U^k has k times the steps). For a unitary whose U^k costs
+    far less than k U, sum a per-power cost instead, e.g. an optional `power_cost(k)` on the
+    unitary (default k) over j = 0..m-1.
     """
     return num_runs * (2**num_phase_qubits - 1)
 
