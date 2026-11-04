@@ -34,13 +34,13 @@ def test_toy_fci_file():
 
     # check scalars
     n = H.num_qubits()
-    assert n == 3
+    assert n == 6
     ecore = intop.constant
     assert ecore == 99999.0
 
     # check one-body coefficients
     h1 = intop.one_body_tensor
-    assert h1.shape == (3,3)
+    assert h1.shape == (6,6)
     for i in range(3):
         for j in range(3):
             # put indices in canonical order, convert to decimal number
@@ -48,11 +48,12 @@ def test_toy_fci_file():
             jp = j + 1
             d = (max(ip, jp), min(ip, jp))
             val = 10. * d[0] + d[1]
-            assert val == h1[i, j]
+            assert val == h1[2*i  , 2*j  ]
+            assert val == h1[2*i+1, 2*j+1]
 
     # check two-body coefficients
     h2 = intop.two_body_tensor
-    assert h2.shape == (3,3,3,3)
+    assert h2.shape == (6,6,6,6)
     for i in range(3):
         for j in range(3):
             for k in range(3):
@@ -67,7 +68,10 @@ def test_toy_fci_file():
                     d = np.empty(4)
                     d[[0,1]], d[[2,3]] = (max(il, jk), min(il, jk))
                     val = 1000. * d[0] + 100. * d[1] + 10. * d[2] + d[3]
-                    assert val == h2[i, j, k, l]
+                    assert val == h2[2*i  , 2*j  , 2*k  , 2*l  ]
+                    assert val == h2[2*i+1, 2*j+1, 2*k+1, 2*l+1]
+                    assert val == h2[2*i  , 2*j+1, 2*k+1, 2*l  ]
+                    assert val == h2[2*i+1, 2*j  , 2*k  , 2*l+1]
 
     print("✓ Toy FCI file loaded successfully")
 
@@ -89,31 +93,37 @@ def test_real_fci_file():
 
     # check scalars
     n = H.num_qubits()
-    assert n == 7
+    assert n == 14
     ecore = intop.constant
     assert ecore == -2885.478832556892
 
     # check one-body coefficients
     h1 = intop.one_body_tensor
-    assert h1.shape == (7,7)
+    assert h1.shape == (14,14)
     # spot-check a few values
     # note:  this code is 0-based, but indices in file are 1-based!
     assert h1[0,0] == -12.71913914619708
-    assert h1[0,1] == -0.0007824310522580448
-    assert h1[6,6] == -3.202720690968762
-    # check that all values are filled (nonzero)
-    assert np.min(np.fabs(h1)) > 0.0
+    assert h1[1,3] == -0.0007824310522580448
+    assert h1[13,13] == -3.202720690968762
+    # check that all values that should be filled are filled (nonzero)
+    assert np.min(np.fabs(h1[0:n:2,0:n:2])) > 0.0
+    assert np.min(np.fabs(h1[1:n:2,1:n:2])) > 0.0
 
     # check two-body coefficients
     h2 = intop.two_body_tensor
-    assert h2.shape == (7,7,7,7)
+    assert h2.shape == (14,14,14,14)
     # spot-check a few values
     # note:  this code is 0-based, but indices in file are 1-based!
     assert h2[0,0,0,0] == 0.32205676424441054
-    assert h2[0,1,2,3] == -0.006295966101239615
-    assert h2[6,6,6,6] == 0.13420411336007884
-    # check that all values are filled (nonzero)
-    assert np.min(np.fabs(h2)) > 0.0
+    assert h2[1,2,4,7] == -0.006295966101239615
+    assert h2[13,13,13,13] == 0.13420411336007884
+    # check that all values that should be filled are filled (nonzero)
+    # indices w/ same spin
+    assert np.min(np.fabs(h2[0:n:2,0:n:2,0:n:2,0:n:2])) > 0.0
+    assert np.min(np.fabs(h2[1:n:2,1:n:2,1:n:2,1:n:2])) > 0.0
+    # indices w/ mixed spin
+    assert np.min(np.fabs(h2[0:n:2,1:n:2,1:n:2,0:n:2])) > 0.0
+    assert np.min(np.fabs(h2[1:n:2,0:n:2,0:n:2,1:n:2])) > 0.0
 
     print("✓ Real FCI file loaded successfully")
 
