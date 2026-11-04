@@ -16,6 +16,7 @@ from openfermion import (
     count_qubits,
     jordan_wigner,
 )
+from openfermion.chem.molecular_data import spinorb_from_spatial
 
 from pyscf import ao2mo, tools
 
@@ -412,18 +413,24 @@ def load_fci(config_hamiltonian: HamiltonianConfiguration):
     f0 = data['ECORE']
 
     # check that f1 has correct shape
-    f1 = data['H1']
-    if f1.shape != (n, n):
+    f1eri = data['H1']
+    if f1eri.shape != (n, n):
         raise ValueError(f"Incorrect f1 shape {f1.shape}. "
                          f"f1 shape should be ({n}, {n}).")
 
     # reader returns a packed f2 - unpack it here
     f2packed = data['H2']
-    f2 = ao2mo.restore('s1', f2packed, n)
+    f2unpacked = ao2mo.restore('s1', f2packed, n)
+
+    # now transform from FCI conventions to OpenFermion conventions:
+    # absorb factor of 0.5 and reorder indices chemist -> physicist
+    f2eri = 0.5 * f2unpacked.transpose(0, 3, 2, 1)
     # check that f2 has correct shape
-    if f2.shape != (n, n, n, n):
+    if f2eri.shape != (n, n, n, n):
         raise ValueError(f"Incorrect f2 shape {f2.shape}. "
                          f"f2 shape should be ({n}, {n}, {n}, {n}).")
+    # transform from spatial to spin orbitals
+    f1, f2 = spinorb_from_spatial(f1eri, f2eri)
 
     return _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, None, None)
 
