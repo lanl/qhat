@@ -4,6 +4,7 @@ Comprehensive test suite for Trotterization Bloq
 Tests expansion logic, resource estimation, unitary generation, and integration.
 """
 
+import attrs
 import numpy as np
 import pytest
 from scipy.linalg import expm
@@ -639,7 +640,7 @@ class TestPower:
         assert powered.time == pytest.approx(1.5)
         assert powered.time / powered.num_steps == pytest.approx(trotter.time / trotter.num_steps)
 
-    @pytest.mark.parametrize("power", [0, -1, 1.5])
+    @pytest.mark.parametrize("power", [0, 1.5, 2.0, True])
     def test_invalid_power_raises(self, power):
         trotter = Trotterization.from_method(
             pauli_terms=[("X", 1.0)], method="first order", time=1.0, num_steps=1)
@@ -1686,7 +1687,7 @@ class TestTensorsInsideOtherBloqs:
 class TestAdjoint:
     """trotter.adjoint() is U^dagger and stays a Trotterization (keeping the fast contraction)."""
 
-    PAULI_TERMS = [("XZ", 0.5), ("ZY", 0.3), ("YX", 0.2)]
+    PAULI_TERMS = [("XZ", 0.5), ("ZI", 0.3), ("YX", 0.2)]
 
     @pytest.mark.parametrize("method", [
         "first order", "second order", "third order", "symmetrized ruth 1983", "fourth order",
@@ -1705,18 +1706,22 @@ class TestAdjoint:
 
     @pytest.mark.parametrize("method", ["first order", (0.2, 0.5, 0.3), (0.3, 0.7)])
     @pytest.mark.parametrize("combine_terms", [True, False])
-    def test_expanded_sequence_is_reversed(self, method, combine_terms):
+    def test_decomposition_order_is_reversed(self, method, combine_terms):
+        """The adjoint decomposes into the forward terms in reverse order, each adjointed."""
         trotter = Trotterization.from_method(
             pauli_terms=self.PAULI_TERMS, method=method, time=0.4, num_steps=3,
             combine_terms=combine_terms)
         adj = trotter.adjoint()
 
         def terms(t):
-            return [(t.pauli_terms[i][0], t.pauli_terms[i][1] * c) for i, c in t.expanded_sequence]
+            # iter_bloqnections is in application order (bloq_instances is an unordered set)
+            return [(bloq.bloq.pauli_terms, bloq.bloq.time, bloq.bloq.is_adjoint)
+                    for bloq, _, _ in t.decompose_bloq().iter_bloqnections()]
 
-        forward, backward = terms(trotter), terms(adj)[::-1]
-        assert [p for p, _ in forward] == [p for p, _ in backward]
-        np.testing.assert_allclose([a for _, a in forward], [a for _, a in backward], atol=1e-14)
+        forward, backward = terms(trotter), terms(adj)
+        assert [(p, t) for p, t, _ in forward] == [(p, t) for p, t, _ in backward[::-1]]
+        assert not any(flag for _, _, flag in forward)
+        assert all(flag for _, _, flag in backward)
 
     def test_double_adjoint_is_identity(self):
         trotter = Trotterization.from_method(
@@ -1732,3 +1737,97 @@ class TestAdjoint:
         with _no_decomposition():
             np.testing.assert_allclose(trotter.adjoint().tensor_contract(), expected, atol=1e-12)
             np.testing.assert_allclose(cbloq.tensor_contract(), expected, atol=1e-12)
+
+
+class TestAdjointFlag:
+    """is_adjoint is a field: the adjoint keeps time, coefficients and term order as given."""
+
+    PAULI_TERMS = [("XZ", 0.5), ("ZI", 0.3), ("YX", 0.2)]
+
+    def test_terms_do_not_commute(self):
+        """With commuting terms, negating time would pass every matrix test here (F12)."""
+        from qhat.common.commuting_pauli_string_evolution import all_commute
+        for terms in (TestAdjoint.PAULI_TERMS, self.PAULI_TERMS, TestNegativePower.PAULI_TERMS):
+            assert not all_commute([p for p, _ in terms])
+
+    def make(self, method="third order", **kwargs):
+        return Trotterization.from_method(
+            pauli_terms=self.PAULI_TERMS, method=method, time=0.4, num_steps=3, **kwargs)
+
+    def test_adjoint_changes_only_the_flag(self):
+        trotter = self.make()
+        adj = trotter.adjoint()
+        assert adj.is_adjoint and not trotter.is_adjoint
+        assert (adj.time, adj.coefficients, adj.pauli_terms) == (
+            trotter.time, trotter.coefficients, trotter.pauli_terms)
+
+    def test_double_adjoint_equals_original_with_same_hash(self):
+        trotter = self.make()
+        assert trotter.adjoint().adjoint() == trotter
+        assert hash(trotter.adjoint().adjoint()) == hash(trotter)
+        assert trotter.adjoint() != trotter
+
+    def test_adjoint_and_negative_time_are_distinct(self):
+        """D7a: analytically equal for a symmetric method, but deliberately not the same object."""
+        trotter = self.make("second order")
+        negated = attrs.evolve(trotter, time=-trotter.time)
+        assert trotter.adjoint() != negated
+        np.testing.assert_allclose(
+            trotter.adjoint().tensor_contract(), negated.tensor_contract(), atol=1e-12)
+
+    @pytest.mark.parametrize("method", ["first order", "third order", "fourth order", (0.3, 0.7)])
+    @pytest.mark.parametrize("contraction", ["qualtran", "incremental", "structured", None])
+    def test_tensor_paths_agree(self, method, contraction):
+        trotter = self.make(method, tensor_contraction_method=contraction)
+        expected = self.make(method, tensor_contraction_method="qualtran") \
+            .decompose_bloq().tensor_contract().conj().T
+        np.testing.assert_allclose(trotter.adjoint().tensor_contract(), expected, atol=1e-12)
+
+    def test_t_complexity_unchanged(self):
+        trotter = self.make("fourth order")
+        assert t_complexity(trotter.adjoint()) == t_complexity(trotter)
+
+    def test_str_and_repr_show_dagger(self):
+        trotter = self.make()
+        assert "†" in str(trotter.adjoint()) and "†" not in str(trotter)
+        assert "is_adjoint=True" in repr(trotter.adjoint())
+
+    def test_phase_error_uses_magnitude(self):
+        trotter = self.make()
+        assert trotter.adjoint().phase_error_from_energy_error(0.1) == \
+            trotter.phase_error_from_energy_error(0.1)
+        negated = attrs.evolve(trotter, time=-trotter.time)
+        assert negated.phase_error_from_energy_error(0.1) > 0
+
+
+class TestNegativePower:
+    PAULI_TERMS = [("XZ", 0.5), ("ZI", 0.3), ("YX", 0.2)]
+
+    def make(self, method="third order", **kwargs):
+        return Trotterization.from_method(
+            pauli_terms=self.PAULI_TERMS, method=method, time=0.4, num_steps=3, **kwargs)
+
+    @pytest.mark.parametrize("method", ["first order", "third order", "fourth order"])
+    @pytest.mark.parametrize("k", [1, 2, 5])
+    def test_negative_power_is_adjoint_of_positive(self, method, k):
+        trotter = self.make(method)
+        assert trotter ** (-k) == (trotter ** k).adjoint()
+        expected = np.linalg.matrix_power(trotter.tensor_contract(), k).conj().T
+        np.testing.assert_allclose((trotter ** (-k)).tensor_contract(), expected, atol=1e-10)
+
+    def test_power_of_adjoint_keeps_the_flag(self):
+        trotter = self.make()
+        assert (trotter.adjoint() ** 3) == (trotter ** 3).adjoint()
+        assert (trotter.adjoint() ** -3) == (trotter ** 3)
+        expected = np.linalg.matrix_power(trotter.tensor_contract().conj().T, 3)
+        np.testing.assert_allclose((trotter.adjoint() ** 3).tensor_contract(), expected, atol=1e-10)
+
+    def test_cirq_pow_reaches_negative_power(self):
+        """F8: cirq.pow dispatches to our __pow__."""
+        import cirq
+        trotter = self.make()
+        assert cirq.pow(trotter, -2) == trotter ** -2
+
+    def test_numpy_integer_power(self):
+        trotter = self.make()
+        assert trotter ** np.int64(-2) == trotter ** -2
