@@ -623,3 +623,54 @@ class TestAdjointAndPower:
         cpse = self.make()
         assert "†" in str(cpse.adjoint()) and "†" not in str(cpse)
         assert "is_adjoint=True" in repr(cpse.adjoint())
+
+
+class TestOwnControlledBloq:
+    """`.controlled()` returns our bloq, which passes its controls to every term."""
+
+    TERMS = (("XZI", 0.4), ("ZXI", -0.7), ("IIY", 0.3), ("III", 0.9))  # commuting, with I and III
+
+    def expected(self, ctrl_value, is_adjoint, time=0.83):
+        forward = np.eye(8, dtype=complex)
+        for pauli_string, coefficient in self.TERMS:
+            forward = expm(-1j * coefficient * time * pauli_string_to_matrix(pauli_string)) @ forward
+        unitary = forward.conj().T if is_adjoint else forward
+        result = np.eye(16, dtype=complex)
+        result[8 * ctrl_value:8 * ctrl_value + 8, 8 * ctrl_value:8 * ctrl_value + 8] = unitary
+        return result
+
+    @pytest.mark.parametrize("ctrl_value", [1, 0])
+    @pytest.mark.parametrize("is_adjoint", [False, True])
+    def test_decomposition_equals_block_matrix(self, ctrl_value, is_adjoint):
+        from qualtran import CtrlSpec
+        cpse = CommutingPauliStringEvolution(self.TERMS, 0.83, is_adjoint=is_adjoint).controlled(
+            CtrlSpec(cvs=ctrl_value))
+        expected = self.expected(ctrl_value, is_adjoint)
+        np.testing.assert_allclose(cpse.decompose_bloq().tensor_contract(), expected, atol=1e-10)
+        np.testing.assert_allclose(cpse.tensor_contract(), expected, atol=1e-10)
+
+    def test_terms_get_the_controls(self):
+        from qualtran import CtrlSpec
+        cpse = CommutingPauliStringEvolution(self.TERMS, 0.83).controlled(CtrlSpec(cvs=0))
+        assert cpse.ctrl_values == (0,)
+        terms = [binst.bloq for binst in cpse.decompose_bloq().bloq_instances]
+        assert len(terms) == 4
+        assert all(isinstance(t, PauliStringEvolution) and t.ctrl_values == (0,) for t in terms)
+
+    def test_controlled_and_adjoint_commute(self):
+        cpse = CommutingPauliStringEvolution(self.TERMS, 0.83)
+        assert cpse.controlled().adjoint() == cpse.adjoint().controlled()
+        assert type(cpse.controlled().adjoint()) is CommutingPauliStringEvolution
+        assert (cpse.controlled() ** -2) == (cpse ** 2).adjoint().controlled()
+
+    def test_t_complexity_is_sum_of_controlled_terms(self):
+        # XZI: 2 + 2 + 2 = 6 Cliffords; ZXI: 6; IIY: 4 + 2 = 6; 2 rotations each; III: 1 rotation
+        tc = t_complexity(CommutingPauliStringEvolution(self.TERMS, 0.83).controlled())
+        assert (tc.t, tc.clifford, tc.rotations) == (0, 18, 7)
+
+    def test_unsupported_ctrl_spec_raises(self):
+        from qualtran import CtrlSpec
+        with pytest.raises(ValueError, match="single-qubit controls"):
+            CommutingPauliStringEvolution(self.TERMS, 0.83).controlled(CtrlSpec(cvs=(1, 1)))
+        with pytest.raises(NotImplementedError):
+            CommutingPauliStringEvolution(self.TERMS, 0.83).controlled().controlled()
