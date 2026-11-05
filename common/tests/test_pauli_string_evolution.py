@@ -543,3 +543,72 @@ class TestDecompositionCounts:
         base = t_complexity(PauliStringEvolution("XZ", 0.4, 0.8))
         padded = t_complexity(PauliStringEvolution("IXIIZI", 0.4, 0.8))
         assert base == padded
+
+
+# ==================================================================================
+# Test: adjoint flag and powers
+# ==================================================================================
+
+class TestAdjointAndPower:
+
+    @pytest.mark.parametrize("pauli_string", DECOMPOSITION_STRINGS)
+    def test_adjoint_is_conjugate_transpose(self, pauli_string):
+        pse = PauliStringEvolution(pauli_string, 0.37, 0.91)
+        expected = pse.tensor_contract().conj().T
+        adj = pse.adjoint()
+        assert isinstance(adj, PauliStringEvolution) and adj.is_adjoint
+        np.testing.assert_allclose(adj.tensor_contract(), expected, atol=1e-10)
+        np.testing.assert_allclose(adj.decompose_bloq().tensor_contract(), expected, atol=1e-10)
+
+    def test_adjoint_keeps_time_and_coefficient(self):
+        pse = PauliStringEvolution("XY", 0.37, 0.91)
+        adj = pse.adjoint()
+        assert (adj.time, adj.coefficient, adj.hbar) == (0.91, 0.37, 1.0)
+
+    def test_double_adjoint_equals_original_with_same_hash(self):
+        pse = PauliStringEvolution("XYZ", 0.37, 0.91)
+        assert pse.adjoint() != pse
+        assert pse.adjoint().adjoint() == pse
+        assert hash(pse.adjoint().adjoint()) == hash(pse)
+
+    def test_adjoint_and_negative_time_are_distinct_but_equal_matrices(self):
+        pse = PauliStringEvolution("XY", 0.37, 0.91)
+        negated = PauliStringEvolution("XY", 0.37, -0.91)
+        assert pse.adjoint() != negated
+        np.testing.assert_allclose(
+            pse.adjoint().tensor_contract(), negated.tensor_contract(), atol=1e-12)
+
+    def test_t_complexity_unchanged(self):
+        pse = PauliStringEvolution("XIYZ", 0.37, 0.91)
+        assert t_complexity(pse.adjoint()) == t_complexity(pse)
+
+    def test_str_and_repr(self):
+        pse = PauliStringEvolution("XY", 0.37, 0.91)
+        assert "†" in str(pse.adjoint()) and "†" not in str(pse)
+        assert "is_adjoint=True" in repr(pse.adjoint())
+
+    @pytest.mark.parametrize("k", [1, 2, 3, 7])
+    def test_power_is_matrix_power(self, k):
+        pse = PauliStringEvolution("XYZ", 0.37, 0.91)
+        np.testing.assert_allclose(
+            (pse ** k).tensor_contract(),
+            np.linalg.matrix_power(pse.tensor_contract(), k), atol=1e-10)
+        assert (pse ** k).time == pytest.approx(0.91 * k)
+
+    @pytest.mark.parametrize("k", [1, 2, 5])
+    def test_negative_power_is_adjoint_of_positive(self, k):
+        pse = PauliStringEvolution("XIZ", 0.37, 0.91)
+        assert pse ** (-k) == (pse ** k).adjoint()
+        np.testing.assert_allclose(
+            (pse ** -k).decompose_bloq().tensor_contract(),
+            np.linalg.matrix_power(pse.tensor_contract(), k).conj().T, atol=1e-10)
+
+    def test_power_of_adjoint_keeps_flag(self):
+        pse = PauliStringEvolution("XZ", 0.37, 0.91)
+        assert pse.adjoint() ** 3 == (pse ** 3).adjoint()
+        assert pse.adjoint() ** -3 == pse ** 3
+
+    @pytest.mark.parametrize("power", [0, 1.5, 2.0, True])
+    def test_invalid_power_raises(self, power):
+        with pytest.raises(ValueError):
+            PauliStringEvolution("XZ", 0.37, 0.91) ** power
