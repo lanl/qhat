@@ -560,3 +560,66 @@ class TestProperties:
             time=1.0
         )
         assert cpse.num_qubits == 4
+
+
+# ==================================================================================
+# Test: adjoint flag and powers
+# ==================================================================================
+
+class TestAdjointAndPower:
+    """Terms share qubits and commute (XX, YY, ZZ), with unequal coefficients."""
+
+    TERMS = (("XXI", 0.5), ("YYI", 0.3), ("ZZI", -0.2), ("IXX", 0.4))
+
+    def make(self, terms=None, time=0.83):
+        # IXX does not commute with YYI; keep only mutually commuting terms
+        return CommutingPauliStringEvolution(terms or self.TERMS[:3], time)
+
+    def test_adjoint_is_conjugate_transpose(self):
+        cpse = self.make()
+        expected = cpse.tensor_contract().conj().T
+        adj = cpse.adjoint()
+        assert adj.is_adjoint
+        np.testing.assert_allclose(adj.tensor_contract(), expected, atol=1e-10)
+        np.testing.assert_allclose(adj.decompose_bloq().tensor_contract(), expected, atol=1e-10)
+
+    def test_decomposition_is_reversed_with_adjointed_terms(self):
+        adj = self.make().adjoint()
+        pieces = [b.bloq for b, _, _ in adj.decompose_bloq().iter_bloqnections()]
+        assert [p.pauli_string for p in pieces] == ["ZZI", "YYI", "XXI"]
+        assert all(p.is_adjoint for p in pieces)
+
+    def test_double_adjoint_equals_original_with_same_hash(self):
+        cpse = self.make()
+        assert cpse.adjoint() != cpse
+        assert cpse.adjoint().adjoint() == cpse
+        assert hash(cpse.adjoint().adjoint()) == hash(cpse)
+
+    def test_t_complexity_unchanged(self):
+        cpse = self.make()
+        assert t_complexity(cpse.adjoint()) == t_complexity(cpse)
+
+    @pytest.mark.parametrize("k", [1, 2, 4])
+    def test_power(self, k):
+        cpse = self.make()
+        np.testing.assert_allclose(
+            (cpse ** k).tensor_contract(),
+            np.linalg.matrix_power(cpse.tensor_contract(), k), atol=1e-10)
+        assert (cpse ** -k) == (cpse ** k).adjoint()
+        np.testing.assert_allclose(
+            (cpse ** -k).decompose_bloq().tensor_contract(),
+            np.linalg.matrix_power(cpse.tensor_contract(), k).conj().T, atol=1e-10)
+
+    def test_power_of_adjoint_keeps_flag(self):
+        cpse = self.make()
+        assert cpse.adjoint() ** 3 == (cpse ** 3).adjoint()
+
+    @pytest.mark.parametrize("power", [0, 1.5, 2.0, True])
+    def test_invalid_power_raises(self, power):
+        with pytest.raises(ValueError):
+            self.make() ** power
+
+    def test_str_and_repr(self):
+        cpse = self.make()
+        assert "†" in str(cpse.adjoint()) and "†" not in str(cpse)
+        assert "is_adjoint=True" in repr(cpse.adjoint())

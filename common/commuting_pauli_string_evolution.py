@@ -9,6 +9,7 @@ Pauli string Hamiltonians:
 This exact decomposition is valid when all Pauli strings commute with each other.
 """
 
+import numbers
 from functools import cached_property
 from typing import TYPE_CHECKING, Dict, Iterable, Sequence, Tuple
 
@@ -101,6 +102,8 @@ class CommutingPauliStringEvolution(Bloq):
             Example: [("XYZ", 0.5), ("ZZI", 0.3)]
         time: Evolution time parameter.
         hbar: Reduced Planck constant (default 1.0 for natural units).
+        is_adjoint: If True, the operator is U^dagger. `adjoint()` flips it; `time` and the term
+            order are left as given, and the decomposition applies the terms in reverse order.
 
     Example:
         >>> terms = [("XZ", 0.5), ("ZX", 0.3)]  # These commute
@@ -113,6 +116,7 @@ class CommutingPauliStringEvolution(Bloq):
     pauli_terms: Tuple[Tuple[str, float], ...]
     time: float
     hbar: float = 1.0
+    is_adjoint: bool = False
 
     def __attrs_post_init__(self):
         """Validate that all Pauli strings commute and have the same length."""
@@ -187,28 +191,30 @@ class CommutingPauliStringEvolution(Bloq):
         assert len(soqs) == 1, f"Expected 1 register, got {len(soqs)}"
         reg_name, register = list(soqs.items())[0]
 
-        # Apply each PauliStringEvolution in sequence
-        for pauli_string, coefficient in self.pauli_terms:
-            pse = PauliStringEvolution(
-                pauli_string=pauli_string,
-                coefficient=coefficient,
-                time=self.time,
-                hbar=self.hbar
-            )
+        # Apply each PauliStringEvolution in sequence (reversed for the adjoint)
+        for pse in self._term_evolutions():
             register = bb.add(pse, q=register)
 
         return {reg_name: register}
 
-    def _t_complexity_(self) -> TComplexity:
-        """Return the T-complexity by summing individual term complexities."""
-        total_complexity = TComplexity()
-        for pauli_string, coefficient in self.pauli_terms:
-            pse = PauliStringEvolution(
+    def _term_evolutions(self) -> Tuple[PauliStringEvolution, ...]:
+        """One PauliStringEvolution per term, in the order they are applied."""
+        terms = reversed(self.pauli_terms) if self.is_adjoint else self.pauli_terms
+        return tuple(
+            PauliStringEvolution(
                 pauli_string=pauli_string,
                 coefficient=coefficient,
                 time=self.time,
-                hbar=self.hbar
+                hbar=self.hbar,
+                is_adjoint=self.is_adjoint,
             )
+            for pauli_string, coefficient in terms
+        )
+
+    def _t_complexity_(self) -> TComplexity:
+        """Return the T-complexity by summing individual term complexities."""
+        total_complexity = TComplexity()
+        for pse in self._term_evolutions():
             total_complexity += t_complexity(pse)
         return total_complexity
 
@@ -217,11 +223,27 @@ class CommutingPauliStringEvolution(Bloq):
         """Number of Pauli string terms in the Hamiltonian."""
         return len(self.pauli_terms)
 
+    def adjoint(self) -> 'CommutingPauliStringEvolution':
+        """Return U^dagger (flips `is_adjoint`; `time` and the terms are unchanged)."""
+        return attrs.evolve(self, is_adjoint=not self.is_adjoint)
+
+    def __pow__(self, power: int) -> 'CommutingPauliStringEvolution':
+        """U**k is the same evolution for k times the time; U**(-k) is (U**k).adjoint().
+
+        Raises ValueError for 0 and for non-integer powers.
+        """
+        if isinstance(power, bool) or not isinstance(power, numbers.Integral) or power == 0:
+            raise ValueError(f"Power must be a non-zero integer, got {power}")
+        return attrs.evolve(
+            self, time=self.time * abs(int(power)), is_adjoint=self.is_adjoint != (power < 0))
+
     def __str__(self) -> str:
         term_strs = [f"{coeff}*{ps}" for ps, coeff in self.pauli_terms]
         H_str = " + ".join(term_strs)
-        return f"exp(-i * ({H_str}) * {self.time} / {self.hbar})"
+        text = f"exp(-i * ({H_str}) * {self.time} / {self.hbar})"
+        return f"[{text}]†" if self.is_adjoint else text
 
     def __repr__(self) -> str:
+        adjoint = ", is_adjoint=True" if self.is_adjoint else ""
         return (f"CommutingPauliStringEvolution(pauli_terms={self.pauli_terms}, "
-                f"time={self.time}, hbar={self.hbar})")
+                f"time={self.time}, hbar={self.hbar}{adjoint})")

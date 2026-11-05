@@ -11,6 +11,7 @@ where:
     - ℏ is the reduced Planck constant (defaults to 1 in natural units)
 """
 
+import numbers
 from functools import cached_property
 from typing import TYPE_CHECKING, Dict, Tuple
 
@@ -43,6 +44,9 @@ class PauliStringEvolution(Bloq):
         coefficient: Scalar coefficient multiplying the Pauli string in the Hamiltonian.
         time: Evolution time parameter.
         hbar: Reduced Planck constant (default 1.0 for natural units).
+        is_adjoint: If True, the operator is U^dagger = exp(+i * coefficient * PauliString * time
+            / hbar). `adjoint()` flips it; `time` is left as given (a negative `time` is a
+            different object that happens to be analytically equal).
 
     Example:
         >>> pse = PauliStringEvolution(pauli_string="XYZ", coefficient=0.5, time=1.0)
@@ -55,6 +59,7 @@ class PauliStringEvolution(Bloq):
     coefficient: float
     time: float
     hbar: float = 1.0
+    is_adjoint: bool = False
 
     def __attrs_post_init__(self):
         """Validate the Pauli string, and store coefficient, time, and hbar as floats."""
@@ -95,11 +100,12 @@ class PauliStringEvolution(Bloq):
         # Build the Pauli string matrix
         P = self._get_pauli_matrix()
 
-        # Compute the evolution operator: exp(-i * coefficient * P * time / hbar)
+        # Compute the evolution operator: exp(-i * coefficient * P * time / hbar), conjugate
+        # transposed for the adjoint
         angle = -1j * self.coefficient * self.time / self.hbar
         U = expm(angle * P)
 
-        return U
+        return U.conj().T if self.is_adjoint else U
 
     def add_my_tensors(
         self,
@@ -135,8 +141,13 @@ class PauliStringEvolution(Bloq):
 
     @cached_property
     def _rotation_angle(self) -> float:
-        """Angle theta of Rz(theta) = exp(-i theta Z / 2) that implements the parity rotation."""
-        return 2.0 * self.coefficient * self.time / self.hbar
+        """Angle theta of Rz(theta) = exp(-i theta Z / 2) that implements the parity rotation.
+
+        The adjoint negates it; the basis changes and the CNOT chain are their own inverse around
+        the rotation, so they are unchanged.
+        """
+        sign = -1.0 if self.is_adjoint else 1.0
+        return sign * 2.0 * self.coefficient * self.time / self.hbar
 
     def build_composite_bloq(self, bb: BloqBuilder, q: NDArray[Soquet]) -> Dict[str, SoquetT]:
         """Decompose exactly (global phase included) into basis changes, CNOTs and one Rz.
@@ -149,7 +160,7 @@ class PauliStringEvolution(Bloq):
         q = np.array(q)
         active = self._active_qubits
         if not active:
-            bb.add(GlobalPhase(np.exp(-1j * self.coefficient * self.time / self.hbar)))
+            bb.add(GlobalPhase(np.exp(self._rotation_angle * -0.5j)))
             return {'q': q}
 
         for i in active:
@@ -179,9 +190,25 @@ class PauliStringEvolution(Bloq):
         num_cnots = 2 * (len(active) - 1)
         return TComplexity(clifford=num_basis + num_cnots) + t_complexity(Rz(self._rotation_angle))
 
+    def adjoint(self) -> 'PauliStringEvolution':
+        """Return U^dagger as a PauliStringEvolution (flips `is_adjoint`; `time` is unchanged)."""
+        return attrs.evolve(self, is_adjoint=not self.is_adjoint)
+
+    def __pow__(self, power: int) -> 'PauliStringEvolution':
+        """U**k is the same evolution for k times the time; U**(-k) is (U**k).adjoint().
+
+        Raises ValueError for 0 and for non-integer powers.
+        """
+        if isinstance(power, bool) or not isinstance(power, numbers.Integral) or power == 0:
+            raise ValueError(f"Power must be a non-zero integer, got {power}")
+        return attrs.evolve(
+            self, time=self.time * abs(int(power)), is_adjoint=self.is_adjoint != (power < 0))
+
     def __str__(self) -> str:
-        return f"exp(-i * {self.coefficient} * {self.pauli_string} * {self.time} / {self.hbar})"
+        text = f"exp(-i * {self.coefficient} * {self.pauli_string} * {self.time} / {self.hbar})"
+        return f"[{text}]†" if self.is_adjoint else text
 
     def __repr__(self) -> str:
+        adjoint = ", is_adjoint=True" if self.is_adjoint else ""
         return (f"PauliStringEvolution(pauli_string='{self.pauli_string}', "
-                f"coefficient={self.coefficient}, time={self.time}, hbar={self.hbar})")
+                f"coefficient={self.coefficient}, time={self.time}, hbar={self.hbar}{adjoint})")
