@@ -460,3 +460,86 @@ class TestNumericalPrecision:
         # Should be very close to identity
         expected = analytical_evolution("X", 1e-6, 1.0)
         assert np.allclose(U, expected)
+
+
+# ==================================================================================
+# Test: Exact decomposition and identity positions
+# ==================================================================================
+
+# Strings with identities in front, in the middle, at the end, all identities, and 1 qubit.
+DECOMPOSITION_STRINGS = ["Z", "X", "Y", "IZ", "ZI", "IIIZ", "XIYIZ", "II", "XYZ", "ZIIX", "IYI"]
+
+
+class TestExactDecomposition:
+    """The decomposition equals the exact matrix, global phase included (not "up to a phase")."""
+
+    @pytest.mark.parametrize("pauli_string", DECOMPOSITION_STRINGS)
+    @pytest.mark.parametrize("coefficient, time, hbar", [(0.37, 0.91, 1.0), (-0.62, 1.37, 1.7)])
+    def test_decomposition_equals_matrix(self, pauli_string, coefficient, time, hbar):
+        pse = PauliStringEvolution(pauli_string, coefficient, time, hbar)
+        np.testing.assert_allclose(
+            pse.decompose_bloq().tensor_contract(), pse.tensor_contract(), atol=1e-10)
+
+    @pytest.mark.parametrize("pauli_string", DECOMPOSITION_STRINGS)
+    def test_decomposition_equals_analytical_matrix(self, pauli_string):
+        """Independent of the class's own matrix code."""
+        pse = PauliStringEvolution(pauli_string, 0.43, 0.77)
+        expected = expm(-1j * 0.43 * 0.77 * pauli_string_to_matrix(pauli_string))
+        np.testing.assert_allclose(pse.decompose_bloq().tensor_contract(), expected, atol=1e-10)
+
+    def test_identity_positions_are_untouched(self):
+        """Only the two active qubits of "IXIZI" are used: one CNOT pair, no gates on the rest.
+
+        (Cirq's PauliStringPhasorGate treated I as Z, which added 2 CNOTs per identity.)
+        """
+        cbloq = PauliStringEvolution("IXIZI", 0.5, 0.3).decompose_bloq()
+        names = sorted(type(binst.bloq).__name__ for binst in cbloq.bloq_instances)
+        assert names == ["CNOT", "CNOT", "Hadamard", "Hadamard", "Rz"]
+
+
+class TestTrotterContractionsAgree:
+    """Trotter's fast contraction and its gate-by-gate "qualtran" contraction still agree."""
+
+    @pytest.mark.parametrize("method", ["first order", "second order", "fourth order"])
+    def test_fast_equals_qualtran(self, method):
+        from qhat.common.trotter_flattened import Trotterization
+        terms = [("XIZ", 0.5), ("IYI", 0.3), ("ZZI", -0.4), ("IXY", 0.2)]
+        kwargs = dict(pauli_terms=terms, method=method, time=0.83, num_steps=3)
+        fast = Trotterization.from_method(**kwargs).tensor_contract()
+        gates = Trotterization.from_method(
+            tensor_contraction_method="qualtran", **kwargs).tensor_contract()
+        np.testing.assert_allclose(fast, gates, atol=1e-10)
+
+
+class TestDecompositionCounts:
+    """T-complexity equals a hand count of the decomposition."""
+
+    # (string, Cliffords, rotations): H = 1 Clifford, S^dagger/S = 1 each, CNOT = 1.
+    #   X: H, H = 2.  Y: S^dagger, H, H, S = 4.  Parity ladder: 2 CNOTs per extra active qubit.
+    @pytest.mark.parametrize("pauli_string, cliffords, rotations", [
+        ("Z", 0, 1),
+        ("IIIZ", 0, 1),
+        ("X", 2, 1),
+        ("IYI", 4, 1),
+        ("IZ", 0, 1),
+        ("XIYIZ", 2 + 4 + 0 + 4, 1),      # 3 active qubits -> 4 CNOTs
+        ("XYZ", 2 + 4 + 0 + 4, 1),
+        ("ZZII", 2, 1),
+        ("II", 0, 0),
+        ("YY", 8 + 2, 1),
+    ])
+    def test_hand_count(self, pauli_string, cliffords, rotations):
+        tc = t_complexity(PauliStringEvolution(pauli_string, 0.37, 0.91))
+        assert (tc.t, tc.clifford, tc.rotations) == (0, cliffords, rotations)
+
+    @pytest.mark.parametrize("pauli_string", DECOMPOSITION_STRINGS)
+    def test_matches_counting_the_decomposition(self, pauli_string):
+        """The hand-coded `_t_complexity_` agrees with Qualtran counting the decomposition."""
+        pse = PauliStringEvolution(pauli_string, 0.37, 0.91)
+        assert pse._t_complexity_() == t_complexity(pse.decompose_bloq())
+
+    def test_identities_add_nothing(self):
+        """Padding a string with identities does not change its cost."""
+        base = t_complexity(PauliStringEvolution("XZ", 0.4, 0.8))
+        padded = t_complexity(PauliStringEvolution("IXIIZI", 0.4, 0.8))
+        assert base == padded
