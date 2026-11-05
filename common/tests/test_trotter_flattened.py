@@ -1687,7 +1687,7 @@ class TestTensorsInsideOtherBloqs:
 class TestAdjoint:
     """trotter.adjoint() is U^dagger and stays a Trotterization (keeping the fast contraction)."""
 
-    PAULI_TERMS = [("XZ", 0.5), ("ZY", 0.3), ("YX", 0.2)]
+    PAULI_TERMS = [("XZ", 0.5), ("ZI", 0.3), ("YX", 0.2)]
 
     @pytest.mark.parametrize("method", [
         "first order", "second order", "third order", "symmetrized ruth 1983", "fourth order",
@@ -1742,7 +1742,13 @@ class TestAdjoint:
 class TestAdjointFlag:
     """is_adjoint is a field: the adjoint keeps time, coefficients and term order as given."""
 
-    PAULI_TERMS = [("XZ", 0.5), ("ZY", 0.3), ("YX", 0.2)]
+    PAULI_TERMS = [("XZ", 0.5), ("ZI", 0.3), ("YX", 0.2)]
+
+    def test_terms_do_not_commute(self):
+        """With commuting terms, negating time would pass every matrix test here (F12)."""
+        from qhat.common.commuting_pauli_string_evolution import all_commute
+        for terms in (TestAdjoint.PAULI_TERMS, self.PAULI_TERMS, TestNegativePower.PAULI_TERMS):
+            assert not all_commute([p for p, _ in terms])
 
     def make(self, method="third order", **kwargs):
         return Trotterization.from_method(
@@ -1795,7 +1801,7 @@ class TestAdjointFlag:
 
 
 class TestNegativePower:
-    PAULI_TERMS = [("XZ", 0.5), ("ZY", 0.3), ("YX", 0.2)]
+    PAULI_TERMS = [("XZ", 0.5), ("ZI", 0.3), ("YX", 0.2)]
 
     def make(self, method="third order", **kwargs):
         return Trotterization.from_method(
