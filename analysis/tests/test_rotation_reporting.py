@@ -102,7 +102,8 @@ def test_end_to_end_fields_and_agreement(bloq_name):
 
 
 def test_converted_once_not_per_part():
-    """Total of two halves converted separately differs from the total converted once."""
+    """`algorithm_precision` is divided by the whole circuit's rotation count, i.e. the rotations
+    are totalled first and converted once (plan D11), not converted bloq by bloq."""
     u = trotter()
     whole = estimate_resources("qualtran", u, algorithm_precision=1e-4)["qualtran"]
     assert whole["rotation_precision"] == pytest.approx(1e-4 / u.t_complexity().rotations)
