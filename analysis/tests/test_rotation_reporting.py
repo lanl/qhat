@@ -131,3 +131,41 @@ def test_toml_records_only_what_was_set():
     config.algorithm_precision = 1e-4
     table = config._generate_TOML_table()
     assert table["algorithm_precision"] == 1e-4 and "rotation_gate_precision" not in table
+
+
+# --- through the driver --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("setting, value, precision_of", [
+    ("rotation_gate_precision", 1e-3, lambda rotations: 1e-3),
+    ("algorithm_precision", 1e-2, lambda rotations: 1e-2 / rotations)])
+def test_driver_uses_the_precision_setting(monkeypatch, tmp_path, setting, value, precision_of):
+    """A precision set in the input file reaches both estimators, not just the TOML (R3 finding 3).
+    The default (1e-10) would give about 103 T per rotation; 1e-3 gives about 32."""
+    import sys
+    import tomllib
+    from pathlib import Path
+    from qhat.analysis import driver
+    data = Path(__file__).parent / "data_pauli.json"
+    config_file = tmp_path / "config.py"
+    config_file.write_text(
+        f'general.output_directory = "{tmp_path}"\n'
+        f'hamiltonian.load_pauli_strings("{data}")\n'
+        'unitary.encode_ramped_trotter(energy_error=1e-1, trotter_order="second order", trotter_steps=3)\n'
+        'algorithm.method = "QPE: QHAT flexible"\n'
+        'algorithm.num_phase_qubits = 3\n'
+        'analysis.resource_estimator = ["qualtran", "pyliqtr"]\n'
+        f'analysis.{setting} = {value}\n')
+    monkeypatch.setattr(sys, "argv", ["driver.py", str(config_file)])
+    driver.run()
+    with open(list(tmp_path.glob("*.toml"))[0], "rb") as f:
+        toml = tomllib.load(f)
+
+    assert toml["analysis"][setting] == value
+    for name in ("qualtran", "pyliqtr"):
+        r = toml["resource_estimates"][name]
+        precision = precision_of(r["rotation_count"])
+        assert r["rotation_count"] > 0
+        assert r["rotation_precision"] == pytest.approx(precision)
+        assert r["T_count"] == (r["T_count_unconverted"]
+                                + t_per_rotation(precision) * r["rotation_count"])
+        assert t_per_rotation(precision) != t_per_rotation(DEFAULT_ROTATION_GATE_PRECISION)
