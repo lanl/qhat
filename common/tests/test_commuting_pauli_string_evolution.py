@@ -674,3 +674,23 @@ class TestOwnControlledBloq:
             CommutingPauliStringEvolution(self.TERMS, 0.83).controlled(CtrlSpec(cvs=(1, 1)))
         with pytest.raises(ValueError, match="multi_control_method"):
             CommutingPauliStringEvolution(self.TERMS, 0.83, multi_control_method="toffoli")
+
+
+class TestCallGraph:
+    """`build_call_graph` lists exactly the decomposition's term evolutions (plan T7)."""
+
+    TERMS = (("XZI", 0.3), ("ZXI", -0.4), ("III", 0.2), ("IIZ", 0.5))
+
+    @pytest.mark.parametrize("adjoint", [False, True])
+    @pytest.mark.parametrize("ctrls", [((), "ancilla"), ((0,), "ancilla"), ((1, 0), "ancilla"),
+                                       ((1, 0), "direct"), ((0, 1, 1), "ancilla")])
+    def test_equals_decomposition_call_graph(self, ctrls, adjoint):
+        ctrl_values, method = ctrls
+        cpse = CommutingPauliStringEvolution(self.TERMS, 0.7, hbar=0.9, is_adjoint=adjoint,
+                                             ctrl_values=ctrl_values, multi_control_method=method)
+        assert dict(cpse.build_call_graph(None)) == dict(
+            cpse.decompose_bloq().build_call_graph(None))
+
+    def test_repeated_term_is_counted_twice(self):
+        cpse = CommutingPauliStringEvolution((("XZ", 0.3), ("ZX", 0.1), ("XZ", 0.3)), 0.7)
+        assert dict(cpse.build_call_graph(None))[PauliStringEvolution("XZ", 0.3, 0.7)] == 2

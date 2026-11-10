@@ -780,3 +780,50 @@ class TestControlled:
         t_old, cliff_old = counts(Controlled(pse, CtrlSpec()))
         assert t_new == 2 * t_u
         assert t_new < t_old / 5 and cliff_new < cliff_old / 5
+
+
+class TestCallGraph:
+    """`build_call_graph` lists exactly the decomposition's gates, angles included (plan T7)."""
+
+    STRINGS = ["Z", "X", "Y", "I", "IZ", "ZI", "II", "IIIZ", "XIYIZ", "XYZ", "ZIIX", "IYI", "YYXZI"]
+    CONTROLS = [((), "ancilla"), ((1,), "ancilla"), ((0,), "ancilla"), ((1, 0), "ancilla"),
+                ((0, 1, 1), "ancilla"), ((1, 0), "direct"), ((0, 0), "direct"),
+                ((1, 0, 1), "direct")]
+
+    @pytest.mark.parametrize("adjoint", [False, True])
+    @pytest.mark.parametrize("ctrls", CONTROLS)
+    @pytest.mark.parametrize("pauli_string", STRINGS)
+    def test_equals_decomposition_call_graph(self, pauli_string, ctrls, adjoint):
+        ctrl_values, method = ctrls
+        pse = PauliStringEvolution(pauli_string, 0.37, 0.91, hbar=0.8, is_adjoint=adjoint,
+                                   ctrl_values=ctrl_values, multi_control_method=method)
+        assert dict(pse.build_call_graph(None)) == dict(pse.decompose_bloq().build_call_graph(None))
+
+    @pytest.mark.parametrize("ctrls", CONTROLS)
+    @pytest.mark.parametrize("pauli_string", STRINGS)
+    def test_costs_agree_with_t_complexity(self, pauli_string, ctrls):
+        """Without the AND ladder (which the two count differently), `QECGatesCost` through
+        the call graph gives the same Cliffords and rotations as `t_complexity`."""
+        from qualtran.resource_counting import get_cost_value, QECGatesCost
+        from qhat.common import controls
+        ctrl_values, method = ctrls
+        pse = PauliStringEvolution(pauli_string, 0.37, 0.91, ctrl_values=ctrl_values,
+                                   multi_control_method=method)
+        gates = get_cost_value(pse, QECGatesCost())
+        tc = t_complexity(pse)
+        assert gates.rotation == tc.rotations
+        if not controls.uses_and_ancilla(ctrl_values, method):
+            assert (gates.t, gates.clifford, gates.and_bloq) == (0, tc.clifford, 0)
+
+    def test_gate_list(self):
+        from qualtran.bloqs.basic_gates import CNOT, Hadamard, Rz
+        pse = PauliStringEvolution("IXIZI", 0.37, 0.91)
+        assert dict(pse.build_call_graph(None)) == {
+            Hadamard(): 2, CNOT(): 2, Rz(2 * 0.37 * 0.91): 1}
+
+    def test_no_zero_counts(self):
+        """1-qubit strings have no CNOT chain; it must not appear with count 0."""
+        for ctrl_values in [(), (1,)]:
+            counts = dict(PauliStringEvolution("Z", 0.3, 0.5, ctrl_values=ctrl_values)
+                          .build_call_graph(None))
+            assert all(n > 0 for n in counts.values())

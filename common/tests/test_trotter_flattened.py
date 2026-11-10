@@ -2055,3 +2055,104 @@ class TestControlled:
         c = estimate_resources("pyliqtr", trotter.controlled())["pyliqtr"]
         assert c["T_count"] == 2 * u["T_count"] > 0
         assert c["qubit_count"] == 4
+
+
+class TestCallGraph:
+    """`build_call_graph` gives the decomposition's callees without building it (plan T7)."""
+
+    PAULI_TERMS = [("XZI", 0.5), ("ZIY", 0.3), ("YXX", -0.2), ("III", 0.4)]
+
+    def make(self, method="fourth order", num_steps=3, ctrl_values=(), **kwargs):
+        trotter = Trotterization.from_method(
+            pauli_terms=self.PAULI_TERMS, method=method, time=0.43, num_steps=num_steps,
+            hbar=0.9, **kwargs)
+        for value in reversed(ctrl_values):
+            trotter = trotter.controlled(CtrlSpec(cvs=value))
+        return trotter
+
+    CASES = [
+        dict(method=method, num_steps=steps, ctrl_values=ctrls, multi_control_method=mcm)
+        for method in ["first order", "second order", "third order", "fourth order", (0.3, 0.7)]
+        for steps in [1, 3]
+        for ctrls, mcm in [((), "ancilla"), ((1,), "ancilla"), ((0,), "ancilla"),
+                           ((1, 0), "ancilla"), ((0, 1, 0), "ancilla"), ((1, 0), "direct"),
+                           ((0, 1, 0), "direct")]
+    ]
+
+    @pytest.mark.parametrize("adjoint", [False, True])
+    @pytest.mark.parametrize("case", CASES)
+    def test_equals_decomposition_call_graph(self, case, adjoint):
+        trotter = self.make(**case)
+        if adjoint:
+            trotter = trotter.adjoint()
+        assert dict(trotter.build_call_graph(None)) == dict(
+            trotter.decompose_bloq().build_call_graph(None))
+
+    @pytest.mark.parametrize("combine_terms", [True, False])
+    @pytest.mark.parametrize("power", [2, -3])
+    def test_equals_decomposition_call_graph_for_powers(self, combine_terms, power):
+        trotter = self.make("third order", ctrl_values=(0,), combine_terms=combine_terms) ** power
+        assert dict(trotter.build_call_graph(None)) == dict(
+            trotter.decompose_bloq().build_call_graph(None))
+
+    def test_one_step_has_no_zero_counts(self):
+        """With 1 step the bridge repeats 0 times; it must not appear as a callee."""
+        counts = dict(self.make("second order", num_steps=1).build_call_graph(None))
+        assert all(n > 0 for n in counts.values())
+        assert sum(counts.values()) == self.make("second order", num_steps=1).num_operations
+
+    def test_counts_add_up_to_num_operations(self):
+        trotter = self.make(num_steps=7, ctrl_values=(1,))
+        assert sum(n for _, n in trotter.build_call_graph(None)) == trotter.num_operations
+
+    def test_callees_carry_controls_and_adjoint(self):
+        trotter = self.make(ctrl_values=(0,)).adjoint()
+        for callee, _ in trotter.build_call_graph(None):
+            assert callee.ctrl_values == (0,)
+            assert callee.is_adjoint
+
+    def test_ancilla_method_ands_once(self):
+        from qualtran.bloqs.mcmt import MultiAnd
+        trotter = self.make(ctrl_values=(1, 0, 1))
+        counts = dict(trotter.build_call_graph(None))
+        assert counts == {MultiAnd(cvs=(1, 0, 1)): 1, MultiAnd(cvs=(1, 0, 1)).adjoint(): 1,
+                          attrs.evolve(trotter, ctrl_values=(1,)): 1}
+
+    @pytest.mark.parametrize("case", CASES)
+    def test_costs_agree_with_t_complexity(self, case):
+        """`QECGatesCost` (through the call graph) agrees with `t_complexity`.
+
+        The two count an `And` differently (`QECGatesCost`: 1 `and_bloq`, and 1 Clifford + 1
+        measurement for the uncompute; `t_complexity`: 4 T and some Cliffords). So with the AND
+        ladder the singly-controlled inner bloq is compared exactly, and the ladder is checked to
+        be k - 1 `And`s.
+        """
+        from qualtran.resource_counting import get_cost_value, QECGatesCost
+        from qhat.common import controls
+        trotter = self.make(**case)
+        tc = t_complexity(trotter)
+        gates = get_cost_value(trotter, QECGatesCost())
+        assert gates.rotation == tc.rotations
+        if not controls.uses_and_ancilla(trotter.ctrl_values, trotter.multi_control_method):
+            assert (gates.t, gates.clifford) == (tc.t, tc.clifford)
+            assert gates.and_bloq == gates.measurement == 0
+            return
+        inner = attrs.evolve(trotter, ctrl_values=(1,))
+        inner_gates = get_cost_value(inner, QECGatesCost())
+        assert (inner_gates.t, inner_gates.clifford, inner_gates.rotation) == (
+            0, t_complexity(inner).clifford, tc.rotations)
+        assert gates.and_bloq == gates.measurement == len(trotter.ctrl_values) - 1
+
+    def test_large_step_count_is_fast(self):
+        """5,000 steps: the default call graph took about 13 s for U and 4 min for QPE (T7)."""
+        import time as timer
+        from qualtran.resource_counting import get_bloq_call_graph, get_cost_value, QECGatesCost
+        from qhat.common.flexible_qpe import FlexibleQPE
+        trotter = self.make(num_steps=5000)
+        start = timer.time()
+        for bloq in (trotter, trotter.controlled(), self.make(num_steps=5000, ctrl_values=(1, 0)),
+                     FlexibleQPE(trotter, 4)):
+            get_bloq_call_graph(bloq)
+            gates = get_cost_value(bloq, QECGatesCost())
+            assert gates.rotation > 0
+        assert timer.time() - start < 5
