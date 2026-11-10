@@ -6,6 +6,7 @@ import tomlkit
 from pathlib import Path
 from tomlkit.toml_file import TOMLFile
 
+from qhat.common.controls import MULTI_CONTROL_METHODS
 from qhat.common.git_utils import get_git_hash
 
 logger = logging.getLogger(__name__)
@@ -142,6 +143,9 @@ class UnitaryConfiguration(ConfigurationBase):
         self.trotter_steps = kwargs.get("trotter_steps", None)
         self.phase_scale_factor = kwargs.get("phase_scale_factor", 1.01)
         self.tensor_contraction_method = kwargs.get("tensor_contraction_method", None)
+        # How a unitary with 2 or more controls is built ("ancilla" or "direct"); `None` means
+        # the default, "ancilla" (see common/controls.py)
+        self.multi_control_method = kwargs.get("multi_control_method", None)
         # Validate trotter_steps
         if self.trotter_steps is not None:
             if not isinstance(self.trotter_steps, int) or self.trotter_steps < 1:
@@ -163,6 +167,12 @@ class UnitaryConfiguration(ConfigurationBase):
                 raise ValueError(
                     f"tensor_contraction_method must be one of {valid_methods}, "
                     f"got '{self.tensor_contraction_method}'")
+        # Validate multi_control_method
+        if self.multi_control_method is not None:
+            if self.multi_control_method not in MULTI_CONTROL_METHODS:
+                raise ValueError(
+                    f"multi_control_method must be one of {list(MULTI_CONTROL_METHODS)}, "
+                    f"got '{self.multi_control_method}'")
     def encode_pauli_lcu(self, **kwargs):
         self._only_once()
         self.method = "pauli lcu"
@@ -184,6 +194,7 @@ class UnitaryConfiguration(ConfigurationBase):
         self.save_if_present(table, "trotter_steps")
         self.save_if_present(table, "phase_scale_factor")
         self.save_if_present(table, "tensor_contraction_method")
+        self.save_if_present(table, "multi_control_method")
         return table
 
 # -------------------------------------------------------------------------------------------------

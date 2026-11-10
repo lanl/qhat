@@ -726,11 +726,12 @@ class TestControlled:
         with pytest.raises(ValueError, match="single-qubit controls"):
             PauliStringEvolution("XZ", 0.37, 0.91).controlled(ctrl_spec)
 
-    def test_two_controls_not_implemented(self):
-        with pytest.raises(NotImplementedError):
-            PauliStringEvolution("XZ", 0.37, 0.91).controlled().controlled()
-        with pytest.raises(NotImplementedError):
-            PauliStringEvolution("XZ", 0.37, 0.91, ctrl_values=(1, 0))
+    def test_second_control_prepends(self):
+        from qualtran import CtrlSpec
+        pse = PauliStringEvolution("XZ", 0.37, 0.91)
+        assert pse.controlled().controlled() == PauliStringEvolution(
+            "XZ", 0.37, 0.91, ctrl_values=(1, 1))
+        assert pse.controlled().controlled(CtrlSpec(cvs=0)).ctrl_values == (0, 1)
 
     @pytest.mark.parametrize("ctrl_values", [(2,), (True,), (-1,)])
     def test_invalid_ctrl_values_raise(self, ctrl_values):

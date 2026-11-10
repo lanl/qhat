@@ -672,5 +672,5 @@ class TestOwnControlledBloq:
         from qualtran import CtrlSpec
         with pytest.raises(ValueError, match="single-qubit controls"):
             CommutingPauliStringEvolution(self.TERMS, 0.83).controlled(CtrlSpec(cvs=(1, 1)))
-        with pytest.raises(NotImplementedError):
-            CommutingPauliStringEvolution(self.TERMS, 0.83).controlled().controlled()
+        with pytest.raises(ValueError, match="multi_control_method"):
+            CommutingPauliStringEvolution(self.TERMS, 0.83, multi_control_method="toffoli")

@@ -283,7 +283,10 @@ class Trotterization(Bloq):
             the reversal themselves.
         ctrl_values: Controls, as in `PauliStringEvolution`: one entry per control qubit, 1 (act
             on |1>) or 0 (act on |0>); empty for no control. `.controlled()` prepends one. Every
-            term of the decomposition gets the same controls. At most one for now.
+            term of the decomposition gets the same controls.
+        multi_control_method: How 2 or more controls are built, "ancilla" (default) or "direct";
+            see `common/controls.py`. With "ancilla" the controls are ANDed once for the whole
+            Trotterization, and each term gets one control. Ignored with 0 or 1 controls.
 
     Example:
         >>> # Second-order Trotterization using named method
@@ -321,6 +324,7 @@ class Trotterization(Bloq):
     tensor_contraction_method: Optional[str] = None
     is_adjoint: bool = False
     ctrl_values: Tuple[int, ...] = ()
+    multi_control_method: str = controls.DEFAULT_MULTI_CONTROL_METHOD
 
     def __attrs_post_init__(self):
         """Validate inputs."""
@@ -352,6 +356,7 @@ class Trotterization(Bloq):
         object.__setattr__(self, "hbar", require_real_scalar("Trotterization hbar", self.hbar))
         object.__setattr__(self, "ctrl_values",
                            controls.validate_ctrl_values("Trotterization", self.ctrl_values))
+        controls.validate_multi_control_method("Trotterization", self.multi_control_method)
 
         # Initialize pattern basics
         object.__setattr__(self, "_prologue", ())
@@ -445,7 +450,8 @@ class Trotterization(Bloq):
         num_steps: int,
         hbar: float = 1.0,
         combine_terms: bool = True,
-        tensor_contraction_method: Optional[str] = None
+        tensor_contraction_method: Optional[str] = None,
+        multi_control_method: str = controls.DEFAULT_MULTI_CONTROL_METHOD,
     ):
         """Create Trotterization using a named method.
 
@@ -460,6 +466,7 @@ class Trotterization(Bloq):
                 None or "auto" = auto-select based on step count
                 "incremental" = force O(n) incremental contraction
                 "structured" = force O(log n) structured contraction (raises error if pattern not detected)
+            multi_control_method: How 2 or more controls are built, "ancilla" or "direct".
 
         Returns:
             Trotterization instance
@@ -480,7 +487,8 @@ class Trotterization(Bloq):
             num_steps=num_steps,
             hbar=hbar,
             combine_terms=combine_terms,
-            tensor_contraction_method=tensor_contraction_method
+            tensor_contraction_method=tensor_contraction_method,
+            multi_control_method=multi_control_method,
         )
 
     @cached_property
@@ -519,8 +527,12 @@ class Trotterization(Bloq):
 
         Uses the expanded sequence with combined terms for efficiency. The adjoint applies the
         sequence in reverse order, with each term adjointed. Under control every term gets the
-        same controls.
+        same controls. With 2 or more controls and the "ancilla" method, the controls are first
+        ANDed into one ancilla, which controls a singly-controlled Trotterization.
         """
+        if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
+            return controls.add_with_and_ancilla(bb, self, **soqs)
+
         # Time step for each Trotterization step
         dt = self.time / self.num_steps
 
@@ -538,6 +550,7 @@ class Trotterization(Bloq):
                 hbar=self.hbar,
                 is_adjoint=self.is_adjoint,
                 ctrl_values=self.ctrl_values,
+                multi_control_method=self.multi_control_method,
             )
             soqs = bb.add_d(cpse, **soqs)
 
@@ -550,8 +563,12 @@ class Trotterization(Bloq):
         times each term appears and compute the complexity once per unique term.
 
         Uses CommutingPauliStringEvolution to match the decomposition used in
-        build_composite_bloq, with the same controls.
+        build_composite_bloq, with the same controls. The "ancilla" method adds the AND ladder
+        once and counts the terms with one control.
         """
+        if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
+            return controls.and_ancilla_t_complexity(self)
+
         # Count occurrences of each term in the expanded sequence
         term_counts = {}
         # -- prologue happens once
@@ -580,6 +597,7 @@ class Trotterization(Bloq):
                 time=1.0,         # Dummy value - doesn't affect complexity
                 hbar=1.0,
                 ctrl_values=self.ctrl_values,
+                multi_control_method=self.multi_control_method,
             )
             term_complexity = t_complexity(cpse)
             total_complexity += count * term_complexity
@@ -791,7 +809,7 @@ class Trotterization(Bloq):
 
     def __repr__(self) -> str:
         adjoint = ", is_adjoint=True" if self.is_adjoint else ""
-        ctrl = f", ctrl_values={self.ctrl_values}" if self.ctrl_values else ""
+        ctrl = controls.ctrl_repr(self.ctrl_values, self.multi_control_method)
         return (f"Trotterization(pauli_terms={self.pauli_terms}, "
                 f"coefficients={self.coefficients}, time={self.time}, "
                 f"num_steps={self.num_steps}, hbar={self.hbar}{adjoint}{ctrl})")
@@ -858,13 +876,13 @@ class Trotterization(Bloq):
         return controls.get_ctrl_system(self, ctrl_spec)
 
     def my_static_costs(self, cost_key: 'CostKey'):
-        """`QubitCount` without decomposing: the qubits plus the controls.
+        """`QubitCount` without decomposing: the qubits, the controls, and the k-1 AND ancillas of
+        the "ancilla" method with k >= 2 controls.
 
-        The decomposition allocates no ancillas, so the peak number of qubits in use is the width
-        of the registers.
+        Nothing else in the decomposition allocates qubits, so this is the peak number in use.
         """
         if isinstance(cost_key, QubitCount):
-            return self.num_qubits + len(self.ctrl_values)
+            return controls.peak_qubits(self.num_qubits, self.ctrl_values, self.multi_control_method)
         return NotImplemented
 
 
@@ -878,7 +896,8 @@ def build_ramped_trotterized_unitary(
     timestep: float,
     numsteps: int,
     combine_terms: bool = True,
-    tensor_contraction_method: Optional[str] = None
+    tensor_contraction_method: Optional[str] = None,
+    multi_control_method: str = controls.DEFAULT_MULTI_CONTROL_METHOD,
 ):
     """Build a Trotterization using the old interface for backward compatibility.
 
@@ -897,6 +916,7 @@ def build_ramped_trotterized_unitary(
             "incremental" = force O(n) incremental contraction
             "structured" = force O(log n) structured contraction (raises error if pattern not detected)
             "qualtran" = contract the decomposition gate by gate with Qualtran (reference)
+        multi_control_method: How 2 or more controls are built, "ancilla" or "direct".
 
     Returns:
         Trotterization instance
@@ -918,5 +938,6 @@ def build_ramped_trotterized_unitary(
         num_steps=numsteps,
         hbar=1.0,
         combine_terms=combine_terms,
-        tensor_contraction_method=tensor_contraction_method
+        tensor_contraction_method=tensor_contraction_method,
+        multi_control_method=multi_control_method,
     )
