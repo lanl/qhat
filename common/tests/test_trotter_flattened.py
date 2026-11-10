@@ -1874,7 +1874,7 @@ def hand_count(trotter):
         if not active:
             total += n * TComplexity(rotations=1)
             continue
-        basis = sum({'X': 2, 'Y': 5, 'Z': 0}[p] for p in active)
+        basis = sum({'X': 2, 'Y': 4, 'Z': 0}[p] for p in active)
         total += n * TComplexity(clifford=basis + 2 * (len(active) - 1) + 2, rotations=2)
     return total
 

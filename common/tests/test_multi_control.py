@@ -133,14 +133,14 @@ class TestPauliStringEvolution:
 
     @pytest.mark.parametrize("ctrl_values", [(1, 0), (0, 1, 1)])
     def test_hand_count(self, ctrl_values):
-        """`XYZI`: basis changes 2 (X) + 5 (Y) and a 4-CNOT ladder are 11 Cliffords."""
+        """`XYZI`: basis changes 2 (X) + 4 (Y) and a 4-CNOT ladder are 10 Cliffords."""
         k = len(ctrl_values)
         pse = PauliStringEvolution("XYZI", 0.37, 0.91, ctrl_values=ctrl_values)
         direct = attrs.evolve(pse, multi_control_method="direct")
         # "direct": the rotation becomes 2^k rotations and 2^k CNOTs
-        assert t_complexity(direct) == TComplexity(clifford=11 + 2 ** k, rotations=2 ** k)
+        assert t_complexity(direct) == TComplexity(clifford=10 + 2 ** k, rotations=2 ** k)
         # "ancilla": the AND ladder, then the singly-controlled term (2 rotations, 2 CNOTs)
-        assert t_complexity(pse) == and_cost(ctrl_values) + TComplexity(clifford=13, rotations=2)
+        assert t_complexity(pse) == and_cost(ctrl_values) + TComplexity(clifford=12, rotations=2)
         assert and_cost(ctrl_values).t == 4 * (k - 1)
 
     @pytest.mark.parametrize("ctrl_values", [(1, 0), (0, 1, 1)])
@@ -286,7 +286,7 @@ class TestTrotterization:
             if not active:
                 expected += n * TComplexity(clifford=2 ** k - 2, rotations=2 ** k - 1)
                 continue
-            basis = sum({'X': 2, 'Y': 5, 'Z': 0}[p] for p in active)
+            basis = sum({'X': 2, 'Y': 4, 'Z': 0}[p] for p in active)
             expected += n * TComplexity(clifford=basis + 2 * (len(active) - 1) + 2 ** k,
                                         rotations=2 ** k)
         assert t_complexity(direct) == expected
