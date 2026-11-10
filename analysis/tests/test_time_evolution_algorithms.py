@@ -355,3 +355,19 @@ if __name__ == "__main__":
 
     # Run with pytest
     pytest.main([__file__, "-v"])
+
+
+def test_controlled_time_evolution_of_trotterization_is_own_bloq():
+    """Controlled time evolution keeps a Trotterization (plan T4), exactly controlled."""
+    from qhat.common.trotter_flattened import Trotterization
+    unitary = Trotterization.from_method(
+        [("XZ", 0.5), ("ZI", 0.3), ("YX", 0.2)], "fourth order", time=0.43, num_steps=3)
+    config = AlgorithmConfiguration()
+    config.method = "controlled time evolution"
+    algorithm = build_algorithm(config, unitary)
+    assert type(algorithm) is Trotterization and algorithm.ctrl_values == (1,)
+    d = 2 ** unitary.num_qubits
+    expected = np.eye(2 * d, dtype=complex)
+    expected[d:, d:] = unitary.tensor_contract()
+    np.testing.assert_allclose(algorithm.tensor_contract(), expected, atol=1e-12)
+    np.testing.assert_allclose(algorithm.decompose_bloq().tensor_contract(), expected, atol=1e-12)

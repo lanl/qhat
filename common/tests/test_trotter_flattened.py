@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 from scipy.linalg import expm
 
+from qualtran import CtrlSpec, QUInt
 from qualtran.cirq_interop.t_complexity_protocol import t_complexity
 
 from qhat.common.pauli_utils import pauli_string_to_matrix
@@ -1831,3 +1832,228 @@ class TestNegativePower:
     def test_numpy_integer_power(self):
         trotter = self.make()
         assert trotter ** np.int64(-2) == trotter ** -2
+
+
+# ==================================================================================
+# Test: Controlled Trotterization
+# ==================================================================================
+
+def reference_trotter_matrix(pauli_terms, coefficients, time, num_steps, hbar=1.0):
+    """Trotter product built directly from expm of each term, without the class's sequence logic.
+
+    Each step applies one ramp per coefficient, alternating forward and backward term order.
+    """
+    dt = time / num_steps
+    dim = 2 ** len(pauli_terms[0][0])
+    result = np.eye(dim, dtype=complex)
+    for _ in range(num_steps):
+        for i, coeff in enumerate(coefficients):
+            ramp = pauli_terms if i % 2 == 0 else pauli_terms[::-1]
+            for pauli_string, h in ramp:
+                P = pauli_string_to_matrix(pauli_string)
+                result = expm(-1j * h * coeff * dt * P / hbar) @ result
+    return result
+
+
+def block_matrix(unitary, ctrl_value):
+    """U on the block where the control equals `ctrl_value`, identity on the other block."""
+    d = unitary.shape[0]
+    result = np.eye(2 * d, dtype=complex)
+    result[ctrl_value * d:(ctrl_value + 1) * d, ctrl_value * d:(ctrl_value + 1) * d] = unitary
+    return result
+
+
+def hand_count(trotter):
+    """Controlled cost per term occurrence: uncontrolled Cliffords + 2 CNOTs and 2 rotations;
+    an all-identity term is 1 rotation on the control."""
+    from collections import Counter
+    from qualtran.cirq_interop.t_complexity_protocol import TComplexity
+    total = TComplexity()
+    for idx, n in Counter(i for i, _ in trotter.expanded_sequence).items():
+        active = [p for p in trotter.pauli_terms[idx][0] if p != 'I']
+        if not active:
+            total += n * TComplexity(rotations=1)
+            continue
+        basis = sum({'X': 2, 'Y': 4, 'Z': 0}[p] for p in active)
+        total += n * TComplexity(clifford=basis + 2 * (len(active) - 1) + 2, rotations=2)
+    return total
+
+
+class TestControlled:
+    """`.controlled()` is our own Trotterization: exact, fast, and with no Qualtran wrappers."""
+
+    PAULI_TERMS = [("XZI", 0.5), ("ZIY", 0.3), ("YXX", -0.2), ("III", 0.4)]
+    METHODS = {"first order": (1.0,), "third order": get_trotterization_coefficients(3),
+               "fourth order": get_trotterization_coefficients(4), "custom": (0.3, 0.7)}
+
+    def make(self, method="third order", num_steps=3, terms=None, **kwargs):
+        return Trotterization(
+            pauli_terms=tuple(terms or self.PAULI_TERMS), coefficients=self.METHODS[method],
+            time=0.43, num_steps=num_steps, hbar=0.9, **kwargs)
+
+    def reference(self, method="third order", num_steps=3, terms=None):
+        return reference_trotter_matrix(
+            terms or self.PAULI_TERMS, self.METHODS[method], 0.43, num_steps, hbar=0.9)
+
+    def test_terms_do_not_commute(self):
+        from qhat.common.commuting_pauli_string_evolution import all_commute
+        assert not all_commute([p for p, _ in self.PAULI_TERMS])
+
+    def test_reference_matches_uncontrolled(self):
+        for method in self.METHODS:
+            np.testing.assert_allclose(
+                self.make(method).tensor_contract(), self.reference(method), atol=1e-12)
+
+    @pytest.mark.parametrize("method", ["first order", "third order", "fourth order", "custom"])
+    @pytest.mark.parametrize("ctrl_value", [1, 0])
+    @pytest.mark.parametrize("adjoint", [False, True])
+    @pytest.mark.parametrize("contraction", [None, "incremental", "structured", "qualtran"])
+    @pytest.mark.parametrize("combine_terms", [True, False])
+    def test_matches_block_matrix(self, method, ctrl_value, adjoint, contraction, combine_terms):
+        trotter = self.make(method, tensor_contraction_method=contraction,
+                            combine_terms=combine_terms)
+        if adjoint:
+            trotter = trotter.adjoint()
+        controlled = trotter.controlled(CtrlSpec(cvs=ctrl_value))
+        u = self.reference(method)
+        expected = block_matrix(u.conj().T if adjoint else u, ctrl_value)
+        np.testing.assert_allclose(controlled.tensor_contract(), expected, atol=1e-12)
+
+    @pytest.mark.parametrize("method", ["first order", "fourth order", "custom"])
+    @pytest.mark.parametrize("ctrl_value", [1, 0])
+    @pytest.mark.parametrize("adjoint", [False, True])
+    def test_decomposition_matches_block_matrix(self, method, ctrl_value, adjoint):
+        trotter = self.make(method, num_steps=2)
+        if adjoint:
+            trotter = trotter.adjoint()
+        controlled = trotter.controlled(CtrlSpec(cvs=ctrl_value))
+        u = self.reference(method, num_steps=2)
+        expected = block_matrix(u.conj().T if adjoint else u, ctrl_value)
+        np.testing.assert_allclose(
+            controlled.decompose_bloq().tensor_contract(), expected, atol=1e-12)
+
+    def test_type_fields_and_registers(self):
+        trotter = self.make()
+        controlled = trotter.controlled()
+        assert type(controlled) is Trotterization
+        assert controlled.ctrl_values == (1,)
+        assert trotter.controlled(CtrlSpec(cvs=0)).ctrl_values == (0,)
+        assert [reg.name for reg in controlled.signature] == ['ctrl', 'q']
+        assert controlled.signature.n_qubits() == trotter.num_qubits + 1
+        assert controlled != trotter.controlled(CtrlSpec(cvs=0))
+
+    def test_terms_carry_the_controls(self):
+        from qhat.common.commuting_pauli_string_evolution import CommutingPauliStringEvolution
+        controlled = self.make().controlled(CtrlSpec(cvs=0))
+        subbloqs = [binst.bloq for binst, _, _ in controlled.decompose_bloq().iter_bloqnections()]
+        assert subbloqs and all(type(b) is CommutingPauliStringEvolution for b in subbloqs)
+        assert all(b.ctrl_values == (0,) for b in subbloqs)
+
+    def test_controlled_and_adjoint_commute(self):
+        trotter = self.make()
+        for cv in (0, 1):
+            spec = CtrlSpec(cvs=cv)
+            assert trotter.controlled(spec).adjoint() == trotter.adjoint().controlled(spec)
+            assert type(trotter.controlled(spec).adjoint()) is Trotterization
+            assert trotter.controlled(spec).adjoint().adjoint() == trotter.controlled(spec)
+
+    @pytest.mark.parametrize("k", [2, 3, -1, -2])
+    def test_powers_keep_the_controls(self, k):
+        trotter = self.make()
+        controlled = trotter.controlled(CtrlSpec(cvs=0))
+        assert controlled ** k == (trotter ** k).controlled(CtrlSpec(cvs=0))
+        u = np.linalg.matrix_power(self.reference(), abs(k))
+        expected = block_matrix(u.conj().T if k < 0 else u, 0)
+        np.testing.assert_allclose((controlled ** k).tensor_contract(), expected, atol=1e-10)
+
+    @pytest.mark.parametrize("method", ["first order", "third order", "fourth order"])
+    @pytest.mark.parametrize("ctrl_value", [1, 0])
+    def test_t_complexity_hand_count(self, method, ctrl_value):
+        trotter = self.make(method, num_steps=4)
+        controlled = trotter.controlled(CtrlSpec(cvs=ctrl_value))
+        assert t_complexity(controlled) == hand_count(trotter)
+        assert t_complexity(controlled.adjoint()) == hand_count(trotter)
+
+    def test_t_complexity_matches_decomposition(self):
+        """The fast count equals Qualtran counting the decomposition term by term."""
+        from qualtran.cirq_interop.t_complexity_protocol import TComplexity
+        controlled = self.make("fourth order", num_steps=3).controlled()
+        from_decomposition = TComplexity()
+        for binst, _, _ in controlled.decompose_bloq().iter_bloqnections():
+            from_decomposition += t_complexity(binst.bloq)
+        assert t_complexity(controlled) == from_decomposition
+
+    @pytest.mark.parametrize("ctrl_value", [1, 0])
+    def test_qubit_count(self, ctrl_value):
+        from qualtran.resource_counting import get_cost_value, QubitCount
+        from qualtran.resource_counting._qubit_counts import _cbloq_max_width
+        trotter = self.make()
+        controlled = trotter.controlled(CtrlSpec(cvs=ctrl_value))
+        assert get_cost_value(trotter, QubitCount()) == 3
+        assert get_cost_value(controlled, QubitCount()) == 4
+        from_decomposition = _cbloq_max_width(
+            controlled.decompose_bloq()._binst_graph, lambda b: get_cost_value(b, QubitCount()))
+        assert from_decomposition == 4
+
+    @pytest.mark.parametrize("ctrl_value", [1, 0])
+    def test_one_qubit_trotter(self, ctrl_value):
+        """F7: the controlled 1-qubit Trotter used to crash in Qualtran's Controlled."""
+        terms = [("X", 0.5), ("Z", 0.3)]
+        trotter = self.make("fourth order", terms=terms)
+        controlled = trotter.controlled(CtrlSpec(cvs=ctrl_value))
+        expected = block_matrix(self.reference("fourth order", terms=terms), ctrl_value)
+        np.testing.assert_allclose(controlled.tensor_contract(), expected, atol=1e-12)
+        np.testing.assert_allclose(
+            controlled.decompose_bloq().tensor_contract(), expected, atol=1e-12)
+        assert t_complexity(controlled) == hand_count(trotter)
+
+    def test_inside_composite_bloq_uses_fast_path(self):
+        controlled = self.make(num_steps=500).controlled(CtrlSpec(cvs=0))
+        expected = block_matrix(self.reference(num_steps=500), 0)
+        with _no_decomposition():
+            U = controlled.as_composite_bloq().tensor_contract()
+        np.testing.assert_allclose(U, expected, atol=1e-10)
+
+    def test_second_control_not_implemented(self):
+        with pytest.raises(NotImplementedError):
+            self.make().controlled().controlled()
+        with pytest.raises(NotImplementedError):
+            self.make(ctrl_values=(1, 0))
+
+    @pytest.mark.parametrize("spec", [
+        CtrlSpec(cvs=(1, 1)), CtrlSpec(qdtypes=QUInt(2), cvs=2), CtrlSpec(cvs=np.array([1, 0]))])
+    def test_unsupported_ctrl_spec_raises(self, spec):
+        with pytest.raises(ValueError, match="Only single-qubit controls"):
+            self.make().controlled(spec)
+
+    @pytest.mark.parametrize("values", [(2,), (True,), (-1,)])
+    def test_invalid_ctrl_values_raise(self, values):
+        with pytest.raises(ValueError):
+            self.make(ctrl_values=values)
+
+    def test_str_and_repr_show_controls(self):
+        trotter = self.make()
+        assert str(trotter.controlled(CtrlSpec(cvs=0))).startswith("C[0](Trotterization(")
+        assert "ctrl_values=(1,)" in repr(trotter.controlled())
+        assert "ctrl_values" not in repr(trotter)
+
+    def test_large_step_count_is_fast(self):
+        import time as timer
+        from qualtran.resource_counting import get_cost_value, QubitCount
+        controlled = self.make("fourth order", num_steps=5000).controlled()
+        start = timer.time()
+        tc = t_complexity(controlled)
+        qubits = get_cost_value(controlled, QubitCount())
+        controlled.tensor_contract()
+        assert timer.time() - start < 5
+        assert tc == hand_count(self.make("fourth order", num_steps=5000))
+        assert qubits == 4
+
+    def test_pyliqtr_controlled_cost_is_twice_uncontrolled(self):
+        """D10: each controlled term synthesizes 2 rotations; no all-identity term here."""
+        from qhat.analysis.resource_estimation import estimate_resources
+        trotter = self.make("fourth order", terms=self.PAULI_TERMS[:3])
+        u = estimate_resources("pyliqtr", trotter)["pyliqtr"]
+        c = estimate_resources("pyliqtr", trotter.controlled())["pyliqtr"]
+        assert c["T_count"] == 2 * u["T_count"] > 0
+        assert c["qubit_count"] == 4
