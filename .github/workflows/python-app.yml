@@ -9,9 +9,15 @@ on:
 permissions:
   contents: read
 
+# Both jobs are pinned to ubuntu-24.04 instead of ubuntu-latest. When ubuntu-latest moved to
+# ubuntu-26.04 (November 2026), the pyLIQTR jobs (pauli-lcu, dbl-factor) started failing: juliapkg
+# downloads and installs Julia 1.9.4, but then can't run it (`julia --version` fails), so juliapkg
+# stops at `assert pr_ver is not None`. pyLIQTR requires this older Julia (~1.9); we have had
+# problems updating to a newer Julia with pyLIQTR. GitHub's support for the ubuntu-24.04 runner
+# is estimated to end around April 2027, so this needs revisiting before then.
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned; see the note above `jobs:`
     steps:
     - uses: actions/checkout@v6
 
@@ -59,7 +65,7 @@ jobs:
         retention-days: 7
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned; see the note above `jobs:`
     needs: build
     strategy:
       fail-fast: false
