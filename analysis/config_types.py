@@ -233,6 +233,11 @@ class AnalysisConfiguration(ConfigurationBase):
         # Do resource estimation (e.g., qubit and gate counts)
         # Can be a string ('pyliqtr', 'qualtran', 'cirq') or list (['pyliqtr', 'qualtran'])
         self.resource_estimator = None
+        # Precision for converting rotations to T gates; set at most one (see convert_rotations)
+        # -- rotation_gate_precision: for each rotation (default 1e-10)
+        # -- algorithm_precision: total, divided by the number of rotations
+        self.rotation_gate_precision = None
+        self.algorithm_precision = None
         # Write unitary matrix of full algorithm to a file
         self.algorithm_matrix_output_file = None
         # Do numerical simulation with the provided starting state(s)
@@ -355,6 +360,8 @@ class AnalysisConfiguration(ConfigurationBase):
     def _generate_TOML_table(self):
         table = tomlkit.table()
         self.save_if_present(table, "resource_estimator")
+        self.save_if_present(table, "rotation_gate_precision")
+        self.save_if_present(table, "algorithm_precision")
         self.save_if_present(table, "algorithm_matrix_output_file")
         self.save_if_present(table, "numerical_simulation_inputs")
         self.save_if_present(table, "matrix_memory_threshold_gb")

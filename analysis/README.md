@@ -307,6 +307,12 @@ discussed below.
 - **pyLIQTR Resource Estimation**: Setting `analysis.resource_estimator` to "pyLIQTR" will use the
   resource estimation capability from pyLIQTR, which is in turn based on the resource estimation
   capability from Qualtran.
+- **Rotations**: Both estimators count every rotation as one rotation, total them, and convert the
+  total to T and Clifford gates once at the end, using pyLIQTR's fit (about 3.02 log2(1/precision)
+  T gates per rotation). The results hold `rotation_count`, the unconverted `T_count_unconverted`
+  and `Clifford_count_unconverted`, and the converted `T_count` and `Clifford_count`. Set
+  `analysis.rotation_gate_precision` (per rotation; default 1e-10) or
+  `analysis.algorithm_precision` (total, divided by the number of rotations), not both.
 - **Cirq Resource Estimation**: Setting `analysis.resource_estimator` to "Cirq" is available but
   deprecated and may not work correctly.
 
