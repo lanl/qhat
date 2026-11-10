@@ -11,10 +11,12 @@ import math
 from qhat.common.hermiticity import require_real_scalar
 from qhat.common.logging_utils import configure_logging
 from qhat.analysis.algorithm import (
-    build_algorithm, check_unitary_supports_algorithm, qpe_energy_window)
+    build_algorithm, check_algorithm_settings, check_unitary_supports_algorithm,
+    qpe_energy_window)
 from qhat.analysis.analysis import analyze_algorithm
 from qhat.analysis.configuration import load_configuration
 from qhat.analysis.hamiltonian import get_physical_hamiltonian
+from qhat.analysis.qubit_summary import log_qubit_summary
 from qhat.analysis.unitary import encode_as_unitary
 
 logger = logging.getLogger("qhat.analysis.driver")
@@ -96,6 +98,7 @@ def run():
 
     # Algorithm ___________________________________________________________________________________
 
+    check_algorithm_settings(state.config_algorithm, unitary_hamiltonian)
     algorithm = build_algorithm(
             state.config_algorithm,
             unitary_hamiltonian)
@@ -115,6 +118,7 @@ def run():
 
     # Save Results ________________________________________________________________________________
 
+    log_qubit_summary(state.config_algorithm, unitary_hamiltonian, algorithm)
     state.show_results()
     state.save_summary()
 
