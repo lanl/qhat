@@ -333,6 +333,21 @@ def log_multi_control_method(unitary, num_controls: int):
     logger.info(f"-- multi-control method: \"{method}\" ({num_controls} controls), "
                 f"{ancillas} ancillas added")
 
+def log_controlled_rotation_method(unitary):
+    """Log how a controlled unitary controls its rotations, and the ancilla that adds (plan T10).
+
+    Unitaries without a `controlled_rotation_method` field log nothing.
+    """
+    method = getattr(unitary, "controlled_rotation_method", None)
+    if method is None:
+        return
+    if method == "ancilla":
+        logger.info("-- controlled-rotation method: \"ancilla\" (AND ancilla per rotation, 1 "
+                    "rotation + 4 T each), 1 ancilla added")
+    else:
+        logger.info(f"-- controlled-rotation method: \"{method}\" (2 rotations each), "
+                    "0 ancillas added")
+
 def build_algorithm(
         config_algorithm: AlgorithmConfiguration,
         unitary):
@@ -344,6 +359,7 @@ def build_algorithm(
     # Every controlled algorithm but "controlled time evolution" controls the unitary on one qubit
     if is_controlled_algorithm(config_algorithm):
         log_multi_control_method(unitary, len(control_values(config_algorithm)))
+        log_controlled_rotation_method(unitary)
 
     if config_algorithm.method.lower() in ("qpe: qualtran textbook",):
         return build_qpe_qualtran_textbook(config_algorithm, unitary)

@@ -24,7 +24,7 @@ from pyLIQTR.ProblemInstances.ChemicalHamiltonian import ChemicalHamiltonian
 from qhat.analysis.config_types import UnitaryConfiguration
 from qhat.analysis.ordering import reorder_paulis
 from qhat.analysis.utils import value
-from qhat.common.controls import DEFAULT_MULTI_CONTROL_METHOD
+from qhat.common.controls import DEFAULT_CONTROLLED_ROTATION_METHOD, DEFAULT_MULTI_CONTROL_METHOD
 from qhat.common.hermiticity import DEFAULT_RTOL, max_relative_imaginary, require_real_scalar
 
 logger = logging.getLogger(__name__)
@@ -238,9 +238,10 @@ def encode_ramped_trotter(
             f"Invalid trotter_implementation '{trotter_impl}'. "
             f"Must be 'original' or 'flattened'."
         )
-    if trotter_impl == 'original' and getattr(config_unitary, 'multi_control_method', None):
-        raise ValueError(
-            "multi_control_method is only supported with trotter_implementation='flattened'.")
+    for option in ('multi_control_method', 'controlled_rotation_method'):
+        if trotter_impl == 'original' and getattr(config_unitary, option, None):
+            raise ValueError(
+                f"{option} is only supported with trotter_implementation='flattened'.")
     if trotter_impl == 'original':
         logger.warning(
             "trotter_implementation='original' is deprecated and will be removed in a future "
@@ -381,6 +382,7 @@ def encode_ramped_trotter(
         # Pass combine_terms and tensor_contraction_method parameters only for flattened implementation
         tensor_contraction_method = getattr(config_unitary, 'tensor_contraction_method', None)
         multi_control_method = getattr(config_unitary, 'multi_control_method', None)
+        controlled_rotation_method = getattr(config_unitary, 'controlled_rotation_method', None)
         return build_ramped_trotterized_unitary(
                 pauli_strings.items(),
                 method,
@@ -388,7 +390,9 @@ def encode_ramped_trotter(
                 Nsteps,
                 combine_terms=config_unitary.trotter_combine_terms,
                 tensor_contraction_method=tensor_contraction_method,
-                multi_control_method=multi_control_method or DEFAULT_MULTI_CONTROL_METHOD)
+                multi_control_method=multi_control_method or DEFAULT_MULTI_CONTROL_METHOD,
+                controlled_rotation_method=(controlled_rotation_method
+                                            or DEFAULT_CONTROLLED_ROTATION_METHOD))
     else:  # 'original'
         from qhat.common.trotter_original import build_ramped_trotterized_unitary
         # Original implementation doesn't support combine_terms or tensor_contraction_method parameters

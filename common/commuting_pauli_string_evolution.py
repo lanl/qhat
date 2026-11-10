@@ -113,6 +113,10 @@ class CommutingPauliStringEvolution(Bloq):
         ctrl_values: Controls, as in `PauliStringEvolution`; each term gets the same controls.
         multi_control_method: As in `PauliStringEvolution`. With "ancilla" and 2 or more controls,
             the controls are ANDed once for the whole bloq, and each term gets one control.
+        controlled_rotation_method: As in `PauliStringEvolution`. With "ancilla", the terms leave
+            out their phases on the control, and this bloq applies their sum once.
+        omit_control_phase: As in `PauliStringEvolution`: if True, the summed phase is left out
+            too, for a parent (`Trotterization`) to apply.
 
     Example:
         >>> terms = [("XZ", 0.5), ("ZX", 0.3)]  # These commute
@@ -128,6 +132,8 @@ class CommutingPauliStringEvolution(Bloq):
     is_adjoint: bool = False
     ctrl_values: Tuple[int, ...] = ()
     multi_control_method: str = controls.DEFAULT_MULTI_CONTROL_METHOD
+    controlled_rotation_method: str = controls.DEFAULT_CONTROLLED_ROTATION_METHOD
+    omit_control_phase: bool = False
 
     def __attrs_post_init__(self):
         """Validate that all Pauli strings commute and have the same length."""
@@ -157,6 +163,12 @@ class CommutingPauliStringEvolution(Bloq):
             "CommutingPauliStringEvolution", self.ctrl_values))
         controls.validate_multi_control_method(
             "CommutingPauliStringEvolution", self.multi_control_method)
+        controls.validate_controlled_rotation_method(
+            "CommutingPauliStringEvolution", self.controlled_rotation_method, self.ctrl_values,
+            self.multi_control_method)
+        controls.validate_omit_control_phase(
+            "CommutingPauliStringEvolution", self.omit_control_phase, self.ctrl_values,
+            self.controlled_rotation_method)
 
         # Check that all Pauli strings pairwise commute
         if not all_commute(pauli_strings):
@@ -203,15 +215,36 @@ class CommutingPauliStringEvolution(Bloq):
 
         Since all terms commute, the exact evolution is the product of individual evolutions.
         With 2 or more controls and the "ancilla" method, the controls are first ANDed into one
-        ancilla, which controls this bloq.
+        ancilla, which controls this bloq. With the "ancilla" rotation method, the terms' phases
+        on the control are applied last, as one phase (unless `omit_control_phase`).
         """
         if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
             return controls.add_with_and_ancilla(bb, self, **soqs)
         # Apply each PauliStringEvolution in sequence (reversed for the adjoint)
         for pse in self._term_evolutions():
             soqs = bb.add_d(pse, **soqs)
+        if self._applies_merged_phase:
+            soqs['ctrl'] = np.array(controls.add_controlled_phase(
+                bb, self.control_phase, soqs['ctrl'], self.ctrl_values))
 
         return soqs
+
+    @cached_property
+    def _merges_control_phases(self) -> bool:
+        """True if the terms leave out their phases on the control (the "ancilla" rotation
+        method with one control)."""
+        return controls.uses_rotation_ancilla(self.ctrl_values, self.controlled_rotation_method)
+
+    @cached_property
+    def _applies_merged_phase(self) -> bool:
+        """True if this bloq applies the terms' summed phase on the control itself."""
+        return self._merges_control_phases and not self.omit_control_phase
+
+    @cached_property
+    def control_phase(self) -> float:
+        """The sum of the terms' `control_phase`s: the phase exp(-i phi) the "ancilla" rotation
+        method leaves on the active control. A parent adds these up and applies them once."""
+        return sum(pse.control_phase for pse in self._term_evolutions())
 
     def _term_evolutions(self) -> Tuple[PauliStringEvolution, ...]:
         """One PauliStringEvolution per term, in the order they are applied."""
@@ -225,31 +258,46 @@ class CommutingPauliStringEvolution(Bloq):
                 is_adjoint=self.is_adjoint,
                 ctrl_values=self.ctrl_values,
                 multi_control_method=self.multi_control_method,
+                controlled_rotation_method=self.controlled_rotation_method,
+                omit_control_phase=self._merges_control_phases,
             )
             for pauli_string, coefficient in terms
         )
+
+    def _merged_phase_call_graph(self) -> Counter:
+        """The gates of the summed phase on the control, if this bloq applies it."""
+        if not self._applies_merged_phase:
+            return Counter()
+        return controls.controlled_phase_call_graph(self.control_phase, self.ctrl_values)
 
     def build_call_graph(self, ssa: 'SympySymbolAllocator') -> Set['BloqCountT']:
         """The decomposition's term evolutions (or, for the "ancilla" method with 2 or more
         controls, the AND, its uncompute and this bloq on one control), without building it."""
         if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
             return controls.and_ancilla_call_graph(self)
-        return set(Counter(self._term_evolutions()).items())
+        return set((Counter(self._term_evolutions()) + self._merged_phase_call_graph()).items())
 
     def _t_complexity_(self) -> TComplexity:
         """Return the T-complexity by summing individual term complexities (plus the AND ladder
-        for the "ancilla" method)."""
+        for the "ancilla" method, and the summed phase for the "ancilla" rotation method)."""
         if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
             return controls.and_ancilla_t_complexity(self)
         total_complexity = TComplexity()
         for pse in self._term_evolutions():
             total_complexity += t_complexity(pse)
+        if self._applies_merged_phase:
+            total_complexity += controls.controlled_phase_t_complexity(len(self.ctrl_values))
         return total_complexity
 
     def my_static_costs(self, cost_key: 'CostKey'):
-        """`QubitCount` without decomposing: qubits + controls + AND ancillas (if any)."""
+        """`QubitCount` without decomposing: qubits + controls + AND ancillas (if any), + 1 for the
+        "ancilla" rotation method (unless every term is all identities)."""
         if isinstance(cost_key, QubitCount):
-            return controls.peak_qubits(self.num_qubits, self.ctrl_values, self.multi_control_method)
+            has_rotations = any(set(ps) != {'I'} for ps, _ in self.pauli_terms)
+            return controls.peak_qubits(
+                self.num_qubits, self.ctrl_values, self.multi_control_method,
+                controls.num_rotation_ancillas(self.ctrl_values, self.controlled_rotation_method,
+                                               has_rotations))
         return NotImplemented
 
     @property
@@ -288,6 +336,8 @@ class CommutingPauliStringEvolution(Bloq):
 
     def __repr__(self) -> str:
         adjoint = ", is_adjoint=True" if self.is_adjoint else ""
-        ctrl = controls.ctrl_repr(self.ctrl_values, self.multi_control_method)
+        ctrl = controls.ctrl_repr(self.ctrl_values, self.multi_control_method,
+                                  self.controlled_rotation_method)
+        omit = ", omit_control_phase=True" if self.omit_control_phase else ""
         return (f"CommutingPauliStringEvolution(pauli_terms={self.pauli_terms}, "
-                f"time={self.time}, hbar={self.hbar}{adjoint}{ctrl})")
+                f"time={self.time}, hbar={self.hbar}{adjoint}{ctrl}{omit})")

@@ -92,3 +92,73 @@ class TestLogging:
         with caplog.at_level(logging.INFO, logger="qhat.analysis.algorithm"):
             build_algorithm(config, self.trotter())
         assert "multi-control method" not in caplog.text
+
+
+# -------------------------------------------------------------------------------------------------
+# The `controlled_rotation_method` unitary option (plan T10), by the same rules
+# -------------------------------------------------------------------------------------------------
+
+class TestControlledRotationMethodOption:
+    def test_unset_is_not_in_toml(self):
+        config = unitary_config()
+        assert config.controlled_rotation_method is None
+        assert "controlled_rotation_method" not in config._generate_TOML_table()
+
+    @pytest.mark.parametrize("method", ["textbook", "ancilla"])
+    def test_set_is_in_toml(self, method):
+        """Recorded whenever the user set it, the default included."""
+        table = unitary_config(controlled_rotation_method=method)._generate_TOML_table()
+        assert table["controlled_rotation_method"] == method
+
+    def test_unknown_value_raises_listing_valid_ones(self):
+        with pytest.raises(ValueError, match=r"\['textbook', 'ancilla'\]"):
+            unitary_config(controlled_rotation_method="toffoli")
+
+    def test_default_is_textbook(self, hamiltonian):
+        trotter = encode_ramped_trotter(unitary_config(), hamiltonian, tevol_hbar=0.7)
+        assert trotter.controlled_rotation_method == "textbook"
+
+    def test_ancilla_reaches_the_bloq(self, hamiltonian):
+        trotter = encode_ramped_trotter(
+            unitary_config(controlled_rotation_method="ancilla"), hamiltonian, tevol_hbar=0.7)
+        assert trotter.controlled_rotation_method == "ancilla"
+        assert trotter.controlled().controlled_rotation_method == "ancilla"
+
+    def test_original_with_method_raises(self, hamiltonian):
+        config = unitary_config(trotter_implementation="original",
+                                controlled_rotation_method="ancilla")
+        with pytest.raises(ValueError, match="flattened"):
+            encode_ramped_trotter(config, hamiltonian, tevol_hbar=0.7)
+
+    def test_conflict_with_direct_and_several_controls_raises(self, hamiltonian):
+        """Two settings that can't both be honoured: the build raises instead of choosing."""
+        trotter = encode_ramped_trotter(
+            unitary_config(controlled_rotation_method="ancilla", multi_control_method="direct"),
+            hamiltonian, tevol_hbar=0.7)
+        config = AlgorithmConfiguration()
+        config.method = "controlled time evolution"
+        config.control_values = [1, 0]
+        with pytest.raises(ValueError, match="multi_control_method 'direct'"):
+            build_algorithm(config, trotter)
+
+    @pytest.mark.parametrize("method, line", [
+        ("ancilla", 'controlled-rotation method: "ancilla" (AND ancilla per rotation, 1 rotation '
+                    '+ 4 T each), 1 ancilla added'),
+        ("textbook", 'controlled-rotation method: "textbook" (2 rotations each), 0 ancillas')])
+    def test_log_line_for_controlled_algorithms(self, caplog, hamiltonian, method, line):
+        trotter = encode_ramped_trotter(
+            unitary_config(controlled_rotation_method=method), hamiltonian, tevol_hbar=0.7)
+        config = AlgorithmConfiguration()
+        config.method = "controlled time evolution"
+        with caplog.at_level(logging.INFO, logger="qhat.analysis.algorithm"):
+            build_algorithm(config, trotter)
+        assert line in caplog.text
+
+    def test_not_logged_for_plain_time_evolution(self, caplog, hamiltonian):
+        trotter = encode_ramped_trotter(
+            unitary_config(controlled_rotation_method="ancilla"), hamiltonian, tevol_hbar=0.7)
+        config = AlgorithmConfiguration()
+        config.method = "time evolution"
+        with caplog.at_level(logging.INFO, logger="qhat.analysis.algorithm"):
+            build_algorithm(config, trotter)
+        assert "controlled-rotation method" not in caplog.text

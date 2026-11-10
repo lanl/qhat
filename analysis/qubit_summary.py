@@ -9,6 +9,7 @@ Example (QPE with 9 phase qubits on a 12-qubit system):
       system qubits:          12
       phase qubits:            9
       multi-control ancillas:  0  (single control; method not used)
+      rotation ancillas:       0  (controlled-rotation method "textbook")
       total:                  21  (Qualtran QubitCount)
 """
 
@@ -51,7 +52,9 @@ def qubit_summary_components(config_algorithm: AlgorithmConfiguration, unitary, 
                   "phase": num_phase_qubits(algorithm),
                   "control": 0,
                   "ancilla": 0,
-                  "ancilla_note": "no controls"}
+                  "ancilla_note": "no controls",
+                  "rotation_ancilla": 0,
+                  "rotation_note": None}
     if method == "controlled time evolution":
         ctrl_values = tuple(algorithm.ctrl_values) if hasattr(algorithm, "ctrl_values") else (1,)
         multi_method = getattr(algorithm, "multi_control_method", None)
@@ -65,7 +68,18 @@ def qubit_summary_components(config_algorithm: AlgorithmConfiguration, unitary, 
     elif method.startswith("qpe:"):
         # The phase qubits are the controls, one per controlled U^(2^j)
         components["ancilla_note"] = "single control per unitary; method not used"
+    rotation_method = getattr(unitary, "controlled_rotation_method", None)
+    if method != "time evolution" and rotation_method is not None:
+        # One ancilla, reused by every controlled rotation (none if the unitary has no rotation)
+        components["rotation_ancilla"] = controls.num_rotation_ancillas(
+            (1,), rotation_method, has_rotations(unitary))
+        components["rotation_note"] = f"controlled-rotation method \"{rotation_method}\""
     return components
+
+def has_rotations(unitary) -> bool:
+    """False only if every term of the unitary is all identities (then nothing is rotated)."""
+    terms = getattr(unitary, "pauli_terms", None)
+    return terms is None or any(set(ps) != {"I"} for ps, _ in terms)
 
 def log_qubit_summary(config_algorithm: AlgorithmConfiguration, unitary, algorithm):
     """Log the qubit summary block (INFO), with a warning if the parts don't add up."""
@@ -87,12 +101,16 @@ def log_qubit_summary(config_algorithm: AlgorithmConfiguration, unitary, algorit
         if parts["control"]:
             lines.append(f"  control qubits:         {parts['control']:>4}")
         lines.append(f"  multi-control ancillas: {parts['ancilla']:>4}  ({parts['ancilla_note']})")
+        if parts["rotation_note"]:
+            lines.append(f"  rotation ancillas:      {parts['rotation_ancilla']:>4}  "
+                         f"({parts['rotation_note']})")
     if total is not None:
         lines.append(f"  total:                  {total:>4}  ({source})")
     logger.info("\n".join(lines))
 
     if parts and total is not None:
-        added = parts["system"] + parts["phase"] + parts["control"] + parts["ancilla"]
+        added = (parts["system"] + parts["phase"] + parts["control"] + parts["ancilla"]
+                 + parts["rotation_ancilla"])
         if added != total:
             logger.warning(
                 f"Qubit summary: the components add up to {added}, but {source} says {total}.")
