@@ -218,6 +218,9 @@ class AlgorithmConfiguration(ConfigurationBase):
         # Components for "QPE: QHAT flexible"; `None` yields default options
         self.ancilla_prep = None
         self.qft_inv = None
+        # "QPE: QHAT flexible" only: how each U^(2^j) is controlled, "controlled" (default) or
+        # "sign" (sign-controlled square root; symmetric Trotter with an even step count only)
+        self.controlled_power_method = None
         # "controlled time evolution" only: one 0 or 1 per control qubit, e.g. [1, 0, 1]; `None`
         # means a single control on |1>
         self.control_values = None
@@ -229,6 +232,7 @@ class AlgorithmConfiguration(ConfigurationBase):
         self.save_if_present(table, "energy_error")
         self.save_if_present(table, "ancilla_prep")
         self.save_if_present(table, "qft_inv")
+        self.save_if_present(table, "controlled_power_method")
         self.save_if_present(table, "control_values")
         return table
 

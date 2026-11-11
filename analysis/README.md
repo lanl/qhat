@@ -261,6 +261,13 @@ However, this section is still under development and currently has very limited 
   - `algorithm.ancilla_prep`: initial state of the phase register; defaults to "rectangular" (a
     Hadamard on each phase qubit, yielding "textbook" phase estimation);
   - `algorithm.qft_inv`: inverse quantum Fourier transform; defaults to "textbook".
+  - `algorithm.controlled_power_method`: how each U^(2^j) is controlled by its phase qubit.
+    "controlled" (default) applies controlled U^(2^j). "sign" applies V^† when the phase qubit is
+    |0> and V when it is |1>, with V^2 = U^(2^j). The phase register reads out the same
+    distribution, at about a quarter of the rotations, with no T gates or ancillas. "sign" needs
+    the flattened Trotterization with a symmetric `trotter_order` (e.g. "second order" or "fourth
+    order", not "first order" or "third order") and an even number of Trotter steps; otherwise
+    it raises an error. It can't be combined with `controlled_rotation_method = "ancilla"`.
 - Qubitized Phase Estimation: Setting `algorithm.method` to "QPE: pyliqtr qubitized" will embed the
   unitary encoding of the Hamiltonian into a phase estimation algorithm that uses pyLIQTR's
   qubitized phase estimation.  This uses only a single ancilla qubit for the phase, with multiple
