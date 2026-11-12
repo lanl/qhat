@@ -25,8 +25,8 @@ from qhat.common.commuting_pauli_string_evolution import CommutingPauliStringEvo
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.pauli_string_evolution import PauliStringEvolution
 from qhat.common.pauli_utils import pauli_string_to_matrix
-from qhat.common.tests.test_multi_control import (block_matrix, check_exact, decomposition_width,
-                                                  reference_trotter_matrix)
+from .test_multi_control import (block_matrix, check_exact, decomposition_width,
+                                 reference_trotter_matrix)
 from qhat.common.trotter_flattened import Trotterization
 
 ANCILLA = "ancilla"
