@@ -804,7 +804,8 @@ class TestCallGraph:
     @pytest.mark.parametrize("pauli_string", STRINGS)
     def test_costs_agree_with_t_complexity(self, pauli_string, ctrls):
         """Without the AND ladder (which the two count differently), `QECGatesCost` through
-        the call graph gives the same Cliffords and rotations as `t_complexity`."""
+        the call graph gives the same T, Cliffords and rotations as `t_complexity` (T only from
+        the Toffoli-based "direct" rotation)."""
         from qualtran.resource_counting import get_cost_value, QECGatesCost
         from qhat.common import controls
         ctrl_values, method = ctrls
@@ -814,7 +815,7 @@ class TestCallGraph:
         tc = t_complexity(pse)
         assert gates.rotation == tc.rotations
         if not controls.uses_and_ancilla(ctrl_values, method):
-            assert (gates.t, gates.clifford, gates.and_bloq) == (0, tc.clifford, 0)
+            assert (gates.t, gates.clifford, gates.and_bloq) == (tc.t, tc.clifford, 0)
 
     def test_gate_list(self):
         from qualtran.bloqs.basic_gates import CNOT, Hadamard, Rz

@@ -241,7 +241,7 @@ class PauliStringEvolution(Bloq):
         q = np.array(q)
         active = self._active_qubits
         if not active:
-            ctrl = self._add_identity_phase(bb, ctrl)
+            q, ctrl = self._add_identity_phase(bb, q, ctrl)
             return self._outputs(q, ctrl)
 
         for i in active:
@@ -251,7 +251,7 @@ class PauliStringEvolution(Bloq):
                 q[i] = bb.add(Hadamard(), q=q[i])
         for i, j in zip(active[:-1], active[1:]):
             q[i], q[j] = bb.add(CNOT(), ctrl=q[i], target=q[j])
-        q[active[-1]], ctrl = self._add_rotation(bb, q[active[-1]], ctrl)
+        q, ctrl = self._add_rotation(bb, q, ctrl)
         for i, j in reversed(list(zip(active[:-1], active[1:]))):
             q[i], q[j] = bb.add(CNOT(), ctrl=q[i], target=q[j])
         for i in active:
@@ -260,54 +260,64 @@ class PauliStringEvolution(Bloq):
             if self.pauli_string[i] == 'Y':
                 q[i] = bb.add(CirqSafeSGate(), q=q[i])
         if self._uses_rotation_ancilla and not self.omit_control_phase:
-            ctrl = np.array(controls.add_controlled_phase(
-                bb, self.control_phase, ctrl, self.ctrl_values))
+            ctrl, _ = controls.add_controlled_phase(bb, self.control_phase, ctrl, self.ctrl_values)
+            ctrl = np.array(ctrl)
         return self._outputs(q, ctrl)
 
     def _outputs(self, q: NDArray[Soquet], ctrl: Optional[NDArray[Soquet]]) -> Dict[str, SoquetT]:
         return {'q': q} if ctrl is None else {'ctrl': ctrl, 'q': q}
 
-    def _add_rotation(self, bb: BloqBuilder, target: Soquet, ctrl: Optional[NDArray[Soquet]]):
-        """Add Rz(theta) on the parity qubit `target`, controlled on `ctrl` if there is one.
+    def _add_rotation(self, bb: BloqBuilder, q: NDArray[Soquet], ctrl: Optional[NDArray[Soquet]]):
+        """Add Rz(theta) on the parity qubit (the last active one), controlled on `ctrl` if any.
 
         With one control the rotation is Rz(theta/2) . CNOT . Rz(-+theta/2) . CNOT on the target (2
         rotations, 2 CNOTs, exact): if the control is |1> the CNOTs flip the second rotation's
         sign, so the two add up to Rz(theta); if |0> they cancel. For a control on |0> the second
         angle is +theta/2 instead, which swaps the two cases at no extra cost. With k controls
-        ("direct") it is the same idea over all 2^k sign patterns (`controls.add_controlled_rz`).
+        ("direct") it is Rz(theta/2) and Rz(-theta/2) around two Toffoli-like gates, borrowing
+        k-2 of the other qubits, idle during the rotation, as dirty ancillas; with too few of them,
+        the textbook idea over all 2^k sign patterns (`controls.add_direct_controlled_rz`).
         With the "ancilla" rotation method it is `controls.add_and_ancilla_rz`, which leaves the
         phase exp(-i theta/2) on the control to `build_composite_bloq` or a parent.
 
-        Returns the target and control soquets.
+        Returns the system and control soquets.
         """
         theta = self._rotation_angle
+        parity = self._active_qubits[-1]
         if ctrl is None:
-            return bb.add(Rz(theta), q=target), None
+            q[parity] = bb.add(Rz(theta), q=q[parity])
+            return q, None
         if self._uses_rotation_ancilla:
-            target, ctrl_soq = controls.add_and_ancilla_rz(
-                bb, theta, target, ctrl[0], self.ctrl_values[0])
-            return target, np.array([ctrl_soq])
-        target, ctrl = controls.add_controlled_rz(bb, theta, target, ctrl, self.ctrl_values)
-        return target, np.array(ctrl)
+            q[parity], ctrl_soq = controls.add_and_ancilla_rz(
+                bb, theta, q[parity], ctrl[0], self.ctrl_values[0])
+            return q, np.array([ctrl_soq])
+        idle = [i for i in range(self.num_qubits) if i != parity]
+        q[parity], ctrl, dirty = controls.add_direct_controlled_rz(
+            bb, theta, q[parity], ctrl, self.ctrl_values, [q[i] for i in idle])
+        for i, soq in zip(idle, dirty):
+            q[i] = soq
+        return q, np.array(ctrl)
 
-    def _add_identity_phase(self, bb: BloqBuilder, ctrl: Optional[NDArray[Soquet]]):
+    def _add_identity_phase(self, bb: BloqBuilder, q: NDArray[Soquet],
+                            ctrl: Optional[NDArray[Soquet]]):
         """Add exp(-i phi), phi = theta/2, the evolution of an all-identity string.
 
         Uncontrolled it is a `GlobalPhase`. Under one control it is a phase on the control qubit:
         diag(1, e^{-i phi}) = e^{-i phi/2} Rz(-phi) for a control on |1>, and
         diag(e^{-i phi}, 1) = e^{-i phi/2} Rz(phi) for a control on |0>. With k controls
-        ("direct") see `controls.add_controlled_phase`. With `omit_control_phase` it is nothing:
-        the whole evolution is the phase a parent applies.
+        ("direct") see `controls.add_controlled_phase`, which may borrow the (idle) system qubits.
+        With `omit_control_phase` it is nothing: the whole evolution is the phase a parent applies.
 
-        Returns the control soquets.
+        Returns the system and control soquets.
         """
         phi = self.control_phase
         if ctrl is None:
             bb.add(GlobalPhase(np.exp(-1j * phi)))
-            return None
+            return q, None
         if self.omit_control_phase:
-            return ctrl
-        return np.array(controls.add_controlled_phase(bb, phi, ctrl, self.ctrl_values))
+            return q, ctrl
+        ctrl, dirty = controls.add_controlled_phase(bb, phi, ctrl, self.ctrl_values, list(q))
+        return np.array(dirty), np.array(ctrl)
 
     def build_call_graph(self, ssa: 'SympySymbolAllocator') -> Set['BloqCountT']:
         """The decomposition's gates and their counts, without building the decomposition.
@@ -322,7 +332,8 @@ class PauliStringEvolution(Bloq):
         counts = Counter()
         if not active:
             if not self.omit_control_phase:
-                counts += controls.controlled_phase_call_graph(self.control_phase, self.ctrl_values)
+                counts += controls.controlled_phase_call_graph(
+                    self.control_phase, self.ctrl_values, self.num_qubits)
             return set(counts.items())
         for i in active:
             if self.pauli_string[i] == 'Y':
@@ -337,7 +348,8 @@ class PauliStringEvolution(Bloq):
             if not self.omit_control_phase:
                 counts += controls.controlled_phase_call_graph(self.control_phase, self.ctrl_values)
         else:
-            counts += controls.controlled_rz_call_graph(self._rotation_angle, self.ctrl_values)
+            counts += controls.direct_controlled_rz_call_graph(
+                self._rotation_angle, self.ctrl_values, self.num_qubits - 1)
         return set(counts.items())
 
     def _t_complexity_(self) -> TComplexity:
@@ -345,9 +357,11 @@ class PauliStringEvolution(Bloq):
 
         Every Rz counts as 1 rotation, whatever its angle (plan D14), so the count doesn't depend
         on the coefficient or time. Uncontrolled: the basis changes and CNOT chain (Cliffords) and
-        1 rotation; an all-identity string is free. With k controls ("direct", or k = 1): the same
-        with the rotation replaced by 2^k rotations and 2^k CNOTs; an all-identity string is
-        2^k - 1 rotations and 2^k - 2 CNOTs. With the "ancilla" method: the AND and its uncompute
+        1 rotation; an all-identity string is free. With one control: the same with the rotation
+        replaced by 2 rotations and 2 CNOTs. With k >= 2 controls ("direct"): 2 rotations and the
+        Toffoli-like gates of `controls.toffoli_controlled_rz_t_complexity` if the string has k-2
+        other qubits to borrow, else 2^k rotations and 2^k CNOTs; an all-identity string follows
+        `controls.controlled_phase_t_complexity`. With the "ancilla" method: the AND and its uncompute
         plus the singly-controlled count. With the "ancilla" rotation method, the rotation is the
         `And` pair and 1 rotation, plus 1 rotation for the phase on the control unless
         `omit_control_phase` (which also makes an all-identity string free).
@@ -355,18 +369,19 @@ class PauliStringEvolution(Bloq):
         if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
             return controls.and_ancilla_t_complexity(self)
         active = self._active_qubits
-        num_ctrls = len(self.ctrl_values)
-        phase = (TComplexity() if self.omit_control_phase
-                 else controls.controlled_phase_t_complexity(num_ctrls))
         if not active:
-            return phase
+            return (TComplexity() if self.omit_control_phase else
+                    controls.controlled_phase_t_complexity(self.ctrl_values, self.num_qubits))
+        phase = (TComplexity() if self.omit_control_phase
+                 else controls.controlled_phase_t_complexity(self.ctrl_values))
         num_basis = sum(2 if self.pauli_string[i] == 'X' else 4
                         for i in active if self.pauli_string[i] != 'Z')
         num_cnots = 2 * (len(active) - 1)
         if self._uses_rotation_ancilla:
             rotation = controls.and_ancilla_rz_t_complexity(self.ctrl_values[0]) + phase
         else:
-            rotation = controls.controlled_rz_t_complexity(num_ctrls)
+            rotation = controls.direct_controlled_rz_t_complexity(
+                self.ctrl_values, self.num_qubits - 1)
         return TComplexity(clifford=num_basis + num_cnots) + rotation
 
     def my_static_costs(self, cost_key: 'CostKey'):

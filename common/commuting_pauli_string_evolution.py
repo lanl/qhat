@@ -224,8 +224,9 @@ class CommutingPauliStringEvolution(Bloq):
         for pse in self._term_evolutions():
             soqs = bb.add_d(pse, **soqs)
         if self._applies_merged_phase:
-            soqs['ctrl'] = np.array(controls.add_controlled_phase(
-                bb, self.control_phase, soqs['ctrl'], self.ctrl_values))
+            ctrl, _ = controls.add_controlled_phase(
+                bb, self.control_phase, soqs['ctrl'], self.ctrl_values)
+            soqs['ctrl'] = np.array(ctrl)
 
         return soqs
 
@@ -286,7 +287,7 @@ class CommutingPauliStringEvolution(Bloq):
         for pse in self._term_evolutions():
             total_complexity += t_complexity(pse)
         if self._applies_merged_phase:
-            total_complexity += controls.controlled_phase_t_complexity(len(self.ctrl_values))
+            total_complexity += controls.controlled_phase_t_complexity(self.ctrl_values)
         return total_complexity
 
     def my_static_costs(self, cost_key: 'CostKey'):

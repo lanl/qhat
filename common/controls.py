@@ -12,7 +12,10 @@ The controls live in a register `ctrl` of shape `(len(ctrl_values),)`, placed be
 With two or more controls, `multi_control_method` picks the circuit:
 - "ancilla" (default): AND the controls into one ancilla once (Qualtran `And` / `MultiAnd`, k-1
   ancillas, about 4(k-1) T), run the singly-controlled bloq on it, then uncompute.
-- "direct": no ancilla; every rotation is k-controlled (`add_controlled_rz`, 2^k rotations each).
+- "direct": no new ancilla; every rotation is k-controlled (`add_direct_controlled_rz`): 2
+  rotations and two Toffoli-like gates each, borrowing k-2 idle qubits of the bloq as dirty
+  ancillas (`add_toffoli_controlled_rz`), or 2^k rotations if too few are idle
+  (`add_controlled_rz`).
 With 0 or 1 controls it is ignored.
 
 `controlled_rotation_method` picks the singly-controlled rotation of each Pauli term:
@@ -34,7 +37,7 @@ import attrs
 import numpy as np
 
 from qualtran import Bloq, BloqBuilder, CtrlSpec, QBit, Register, Side, Soquet, SoquetT
-from qualtran.bloqs.basic_gates import CNOT, GlobalPhase, Rz
+from qualtran.bloqs.basic_gates import CNOT, GlobalPhase, Hadamard, Rz, TGate, XGate
 from qualtran.bloqs.mcmt import And, MultiAnd
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
 
@@ -287,42 +290,192 @@ def controlled_rz_t_complexity(num_ctrls: int) -> TComplexity:
     return TComplexity(clifford=2 ** num_ctrls, rotations=2 ** num_ctrls)
 
 
+def uses_toffoli_rz(num_ctrls: int, num_dirty: int) -> bool:
+    """True if `add_direct_controlled_rz` uses the Toffoli circuit: 2 or more controls and at
+    least k-2 idle qubits to borrow."""
+    return num_ctrls >= 2 and num_dirty >= num_ctrls - 2
+
+
+def _add_relative_phase_toffoli(
+    bb: BloqBuilder, ctrl_a: Soquet, ctrl_b: Soquet, target: Soquet, adjoint: bool = False
+) -> Tuple[Soquet, Soquet, Soquet]:
+    """Add a Toffoli up to a diagonal phase: H, T, CNOT(b), T^dagger, CNOT(a), T, CNOT(b),
+    T^dagger, H on `target` (4 T, 2 H, 3 CNOT, no ancilla); its inverse if `adjoint`."""
+    t_signs = [False, True, False, True]
+    cnot_ctrls = ['b', 'a', 'b']
+    if adjoint:
+        t_signs = [not sign for sign in reversed(t_signs)]
+        cnot_ctrls = cnot_ctrls[::-1]
+    soqs = {'a': ctrl_a, 'b': ctrl_b}
+    target = bb.add(Hadamard(), q=target)
+    for step, is_adjoint in enumerate(t_signs):
+        target = bb.add(TGate(is_adjoint=is_adjoint), q=target)
+        if step < 3:
+            name = cnot_ctrls[step]
+            soqs[name], target = bb.add(CNOT(), ctrl=soqs[name], target=target)
+    target = bb.add(Hadamard(), q=target)
+    return soqs['a'], soqs['b'], target
+
+
+def _toffoli_ladder(num_ctrls: int) -> List[Tuple[str, int, str, int, str, int]]:
+    """The relative-phase Toffolis of an X on the target controlled on k >= 2 qubits, up to a
+    diagonal, as (kind, index) pairs for (control a, control b, target).
+
+    k = 2: one Toffoli on (c0, c1 -> t). k >= 3 borrows k-2 dirty qubits d0..d(k-3), which can be
+    in any state and are restored: with top = (c(k-1), d(k-3) -> t), chain_j = (c(j+2), d(j) ->
+    d(j+1)) and bottom = (c0, c1 -> d0), the sequence is top, chain down, bottom, chain up, twice
+    over, i.e. 4(k-2) Toffolis.
+    """
+    if num_ctrls == 2:
+        return [('c', 0, 'c', 1, 't', 0)]
+    top = ('c', num_ctrls - 1, 'd', num_ctrls - 3, 't', 0)
+    chain = [('c', j + 2, 'd', j, 'd', j + 1) for j in range(num_ctrls - 3)]
+    half = [top] + chain[::-1] + [('c', 0, 'c', 1, 'd', 0)] + chain
+    return half + half
+
+
+def add_toffoli_controlled_rz(
+    bb: BloqBuilder, theta: float, target: Soquet, ctrl: Sequence[Soquet],
+    ctrl_values: Tuple[int, ...], dirty: Sequence[Soquet]
+) -> Tuple[Soquet, List[Soquet], List[Soquet]]:
+    """Add Rz(theta) on `target`, controlled on k >= 2 `ctrl` matching `ctrl_values`; exact.
+
+    The circuit (in time order) is M^dagger, Rz(-theta/2), M, Rz(theta/2), where M is an X on the
+    target controlled on the k controls, times some diagonal phase. The diagonal commutes with the
+    Rz and cancels, so M can use relative-phase Toffolis (`_toffoli_ladder`). When the controls
+    match, M flips the target and the two half rotations add up to Rz(theta); otherwise they
+    cancel. A control on |0> is X before and after the whole circuit. The first k-2 `dirty`
+    qubits are borrowed (any state, restored); the rest are untouched.
+
+    Cost: 2 rotations, 8 T and 10 Cliffords for k = 2; 2 rotations, 32(k-2) T and 40(k-2)
+    Cliffords for k >= 3; plus 2 X per control on |0>. No ancilla.
+
+    Returns the target, control and dirty soquets.
+    """
+    num_ctrls = len(ctrl_values)
+    soqs = {'c': list(ctrl), 'd': list(dirty), 't': [target]}
+    ladder = _toffoli_ladder(num_ctrls)
+
+    def add_x_on_negative_controls():
+        for j, value in enumerate(ctrl_values):
+            if value == 0:
+                soqs['c'][j] = bb.add(XGate(), q=soqs['c'][j])
+
+    def add_m(adjoint):
+        for kind_a, a, kind_b, b, kind_t, t in (ladder[::-1] if adjoint else ladder):
+            soqs[kind_a][a], soqs[kind_b][b], soqs[kind_t][t] = _add_relative_phase_toffoli(
+                bb, soqs[kind_a][a], soqs[kind_b][b], soqs[kind_t][t], adjoint)
+
+    add_x_on_negative_controls()
+    add_m(adjoint=True)
+    soqs['t'][0] = bb.add(Rz(-theta / 2), q=soqs['t'][0])
+    add_m(adjoint=False)
+    add_x_on_negative_controls()
+    soqs['t'][0] = bb.add(Rz(theta / 2), q=soqs['t'][0])
+    return soqs['t'][0], soqs['c'], soqs['d']
+
+
+def toffoli_controlled_rz_call_graph(theta: float, ctrl_values: Tuple[int, ...]) -> Counter:
+    """The gates of `add_toffoli_controlled_rz`, counted."""
+    num_toffolis = 2 * len(_toffoli_ladder(len(ctrl_values)))
+    counts = Counter({Rz(-theta / 2): 1, TGate(): 2 * num_toffolis,
+                      TGate(is_adjoint=True): 2 * num_toffolis, Hadamard(): 2 * num_toffolis,
+                      CNOT(): 3 * num_toffolis})
+    counts[Rz(theta / 2)] += 1
+    num_negative = ctrl_values.count(0)
+    if num_negative:
+        counts[XGate()] = 2 * num_negative
+    return counts
+
+
+def toffoli_controlled_rz_t_complexity(ctrl_values: Tuple[int, ...]) -> TComplexity:
+    """T-complexity of `add_toffoli_controlled_rz`: 2 rotations, 4 T and 5 Cliffords per
+    relative-phase Toffoli, and 2 X per control on |0>."""
+    num_toffolis = 2 * len(_toffoli_ladder(len(ctrl_values)))
+    return TComplexity(t=4 * num_toffolis, clifford=5 * num_toffolis + 2 * ctrl_values.count(0),
+                       rotations=2)
+
+
+def add_direct_controlled_rz(
+    bb: BloqBuilder, theta: float, target: Soquet, ctrl: Sequence[Soquet],
+    ctrl_values: Tuple[int, ...], dirty: Sequence[Soquet] = ()
+) -> Tuple[Soquet, List[Soquet], List[Soquet]]:
+    """Add Rz(theta) on `target` controlled on `ctrl`, without allocating an ancilla.
+
+    `add_toffoli_controlled_rz` if `uses_toffoli_rz` (2 or more controls, k-2 qubits in `dirty`
+    to borrow), else `add_controlled_rz` (the Gray-code walk; for one control it is the textbook
+    circuit). Returns the target, control and dirty soquets.
+    """
+    if uses_toffoli_rz(len(ctrl_values), len(dirty)):
+        return add_toffoli_controlled_rz(bb, theta, target, ctrl, ctrl_values, dirty)
+    target, ctrl = add_controlled_rz(bb, theta, target, ctrl, ctrl_values)
+    return target, ctrl, list(dirty)
+
+
+def direct_controlled_rz_call_graph(theta: float, ctrl_values: Tuple[int, ...],
+                                    num_dirty: int = 0) -> Counter:
+    """The gates of `add_direct_controlled_rz` with `num_dirty` qubits to borrow, counted."""
+    if uses_toffoli_rz(len(ctrl_values), num_dirty):
+        return toffoli_controlled_rz_call_graph(theta, ctrl_values)
+    return controlled_rz_call_graph(theta, ctrl_values)
+
+
+def direct_controlled_rz_t_complexity(ctrl_values: Tuple[int, ...],
+                                      num_dirty: int = 0) -> TComplexity:
+    """T-complexity of `add_direct_controlled_rz` with `num_dirty` qubits to borrow."""
+    if uses_toffoli_rz(len(ctrl_values), num_dirty):
+        return toffoli_controlled_rz_t_complexity(ctrl_values)
+    return controlled_rz_t_complexity(len(ctrl_values))
+
+
 def add_controlled_phase(
-    bb: BloqBuilder, phi: float, ctrl: Sequence[Soquet], ctrl_values: Tuple[int, ...]
-) -> List[Soquet]:
+    bb: BloqBuilder, phi: float, ctrl: Sequence[Soquet], ctrl_values: Tuple[int, ...],
+    dirty: Sequence[Soquet] = ()
+) -> Tuple[List[Soquet], List[Soquet]]:
     """Add exp(-i phi) on the control pattern `ctrl_values` (identity elsewhere); exact, no ancilla.
 
     Peeling off the last control, with P = (1 + s Z) / 2 its projector:
     exp(-i phi Pi' P) = exp(-i phi/2 Pi') . exp(-i (s phi/2) Pi' Z), where the second factor is
-    Rz(s phi) on the last control, controlled on the others (`add_controlled_rz`), and the first is
-    the same problem with one control fewer. With no controls it is a `GlobalPhase`.
+    Rz(s phi) on the last control, controlled on the others (`add_direct_controlled_rz`, which may
+    borrow `dirty` and the later controls), and the first is the same problem with one control
+    fewer. With no controls it is a `GlobalPhase`.
 
-    k controls cost 2^k - 1 rotations and 2^k - 2 CNOTs. Returns the control soquets.
+    With the Gray-code walk only, k controls cost 2^k - 1 rotations and 2^k - 2 CNOTs. Returns the
+    control and dirty soquets.
     """
     ctrl = list(ctrl)
+    dirty = list(dirty)
     for last in reversed(range(len(ctrl_values))):
-        ctrl[last], ctrl[:last] = add_controlled_rz(
-            bb, _sign(ctrl_values[last]) * phi, ctrl[last], ctrl[:last], ctrl_values[:last])
+        borrowed = dirty + ctrl[last + 1:]
+        ctrl[last], ctrl[:last], borrowed = add_direct_controlled_rz(
+            bb, _sign(ctrl_values[last]) * phi, ctrl[last], ctrl[:last], ctrl_values[:last],
+            borrowed)
+        dirty, ctrl[last + 1:] = borrowed[:len(dirty)], borrowed[len(dirty):]
         phi = phi / 2
     bb.add(GlobalPhase(np.exp(-1j * phi)))
-    return ctrl
+    return ctrl, dirty
 
 
-def controlled_phase_call_graph(phi: float, ctrl_values: Tuple[int, ...]) -> Counter:
+def controlled_phase_call_graph(phi: float, ctrl_values: Tuple[int, ...],
+                                num_dirty: int = 0) -> Counter:
     """The gates of `add_controlled_phase`, counted, following the same recursion."""
     counts = Counter()
-    for last in reversed(range(len(ctrl_values))):
-        counts += controlled_rz_call_graph(_sign(ctrl_values[last]) * phi, ctrl_values[:last])
+    k = len(ctrl_values)
+    for last in reversed(range(k)):
+        counts += direct_controlled_rz_call_graph(
+            _sign(ctrl_values[last]) * phi, ctrl_values[:last], num_dirty + k - 1 - last)
         phi = phi / 2
     counts[GlobalPhase(np.exp(-1j * phi))] += 1
     return counts
 
 
-def controlled_phase_t_complexity(num_ctrls: int) -> TComplexity:
-    """T-complexity of `add_controlled_phase`: 2^k - 1 rotations and 2^k - 2 CNOTs."""
+def controlled_phase_t_complexity(ctrl_values: Tuple[int, ...],
+                                  num_dirty: int = 0) -> TComplexity:
+    """T-complexity of `add_controlled_phase`; 2^k - 1 rotations and 2^k - 2 CNOTs for k <= 2."""
     total = TComplexity()
-    for k in range(num_ctrls):
-        total += controlled_rz_t_complexity(k)
+    k = len(ctrl_values)
+    for last in range(k):
+        total += direct_controlled_rz_t_complexity(ctrl_values[:last], num_dirty + k - 1 - last)
     return total
 
 

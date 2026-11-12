@@ -551,8 +551,9 @@ class Trotterization(Bloq):
         for term_idx, coeff in sequence:
             soqs = bb.add_d(self._term_evolution(term_idx, coeff), **soqs)
         if self._merges_control_phases:
-            soqs['ctrl'] = np.array(controls.add_controlled_phase(
-                bb, self._control_phase, soqs['ctrl'], self.ctrl_values))
+            ctrl, _ = controls.add_controlled_phase(
+                bb, self._control_phase, soqs['ctrl'], self.ctrl_values)
+            soqs['ctrl'] = np.array(ctrl)
 
         return soqs
 
@@ -665,7 +666,7 @@ class Trotterization(Bloq):
             term_complexity = t_complexity(cpse)
             total_complexity += count * term_complexity
         if self._merges_control_phases:
-            total_complexity += controls.controlled_phase_t_complexity(len(self.ctrl_values))
+            total_complexity += controls.controlled_phase_t_complexity(self.ctrl_values)
 
         return total_complexity
 
