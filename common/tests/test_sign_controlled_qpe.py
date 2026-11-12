@@ -20,7 +20,7 @@ from qualtran.resource_counting._qubit_counts import _cbloq_max_width
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.pauli_utils import pauli_string_to_matrix
 from qhat.common.trotter_flattened import Trotterization
-from qhat.common.tests.test_multi_control import block_matrix
+from .test_multi_control import block_matrix
 
 SIGN = "sign"
 # Terms that don't commute, with an all-identity term; odd time and hbar
@@ -269,6 +269,6 @@ class TestSignQPEValidation:
             sign_qpe(trotter("first order", num_steps=2), 3)
 
     def test_other_unitary_raises(self):
-        from qhat.common.tests.test_flexible_qpe import TwoQubitPlainBloq
+        from .test_flexible_qpe import TwoQubitPlainBloq
         with pytest.raises(ValueError, match="flattened Trotterization"):
             sign_qpe(TwoQubitPlainBloq(), 3)
