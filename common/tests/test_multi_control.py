@@ -129,7 +129,11 @@ class TestControlledRotationHelpers:
         size = 2 ** (num_dirty + 1)
         expected[block * size:(block + 1) * size, block * size:(block + 1) * size] = np.kron(
             np.eye(2 ** num_dirty), rz)
-        np.testing.assert_allclose(cbloq.tensor_contract(), expected, atol=1e-11)
+        actual = cbloq.tensor_contract()
+        assert actual.shape == expected.shape
+        # Not assert_allclose: on CI (Python 3.14, numpy 1.26.4) it failed with "operands could
+        # not be broadcast together with shapes (262144,) (0,)" for the 9- and 11-qubit cases.
+        assert np.max(np.abs(actual - expected)) < 1e-11
         assert t_complexity(cbloq) == controls.toffoli_controlled_rz_t_complexity(ctrl_values)
         assert dict(cbloq.build_call_graph(None)) == dict(
             controls.toffoli_controlled_rz_call_graph(theta, ctrl_values))
