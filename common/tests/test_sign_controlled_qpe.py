@@ -71,6 +71,15 @@ class TestIsSymmetric:
                               atol=1e-12)
         assert negated is expected
 
+    def test_bookends_decide(self):
+        """Two terms with (0.3, 0.7): the repeat core is a palindrome, but the prologue (0.3)
+        and the epilogue (0.7) differ, so the sequence isn't symmetric."""
+        tr = Trotterization((("XZ", 0.4), ("ZI", -0.3)), (0.3, 0.7), TIME, 4)
+        assert tr._repeat_core == tr._repeat_core[::-1]
+        assert tr.is_symmetric is False
+        assert not np.allclose(reference(attrs.evolve(tr, time=-TIME)), reference(tr).conj().T,
+                               atol=1e-12)
+
 
 class TestSquareRoot:
     @pytest.mark.parametrize("num_steps", [2, 6])

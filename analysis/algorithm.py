@@ -322,8 +322,19 @@ def check_algorithm_settings(config_algorithm: AlgorithmConfiguration, unitary=N
     `control_values` applies only to "controlled time evolution", and more than one control
     needs a unitary with a `multi_control_method` (the flattened Trotterization). Without this
     check QPE, which wraps the unitary in Qualtran's `Controlled`, would silently ignore it.
+
+    `unitary.controlled_rotation_method = "ancilla"` can't be used with "QPE: qualtran textbook":
+    `TextbookQPE` wraps the unitary in Qualtran's `Controlled`, which controls each term on its
+    own, so the terms' phases on the control aren't merged and it costs more than "textbook".
     """
     check_controlled_power_method(config_algorithm, unitary)
+    if (config_algorithm.method.lower() == "qpe: qualtran textbook"
+            and getattr(unitary, "controlled_rotation_method", None) == "ancilla"):
+        raise ValueError(
+            "unitary.controlled_rotation_method = \"ancilla\" doesn't work with \"QPE: qualtran "
+            "textbook\": Qualtran's Controlled wrapper controls each term separately, which costs "
+            "more than \"textbook\". Use \"QPE: QHAT flexible\", or controlled_rotation_method "
+            "\"textbook\".")
     if config_algorithm.control_values is None:
         return
     values = control_values(config_algorithm)    # validates the entries

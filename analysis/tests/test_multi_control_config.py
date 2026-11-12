@@ -141,6 +141,33 @@ class TestControlledRotationMethodOption:
         with pytest.raises(ValueError, match="multi_control_method 'direct'"):
             build_algorithm(config, trotter)
 
+    def test_textbook_qpe_with_ancilla_raises(self, hamiltonian):
+        """TextbookQPE wraps U in Qualtran's Controlled, which loses the merged phase (R4)."""
+        trotter = encode_ramped_trotter(
+            unitary_config(controlled_rotation_method="ancilla"), hamiltonian, tevol_hbar=0.7)
+        config = AlgorithmConfiguration()
+        config.method = "QPE: qualtran textbook"
+        config.num_phase_qubits = 3
+        with pytest.raises(ValueError, match="QPE: QHAT flexible"):
+            build_algorithm(config, trotter)
+
+    @pytest.mark.parametrize("method", ["QPE: QHAT flexible", "controlled time evolution"])
+    def test_other_controlled_methods_with_ancilla_work(self, hamiltonian, method):
+        trotter = encode_ramped_trotter(
+            unitary_config(controlled_rotation_method="ancilla"), hamiltonian, tevol_hbar=0.7)
+        config = AlgorithmConfiguration()
+        config.method = method
+        config.num_phase_qubits = 3
+        build_algorithm(config, trotter)
+
+    def test_textbook_qpe_with_textbook_rotation_works(self, hamiltonian):
+        trotter = encode_ramped_trotter(
+            unitary_config(controlled_rotation_method="textbook"), hamiltonian, tevol_hbar=0.7)
+        config = AlgorithmConfiguration()
+        config.method = "QPE: qualtran textbook"
+        config.num_phase_qubits = 3
+        build_algorithm(config, trotter)
+
     @pytest.mark.parametrize("method, line", [
         ("ancilla", 'controlled-rotation method: "ancilla" (AND ancilla per rotation, 1 rotation '
                     '+ 4 T each), 1 ancilla added'),
