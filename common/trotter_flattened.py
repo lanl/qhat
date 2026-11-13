@@ -288,6 +288,10 @@ class Trotterization(Bloq):
         multi_control_method: How 2 or more controls are built, "ancilla" (default) or "direct";
             see `common/controls.py`. With "ancilla" the controls are ANDed once for the whole
             Trotterization, and each term gets one control. Ignored with 0 or 1 controls.
+        controlled_rotation_method: How each term's rotation is controlled, "textbook" (default;
+            2 rotations) or "ancilla" (1 rotation + 4 T through an AND ancilla); see
+            `common/controls.py`. With "ancilla" the terms leave out their phases on the control,
+            and the Trotterization applies their sum once, at the end. Ignored without controls.
 
     Example:
         >>> # Second-order Trotterization using named method
@@ -326,6 +330,7 @@ class Trotterization(Bloq):
     is_adjoint: bool = False
     ctrl_values: Tuple[int, ...] = ()
     multi_control_method: str = controls.DEFAULT_MULTI_CONTROL_METHOD
+    controlled_rotation_method: str = controls.DEFAULT_CONTROLLED_ROTATION_METHOD
 
     def __attrs_post_init__(self):
         """Validate inputs."""
@@ -358,6 +363,9 @@ class Trotterization(Bloq):
         object.__setattr__(self, "ctrl_values",
                            controls.validate_ctrl_values("Trotterization", self.ctrl_values))
         controls.validate_multi_control_method("Trotterization", self.multi_control_method)
+        controls.validate_controlled_rotation_method(
+            "Trotterization", self.controlled_rotation_method, self.ctrl_values,
+            self.multi_control_method)
 
         # Initialize pattern basics
         object.__setattr__(self, "_prologue", ())
@@ -453,6 +461,7 @@ class Trotterization(Bloq):
         combine_terms: bool = True,
         tensor_contraction_method: Optional[str] = None,
         multi_control_method: str = controls.DEFAULT_MULTI_CONTROL_METHOD,
+        controlled_rotation_method: str = controls.DEFAULT_CONTROLLED_ROTATION_METHOD,
     ):
         """Create Trotterization using a named method.
 
@@ -468,6 +477,7 @@ class Trotterization(Bloq):
                 "incremental" = force O(n) incremental contraction
                 "structured" = force O(log n) structured contraction (raises error if pattern not detected)
             multi_control_method: How 2 or more controls are built, "ancilla" or "direct".
+            controlled_rotation_method: How each rotation is controlled, "textbook" or "ancilla".
 
         Returns:
             Trotterization instance
@@ -490,6 +500,7 @@ class Trotterization(Bloq):
             combine_terms=combine_terms,
             tensor_contraction_method=tensor_contraction_method,
             multi_control_method=multi_control_method,
+            controlled_rotation_method=controlled_rotation_method,
         )
 
     @cached_property
@@ -529,7 +540,8 @@ class Trotterization(Bloq):
         Uses the expanded sequence with combined terms for efficiency. The adjoint applies the
         sequence in reverse order, with each term adjointed. Under control every term gets the
         same controls. With 2 or more controls and the "ancilla" method, the controls are first
-        ANDed into one ancilla, which controls a singly-controlled Trotterization.
+        ANDed into one ancilla, which controls a singly-controlled Trotterization. With the
+        "ancilla" rotation method, the terms' phases on the control are applied last, as one.
         """
         if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
             return controls.add_with_and_ancilla(bb, self, **soqs)
@@ -538,8 +550,25 @@ class Trotterization(Bloq):
         sequence = reversed(self.expanded_sequence) if self.is_adjoint else self.expanded_sequence
         for term_idx, coeff in sequence:
             soqs = bb.add_d(self._term_evolution(term_idx, coeff), **soqs)
+        if self._merges_control_phases:
+            soqs['ctrl'] = np.array(controls.add_controlled_phase(
+                bb, self._control_phase, soqs['ctrl'], self.ctrl_values))
 
         return soqs
+
+    @cached_property
+    def _merges_control_phases(self) -> bool:
+        """True if the terms leave out their phases on the control and this bloq applies their
+        sum (the "ancilla" rotation method with one control)."""
+        return controls.uses_rotation_ancilla(self.ctrl_values, self.controlled_rotation_method)
+
+    @cached_property
+    def _control_phase(self) -> float:
+        """The sum of the terms' `control_phase`s over the whole circuit, from `_occurrences`, so
+        it doesn't expand the sequence. Example: 3 steps of a term that leaves phi each time
+        give 3 phi."""
+        return sum(n * self._term_evolution(term_idx, coeff).control_phase
+                   for (term_idx, coeff), n in self._occurrences().items())
 
     def _term_evolution(self, term_idx: int, coeff: float) -> CommutingPauliStringEvolution:
         """The bloq the decomposition applies for one (term_index, coefficient) pair.
@@ -557,6 +586,8 @@ class Trotterization(Bloq):
             is_adjoint=self.is_adjoint,
             ctrl_values=self.ctrl_values,
             multi_control_method=self.multi_control_method,
+            controlled_rotation_method=self.controlled_rotation_method,
+            omit_control_phase=self._merges_control_phases,
         )
 
     def _occurrences(self) -> Counter:
@@ -584,13 +615,16 @@ class Trotterization(Bloq):
         for `QECGatesCost` of a 500-step QPE). Here the work grows only with the length of the
         repeat pattern. The callees are exactly the decomposition's bloqs: the same coefficients,
         time step, adjoint flag and controls. With the "ancilla" method and 2 or more controls,
-        they are the AND, its uncompute, and this bloq with one control.
+        they are the AND, its uncompute, and this bloq with one control. With the "ancilla"
+        rotation method they include the summed phase on the control.
         """
         if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
             return controls.and_ancilla_call_graph(self)
         counts = Counter()
         for (term_idx, coeff), n in self._occurrences().items():
             counts[self._term_evolution(term_idx, coeff)] += n
+        if self._merges_control_phases:
+            counts += controls.controlled_phase_call_graph(self._control_phase, self.ctrl_values)
         return set(counts.items())
 
     def _t_complexity_(self) -> TComplexity:
@@ -601,7 +635,8 @@ class Trotterization(Bloq):
 
         Uses CommutingPauliStringEvolution to match the decomposition used in
         build_composite_bloq, with the same controls. The "ancilla" method adds the AND ladder
-        once and counts the terms with one control.
+        once and counts the terms with one control. The "ancilla" rotation method adds the
+        summed phase on the control once.
         """
         if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
             return controls.and_ancilla_t_complexity(self)
@@ -624,9 +659,13 @@ class Trotterization(Bloq):
                 hbar=1.0,
                 ctrl_values=self.ctrl_values,
                 multi_control_method=self.multi_control_method,
+                controlled_rotation_method=self.controlled_rotation_method,
+                omit_control_phase=self._merges_control_phases,
             )
             term_complexity = t_complexity(cpse)
             total_complexity += count * term_complexity
+        if self._merges_control_phases:
+            total_complexity += controls.controlled_phase_t_complexity(len(self.ctrl_values))
 
         return total_complexity
 
@@ -835,7 +874,8 @@ class Trotterization(Bloq):
 
     def __repr__(self) -> str:
         adjoint = ", is_adjoint=True" if self.is_adjoint else ""
-        ctrl = controls.ctrl_repr(self.ctrl_values, self.multi_control_method)
+        ctrl = controls.ctrl_repr(self.ctrl_values, self.multi_control_method,
+                                  self.controlled_rotation_method)
         return (f"Trotterization(pauli_terms={self.pauli_terms}, "
                 f"coefficients={self.coefficients}, time={self.time}, "
                 f"num_steps={self.num_steps}, hbar={self.hbar}{adjoint}{ctrl})")
@@ -902,13 +942,18 @@ class Trotterization(Bloq):
         return controls.get_ctrl_system(self, ctrl_spec)
 
     def my_static_costs(self, cost_key: 'CostKey'):
-        """`QubitCount` without decomposing: the qubits, the controls, and the k-1 AND ancillas of
-        the "ancilla" method with k >= 2 controls.
+        """`QubitCount` without decomposing: the qubits, the controls, the k-1 AND ancillas of
+        the "ancilla" method with k >= 2 controls, and 1 for the "ancilla" rotation method (unless
+        every term is all identities).
 
         Nothing else in the decomposition allocates qubits, so this is the peak number in use.
         """
         if isinstance(cost_key, QubitCount):
-            return controls.peak_qubits(self.num_qubits, self.ctrl_values, self.multi_control_method)
+            has_rotations = any(set(ps) != {'I'} for ps, _ in self.pauli_terms)
+            return controls.peak_qubits(
+                self.num_qubits, self.ctrl_values, self.multi_control_method,
+                controls.num_rotation_ancillas(self.ctrl_values, self.controlled_rotation_method,
+                                               has_rotations))
         return NotImplemented
 
 
@@ -924,6 +969,7 @@ def build_ramped_trotterized_unitary(
     combine_terms: bool = True,
     tensor_contraction_method: Optional[str] = None,
     multi_control_method: str = controls.DEFAULT_MULTI_CONTROL_METHOD,
+    controlled_rotation_method: str = controls.DEFAULT_CONTROLLED_ROTATION_METHOD,
 ):
     """Build a Trotterization using the old interface for backward compatibility.
 
@@ -943,6 +989,7 @@ def build_ramped_trotterized_unitary(
             "structured" = force O(log n) structured contraction (raises error if pattern not detected)
             "qualtran" = contract the decomposition gate by gate with Qualtran (reference)
         multi_control_method: How 2 or more controls are built, "ancilla" or "direct".
+        controlled_rotation_method: How each rotation is controlled, "textbook" or "ancilla".
 
     Returns:
         Trotterization instance
@@ -966,4 +1013,5 @@ def build_ramped_trotterized_unitary(
         combine_terms=combine_terms,
         tensor_contraction_method=tensor_contraction_method,
         multi_control_method=multi_control_method,
+        controlled_rotation_method=controlled_rotation_method,
     )

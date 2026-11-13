@@ -73,6 +73,25 @@ class TestSummaryContent:
         assert get_cost_value(algorithm, QubitCount()) == 3 + 3 + ancillas
         assert "WARNING" not in text
 
+    @pytest.mark.parametrize("method, control_values", [
+        ("controlled time evolution", None), ("controlled time evolution", [1, 0, 1]),
+        ("QPE: QHAT flexible", None)])
+    def test_rotation_ancilla(self, caplog, method, control_values):
+        """The "ancilla" rotation method adds 1 qubit, and the parts still add up."""
+        config = make_config(method, num_phase_qubits=4, control_values=control_values)
+        unitary = trotter(controlled_rotation_method="ancilla")
+        text, algorithm = summary(caplog, config, unitary)
+        assert 'rotation ancillas: 1 (controlled-rotation method "ancilla")' in text
+        textbook = build_algorithm(config, trotter())
+        assert (get_cost_value(algorithm, QubitCount())
+                == get_cost_value(textbook, QubitCount()) + 1)
+        assert "WARNING" not in text
+
+    def test_no_rotation_ancilla_line_without_controls(self, caplog):
+        text, _ = summary(caplog, make_config("time evolution"),
+                          trotter(controlled_rotation_method="ancilla"))
+        assert "rotation ancillas" not in text
+
     def test_warns_when_parts_disagree(self, caplog, monkeypatch):
         """If the Qualtran total isn't the sum of the parts, say so."""
         monkeypatch.setattr("qhat.analysis.qubit_summary.get_cost_value",

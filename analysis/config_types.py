@@ -6,7 +6,7 @@ import tomlkit
 from pathlib import Path
 from tomlkit.toml_file import TOMLFile
 
-from qhat.common.controls import MULTI_CONTROL_METHODS
+from qhat.common.controls import CONTROLLED_ROTATION_METHODS, MULTI_CONTROL_METHODS
 from qhat.common.git_utils import get_git_hash
 
 logger = logging.getLogger(__name__)
@@ -146,6 +146,9 @@ class UnitaryConfiguration(ConfigurationBase):
         # How a unitary with 2 or more controls is built ("ancilla" or "direct"); `None` means
         # the default, "ancilla" (see common/controls.py)
         self.multi_control_method = kwargs.get("multi_control_method", None)
+        # How each controlled rotation is built ("textbook" or "ancilla"); `None` means the
+        # default, "textbook" (see common/controls.py)
+        self.controlled_rotation_method = kwargs.get("controlled_rotation_method", None)
         # Validate trotter_steps
         if self.trotter_steps is not None:
             if not isinstance(self.trotter_steps, int) or self.trotter_steps < 1:
@@ -173,6 +176,12 @@ class UnitaryConfiguration(ConfigurationBase):
                 raise ValueError(
                     f"multi_control_method must be one of {list(MULTI_CONTROL_METHODS)}, "
                     f"got '{self.multi_control_method}'")
+        # Validate controlled_rotation_method
+        if self.controlled_rotation_method is not None:
+            if self.controlled_rotation_method not in CONTROLLED_ROTATION_METHODS:
+                raise ValueError(
+                    f"controlled_rotation_method must be one of "
+                    f"{list(CONTROLLED_ROTATION_METHODS)}, got '{self.controlled_rotation_method}'")
     def encode_pauli_lcu(self, **kwargs):
         self._only_once()
         self.method = "pauli lcu"
@@ -195,6 +204,7 @@ class UnitaryConfiguration(ConfigurationBase):
         self.save_if_present(table, "phase_scale_factor")
         self.save_if_present(table, "tensor_contraction_method")
         self.save_if_present(table, "multi_control_method")
+        self.save_if_present(table, "controlled_rotation_method")
         return table
 
 # -------------------------------------------------------------------------------------------------

@@ -14,6 +14,16 @@ With two or more controls, `multi_control_method` picks the circuit:
   ancillas, about 4(k-1) T), run the singly-controlled bloq on it, then uncompute.
 - "direct": no ancilla; every rotation is k-controlled (`add_controlled_rz`, 2^k rotations each).
 With 0 or 1 controls it is ignored.
+
+`controlled_rotation_method` picks the singly-controlled rotation of each Pauli term:
+- "textbook" (default): Rz(theta/2) . CNOT . Rz(-theta/2) . CNOT, 2 rotations, no ancilla.
+- "ancilla": AND the control and the parity qubit into an ancilla, rotate the ancilla, un-AND
+  (`add_and_ancilla_rz`): 1 rotation + 4 T and 1 ancilla. It leaves out a phase exp(-i theta/2)
+  on the control. A parent bloq (`CommutingPauliStringEvolution`, `Trotterization`) sums these
+  phases over its terms and applies them once, as one rotation on the control; a standalone term
+  applies its own. It needs one control per rotation, so with 2 or more controls it needs the
+  "ancilla" multi-control method.
+Without controls it is ignored.
 """
 
 import numbers
@@ -34,6 +44,8 @@ if TYPE_CHECKING:
 
 MULTI_CONTROL_METHODS = ("ancilla", "direct")
 DEFAULT_MULTI_CONTROL_METHOD = "ancilla"
+CONTROLLED_ROTATION_METHODS = ("textbook", "ancilla")
+DEFAULT_CONTROLLED_ROTATION_METHOD = "textbook"
 
 
 def validate_ctrl_values(owner: str, ctrl_values: Iterable[int]) -> Tuple[int, ...]:
@@ -53,6 +65,52 @@ def validate_multi_control_method(owner: str, method: str) -> str:
     return method
 
 
+def validate_controlled_rotation_method(
+    owner: str, method: str, ctrl_values: Tuple[int, ...], multi_control_method: str
+) -> str:
+    """Return `method` if it is one of `CONTROLLED_ROTATION_METHODS` and fits the controls.
+
+    Raises ValueError for an unknown method, and for "ancilla" with 2 or more controls and the
+    "direct" multi-control method (every rotation would need k controls, not one).
+    """
+    if method not in CONTROLLED_ROTATION_METHODS:
+        raise ValueError(f"{owner} controlled_rotation_method must be one of "
+                         f"{CONTROLLED_ROTATION_METHODS}, got {method!r}.")
+    if method == "ancilla" and len(ctrl_values) >= 2 and multi_control_method == "direct":
+        raise ValueError(
+            f"{owner}: controlled_rotation_method 'ancilla' needs one control per rotation, so it "
+            f"can't be combined with multi_control_method 'direct' and {len(ctrl_values)} "
+            "controls. Use multi_control_method 'ancilla' or controlled_rotation_method "
+            "'textbook'.")
+    return method
+
+
+def validate_omit_control_phase(
+    owner: str, omit: bool, ctrl_values: Tuple[int, ...], controlled_rotation_method: str
+):
+    """Raise ValueError unless `omit` is False, or the bloq has one control and the "ancilla"
+    rotation method (the only case where a parent merges the control phases)."""
+    if omit and not uses_rotation_ancilla(ctrl_values, controlled_rotation_method):
+        raise ValueError(f"{owner} omit_control_phase needs one control and "
+                         f"controlled_rotation_method 'ancilla', got ctrl_values={ctrl_values} "
+                         f"and {controlled_rotation_method!r}.")
+
+
+def uses_rotation_ancilla(ctrl_values: Tuple[int, ...], controlled_rotation_method: str) -> bool:
+    """True if each rotation is controlled through an AND ancilla: one control and "ancilla".
+
+    (With 2 or more controls the "ancilla" multi-control method first reduces them to one.)
+    """
+    return len(ctrl_values) == 1 and controlled_rotation_method == "ancilla"
+
+
+def num_rotation_ancillas(ctrl_values: Tuple[int, ...], controlled_rotation_method: str,
+                          has_rotations: bool) -> int:
+    """Ancillas the controlled rotations add at the peak: 1 (reused by every term) for "ancilla"
+    with any controls, if the bloq has a rotation at all (not only all-identity terms); else 0."""
+    return 1 if ctrl_values and controlled_rotation_method == "ancilla" and has_rotations else 0
+
+
 def uses_and_ancilla(ctrl_values: Tuple[int, ...], multi_control_method: str) -> bool:
     """True if the bloq ANDs its controls into an ancilla: 2 or more controls and "ancilla"."""
     return len(ctrl_values) >= 2 and multi_control_method == "ancilla"
@@ -63,12 +121,15 @@ def num_ancillas(ctrl_values: Tuple[int, ...], multi_control_method: str) -> int
     return len(ctrl_values) - 1 if uses_and_ancilla(ctrl_values, multi_control_method) else 0
 
 
-def peak_qubits(num_qubits: int, ctrl_values: Tuple[int, ...], multi_control_method: str) -> int:
+def peak_qubits(num_qubits: int, ctrl_values: Tuple[int, ...], multi_control_method: str,
+                rotation_ancillas: int = 0) -> int:
     """`QubitCount` of a controlled bloq whose own decomposition allocates nothing else.
 
-    For example, 10 qubits with 3 controls: 10 + 3 + 2 = 15 for "ancilla", 13 for "direct".
+    For example, 10 qubits with 3 controls: 10 + 3 + 2 = 15 for "ancilla", 13 for "direct";
+    `rotation_ancillas` (see `num_rotation_ancillas`) adds to that.
     """
-    return num_qubits + len(ctrl_values) + num_ancillas(ctrl_values, multi_control_method)
+    return (num_qubits + len(ctrl_values) + num_ancillas(ctrl_values, multi_control_method)
+            + rotation_ancillas)
 
 
 def ctrl_value_from_spec(ctrl_spec: 'CtrlSpec | None') -> int:
@@ -265,6 +326,44 @@ def controlled_phase_t_complexity(num_ctrls: int) -> TComplexity:
     return total
 
 
+def add_and_ancilla_rz(
+    bb: BloqBuilder, theta: float, target: Soquet, ctrl: Soquet, ctrl_value: int
+) -> Tuple[Soquet, Soquet]:
+    """Add Rz(theta) on `target` controlled on `ctrl`, through an AND ancilla, without the phase.
+
+    `And` puts (ctrl matches, target is |1>) into a fresh ancilla, Rz(theta) and a
+    `GlobalPhase(e^{i theta/2})` make diag(1, e^{i theta}) on it, and `And`^dagger (measurement
+    based, 0 T) frees it. That is the controlled Rz(theta) times exp(+i theta/2) on the active
+    control, so the caller must still apply exp(-i theta/2) there (`add_controlled_phase`), once
+    for many terms if it likes. Cost: 1 rotation + the `And` pair (4 T); 1 ancilla.
+
+    Returns the target and control soquets.
+    """
+    ladder = And(ctrl_value, 1)
+    (ctrl, target), ancilla = bb.add(ladder, ctrl=np.array([ctrl, target]))
+    ancilla = bb.add(Rz(theta), q=ancilla)
+    bb.add(GlobalPhase(np.exp(0.5j * theta)))
+    ctrl, target = bb.add(ladder.adjoint(), ctrl=np.array([ctrl, target]), target=ancilla)
+    return target, ctrl
+
+
+def and_ancilla_rz_call_graph(theta: float, ctrl_value: int) -> Counter:
+    """The gates of `add_and_ancilla_rz`, counted."""
+    ladder = And(ctrl_value, 1)
+    return Counter({ladder: 1, ladder.adjoint(): 1, Rz(theta): 1,
+                    GlobalPhase(np.exp(0.5j * theta)): 1})
+
+
+def and_ancilla_rz_t_complexity(ctrl_value: int) -> TComplexity:
+    """T-complexity of `add_and_ancilla_rz`: the `And` pair and 1 rotation.
+
+    Qualtran 0.4: 4 T + 13 Cliffords for a control on |1>, 4 T + 17 for |0> (the `And` adds X
+    gates for a 0 input).
+    """
+    ladder = And(ctrl_value, 1)
+    return t_complexity(ladder) + t_complexity(ladder.adjoint()) + TComplexity(rotations=1)
+
+
 def controlled_matrix(unitary: np.ndarray, ctrl_values: Tuple[int, ...]) -> np.ndarray:
     """The matrix of U controlled on `ctrl_values`: U on the matching block, identity elsewhere.
 
@@ -280,14 +379,18 @@ def controlled_matrix(unitary: np.ndarray, ctrl_values: Tuple[int, ...]) -> np.n
     return result
 
 
-def ctrl_repr(ctrl_values: Tuple[int, ...], multi_control_method: str) -> str:
+def ctrl_repr(ctrl_values: Tuple[int, ...], multi_control_method: str,
+              controlled_rotation_method: str = DEFAULT_CONTROLLED_ROTATION_METHOD) -> str:
     """The `repr` suffix for the controls, e.g. ", ctrl_values=(1, 0)"; empty if there are none.
 
-    `multi_control_method` is shown only when it isn't the default.
+    `multi_control_method` and `controlled_rotation_method` are shown only when they aren't the
+    defaults.
     """
     text = f", ctrl_values={ctrl_values}" if ctrl_values else ""
     if multi_control_method != DEFAULT_MULTI_CONTROL_METHOD:
         text += f", multi_control_method={multi_control_method!r}"
+    if controlled_rotation_method != DEFAULT_CONTROLLED_ROTATION_METHOD:
+        text += f", controlled_rotation_method={controlled_rotation_method!r}"
     return text
 
 
