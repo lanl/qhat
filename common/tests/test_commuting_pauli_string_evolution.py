@@ -664,9 +664,9 @@ class TestOwnControlledBloq:
         assert (cpse.controlled() ** -2) == (cpse ** 2).adjoint().controlled()
 
     def test_t_complexity_is_sum_of_controlled_terms(self):
-        # XZI: 2 + 2 + 2 = 6 Cliffords; ZXI: 6; IIY: 5 + 2 = 7; 2 rotations each; III: 1 rotation
+        # XZI: 2 + 2 + 2 = 6 Cliffords; ZXI: 6; IIY: 4 + 2 = 6; 2 rotations each; III: 1 rotation
         tc = t_complexity(CommutingPauliStringEvolution(self.TERMS, 0.83).controlled())
-        assert (tc.t, tc.clifford, tc.rotations) == (0, 19, 7)
+        assert (tc.t, tc.clifford, tc.rotations) == (0, 18, 7)
 
     def test_unsupported_ctrl_spec_raises(self):
         from qualtran import CtrlSpec

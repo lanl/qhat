@@ -22,7 +22,7 @@ from scipy.linalg import expm
 
 from numpy.typing import NDArray
 from qualtran import Bloq, BloqBuilder, CtrlSpec, QBit, Register, Side, Signature, Soquet, SoquetT
-from qualtran.bloqs.basic_gates import CNOT, GlobalPhase, Hadamard, Rz, SGate, ZGate
+from qualtran.bloqs.basic_gates import CNOT, GlobalPhase, Hadamard, Rz, SGate
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity
 from qualtran.resource_counting import QubitCount
 
@@ -31,9 +31,31 @@ from qhat.common.hermiticity import require_real_scalar
 from qhat.common.pauli_utils import validate_pauli_string
 
 if TYPE_CHECKING:
+    import cirq
     import quimb.tensor as qtn
     from qualtran import AddControlledT
+    from qualtran.cirq_interop import CirqQuregT
     from qualtran.resource_counting import BloqCountT, CostKey, SympySymbolAllocator
+
+
+@attrs.frozen
+class CirqSafeSGate(SGate):
+    """Qualtran's `SGate`, except that S^dagger converts to Cirq as `cirq.S**-1`.
+
+    Qualtran 0.4's `SGate(is_adjoint=True).as_cirq_op` returns plain `cirq.S`, so anything that
+    goes through Cirq (e.g. pyLIQTR, `BloqAsCirqGate`) would see S instead of S^dagger (notes F19).
+    Everything else (tensor, 1 Clifford in `t_complexity` and `QECGatesCost`) is `SGate`'s.
+    Example: `CirqSafeSGate(is_adjoint=True)` is diag(1, -i) in Qualtran and in Cirq.
+    """
+
+    def as_cirq_op(
+        self, qubit_manager: 'cirq.QubitManager', q: 'CirqQuregT'
+    ) -> Tuple['cirq.Operation', Dict[str, 'CirqQuregT']]:
+        import cirq
+
+        (q,) = q
+        gate = cirq.S**-1 if self.is_adjoint else cirq.S
+        return gate(q), {'q': np.array([q])}
 
 
 @attrs.frozen
@@ -175,10 +197,10 @@ class PauliStringEvolution(Bloq):
         """Decompose exactly (global phase included) into basis changes, CNOTs and Rz rotations.
 
         Only the non-identity qubits are touched. Each is rotated so that its Pauli becomes Z
-        (X: H; Y: S^dagger then H, with S^dagger written as Z then S, because Qualtran 0.4 converts
-        `SGate(is_adjoint=True)` to Cirq as plain S), a CNOT chain collects the parity on the last of them, Rz rotates
-        by the parity, and the chain and basis changes are undone. An all-identity string is
-        exp(-i * coefficient * time / hbar) times the identity, i.e. a `GlobalPhase`.
+        (X: H; Y: S^dagger then H, using `CirqSafeSGate` so the S^dagger is right in Cirq too), a
+        CNOT chain collects the parity on the last of them, Rz rotates by the parity, and the chain
+        and basis changes are undone. An all-identity string is exp(-i * coefficient * time / hbar)
+        times the identity, i.e. a `GlobalPhase`.
 
         Under control only the rotation is controlled (see `_add_rotation`); the basis changes and
         the CNOT chain cancel when the rotation is skipped. With 2 or more controls and the
@@ -194,8 +216,7 @@ class PauliStringEvolution(Bloq):
 
         for i in active:
             if self.pauli_string[i] == 'Y':
-                q[i] = bb.add(ZGate(), q=q[i])
-                q[i] = bb.add(SGate(), q=q[i])
+                q[i] = bb.add(CirqSafeSGate(is_adjoint=True), q=q[i])
             if self.pauli_string[i] in 'XY':
                 q[i] = bb.add(Hadamard(), q=q[i])
         for i, j in zip(active[:-1], active[1:]):
@@ -207,7 +228,7 @@ class PauliStringEvolution(Bloq):
             if self.pauli_string[i] in 'XY':
                 q[i] = bb.add(Hadamard(), q=q[i])
             if self.pauli_string[i] == 'Y':
-                q[i] = bb.add(SGate(), q=q[i])
+                q[i] = bb.add(CirqSafeSGate(), q=q[i])
         return self._outputs(q, ctrl)
 
     def _outputs(self, q: NDArray[Soquet], ctrl: Optional[NDArray[Soquet]]) -> Dict[str, SoquetT]:
@@ -262,8 +283,8 @@ class PauliStringEvolution(Bloq):
         counts = Counter()
         for i in active:
             if self.pauli_string[i] == 'Y':
-                counts[ZGate()] += 1
-                counts[SGate()] += 2
+                counts[CirqSafeSGate(is_adjoint=True)] += 1
+                counts[CirqSafeSGate()] += 1
             if self.pauli_string[i] in 'XY':
                 counts[Hadamard()] += 2
         if len(active) > 1:
@@ -287,7 +308,7 @@ class PauliStringEvolution(Bloq):
         num_ctrls = len(self.ctrl_values)
         if not active:
             return controls.controlled_phase_t_complexity(num_ctrls)
-        num_basis = sum(2 if self.pauli_string[i] == 'X' else 5
+        num_basis = sum(2 if self.pauli_string[i] == 'X' else 4
                         for i in active if self.pauli_string[i] != 'Z')
         num_cnots = 2 * (len(active) - 1)
         return TComplexity(clifford=num_basis + num_cnots) + controls.controlled_rz_t_complexity(

@@ -135,6 +135,19 @@ class TestControlValuesSetting:
         with pytest.raises(ValueError, match="only used by \"controlled time evolution\""):
             check_algorithm_settings(config, trotter())
 
+    @pytest.mark.parametrize("method, values, match", [
+        ("QPE: QHAT flexible", [1, 1], "only used by"),
+        ("QPE: qualtran textbook", [1], "only used by"),
+        ("time evolution", [0], "only used by"),
+        ("controlled time evolution", [], "empty"),
+        ("controlled time evolution", [1, 2], "must be 0 or 1")])
+    def test_build_algorithm_checks_the_setting(self, method, values, match):
+        """`build_algorithm` runs the check itself, so no caller can skip it. Without it, QPE
+        would ignore `control_values` while the TOML recorded them (R3 finding 2)."""
+        config = make_config(method, num_phase_qubits=3, control_values=values)
+        with pytest.raises(ValueError, match=match):
+            build_algorithm(config, trotter())
+
     def test_unitary_without_multi_control_raises(self):
         from qhat.common.pauli_string_evolution import PauliStringEvolution
         config = make_config("controlled time evolution", control_values=[1, 1])
@@ -203,6 +216,13 @@ class TestDriverEndToEnd:
         assert toml.count("qubit_count") == 2
         counts = {line.split("=")[1].strip() for line in toml.splitlines() if "qubit_count" in line}
         assert len(counts) == 1
+
+    def test_qpe_with_control_values_raises(self, monkeypatch, tmp_path):
+        with pytest.raises(ValueError, match="only used by \"controlled time evolution\""):
+            self.run_driver(
+                monkeypatch, tmp_path,
+                'algorithm.method = "QPE: QHAT flexible"\nalgorithm.num_phase_qubits = 3\n'
+                'algorithm.control_values = [1, 1]')
 
     def test_flexible_qpe(self, monkeypatch, tmp_path):
         log, toml = self.run_driver(

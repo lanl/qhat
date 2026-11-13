@@ -339,6 +339,8 @@ def build_algorithm(
 
     logger.info("Beginning to construct quantum algorithm.")
 
+    check_algorithm_settings(config_algorithm, unitary)
+
     # Every controlled algorithm but "controlled time evolution" controls the unitary on one qubit
     if is_controlled_algorithm(config_algorithm):
         log_multi_control_method(unitary, len(control_values(config_algorithm)))

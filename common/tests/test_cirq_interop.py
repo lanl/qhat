@@ -120,6 +120,41 @@ def test_wrong_without_the_s_dagger_fix_is_detected():
         np.testing.assert_allclose(cirq.unitary(BloqAsCirqGate(bloq)), expected, atol=1e-10)
 
 
+@pytest.mark.parametrize("is_adjoint, matrix", [(False, np.diag([1, 1j])), (True, np.diag([1, -1j]))])
+def test_cirq_safe_s_gate(is_adjoint, matrix):
+    """`CirqSafeSGate` is S or S^dagger in Qualtran and in Cirq, and 1 Clifford in every counter
+    (plain `SGate(is_adjoint=True)` becomes `cirq.S` in Cirq)."""
+    from pyLIQTR.utils.resource_analysis import estimate_resources
+    from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
+    from qualtran.resource_counting import GateCounts, QECGatesCost, get_cost_value
+    from qhat.common.pauli_string_evolution import CirqSafeSGate
+    gate = CirqSafeSGate(is_adjoint=is_adjoint)
+    np.testing.assert_allclose(gate.tensor_contract(), matrix, atol=1e-12)
+    np.testing.assert_allclose(cirq.unitary(BloqAsCirqGate(gate)), matrix, atol=1e-12)
+    q = cirq.LineQubit(0)
+    ops, _ = gate.as_cirq_op(cirq.SimpleQubitManager(), q=np.array([q]))
+    np.testing.assert_allclose(cirq.unitary(cirq.Circuit(ops)), matrix, atol=1e-12)
+    assert gate.adjoint() == CirqSafeSGate(is_adjoint=not is_adjoint)
+    assert t_complexity(gate) == TComplexity(clifford=1)
+    assert get_cost_value(gate, QECGatesCost()) == GateCounts(clifford=1)
+    resources = estimate_resources(gate, profile=True)
+    assert (resources["T"], resources["Clifford"], resources["Rotations"]) == (0, 1, 0)
+
+
+def test_y_basis_change_uses_one_s_dagger():
+    """A Y costs S^dagger, H, H, S (4 Cliffords), with no plain `SGate(is_adjoint=True)`."""
+    from collections import Counter
+    from qualtran.bloqs.basic_gates import Hadamard, SGate
+    from qhat.common.pauli_string_evolution import CirqSafeSGate
+    bloq = PauliStringEvolution("IYX", 0.7, TIME)
+    gates = Counter(bi.bloq for bi in bloq.decompose_bloq().bloq_instances)
+    assert gates[CirqSafeSGate(is_adjoint=True)] == 1
+    assert gates[CirqSafeSGate()] == 1
+    assert gates[Hadamard()] == 4
+    assert not any(type(g) is SGate for g in gates)
+    assert bloq.t_complexity().clifford == 4 + 2 + 2    # Y, X, 2 CNOTs
+
+
 def test_ancilla_method_has_no_cirq_unitary():
     """Known limitation: the AND ladder allocates an ancilla, which `cirq.unitary` can't contract.
 
