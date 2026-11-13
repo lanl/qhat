@@ -12,16 +12,15 @@ where:
 """
 
 from functools import cached_property
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING, Dict, Tuple
 
 import attrs
 import numpy as np
 from scipy.linalg import expm
 
-from cirq import DensePauliString as CirqDensePauliString
-from cirq import LineQubit, PauliStringPhasorGate
-from qualtran import Bloq, BloqBuilder, QBit, Register, Side, Signature, SoquetT
-from qualtran.cirq_interop import CirqGateAsBloq
+from numpy.typing import NDArray
+from qualtran import Bloq, BloqBuilder, QBit, Register, Side, Signature, Soquet, SoquetT
+from qualtran.bloqs.basic_gates import CNOT, GlobalPhase, Hadamard, Rz, SGate
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
 
 from qhat.common.hermiticity import require_real_scalar
@@ -129,44 +128,56 @@ class PauliStringEvolution(Bloq):
             )
         )
 
-    def _build_cirq_gate(self):
-        """Build the corresponding Cirq gate for resource estimation."""
-        # Create a Cirq DensePauliString directly from the Pauli string
-        # We use coefficient=1.0 as the base, and scale via the power parameter below
-        cirq_pauli = CirqDensePauliString(self.pauli_string, coefficient=1.0)
+    @cached_property
+    def _active_qubits(self) -> Tuple[int, ...]:
+        """Indices of the qubits where the Pauli string is not the identity."""
+        return tuple(i for i, p in enumerate(self.pauli_string) if p != 'I')
 
-        # PauliStringPhasorGate implements exp(-i * exponent * P / 2) where P has eigenvalues ±1
-        # We want exp(-i * coefficient * time / hbar * P)
-        # So we need: exponent / 2 = coefficient * time / hbar
-        # Therefore: exponent = 2 * coefficient * time / hbar
-        # And power = exponent / π (since PauliString**power gives exponent = π * power)
-        power = 2.0 * self.coefficient * self.time / (self.hbar * np.pi)
+    @cached_property
+    def _rotation_angle(self) -> float:
+        """Angle theta of Rz(theta) = exp(-i theta Z / 2) that implements the parity rotation."""
+        return 2.0 * self.coefficient * self.time / self.hbar
 
-        # Create the PauliStringPhasorGate from the base Pauli string
-        exp_gate = PauliStringPhasorGate(cirq_pauli) ** power
+    def build_composite_bloq(self, bb: BloqBuilder, q: NDArray[Soquet]) -> Dict[str, SoquetT]:
+        """Decompose exactly (global phase included) into basis changes, CNOTs and one Rz.
 
-        return exp_gate
-
-    def build_composite_bloq(self, bb: BloqBuilder, **soqs: SoquetT) -> Dict[str, SoquetT]:
-        """Decompose into a Cirq gate for resource estimation.
-
-        This decomposition is needed for pyLIQTR and controlled versions to work properly.
+        Only the non-identity qubits are touched. Each is rotated so that its Pauli becomes Z
+        (X: H; Y: S^dagger then H), a CNOT chain collects the parity on the last of them, Rz rotates
+        by the parity, and the chain and basis changes are undone. An all-identity string is
+        exp(-i * coefficient * time / hbar) times the identity, i.e. a `GlobalPhase`.
         """
-        # Get the Cirq gate representation
-        cirq_gate = self._build_cirq_gate()
+        q = np.array(q)
+        active = self._active_qubits
+        if not active:
+            bb.add(GlobalPhase(np.exp(-1j * self.coefficient * self.time / self.hbar)))
+            return {'q': q}
 
-        # Wrap it as a Bloq
-        gate_bloq = CirqGateAsBloq(cirq_gate)
-
-        # Add it to the bloq builder
-        return bb.add_d(gate_bloq, **soqs)
+        for i in active:
+            if self.pauli_string[i] == 'Y':
+                q[i] = bb.add(SGate(is_adjoint=True), q=q[i])
+            if self.pauli_string[i] in 'XY':
+                q[i] = bb.add(Hadamard(), q=q[i])
+        for i, j in zip(active[:-1], active[1:]):
+            q[i], q[j] = bb.add(CNOT(), ctrl=q[i], target=q[j])
+        q[active[-1]] = bb.add(Rz(self._rotation_angle), q=q[active[-1]])
+        for i, j in reversed(list(zip(active[:-1], active[1:]))):
+            q[i], q[j] = bb.add(CNOT(), ctrl=q[i], target=q[j])
+        for i in active:
+            if self.pauli_string[i] in 'XY':
+                q[i] = bb.add(Hadamard(), q=q[i])
+            if self.pauli_string[i] == 'Y':
+                q[i] = bb.add(SGate(), q=q[i])
+        return {'q': q}
 
     def _t_complexity_(self) -> TComplexity:
-        """Return the T-complexity for resource estimation."""
-        # Build the internal Cirq gate representation and get its complexity
-        cirq_gate = self._build_cirq_gate()
-        bloq = CirqGateAsBloq(cirq_gate)
-        return t_complexity(bloq)
+        """T-complexity of the decomposition, counted by hand (no decomposition needed)."""
+        active = self._active_qubits
+        if not active:
+            return TComplexity()
+        num_basis = sum(2 if self.pauli_string[i] == 'X' else 4
+                        for i in active if self.pauli_string[i] != 'Z')
+        num_cnots = 2 * (len(active) - 1)
+        return TComplexity(clifford=num_basis + num_cnots) + t_complexity(Rz(self._rotation_angle))
 
     def __str__(self) -> str:
         return f"exp(-i * {self.coefficient} * {self.pauli_string} * {self.time} / {self.hbar})"
