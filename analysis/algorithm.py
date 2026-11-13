@@ -30,6 +30,8 @@
 import logging
 import math
 
+import attrs
+
 from qualtran import CtrlSpec
 from qualtran.bloqs.phase_estimation import TextbookQPE, QubitizationQPE
 from qualtran.bloqs.qubitization.qubitization_walk_operator import QubitizationWalkOperator
@@ -38,7 +40,7 @@ from pyLIQTR.qubitization.phase_estimation import QubitizedPhaseEstimation
 
 from qhat.analysis.config_types import AlgorithmConfiguration
 from qhat.common import controls
-from qhat.common.flexible_qpe import FlexibleQPE
+from qhat.common.flexible_qpe import CONTROLLED_POWER_METHODS, FlexibleQPE
 from qhat.common.hermiticity import require_real_scalar
 from qhat.common.qpe_window_state import precision_bits, RectangularWindowState
 
@@ -197,6 +199,7 @@ def build_qpe_qhat_flexible(
         phase_error, probability_of_failure = qpe_requirements(config_algorithm, unitary)
         qpe = FlexibleQPE.from_requirements(
                 unitary, phase_error, probability_of_failure, **components)
+    qpe = attrs.evolve(qpe, controlled_power_method=controlled_power_method(config_algorithm))
     logger.verbose(f"-- number of phase qubits = {qpe.num_ancilla_qubits}")
     return qpe
 
@@ -278,13 +281,49 @@ def is_controlled_algorithm(config_algorithm: AlgorithmConfiguration) -> bool:
     method = config_algorithm.method.lower()
     return method.startswith("qpe:") or method == "controlled time evolution"
 
-def check_algorithm_settings(config_algorithm: AlgorithmConfiguration, unitary=None):
-    """Raise if `algorithm.control_values` is set where it can't be honoured.
+def controlled_power_method(config_algorithm: AlgorithmConfiguration) -> str:
+    """`algorithm.controlled_power_method`, lower case, or "controlled" if it isn't set."""
+    method = (config_algorithm.controlled_power_method or "controlled").lower()
+    if method not in CONTROLLED_POWER_METHODS:
+        raise ValueError(
+            f"algorithm.controlled_power_method must be one of {list(CONTROLLED_POWER_METHODS)}, "
+            f"got \"{config_algorithm.controlled_power_method}\".")
+    return method
 
-    It applies only to "controlled time evolution", and more than one control needs a unitary
-    with a `multi_control_method` (the flattened Trotterization). Without this check QPE, which
-    wraps the unitary in Qualtran's `Controlled`, would silently ignore it.
+def check_controlled_power_method(config_algorithm: AlgorithmConfiguration, unitary=None):
+    """Raise if `algorithm.controlled_power_method` is set where it can't be honoured.
+
+    It applies only to "QPE: QHAT flexible". "sign" needs a flattened Trotterization (FlexibleQPE
+    checks that it is symmetric with an even step count). It controls no rotation, so it
+    conflicts with `unitary.controlled_rotation_method = "ancilla"`.
     """
+    if config_algorithm.controlled_power_method is None:
+        return
+    method = controlled_power_method(config_algorithm)    # validates the value
+    if config_algorithm.method.lower() != "qpe: qhat flexible":
+        raise ValueError(
+            "algorithm.controlled_power_method is only used by \"QPE: QHAT flexible\", not "
+            f"\"{config_algorithm.method}\".")
+    if method == "sign" and unitary is not None:
+        if not hasattr(unitary, "sign_controlled"):
+            raise ValueError(
+                "algorithm.controlled_power_method = \"sign\" needs the flattened "
+                f"Trotterization, not {type(unitary).__name__}. Use unitary.encode_ramped_trotter "
+                "with trotter_implementation = \"flattened\".")
+        if getattr(unitary, "controlled_rotation_method", None) == "ancilla":
+            raise ValueError(
+                "algorithm.controlled_power_method = \"sign\" controls no rotation, so it "
+                "conflicts with unitary.controlled_rotation_method = \"ancilla\". Set only one.")
+
+def check_algorithm_settings(config_algorithm: AlgorithmConfiguration, unitary=None):
+    """Raise if `algorithm.control_values` or `algorithm.controlled_power_method` is set where it
+    can't be honoured.
+
+    `control_values` applies only to "controlled time evolution", and more than one control
+    needs a unitary with a `multi_control_method` (the flattened Trotterization). Without this
+    check QPE, which wraps the unitary in Qualtran's `Controlled`, would silently ignore it.
+    """
+    check_controlled_power_method(config_algorithm, unitary)
     if config_algorithm.control_values is None:
         return
     values = control_values(config_algorithm)    # validates the entries
@@ -348,6 +387,19 @@ def log_controlled_rotation_method(unitary):
         logger.info(f"-- controlled-rotation method: \"{method}\" (2 rotations each), "
                     "0 ancillas added")
 
+def uses_sign_controlled_powers(config_algorithm: AlgorithmConfiguration) -> bool:
+    """True for "QPE: QHAT flexible" with `algorithm.controlled_power_method = "sign"`."""
+    return (config_algorithm.method.lower() == "qpe: qhat flexible"
+            and controlled_power_method(config_algorithm) == "sign")
+
+def log_controlled_power_method(method: str):
+    """Log how FlexibleQPE controls each U^(2^j) (plan T11)."""
+    if method == "sign":
+        logger.info("-- controlled-power method: \"sign\" (V^dagger on |0>, V on |1>, V^2 = "
+                    "U^(2^j); 1 rotation per term of V, no T), 0 ancillas added")
+    else:
+        logger.info(f"-- controlled-power method: \"{method}\" (controlled U^(2^j))")
+
 def build_algorithm(
         config_algorithm: AlgorithmConfiguration,
         unitary):
@@ -359,7 +411,13 @@ def build_algorithm(
     # Every controlled algorithm but "controlled time evolution" controls the unitary on one qubit
     if is_controlled_algorithm(config_algorithm):
         log_multi_control_method(unitary, len(control_values(config_algorithm)))
-        log_controlled_rotation_method(unitary)
+        if config_algorithm.method.lower() == "qpe: qhat flexible":
+            log_controlled_power_method(controlled_power_method(config_algorithm))
+        if uses_sign_controlled_powers(config_algorithm):
+            logger.info("-- controlled-rotation method: not used (sign-controlled powers control "
+                        "no rotation), 0 ancillas added")
+        else:
+            log_controlled_rotation_method(unitary)
 
     if config_algorithm.method.lower() in ("qpe: qualtran textbook",):
         return build_qpe_qualtran_textbook(config_algorithm, unitary)

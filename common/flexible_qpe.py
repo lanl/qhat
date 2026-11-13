@@ -34,6 +34,10 @@ if TYPE_CHECKING:
     import quimb.tensor as qtn
     from qualtran.resource_counting import BloqCountT, CostKey, SympySymbolAllocator
 
+# How FlexibleQPE controls each U^(2^j); see `FlexibleQPE.controlled_power_method`
+CONTROLLED_POWER_METHODS = ("controlled", "sign")
+DEFAULT_CONTROLLED_POWER_METHOD = "controlled"
+
 
 @attrs.frozen
 class FlexibleQPE(GateWithRegisters):
@@ -65,6 +69,12 @@ class FlexibleQPE(GateWithRegisters):
             `RectangularWindowState(num_ancilla_qubits)` (a Hadamard on each phase qubit).
         qft_inv: Inverse QFT on the phase register. Defaults to
             `QFTTextBook(num_ancilla_qubits, with_reverse=True).adjoint()`.
+        controlled_power_method: How each U^(2^j) is controlled. "controlled" (default) uses
+            the unitary's `.controlled()`. "sign" applies V^dagger on phase qubit |0> and V on
+            |1>, with V^2 = U^(2^j) (`Trotterization.sign_controlled`; 1 rotation per term, no T,
+            no ancilla). The extra V^dagger commutes with every power, so the measured phases
+            are the same; only the target state after the measurement differs. "sign" needs a
+            symmetric Trotterization with an even step count.
 
     Registers:
         qpe_reg: Phase register of `num_ancilla_qubits` qubits, of type `QFxp(m, m)` with
@@ -76,6 +86,7 @@ class FlexibleQPE(GateWithRegisters):
     num_ancilla_qubits: SymbolicInt
     ancilla_prep: QPEWindowStateBase = attrs.field()
     qft_inv: Bloq = attrs.field()
+    controlled_power_method: str = DEFAULT_CONTROLLED_POWER_METHOD
 
     @ancilla_prep.default
     def _default_ancilla_prep(self):
@@ -99,6 +110,17 @@ class FlexibleQPE(GateWithRegisters):
                 )
         if any(reg.name == 'qpe_reg' for reg in self.unitary.signature):
             raise ValueError("The unitary may not have a register named 'qpe_reg'.")
+        if self.controlled_power_method not in CONTROLLED_POWER_METHODS:
+            raise ValueError(
+                f"controlled_power_method must be one of {list(CONTROLLED_POWER_METHODS)}, "
+                f"got {self.controlled_power_method!r}.")
+        if self.controlled_power_method == "sign":
+            if not hasattr(self.unitary, "sign_controlled"):
+                raise ValueError(
+                    f"controlled_power_method = \"sign\" needs a flattened Trotterization, "
+                    f"not {type(self.unitary).__name__}.")
+            if not is_symbolic(self.num_ancilla_qubits) and self.num_ancilla_qubits > 0:
+                self.sign_controlled_power(0)    # raises for odd steps or a non-symmetric method
 
     @cached_property
     def num_state_qubits(self) -> int:
@@ -127,6 +149,8 @@ class FlexibleQPE(GateWithRegisters):
         return Signature([*self.phase_registers, *self.target_registers])
 
     def __str__(self) -> str:
+        if self.controlled_power_method == "sign":
+            return f'FlexibleQPE[{self.num_ancilla_qubits}, sign]'
         return f'FlexibleQPE[{self.num_ancilla_qubits}]'
 
     @classmethod
@@ -180,6 +204,23 @@ class FlexibleQPE(GateWithRegisters):
         """Return the bloq for controlled U^(2^j)."""
         return self.unitary_power(2**j).controlled()
 
+    def sign_controlled_power(self, j: int) -> Bloq:
+        """Return the sign-controlled V with V^2 = U^(2^j): V^dagger on phase qubit |0>, V on
+        |1>. The phase qubit is the bloq's `q[0]`. Example: U = 4 steps over t gives V = 2 steps
+        over t/2 for j = 0, and V = U for j = 1."""
+        root = self.unitary_power(2**j).square_root()
+        if root is None:
+            raise ValueError(
+                "controlled_power_method = \"sign\" needs U = V^2, i.e. an even number of "
+                f"Trotter steps; got {self.unitary.num_steps}.")
+        return root.sign_controlled()
+
+    def _phase_kickback_power(self, j: int) -> Bloq:
+        """The bloq the decomposition applies for phase bit j, by `controlled_power_method`."""
+        if self.controlled_power_method == "sign":
+            return self.sign_controlled_power(j)
+        return self.controlled_power(j)
+
     def build_composite_bloq(
         self, bb: BloqBuilder, qpe_reg: SoquetT, **target_soqs: SoquetT
     ) -> Dict[str, SoquetT]:
@@ -192,6 +233,12 @@ class FlexibleQPE(GateWithRegisters):
         target_names = [reg.name for reg in self.target_registers]
         for j in range(m):
             # bb.split is big-endian, so the last qubit is the least significant bit.
+            if self.controlled_power_method == "sign":
+                # The phase qubit is q[0] of the sign-controlled Trotterization
+                q = bb.add(self.sign_controlled_power(j),
+                           q=np.concatenate([[qs[m - 1 - j]], target_soqs['q']]))
+                qs[m - 1 - j], target_soqs = q[0], {'q': q[1:]}
+                continue
             _, add_controlled = self.unitary_power(2**j).get_ctrl_system(CtrlSpec())
             (qs[m - 1 - j],), out_soqs = add_controlled(bb, [qs[m - 1 - j]], target_soqs)
             target_soqs = dict(zip(target_names, out_soqs))
@@ -209,7 +256,7 @@ class FlexibleQPE(GateWithRegisters):
                 (self.qft_inv, 1),
             }
         counts = Counter([self.ancilla_prep, self.qft_inv])
-        counts.update(self.controlled_power(j) for j in range(m))
+        counts.update(self._phase_kickback_power(j) for j in range(m))
         return set(counts.items())
 
     def my_static_costs(self, cost_key: 'CostKey'):
@@ -222,6 +269,10 @@ class FlexibleQPE(GateWithRegisters):
             get_cost_value(self.qft_inv, cost_key) + n,
         ]
         for j in range(m):
+            if self.controlled_power_method == "sign":
+                # The sign-controlled bloq holds its phase qubit
+                widths.append(get_cost_value(self.sign_controlled_power(j), cost_key) + m - 1)
+                continue
             u_k = self.unitary_power(2**j)
             if isinstance(u_k, Power):
                 # Same width as a single controlled U; avoids decomposing 2^j copies.
@@ -241,9 +292,17 @@ class FlexibleQPE(GateWithRegisters):
         U^(2^j) bloq, which assumes `unitary_power(k)` is exactly U^k.
 
         Example (m = 2): a = [U, U^2] and W = [U^0, U^1, U^2, U^3], with U^3 = U^2 @ U.
+
+        With `controlled_power_method = "sign"`, phase bit j applies V_j^dagger on |0> and V_j on
+        |1>, with V_j^2 = U^(2^j), so W[k] = U^k times the product of every V_j^dagger, i.e.
+        times (R^(2^m - 1))^dagger, with R = V_0 the square root of U.
         """
         m = self.num_ancilla_qubits
-        a = [self.unitary.tensor_contract()]
+        if self.controlled_power_method == "sign":
+            root = self.unitary.square_root().tensor_contract()
+            a = [root @ root]
+        else:
+            a = [self.unitary.tensor_contract()]
         for _ in range(1, m):
             a.append(a[-1] @ a[-1])
         d = a[0].shape[0]
@@ -252,6 +311,9 @@ class FlexibleQPE(GateWithRegisters):
         for k in range(1, 2**m):
             h = k.bit_length() - 1
             w[k] = a[h] @ w[k - 2**h]
+        if self.controlled_power_method == "sign":
+            # R^(2^m - 1) = R @ U^(2^(m-1) - 1)
+            w = w @ (root @ w[2**(m - 1) - 1]).conj().T
         return w
 
     def tensor_contract(self) -> np.ndarray:

@@ -69,7 +69,11 @@ def qubit_summary_components(config_algorithm: AlgorithmConfiguration, unitary, 
         # The phase qubits are the controls, one per controlled U^(2^j)
         components["ancilla_note"] = "single control per unitary; method not used"
     rotation_method = getattr(unitary, "controlled_rotation_method", None)
-    if method != "time evolution" and rotation_method is not None:
+    if (method == "qpe: qhat flexible"
+            and getattr(algorithm, "controlled_power_method", None) == "sign"):
+        # Sign-controlled powers control no rotation; the phase qubit is part of each term
+        components["rotation_note"] = "sign-controlled powers; controlled-rotation method not used"
+    elif method != "time evolution" and rotation_method is not None:
         # One ancilla, reused by every controlled rotation (none if the unitary has no rotation)
         components["rotation_ancilla"] = controls.num_rotation_ancillas(
             (1,), rotation_method, has_rotations(unitary))

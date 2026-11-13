@@ -932,6 +932,45 @@ class Trotterization(Bloq):
         """
         return attrs.evolve(self, is_adjoint=not self.is_adjoint)
 
+    @cached_property
+    def is_symmetric(self) -> bool:
+        """True if the expanded sequence reads the same backwards (coefficients equal to 1e-12
+        relative), so that U(-time) == U^dagger. Second and fourth order are; first and third
+        order aren't. Checked on the repeat pattern, without expanding the sequence."""
+        def same(a, b):
+            return len(a) == len(b) and all(
+                i == j and np.isclose(x, y, rtol=1e-12, atol=0) for (i, x), (j, y) in zip(a, b))
+        return (same(self._repeat_core, self._repeat_core[::-1])
+                and same(self._prologue, self._epilogue))
+
+    def square_root(self) -> Optional['Trotterization']:
+        """The Trotterization V with V**2 == self (half the steps and half the time, the same
+        time step), or None if the step count is odd. Example: 6 steps over t gives 3 over t/2."""
+        if self.num_steps % 2:
+            return None
+        return attrs.evolve(self, time=self.time / 2, num_steps=self.num_steps // 2)
+
+    def sign_controlled(self) -> 'Trotterization':
+        """The sign-controlled evolution of this bloq V: V on control |1>, V^dagger on |0>.
+
+        Each term (P, h) becomes ("Z" + P, -h) on one more qubit, `q[0]` being the control, so
+        the result is again a Trotterization: per term 1 rotation, 2 more CNOTs than V, no T and
+        no ancilla (an all-identity term becomes 1 rotation on the control). On control |0> it
+        is V(-time), which is V^dagger only for a symmetric sequence, so other methods raise.
+
+        It equals (I x V^dagger) times controlled-V^2, so it is *not* controlled-V and
+        `.controlled()` never returns it. `FlexibleQPE` uses it with
+        `controlled_power_method = "sign"`, where the extra V^dagger commutes with every power.
+        Example: V = 2 steps over t/2 gives the phases of U = 4 steps over t.
+        """
+        if self.ctrl_values:
+            raise ValueError("sign_controlled() needs an uncontrolled Trotterization.")
+        if not self.is_symmetric:
+            raise ValueError(
+                "sign_controlled() needs a symmetric Trotter sequence (e.g. second or fourth "
+                f"order), so that U(-t) is U^dagger; got coefficients {self.coefficients}.")
+        return attrs.evolve(self, pauli_terms=tuple(('Z' + p, -h) for p, h in self.pauli_terms))
+
     def get_ctrl_system(
         self, ctrl_spec: Optional[CtrlSpec] = None
     ) -> Tuple['Trotterization', 'AddControlledT']:
