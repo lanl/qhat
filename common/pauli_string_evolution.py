@@ -22,7 +22,7 @@ from scipy.linalg import expm
 
 from numpy.typing import NDArray
 from qualtran import Bloq, BloqBuilder, CtrlSpec, QBit, Register, Side, Signature, Soquet, SoquetT
-from qualtran.bloqs.basic_gates import CNOT, GlobalPhase, Hadamard, Rz, SGate
+from qualtran.bloqs.basic_gates import CNOT, GlobalPhase, Hadamard, Rz, SGate, ZGate
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity
 from qualtran.resource_counting import QubitCount
 
@@ -175,7 +175,8 @@ class PauliStringEvolution(Bloq):
         """Decompose exactly (global phase included) into basis changes, CNOTs and Rz rotations.
 
         Only the non-identity qubits are touched. Each is rotated so that its Pauli becomes Z
-        (X: H; Y: S^dagger then H), a CNOT chain collects the parity on the last of them, Rz rotates
+        (X: H; Y: S^dagger then H, with S^dagger written as Z then S, because Qualtran 0.4 converts
+        `SGate(is_adjoint=True)` to Cirq as plain S), a CNOT chain collects the parity on the last of them, Rz rotates
         by the parity, and the chain and basis changes are undone. An all-identity string is
         exp(-i * coefficient * time / hbar) times the identity, i.e. a `GlobalPhase`.
 
@@ -193,7 +194,8 @@ class PauliStringEvolution(Bloq):
 
         for i in active:
             if self.pauli_string[i] == 'Y':
-                q[i] = bb.add(SGate(is_adjoint=True), q=q[i])
+                q[i] = bb.add(ZGate(), q=q[i])
+                q[i] = bb.add(SGate(), q=q[i])
             if self.pauli_string[i] in 'XY':
                 q[i] = bb.add(Hadamard(), q=q[i])
         for i, j in zip(active[:-1], active[1:]):
@@ -260,8 +262,8 @@ class PauliStringEvolution(Bloq):
         counts = Counter()
         for i in active:
             if self.pauli_string[i] == 'Y':
-                counts[SGate(is_adjoint=True)] += 1
-                counts[SGate()] += 1
+                counts[ZGate()] += 1
+                counts[SGate()] += 2
             if self.pauli_string[i] in 'XY':
                 counts[Hadamard()] += 2
         if len(active) > 1:
@@ -285,7 +287,7 @@ class PauliStringEvolution(Bloq):
         num_ctrls = len(self.ctrl_values)
         if not active:
             return controls.controlled_phase_t_complexity(num_ctrls)
-        num_basis = sum(2 if self.pauli_string[i] == 'X' else 4
+        num_basis = sum(2 if self.pauli_string[i] == 'X' else 5
                         for i in active if self.pauli_string[i] != 'Z')
         num_cnots = 2 * (len(active) - 1)
         return TComplexity(clifford=num_basis + num_cnots) + controls.controlled_rz_t_complexity(

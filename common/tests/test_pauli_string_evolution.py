@@ -515,18 +515,18 @@ class TestDecompositionCounts:
     """T-complexity equals a hand count of the decomposition."""
 
     # (string, Cliffords, rotations): H = 1 Clifford, S^dagger/S = 1 each, CNOT = 1.
-    #   X: H, H = 2.  Y: S^dagger, H, H, S = 4.  Parity ladder: 2 CNOTs per extra active qubit.
+    #   X: H, H = 2.  Y: Z, S, H, H, S = 5 (S^dagger is Z then S, see `build_composite_bloq`).  Parity ladder: 2 CNOTs per extra active qubit.
     @pytest.mark.parametrize("pauli_string, cliffords, rotations", [
         ("Z", 0, 1),
         ("IIIZ", 0, 1),
         ("X", 2, 1),
-        ("IYI", 4, 1),
+        ("IYI", 5, 1),
         ("IZ", 0, 1),
-        ("XIYIZ", 2 + 4 + 0 + 4, 1),      # 3 active qubits -> 4 CNOTs
-        ("XYZ", 2 + 4 + 0 + 4, 1),
+        ("XIYIZ", 2 + 5 + 0 + 4, 1),      # 3 active qubits -> 4 CNOTs
+        ("XYZ", 2 + 5 + 0 + 4, 1),
         ("ZZII", 2, 1),
         ("II", 0, 0),
-        ("YY", 8 + 2, 1),
+        ("YY", 10 + 2, 1),
     ])
     def test_hand_count(self, pauli_string, cliffords, rotations):
         tc = t_complexity(PauliStringEvolution(pauli_string, 0.37, 0.91))
@@ -706,9 +706,9 @@ class TestControlled:
         ("Z", 2, 2),
         ("IIIZ", 2, 2),
         ("X", 4, 2),
-        ("IYI", 6, 2),
-        ("XIYIZ", 2 + 4 + 4 + 2, 2),
-        ("YY", 8 + 2 + 2, 2),
+        ("IYI", 7, 2),
+        ("XIYIZ", 2 + 5 + 4 + 2, 2),
+        ("YY", 10 + 2 + 2, 2),
         ("II", 0, 1),
     ])
     @pytest.mark.parametrize("ctrl_value", [1, 0])
