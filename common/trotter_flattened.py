@@ -7,6 +7,7 @@ same Pauli string are combined for efficiency.
 """
 
 import logging
+import numbers
 from functools import cached_property
 from math import cbrt
 from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple, Union
@@ -273,6 +274,9 @@ class Trotterization(Bloq):
             "incremental" = force O(n) incremental contraction
             "structured" = force O(log n) structured contraction (raises error if pattern not detected)
             "qualtran" = contract the decomposition gate by gate with Qualtran (reference)
+        is_adjoint: If True, the operator is U^dagger. `adjoint()` flips it and leaves `time`,
+            the coefficients and the term order as given; the decomposition and the tensor apply
+            the reversal themselves.
 
     Example:
         >>> # Second-order Trotterization using named method
@@ -308,6 +312,7 @@ class Trotterization(Bloq):
     _repeat_bridge: Tuple[Tuple[str, float], ...] = ()
     _symmetric_bookends: bool = True
     tensor_contraction_method: Optional[str] = None
+    is_adjoint: bool = False
 
     def __attrs_post_init__(self):
         """Validate inputs."""
@@ -502,7 +507,8 @@ class Trotterization(Bloq):
         Currently, each instance contains a single term, but the infrastructure is in place
         for future optimization where multiple commuting terms can be grouped together.
 
-        Uses the expanded sequence with combined terms for efficiency.
+        Uses the expanded sequence with combined terms for efficiency. The adjoint applies the
+        sequence in reverse order, with each term adjointed.
         """
         # Get the input register
         assert len(soqs) == 1, f"Expected 1 register, got {len(soqs)}"
@@ -511,8 +517,9 @@ class Trotterization(Bloq):
         # Time step for each Trotterization step
         dt = self.time / self.num_steps
 
-        # Apply each term in the expanded sequence
-        for term_idx, coeff in self.expanded_sequence:
+        # Apply each term in the expanded sequence (reversed for the adjoint)
+        sequence = reversed(self.expanded_sequence) if self.is_adjoint else self.expanded_sequence
+        for term_idx, coeff in sequence:
             pauli_string, h_i = self.pauli_terms[term_idx]
 
             # Create CommutingPauliStringEvolution for this term
@@ -521,7 +528,8 @@ class Trotterization(Bloq):
             cpse = CommutingPauliStringEvolution(
                 pauli_terms=((pauli_string, h_i * coeff),),
                 time=dt,
-                hbar=self.hbar
+                hbar=self.hbar,
+                is_adjoint=self.is_adjoint,
             )
             register = bb.add(cpse, q=register)
 
@@ -617,6 +625,11 @@ class Trotterization(Bloq):
         logger.debug(f"-- num_steps = {self.num_steps}")
         logger.debug(f"-- num_terms = {len(self.pauli_terms)}")
         logger.debug(f"-- expanded_sequence length = {self.num_operations}")
+
+        # The "qualtran" method contracts the decomposition, which already applies the adjoint
+        # flag. The other methods build the forward matrix, so conjugate-transpose it.
+        if self.is_adjoint and self.tensor_contraction_method != "qualtran":
+            return attrs.evolve(self, is_adjoint=False).tensor_contract().conj().T
 
         # Check if a specific method is forced via configuration
         forced_method = self.tensor_contraction_method
@@ -743,13 +756,15 @@ class Trotterization(Bloq):
 
     def __str__(self) -> str:
         method_name = self._infer_method_name()
+        dagger = "†" if self.is_adjoint else ""
         return (f"Trotterization({method_name}, {self.num_terms} terms, "
-                f"{self.num_steps} steps, t={self.time})")
+                f"{self.num_steps} steps, t={self.time}){dagger}")
 
     def __repr__(self) -> str:
+        adjoint = ", is_adjoint=True" if self.is_adjoint else ""
         return (f"Trotterization(pauli_terms={self.pauli_terms}, "
                 f"coefficients={self.coefficients}, time={self.time}, "
-                f"num_steps={self.num_steps}, hbar={self.hbar})")
+                f"num_steps={self.num_steps}, hbar={self.hbar}{adjoint})")
 
     def _infer_method_name(self) -> str:
         """Infer the method name from coefficients for display."""
@@ -763,48 +778,45 @@ class Trotterization(Bloq):
     def phase_error_from_energy_error(self, energy_error: float) -> float:
         """Eigenphase error, in turns ([0, 1)), corresponding to an energy error.
 
-        U = exp(-i H t / hbar), so an energy E has phase E t / (2 pi hbar) turns.
+        U = exp(-i H t / hbar), so an energy E has phase E t / (2 pi hbar) turns. This is a
+        magnitude: it uses |time|, so a negative time or an adjoint gives the same (positive) error.
         """
-        return energy_error * self.time / (2 * np.pi * self.hbar)
+        return energy_error * abs(self.time) / (2 * np.pi * self.hbar)
 
     def __pow__(self, power: int):
-        """Raise the Trotterization to an integer power.
+        """Raise the Trotterization to a non-zero integer power.
 
         For QPE, we need U^k where k is an integer. Since U applies the Trotter
         sequence num_steps times with time step time / num_steps, U^k applies the same
         sequence (num_steps * k) times with the same time step, i.e. for total time (time * k).
+        U^(-k) is (U^k).adjoint(). A power of an adjoint keeps the flag: (U^dagger)^k is
+        (U^k)^dagger.
 
         Args:
-            power: Integer power to raise to (must be positive)
+            power: Non-zero integer power to raise to
 
         Returns:
-            New Trotterization bloq with num_steps and time multiplied by power
+            New Trotterization bloq with num_steps and time multiplied by |power|
 
         Raises:
-            ValueError: If power is not a positive integer
+            ValueError: If power is zero or not an integer
         """
-        if not isinstance(power, int) or power < 1:
-            raise ValueError(f"Power must be a positive integer, got {power}")
+        if isinstance(power, bool) or not isinstance(power, numbers.Integral) or power == 0:
+            raise ValueError(f"Power must be a non-zero integer, got {power}")
 
-        return attrs.evolve(self, num_steps=self.num_steps * power, time=self.time * power)
+        k = abs(int(power))
+        return attrs.evolve(
+            self, num_steps=self.num_steps * k, time=self.time * k,
+            is_adjoint=self.is_adjoint != (power < 0))
 
     def adjoint(self) -> 'Trotterization':
         """Return U^dagger as a Trotterization, so it keeps the optimized tensor contraction.
 
-        U^dagger applies the expanded sequence in reverse order with negated time. Reversing the
-        coefficients reverses the order of the ramps. With an odd number of coefficients each step
-        starts and ends with an ascending ramp, so the term order must also be reversed so that
-        the ramps of the reversed step run descending.
+        Flips `is_adjoint` and leaves `time`, the coefficients and the term order as given, so
+        the adjoint of the adjoint equals the original. Negating `time` alone would be wrong for
+        methods that are not symmetric; the decomposition and the tensor apply the reversal.
         """
-        pauli_terms = self.pauli_terms
-        if len(self.coefficients) % 2 == 1:
-            pauli_terms = tuple(reversed(pauli_terms))
-        return attrs.evolve(
-            self,
-            pauli_terms=pauli_terms,
-            coefficients=tuple(reversed(self.coefficients)),
-            time=-self.time,
-        )
+        return attrs.evolve(self, is_adjoint=not self.is_adjoint)
 
 
 # =================================================================================================
