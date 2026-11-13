@@ -34,9 +34,13 @@ class PauliStringLCU(LCUBlockEncoding):
 
     def __init__(self, hamiltonian, prepare_type=None, energy_error=None, **kwargs):
 
-        pauli_terms = [cirq.DensePauliString(term[0],coefficient=term[1])
-                          for term in hamiltonian.get_all_pauli_strings(return_as='strings').items()
-                      ]
+        for term in hamiltonian.terms():
+            if not isinstance(term, PauliStringTerm):
+                raise ValueError("When using the PauliStringLCU block encoding, the Hamiltonian "
+                                 "needs to be decomposed into single Pauli string terms.  Got a "
+                                 f"term of type {type(term)}: {term}.")
+        pauli_terms = [cirq.DensePauliString(term.dense_string(), coefficient=term.coefficients)
+                       for term in hamiltonian.terms]
 
         ##  n_terms   :   Number of problem terms
         ##  n_pad     :   Number of padding terms
@@ -293,8 +297,23 @@ def encode_ramped_trotter(
         logger.info(f"-- Error coefficient time limit: {error_coeff_time_limit}s")
 
         # Compute error coefficients with user-specified mode
+        # TODO: We need to think about if we should compute the comutators based on the actual
+        #       terms used, and how to make that performant.  There's the "every term is the same
+        #       kind" case (e.g., all second-quantization operators, although some are one-body and
+        #       some are two-body; or all energy operators, although one is diagonal and the other
+        #       is circulant) and there's also the general case (any and all types of operators may
+        #       show up in the same Hamiltonian).
+        #       -- Computing the error bound based on the terms actually used in the Hamiltonian is
+        #          probably the most correct thing to do.
+        #       -- If we stick with computing error bounds based on Pauli strings, is that
+        #          over-estimating the error, under-estimating the error, or unclear?
+        #       For now, we're collapsing down to Pauli strings to compute the coefficients.  This
+        #       is sufficient for the current state where the only type of term is single Pauli
+        #       strings.  Going forward, this will likely need to be improved.
+        from openfermion import QubitOperator
         c1, c2 = trotter_error_estimator_fast(
-            hamiltonian.get_grouped_terms(),
+            list(QubitOperator(item.pauli_string.to_sparse(), item.coefficient) for item in
+                 hamiltonian.terms()),
             error_coeff_time_limit,
             mode=error_coeff_mode,
             auto_exact=error_coeff_auto_exact
@@ -368,8 +387,22 @@ def encode_ramped_trotter(
         logger.info(f"-- Trotter recommendation: use {method} formula with {Nsteps} steps ({Nsteps0})")
         logger.verbose(f"-- unoptimized ramp count = {Nsteps * ramps_per_step}")
 
-    pauli_strings = hamiltonian.get_all_pauli_strings(return_as='strings')
-    pauli_strings = reorder_paulis(pauli_strings, config_unitary.ordering_method)
+    # Sort Hamiltonian terms
+    hamiltonian_terms = hamiltonian.terms()
+    # TODO: This is a temporary patch.  We need to write a new ordering method that isn't
+    #       hard-coded to Pauli strings, and then implement appropriate operations on terms.
+    from qhat.common.terms.single_pauli_term import SinglePauliTerm
+    if all(isinstance(term, SinglePauliTerm) for term in hamiltonian_terms):
+        # Extract all the terms as {pauli_string: coefficient}
+        pauli_strings = {term.dense_string(): term.coefficient for term in hamiltonian_terms}
+        # Sort terms
+        pauli_strings = reorder_paulis(pauli_strings, config_unitary.ordering_method)
+        # Repack terms back to SinglePauliTerm
+        hamiltonian_terms = [SinglePauliTerm(*term) for term in pauli_strings.items()]
+    else:
+        logger.warning("***TERM ORDERING WARNING***\nNot all Hamiltonian terms are of type "
+                       "SinglePauliTerm.  Unable to sort terms.  Term ordering controls are "
+                       "ignored, and default order from Hamiltonian reader is used.")
 
     # Import the appropriate implementation
     if trotter_impl == 'flattened':
@@ -377,7 +410,7 @@ def encode_ramped_trotter(
         # Pass combine_terms and tensor_contraction_method parameters only for flattened implementation
         tensor_contraction_method = getattr(config_unitary, 'tensor_contraction_method', None)
         return build_ramped_trotterized_unitary(
-                pauli_strings.items(),
+                hamiltonian_terms,
                 method,
                 tevol_hbar,
                 Nsteps,
@@ -387,7 +420,7 @@ def encode_ramped_trotter(
         from qhat.common.trotter_original import build_ramped_trotterized_unitary
         # Original implementation doesn't support combine_terms or tensor_contraction_method parameters
         return build_ramped_trotterized_unitary(
-                pauli_strings.items(),
+                ((term.dense_string(), term.coefficient) for term in hamiltonian_terms),
                 method,
                 tevol_hbar,
                 Nsteps)
