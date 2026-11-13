@@ -250,13 +250,26 @@ def build_time_evolution(
 
 # -------------------------------------------------------------------------------------------------
 
+def control_values(config_algorithm: AlgorithmConfiguration) -> tuple:
+    """The control values to use: `algorithm.control_values`, or `(1,)` if it isn't set."""
+    if config_algorithm.control_values is None:
+        return (1,)
+    return controls.validate_ctrl_values("algorithm.control_values",
+                                         config_algorithm.control_values)
+
 def build_controlled_time_evolution(
         config_algorithm: AlgorithmConfiguration,
         unitary):
 
-    logger.verbose("Build a singly-controlled time evolution algorithm.")
+    values = control_values(config_algorithm)
+    logger.verbose(f"Build a time evolution controlled on {len(values)} qubit(s), "
+                   f"control values {list(values)}.")
 
-    return unitary.controlled()
+    # Each `.controlled()` prepends its control, so add them last to first
+    algorithm = unitary
+    for value in reversed(values):
+        algorithm = algorithm.controlled(CtrlSpec(cvs=value))
+    return algorithm
 
 # -------------------------------------------------------------------------------------------------
 
@@ -264,6 +277,28 @@ def is_controlled_algorithm(config_algorithm: AlgorithmConfiguration) -> bool:
     """True if the algorithm controls the unitary: any QPE method, or controlled time evolution."""
     method = config_algorithm.method.lower()
     return method.startswith("qpe:") or method == "controlled time evolution"
+
+def check_algorithm_settings(config_algorithm: AlgorithmConfiguration, unitary=None):
+    """Raise if `algorithm.control_values` is set where it can't be honoured.
+
+    It applies only to "controlled time evolution", and more than one control needs a unitary
+    with a `multi_control_method` (the flattened Trotterization). Without this check QPE, which
+    wraps the unitary in Qualtran's `Controlled`, would silently ignore it.
+    """
+    if config_algorithm.control_values is None:
+        return
+    values = control_values(config_algorithm)    # validates the entries
+    if config_algorithm.method.lower() != "controlled time evolution":
+        raise ValueError(
+            f"algorithm.control_values is only used by \"controlled time evolution\", not "
+            f"\"{config_algorithm.method}\".")
+    if len(values) == 0:
+        raise ValueError(
+            "algorithm.control_values is empty; use the \"time evolution\" method for no controls.")
+    if len(values) > 1 and unitary is not None and not hasattr(unitary, "multi_control_method"):
+        raise ValueError(
+            f"algorithm.control_values asks for {len(values)} controls, which {type(unitary).__name__} "
+            "doesn't support. Use the flattened Trotterization (unitary.encode_ramped_trotter).")
 
 def check_unitary_supports_algorithm(config_unitary, config_algorithm: AlgorithmConfiguration):
     """Raise if the unitary settings can't be used with the algorithm (plan D5).
@@ -304,9 +339,9 @@ def build_algorithm(
 
     logger.info("Beginning to construct quantum algorithm.")
 
-    # Every controlled algorithm built here controls the unitary on a single qubit
+    # Every controlled algorithm but "controlled time evolution" controls the unitary on one qubit
     if is_controlled_algorithm(config_algorithm):
-        log_multi_control_method(unitary, 1)
+        log_multi_control_method(unitary, len(control_values(config_algorithm)))
 
     if config_algorithm.method.lower() in ("qpe: qualtran textbook",):
         return build_qpe_qualtran_textbook(config_algorithm, unitary)

@@ -33,10 +33,20 @@ def resource_estimation_pyliqtr(algorithm) -> dict:
         "Clifford_count" : resources["Clifford"],
         "T_count"        : resources["T"],
         }
-    if "LogicalQubits" in resources:
-        resource_dict["qubit_count"] = resources["LogicalQubits"]
+    # The qubit count is the peak in use (plan D3). pyLIQTR's LogicalQubits counts registers only.
+    try:
+        qubits = get_cost_value(algorithm, QubitCount())
+    except Exception as error:    # e.g. known issue K1: "QPE: qualtran textbook"
+        if "LogicalQubits" not in resources:
+            raise
+        qubits = resources["LogicalQubits"]
+        logger.warning(f"Qualtran QubitCount failed ({type(error).__name__}); using pyLIQTR's "
+                       f"LogicalQubits ({qubits}), which counts registers only.")
     else:
-        resource_dict["qubit_count"] = get_cost_value(algorithm, QubitCount())
+        if "LogicalQubits" in resources and resources["LogicalQubits"] != qubits:
+            logger.info(f"pyLIQTR LogicalQubits = {resources['LogicalQubits']} counts registers "
+                        f"only; qubit_count uses the peak, {qubits} (Qualtran QubitCount).")
+    resource_dict["qubit_count"] = qubits
     return resource_dict
 
 # -------------------------------------------------------------------------------------------------
