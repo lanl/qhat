@@ -8,7 +8,7 @@ from pathlib import Path
 
 from openfermion import InteractionOperator
 
-from qhat.analysis.hamiltonian import Hamiltonian, load_fci
+from qhat.analysis.hamiltonian import Hamiltonian, load_fci, load_numpy
 
 
 class MockConfig:
@@ -76,17 +76,8 @@ def test_toy_fci_file():
     print("✓ Toy FCI file loaded successfully")
 
 
-def test_real_fci_file():
-    """Test loading a real FCIDump file (from PyLIQTR example)."""
-    # Path to the real FCIDump file
-    test_file = Path(__file__).parent / "32_2ru_III_3pl.fci"
-    assert test_file.exists()
-
-    config_hamiltonian = MockConfig()
-    config_hamiltonian.filename = str(test_file)
-    config_hamiltonian.fermion_to_qubit_transform = None
-
-    H = load_fci(config_hamiltonian)
+def check_32_2ru_III_3pl_operator(H, filetype):
+#    """Check correctness of operator from file "32_2ru_III_3pl.*"
     assert isinstance(H, Hamiltonian)
     intop = H.get_core_operator()
     assert isinstance(intop, InteractionOperator)
@@ -125,13 +116,85 @@ def test_real_fci_file():
     assert np.min(np.fabs(h2[0:n:2,1:n:2,1:n:2,0:n:2])) > 0.0
     assert np.min(np.fabs(h2[1:n:2,0:n:2,0:n:2,1:n:2])) > 0.0
 
-    print("✓ Real FCI file loaded successfully")
+    print(f"✓ {filetype} loaded successfully")
+
+
+def test_real_fci_file():
+    """Test loading a real FCIDump file (from PyLIQTR example)."""
+    # Path to the real FCIDump file
+    test_file = Path(__file__).parent / "32_2ru_III_3pl.fci"
+    assert test_file.exists()
+
+    config_hamiltonian = MockConfig()
+    config_hamiltonian.filename = str(test_file)
+    config_hamiltonian.fermion_to_qubit_transform = None
+
+    H = load_fci(config_hamiltonian)
+    check_32_2ru_III_3pl_operator(H, "Real FCI file")
+
+
+def test_numpy_file_openfermion():
+    """Test loading a numpy file in openfermion convention."""
+    # Path to the numpy file
+    test_file = Path(__file__).parent.parent / "examples/Be-H_1.30_sto-6g_as-003-003.tensors.npz"
+    assert test_file.exists()
+
+    config_hamiltonian = MockConfig()
+    config_hamiltonian.filename = str(test_file)
+    config_hamiltonian.fermion_to_qubit_transform = None
+    config_hamiltonian.integral_convention = "openfermion"
+
+    H = load_numpy(config_hamiltonian)
+    assert isinstance(H, Hamiltonian)
+    intop = H.get_core_operator()
+    assert isinstance(intop, InteractionOperator)
+
+    # check scalars
+    n = H.num_qubits()
+    assert n == 6
+    ecore = intop.constant
+    assert ecore == 0.0
+
+    # check one-body coefficients
+    h1 = intop.one_body_tensor
+    assert h1.shape == (6,6)
+    # spot-check a few values
+    assert h1[0,0] == -1.3055432829745055
+    assert h1[1,3] == 0.03509463345405264
+    assert h1[5,5] == -0.8518347869753975
+
+    # check two-body coefficients
+    h2 = intop.two_body_tensor
+    assert h2.shape == (6,6,6,6)
+    # spot-check a few values
+    assert h2[0,0,0,0] == 0.2872954760337895
+    assert h2[0,1,1,2] == -0.027478153443205564
+    assert h2[5,5,5,5] == 0.2250582818237094
+
+    print("✓ Numpy openfermion file loaded successfully")
+
+
+def test_numpy_file_chemist_spatial():
+    """Test loading a numpy file in chemist spatial convention."""
+    # Path to the numpy file
+    test_file = Path(__file__).parent / "32_2ru_III_3pl.npz"
+    assert test_file.exists()
+
+    config_hamiltonian = MockConfig()
+    config_hamiltonian.filename = str(test_file)
+    config_hamiltonian.fermion_to_qubit_transform = None
+    config_hamiltonian.integral_convention = "chemist_spatial"
+
+    H = load_numpy(config_hamiltonian)
+    check_32_2ru_III_3pl_operator(H, "Numpy chemist spatial file")
 
 
 if __name__ == "__main__":
-    print("Running FCI loader tests...\n")
+    print("Running file loader tests...\n")
 
     test_toy_fci_file()
     test_real_fci_file()
+    test_numpy_file_openfermion()
+    test_numpy_file_chemist_spatial()
 
     print("\n✓ All tests passed!")

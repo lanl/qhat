@@ -301,7 +301,26 @@ class Hamiltonian:
 
 # -------------------------------------------------------------------------------------------------
 
-def _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, bs, fb):
+def _convert_to_openfermion(f1in, f2in, integral_convention):
+    if integral_convention == "openfermion":
+        # no conversion needed
+        return (f1in, f2in)
+    elif integral_convention == "chemist_spatial" or integral_convention == "chemist_spin":
+        # absorb factor of 0.5 and reorder indices chemist -> physicist
+        f2trans = 0.5 * f2in.transpose(0, 2, 3, 1)
+        # transform from spatial to spin orbitals, if needed
+        if integral_convention == "chemist_spatial":
+            f1, f2 = spinorb_from_spatial(f1in, f2trans)
+        else:
+            f1, f2 = (f1in, f2trans)
+        return (f1, f2)
+    else:
+        raise ValueError(f"Invalid integral_convention '{integral_convention}'")
+
+# -------------------------------------------------------------------------------------------------
+
+def _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, bs, fb, integral_convention="openfermion"):
+    f1, f2 = _convert_to_openfermion(f1, f2, integral_convention)
     assert len(f1.shape) == 2
     Nf = f1.shape[0]
     assert f1.shape[1] == Nf
@@ -358,6 +377,7 @@ def _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, bs
 def load_hdf5(config_hamiltonian: HamiltonianConfiguration):
     filename = config_hamiltonian.filename
     logger.info(f"Loading second-quantization Hamiltonian from HDF5 file \"{filename}\".")
+    logger.info(f"Ignoring integral_convention field and using default (openfermion).")
     data = h5py.File(filename)
     f0 = 0      # Currently don't support constant terms in HDF5
     f1 = data["1e"]
@@ -393,46 +413,44 @@ def _get_any_of(data: Mapping[str, np.ndarray], keys: list[str], as_scalar: bool
 
 def load_numpy(config_hamiltonian: HamiltonianConfiguration):
     filename = config_hamiltonian.filename
+    integral = config_hamiltonian.integral_convention
     logger.info(f"Loading second-quantization Hamiltonian from file \"{filename}\".")
+    logger.info(f"Using integral_convention field '{integral}'")
     data = np.load(filename)
     f0 = _get_any_of(data, ["constant", "ecore"], as_scalar=True, default=0.0)
     f1 = _get_any_of(data, ["one_body", "h1e"])
     f2 = _get_any_of(data, ["two_body", "eri"])
     bs = _get_any_of(data, ["bosonic_scalar"], default=None)
     fb = _get_any_of(data, ["fb_interaction"], default=None)
-    return _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, bs, fb)
+    return _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, bs, fb, integral)
 
 # -------------------------------------------------------------------------------------------------
 
 def load_fci(config_hamiltonian: HamiltonianConfiguration):
     filename = config_hamiltonian.filename
     logger.info(f"Loading second-quantization Hamiltonian from file \"{filename}\".")
+    logger.info(f"Ignoring integral_convention field and using chemist_spatial.")
     data = tools.fcidump.read(filename)
 
     n = data['NORB']
     f0 = data['ECORE']
 
     # check that f1 has correct shape
-    f1eri = data['H1']
-    if f1eri.shape != (n, n):
+    f1 = data['H1']
+    if f1.shape != (n, n):
         raise ValueError(f"Incorrect f1 shape {f1.shape}. "
                          f"f1 shape should be ({n}, {n}).")
 
     # reader returns a packed f2 - unpack it here
     f2packed = data['H2']
-    f2unpacked = ao2mo.restore('s1', f2packed, n)
+    f2 = ao2mo.restore('s1', f2packed, n)
 
-    # now transform from FCI conventions to OpenFermion conventions:
-    # absorb factor of 0.5 and reorder indices chemist -> physicist
-    f2eri = 0.5 * f2unpacked.transpose(0, 3, 2, 1)
     # check that f2 has correct shape
-    if f2eri.shape != (n, n, n, n):
+    if f2.shape != (n, n, n, n):
         raise ValueError(f"Incorrect f2 shape {f2.shape}. "
                          f"f2 shape should be ({n}, {n}, {n}, {n}).")
-    # transform from spatial to spin orbitals
-    f1, f2 = spinorb_from_spatial(f1eri, f2eri)
 
-    return _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, None, None)
+    return _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, None, None, "chemist_spatial")
 
 # -------------------------------------------------------------------------------------------------
 
