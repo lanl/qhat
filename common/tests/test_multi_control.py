@@ -46,6 +46,16 @@ def check_exact(bloq, expected):
     np.testing.assert_allclose(bloq.decompose_bloq().tensor_contract(), expected, atol=1e-11)
 
 
+def toffoli_rz_cost(ctrl_values):
+    """Hand count of the Toffoli-based k-controlled Rz ("direct", k >= 2): 2 rotations; 2
+    relative-phase Toffolis for k = 2, 8(k-2) for k >= 3, each 4 T + 5 Cliffords (2 H, 3 CNOT);
+    2 X per control on |0>."""
+    k = len(ctrl_values)
+    toffolis = 2 if k == 2 else 8 * (k - 2)
+    return TComplexity(t=4 * toffolis, clifford=5 * toffolis + 2 * ctrl_values.count(0),
+                       rotations=2)
+
+
 def and_cost(ctrl_values):
     """The AND ladder and its uncompute (Qualtran 0.4: `And` 4 T + 9 Cliff, uncompute 0 T)."""
     ladder = And(*ctrl_values) if len(ctrl_values) == 2 else MultiAnd(cvs=ctrl_values)
@@ -72,18 +82,91 @@ class TestControlledRotationHelpers:
         assert t_complexity(cbloq) == TComplexity(clifford=2 ** k, rotations=2 ** k)
         assert t_complexity(cbloq) == controls.controlled_rz_t_complexity(k)
 
+    @pytest.mark.parametrize("num_dirty", [0, 1, 3])
     @pytest.mark.parametrize("ctrl_values", [(1,), (0,)] + CTRL_VALUES + [(1, 0, 0, 1)])
-    def test_controlled_phase_is_exact(self, ctrl_values):
+    def test_controlled_phase_is_exact(self, ctrl_values, num_dirty):
+        """Exact on every state of the borrowed qubits, which come back unchanged."""
         phi = 0.41
         k = len(ctrl_values)
         bb = BloqBuilder()
         ctrl = [bb.add_register(f'c{i}', 1) for i in range(k)]
-        ctrl = controls.add_controlled_phase(bb, phi, ctrl, ctrl_values)
-        cbloq = bb.finalize(**{f'c{i}': ctrl[i] for i in range(k)})
-        expected = block_matrix(np.array([[np.exp(-1j * phi)]]), ctrl_values)
+        dirty = [bb.add_register(f'd{i}', 1) for i in range(num_dirty)]
+        ctrl, dirty = controls.add_controlled_phase(bb, phi, ctrl, ctrl_values, dirty)
+        cbloq = bb.finalize(**{f'c{i}': ctrl[i] for i in range(k)},
+                            **{f'd{i}': dirty[i] for i in range(num_dirty)})
+        expected = np.kron(block_matrix(np.array([[np.exp(-1j * phi)]]), ctrl_values),
+                           np.eye(2 ** num_dirty))
         np.testing.assert_allclose(cbloq.tensor_contract(), expected, atol=1e-12)
-        assert t_complexity(cbloq) == TComplexity(clifford=2 ** k - 2, rotations=2 ** k - 1)
-        assert t_complexity(cbloq) == controls.controlled_phase_t_complexity(k)
+        assert t_complexity(cbloq) == controls.controlled_phase_t_complexity(ctrl_values,
+                                                                             num_dirty)
+        assert dict(cbloq.build_call_graph(None)) == dict(
+            controls.controlled_phase_call_graph(phi, ctrl_values, num_dirty))
+        if k <= 2:
+            # the rotations controlled on 0 or 1 qubit are the Gray-code walk
+            assert t_complexity(cbloq) == TComplexity(clifford=2 ** k - 2, rotations=2 ** k - 1)
+
+    @pytest.mark.parametrize("ctrl_values", CTRL_VALUES + [(1, 0, 0, 1), (0, 1, 1, 0, 1)])
+    @pytest.mark.parametrize("extra_dirty", [0, 2])
+    def test_toffoli_controlled_rz_is_exact(self, ctrl_values, extra_dirty):
+        """Exact on every state of the k-2 borrowed qubits (and any extra, untouched ones),
+        which come back unchanged."""
+        theta = -1.163
+        k = len(ctrl_values)
+        num_dirty = k - 2 + extra_dirty
+        bb = BloqBuilder()
+        ctrl = [bb.add_register(f'c{i}', 1) for i in range(k)]
+        dirty = [bb.add_register(f'd{i}', 1) for i in range(num_dirty)]
+        target = bb.add_register('t', 1)
+        assert controls.uses_toffoli_rz(k, num_dirty)
+        target, ctrl, dirty = controls.add_direct_controlled_rz(
+            bb, theta, target, ctrl, ctrl_values, dirty)
+        cbloq = bb.finalize(**{f'c{i}': ctrl[i] for i in range(k)},
+                            **{f'd{i}': dirty[i] for i in range(num_dirty)}, t=target)
+        rz = np.diag([np.exp(-0.5j * theta), np.exp(0.5j * theta)])
+        # registers in order: controls, dirty qubits, target
+        expected = np.eye(2 ** (k + num_dirty + 1), dtype=complex)
+        block = int(''.join(str(v) for v in ctrl_values), 2)
+        size = 2 ** (num_dirty + 1)
+        expected[block * size:(block + 1) * size, block * size:(block + 1) * size] = np.kron(
+            np.eye(2 ** num_dirty), rz)
+        actual = cbloq.tensor_contract()
+        assert actual.shape == expected.shape
+        # Not assert_allclose: on CI (Python 3.14, numpy 1.26.4) it failed with "operands could
+        # not be broadcast together with shapes (262144,) (0,)" for the 9- and 11-qubit cases.
+        assert np.max(np.abs(actual - expected)) < 1e-11
+        assert t_complexity(cbloq) == controls.toffoli_controlled_rz_t_complexity(ctrl_values)
+        assert dict(cbloq.build_call_graph(None)) == dict(
+            controls.toffoli_controlled_rz_call_graph(theta, ctrl_values))
+
+    @pytest.mark.parametrize("ctrl_values, expected", [
+        ((1, 1), TComplexity(t=8, clifford=10, rotations=2)),
+        ((1, 0), TComplexity(t=8, clifford=12, rotations=2)),
+        ((1, 1, 1), TComplexity(t=32, clifford=40, rotations=2)),
+        ((0, 1, 0), TComplexity(t=32, clifford=44, rotations=2)),
+        ((1, 1, 1, 1), TComplexity(t=64, clifford=80, rotations=2)),
+    ])
+    def test_toffoli_controlled_rz_hand_count(self, ctrl_values, expected):
+        """2 rotations; 2 relative-phase Toffolis (4 T, 2 H, 3 CNOT each) for k = 2, 8(k-2) for
+        k >= 3; 2 X per control on |0>."""
+        assert controls.toffoli_controlled_rz_t_complexity(ctrl_values) == expected
+
+    @pytest.mark.parametrize("num_ctrls, num_dirty, expected", [
+        (1, 0, False), (2, 0, True), (3, 0, False), (3, 1, True), (4, 1, False), (4, 2, True)])
+    def test_toffoli_needs_k_minus_2_dirty_qubits(self, num_ctrls, num_dirty, expected):
+        assert controls.uses_toffoli_rz(num_ctrls, num_dirty) == expected
+
+    @pytest.mark.parametrize("ctrl_values", [(1, 0, 1), (0, 1, 1, 0)])
+    def test_too_few_dirty_qubits_falls_back_to_gray_walk(self, ctrl_values):
+        k = len(ctrl_values)
+        bb = BloqBuilder()
+        ctrl = [bb.add_register(f'c{i}', 1) for i in range(k)]
+        dirty = [bb.add_register(f'd{i}', 1) for i in range(k - 3)]
+        target = bb.add_register('t', 1)
+        target, ctrl, dirty = controls.add_direct_controlled_rz(
+            bb, 0.52, target, ctrl, ctrl_values, dirty)
+        cbloq = bb.finalize(**{f'c{i}': ctrl[i] for i in range(k)},
+                            **{f'd{i}': dirty[i] for i in range(k - 3)}, t=target)
+        assert t_complexity(cbloq) == TComplexity(clifford=2 ** k, rotations=2 ** k)
 
     def test_single_control_is_the_textbook_circuit(self):
         """One control on |1>: Rz(theta/2) . CNOT . Rz(-theta/2) . CNOT (plan D4)."""
@@ -137,8 +220,11 @@ class TestPauliStringEvolution:
         k = len(ctrl_values)
         pse = PauliStringEvolution("XYZI", 0.37, 0.91, ctrl_values=ctrl_values)
         direct = attrs.evolve(pse, multi_control_method="direct")
-        # "direct": the rotation becomes 2^k rotations and 2^k CNOTs
-        assert t_complexity(direct) == TComplexity(clifford=10 + 2 ** k, rotations=2 ** k)
+        # "direct": the rotation becomes the Toffoli-based one (3 other qubits to borrow)
+        assert t_complexity(direct) == TComplexity(clifford=10) + toffoli_rz_cost(ctrl_values)
+        assert t_complexity(direct) == {
+            (1, 0): TComplexity(t=8, clifford=22, rotations=2),
+            (0, 1, 1): TComplexity(t=32, clifford=52, rotations=2)}[ctrl_values]
         # "ancilla": the AND ladder, then the singly-controlled term (2 rotations, 2 CNOTs)
         assert t_complexity(pse) == and_cost(ctrl_values) + TComplexity(clifford=12, rotations=2)
         assert and_cost(ctrl_values).t == 4 * (k - 1)
@@ -148,7 +234,11 @@ class TestPauliStringEvolution:
         k = len(ctrl_values)
         pse = PauliStringEvolution("II", 0.37, 0.91, ctrl_values=ctrl_values)
         direct = attrs.evolve(pse, multi_control_method="direct")
-        assert t_complexity(direct) == TComplexity(clifford=2 ** k - 2, rotations=2 ** k - 1)
+        # Rz on the last control, controlled on the others (Toffoli-based for 2 of them,
+        # borrowing the system qubits), then on one control fewer (textbook), then a phase
+        expected = {(1, 0): TComplexity(clifford=2, rotations=3),
+                    (0, 1, 1): toffoli_rz_cost((0, 1)) + TComplexity(clifford=2, rotations=3)}
+        assert t_complexity(direct) == expected[ctrl_values]
         assert t_complexity(pse) == and_cost(ctrl_values) + TComplexity(rotations=1)
 
     @pytest.mark.parametrize("ctrl_values", CTRL_VALUES)
@@ -165,7 +255,42 @@ class TestPauliStringEvolution:
         pse = PauliStringEvolution("XZ", 0.37, 0.91, ctrl_values=(1, 0, 1),
                                    multi_control_method="direct")
         names = {type(binst.bloq).__name__ for binst in pse.decompose_bloq().bloq_instances}
-        assert names <= {"Rz", "CNOT", "Hadamard"}
+        assert names <= {"Rz", "CNOT", "Hadamard", "TGate", "XGate"}
+
+    def test_all_identity_with_four_controls_borrows_system_qubits(self):
+        """`II` under 4 controls ("direct"): the Rz on the last control, controlled on the other
+        3, borrows a system qubit, so it is Toffoli-based (2 rotations) rather than 8."""
+        ctrl_values = (1, 0, 1, 1)
+        pse = PauliStringEvolution("II", 0.37, 0.91, ctrl_values=ctrl_values,
+                                   multi_control_method="direct")
+        expected = (toffoli_rz_cost((1, 0, 1)) + toffoli_rz_cost((1, 0))
+                    + TComplexity(clifford=2, rotations=3))
+        assert t_complexity(pse) == expected
+        assert t_complexity(pse) == t_complexity(pse.decompose_bloq())
+        assert dict(pse.build_call_graph(None)) == dict(pse.decompose_bloq().build_call_graph(None))
+        check_exact(pse, block_matrix(np.exp(-1j * 0.37 * 0.91) * np.eye(4), ctrl_values))
+        assert decomposition_width(pse) == 6
+
+    @pytest.mark.parametrize("pauli_string, ctrl_values, uses_toffoli", [
+        ("Z", (1, 0), True),        # k = 2 borrows nothing
+        ("Z", (1, 0, 1), False),    # k = 3 needs 1 other qubit; "Z" has none
+        ("XZ", (1, 0, 1), True),
+        ("XZ", (1, 0, 1, 1), False),
+        ("IIZ", (0, 1, 1, 0), True),  # identity positions can be borrowed too
+    ])
+    def test_direct_borrows_other_qubits(self, pauli_string, ctrl_values, uses_toffoli):
+        """The Toffoli-based rotation needs k-2 qubits of the string besides the parity qubit;
+        with fewer, it is the Gray-code walk. Exact either way."""
+        k = len(ctrl_values)
+        pse = PauliStringEvolution(pauli_string, 0.37, 0.91, ctrl_values=ctrl_values,
+                                   multi_control_method="direct")
+        tc = t_complexity(pse)
+        assert (tc.rotations == 2) == uses_toffoli
+        assert (tc.rotations == 2 ** k) == (not uses_toffoli)
+        assert tc == t_complexity(pse.decompose_bloq())
+        forward = expm(-1j * 0.37 * 0.91 * pauli_string_to_matrix(pauli_string))
+        check_exact(pse, block_matrix(forward, ctrl_values))
+        assert decomposition_width(pse) == len(pauli_string) + k
 
     def test_ancilla_ands_once_around_one_control(self):
         pse = PauliStringEvolution("XZ", 0.37, 0.91, ctrl_values=(1, 0, 1))
@@ -274,8 +399,9 @@ class TestTrotterization:
 
     @pytest.mark.parametrize("ctrl_values", [(1, 0), (0, 1, 1)])
     def test_hand_count(self, ctrl_values):
-        """Per term occurrence: "direct" replaces each rotation by 2^k rotations and 2^k CNOTs;
-        "ancilla" is one AND ladder plus the singly-controlled Trotterization."""
+        """Per term occurrence: "direct" replaces each rotation by the Toffoli-based one (every
+        term has 2 other qubits to borrow); "ancilla" is one AND ladder plus the singly-controlled
+        Trotterization."""
         from collections import Counter
         k = len(ctrl_values)
         trotter = self.make(ctrl_values=ctrl_values)
@@ -284,11 +410,15 @@ class TestTrotterization:
         for idx, n in Counter(i for i, _ in trotter.expanded_sequence).items():
             active = [p for p in self.PAULI_TERMS[idx][0] if p != 'I']
             if not active:
-                expected += n * TComplexity(clifford=2 ** k - 2, rotations=2 ** k - 1)
+                # Rz on the last control controlled on the others, ..., then a phase
+                phase = TComplexity(clifford=2, rotations=3)
+                if k == 3:
+                    phase += toffoli_rz_cost(ctrl_values[:2])
+                expected += n * phase
                 continue
             basis = sum({'X': 2, 'Y': 4, 'Z': 0}[p] for p in active)
-            expected += n * TComplexity(clifford=basis + 2 * (len(active) - 1) + 2 ** k,
-                                        rotations=2 ** k)
+            expected += n * (TComplexity(clifford=basis + 2 * (len(active) - 1))
+                             + toffoli_rz_cost(ctrl_values))
         assert t_complexity(direct) == expected
         assert t_complexity(trotter) == (and_cost(ctrl_values)
                                          + t_complexity(self.make(ctrl_values=(1,))))
