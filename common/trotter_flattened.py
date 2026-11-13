@@ -15,12 +15,16 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple, Union
 import attrs
 import numpy as np
 
-from qualtran import Bloq, BloqBuilder, Signature, SoquetT
+from qualtran import Bloq, BloqBuilder, CtrlSpec, QBit, Register, Side, Signature, SoquetT
+from qualtran.resource_counting import QubitCount
 
 if TYPE_CHECKING:
     import quimb.tensor as qtn
+    from qualtran import AddControlledT
+    from qualtran.resource_counting import CostKey
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
 
+from qhat.common import controls
 from qhat.common.commuting_pauli_string_evolution import CommutingPauliStringEvolution
 from qhat.common.hermiticity import require_real_scalar
 from qhat.common.pauli_utils import validate_pauli_string
@@ -277,6 +281,9 @@ class Trotterization(Bloq):
         is_adjoint: If True, the operator is U^dagger. `adjoint()` flips it and leaves `time`,
             the coefficients and the term order as given; the decomposition and the tensor apply
             the reversal themselves.
+        ctrl_values: Controls, as in `PauliStringEvolution`: one entry per control qubit, 1 (act
+            on |1>) or 0 (act on |0>); empty for no control. `.controlled()` prepends one. Every
+            term of the decomposition gets the same controls. At most one for now.
 
     Example:
         >>> # Second-order Trotterization using named method
@@ -313,6 +320,7 @@ class Trotterization(Bloq):
     _symmetric_bookends: bool = True
     tensor_contraction_method: Optional[str] = None
     is_adjoint: bool = False
+    ctrl_values: Tuple[int, ...] = ()
 
     def __attrs_post_init__(self):
         """Validate inputs."""
@@ -342,6 +350,8 @@ class Trotterization(Bloq):
             require_real_scalar("Trotterization ramp coefficient", c) for c in self.coefficients))
         object.__setattr__(self, "time", require_real_scalar("Trotterization time", self.time))
         object.__setattr__(self, "hbar", require_real_scalar("Trotterization hbar", self.hbar))
+        object.__setattr__(self, "ctrl_values",
+                           controls.validate_ctrl_values("Trotterization", self.ctrl_values))
 
         # Initialize pattern basics
         object.__setattr__(self, "_prologue", ())
@@ -480,9 +490,9 @@ class Trotterization(Bloq):
 
     @cached_property
     def signature(self) -> Signature:
-        """Return the signature with a register of qubits."""
-        from qualtran import Register, QBit, Side
-        return Signature([Register('q', QBit(), shape=(self.num_qubits,), side=Side.THRU)])
+        """The `ctrl` register (if controlled), then a register of qubits."""
+        return Signature(controls.ctrl_registers(self.ctrl_values)
+                         + [Register('q', QBit(), shape=(self.num_qubits,), side=Side.THRU)])
 
     @cached_property
     def expanded_sequence(self) -> List[Tuple[int, float]]:
@@ -500,7 +510,7 @@ class Trotterization(Bloq):
         sequence.extend(self._epilogue)
         return sequence
 
-    def build_composite_bloq(self, bb: BloqBuilder, **soqs: SoquetT) -> dict[str, SoquetT]:
+    def build_composite_bloq(self, bb: BloqBuilder, **soqs: SoquetT) -> Dict[str, SoquetT]:
         """Decompose into a sequence of CommutingPauliStringEvolution bloqs.
 
         Uses CommutingPauliStringEvolution to enable future grouping of commuting terms.
@@ -508,12 +518,9 @@ class Trotterization(Bloq):
         for future optimization where multiple commuting terms can be grouped together.
 
         Uses the expanded sequence with combined terms for efficiency. The adjoint applies the
-        sequence in reverse order, with each term adjointed.
+        sequence in reverse order, with each term adjointed. Under control every term gets the
+        same controls.
         """
-        # Get the input register
-        assert len(soqs) == 1, f"Expected 1 register, got {len(soqs)}"
-        reg_name, register = list(soqs.items())[0]
-
         # Time step for each Trotterization step
         dt = self.time / self.num_steps
 
@@ -530,10 +537,11 @@ class Trotterization(Bloq):
                 time=dt,
                 hbar=self.hbar,
                 is_adjoint=self.is_adjoint,
+                ctrl_values=self.ctrl_values,
             )
-            register = bb.add(cpse, q=register)
+            soqs = bb.add_d(cpse, **soqs)
 
-        return {reg_name: register}
+        return soqs
 
     def _t_complexity_(self) -> TComplexity:
         """Return T-complexity by counting term occurrences.
@@ -542,7 +550,7 @@ class Trotterization(Bloq):
         times each term appears and compute the complexity once per unique term.
 
         Uses CommutingPauliStringEvolution to match the decomposition used in
-        build_composite_bloq.
+        build_composite_bloq, with the same controls.
         """
         # Count occurrences of each term in the expanded sequence
         term_counts = {}
@@ -570,7 +578,8 @@ class Trotterization(Bloq):
             cpse = CommutingPauliStringEvolution(
                 pauli_terms=((pauli_string, 1.0),),  # Dummy coefficient
                 time=1.0,         # Dummy value - doesn't affect complexity
-                hbar=1.0
+                hbar=1.0,
+                ctrl_values=self.ctrl_values,
             )
             term_complexity = t_complexity(cpse)
             total_complexity += count * term_complexity
@@ -591,9 +600,12 @@ class Trotterization(Bloq):
         import quimb.tensor as qtn
 
         n = self.num_qubits
-        data = self.tensor_contract().reshape([2] * (2 * n))
-        in_idx = [incoming['q'][i] for i in range(n)]
-        out_idx = [outgoing['q'][i] for i in range(n)]
+        num_ctrls = len(self.ctrl_values)
+        data = self.tensor_contract().reshape([2] * (2 * (num_ctrls + n)))
+        in_idx = ([incoming['ctrl'][i] for i in range(num_ctrls)]
+                  + [incoming['q'][i] for i in range(n)])
+        out_idx = ([outgoing['ctrl'][i] for i in range(num_ctrls)]
+                   + [outgoing['q'][i] for i in range(n)])
         tn.add(qtn.Tensor(data=data, inds=tuple(out_idx + in_idx), tags=[self.pretty_name(), tag]))
 
     def tensor_contract(self) -> np.ndarray:
@@ -606,8 +618,12 @@ class Trotterization(Bloq):
         - "structured": force O(log n) structured contraction (raises error if pattern not detected)
         - "qualtran": contract the decomposition gate by gate with Qualtran
 
+        Under control, the result is block-diagonal: U (or U^dagger) on the block matching
+        `ctrl_values` and the identity elsewhere, with the controls as the most significant qubits.
+
         Returns:
-            The full unitary matrix as a numpy array with shape (2^n_qubits, 2^n_qubits)
+            The full unitary matrix as a numpy array with shape (2^n, 2^n), where n is the number
+            of qubits plus the number of controls
 
         Example:
             >>> trotter = Trotterization.from_method(
@@ -627,18 +643,24 @@ class Trotterization(Bloq):
         logger.debug(f"-- expanded_sequence length = {self.num_operations}")
 
         # The "qualtran" method contracts the decomposition, which already applies the adjoint
-        # flag. The other methods build the forward matrix, so conjugate-transpose it.
-        if self.is_adjoint and self.tensor_contraction_method != "qualtran":
-            return attrs.evolve(self, is_adjoint=False).tensor_contract().conj().T
+        # flag and the controls.
+        if self.tensor_contraction_method == "qualtran":
+            logger.verbose(f"Using Qualtran's gate-by-gate tensor contraction")
+            # Not super().tensor_contract(): that would route back here via add_my_tensors.
+            return self.decompose_bloq().tensor_contract()
 
-        # Check if a specific method is forced via configuration
+        # The other methods build the forward matrix, so conjugate-transpose it for the adjoint
+        # and then add the controls.
+        unitary = self._forward_matrix()
+        if self.is_adjoint:
+            unitary = unitary.conj().T
+        return controls.controlled_matrix(unitary, self.ctrl_values)
+
+    def _forward_matrix(self) -> np.ndarray:
+        """The uncontrolled, forward matrix U, by the configured contraction method (not "qualtran")."""
         forced_method = self.tensor_contraction_method
         if forced_method is not None and forced_method != "auto":
-            if forced_method == "qualtran":
-                logger.verbose(f"Using Qualtran's gate-by-gate tensor contraction")
-                # Not super().tensor_contract(): that would route back here via add_my_tensors.
-                return self.decompose_bloq().tensor_contract()
-            elif forced_method == "incremental":
+            if forced_method == "incremental":
                 logger.verbose(f"Using O(n) incremental tensor contraction")
                 return self._incremental_contraction()
             elif forced_method == "structured":
@@ -655,6 +677,11 @@ class Trotterization(Bloq):
         return self._structured_contraction()
 
     def _structured_contraction(self) -> np.ndarray:
+        """O(log n) contraction of the repeating pattern.
+
+        Returns the forward, uncontrolled matrix U: `tensor_contract` applies the adjoint and the
+        controls.
+        """
         def trm_str(sequence):
             n = len(sequence)
             return f"{n} {'term' if n == 1 else 'terms'}"
@@ -736,7 +763,8 @@ class Trotterization(Bloq):
         Used for small num_steps.
 
         Returns:
-            Full unitary matrix
+            The forward, uncontrolled matrix U: `tensor_contract` applies the adjoint and the
+            controls.
         """
         logger.debug(f"Performing incremental contraction over {self.num_operations} operations")
         return self._build_matrix_from_terms(self.expanded_sequence)
@@ -757,14 +785,16 @@ class Trotterization(Bloq):
     def __str__(self) -> str:
         method_name = self._infer_method_name()
         dagger = "†" if self.is_adjoint else ""
-        return (f"Trotterization({method_name}, {self.num_terms} terms, "
-                f"{self.num_steps} steps, t={self.time}){dagger}")
+        return controls.ctrl_str(self.ctrl_values,
+                                 f"Trotterization({method_name}, {self.num_terms} terms, "
+                                 f"{self.num_steps} steps, t={self.time}){dagger}")
 
     def __repr__(self) -> str:
         adjoint = ", is_adjoint=True" if self.is_adjoint else ""
+        ctrl = f", ctrl_values={self.ctrl_values}" if self.ctrl_values else ""
         return (f"Trotterization(pauli_terms={self.pauli_terms}, "
                 f"coefficients={self.coefficients}, time={self.time}, "
-                f"num_steps={self.num_steps}, hbar={self.hbar}{adjoint})")
+                f"num_steps={self.num_steps}, hbar={self.hbar}{adjoint}{ctrl})")
 
     def _infer_method_name(self) -> str:
         """Infer the method name from coefficients for display."""
@@ -817,6 +847,25 @@ class Trotterization(Bloq):
         methods that are not symmetric; the decomposition and the tensor apply the reversal.
         """
         return attrs.evolve(self, is_adjoint=not self.is_adjoint)
+
+    def get_ctrl_system(
+        self, ctrl_spec: Optional[CtrlSpec] = None
+    ) -> Tuple['Trotterization', 'AddControlledT']:
+        """Controlled version: the same bloq with the new control value prepended to `ctrl_values`.
+
+        Only single-qubit controls on |1> or |0> are supported; others raise ValueError.
+        """
+        return controls.get_ctrl_system(self, ctrl_spec)
+
+    def my_static_costs(self, cost_key: 'CostKey'):
+        """`QubitCount` without decomposing: the qubits plus the controls.
+
+        The decomposition allocates no ancillas, so the peak number of qubits in use is the width
+        of the registers.
+        """
+        if isinstance(cost_key, QubitCount):
+            return self.num_qubits + len(self.ctrl_values)
+        return NotImplemented
 
 
 # =================================================================================================

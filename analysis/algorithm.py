@@ -259,6 +259,27 @@ def build_controlled_time_evolution(
 
 # -------------------------------------------------------------------------------------------------
 
+def is_controlled_algorithm(config_algorithm: AlgorithmConfiguration) -> bool:
+    """True if the algorithm controls the unitary: any QPE method, or controlled time evolution."""
+    method = config_algorithm.method.lower()
+    return method.startswith("qpe:") or method == "controlled time evolution"
+
+def check_unitary_supports_algorithm(config_unitary, config_algorithm: AlgorithmConfiguration):
+    """Raise if the unitary settings can't be used with the algorithm (plan D5).
+
+    The deprecated "original" Trotter implementation has no exact or efficient controlled
+    version, so a controlled algorithm needs `trotter_implementation = "flattened"`.
+    """
+    if (config_unitary.method == "ramped trotter"
+            and getattr(config_unitary, "trotter_implementation", None) == "original"
+            and is_controlled_algorithm(config_algorithm)):
+        raise ValueError(
+            f"Algorithm method \"{config_algorithm.method}\" controls the unitary, which "
+            "trotter_implementation = \"original\" doesn't support. "
+            "Use trotter_implementation = \"flattened\" (the default).")
+
+# -------------------------------------------------------------------------------------------------
+
 def build_algorithm(
         config_algorithm: AlgorithmConfiguration,
         unitary):
