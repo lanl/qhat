@@ -2014,11 +2014,9 @@ class TestControlled:
             U = controlled.as_composite_bloq().tensor_contract()
         np.testing.assert_allclose(U, expected, atol=1e-10)
 
-    def test_second_control_not_implemented(self):
-        with pytest.raises(NotImplementedError):
-            self.make().controlled().controlled()
-        with pytest.raises(NotImplementedError):
-            self.make(ctrl_values=(1, 0))
+    def test_second_control_prepends(self):
+        assert self.make().controlled().controlled() == self.make(ctrl_values=(1, 1))
+        assert self.make().controlled().controlled(CtrlSpec(cvs=0)).ctrl_values == (0, 1)
 
     @pytest.mark.parametrize("spec", [
         CtrlSpec(cvs=(1, 1)), CtrlSpec(qdtypes=QUInt(2), cvs=2), CtrlSpec(cvs=np.array([1, 0]))])

@@ -37,6 +37,7 @@ from qualtran.bloqs.qubitization.qubitization_walk_operator import QubitizationW
 from pyLIQTR.qubitization.phase_estimation import QubitizedPhaseEstimation
 
 from qhat.analysis.config_types import AlgorithmConfiguration
+from qhat.common import controls
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.hermiticity import require_real_scalar
 from qhat.common.qpe_window_state import precision_bits, RectangularWindowState
@@ -280,11 +281,32 @@ def check_unitary_supports_algorithm(config_unitary, config_algorithm: Algorithm
 
 # -------------------------------------------------------------------------------------------------
 
+def log_multi_control_method(unitary, num_controls: int):
+    """Log the multi-control method a controlled unitary uses, and the ancillas it adds (plan D1).
+
+    With 0 or 1 controls the method isn't used, and the log says so. Unitaries without a
+    `multi_control_method` field log nothing.
+    """
+    method = getattr(unitary, "multi_control_method", None)
+    if method is None:
+        return
+    if num_controls <= 1:
+        logger.info(f"-- multi-control method: not used ({num_controls} control per unitary; "
+                    f"\"{method}\" is ignored), 0 ancillas added")
+        return
+    ancillas = controls.num_ancillas((1,) * num_controls, method)
+    logger.info(f"-- multi-control method: \"{method}\" ({num_controls} controls), "
+                f"{ancillas} ancillas added")
+
 def build_algorithm(
         config_algorithm: AlgorithmConfiguration,
         unitary):
 
     logger.info("Beginning to construct quantum algorithm.")
+
+    # Every controlled algorithm built here controls the unitary on a single qubit
+    if is_controlled_algorithm(config_algorithm):
+        log_multi_control_method(unitary, 1)
 
     if config_algorithm.method.lower() in ("qpe: qualtran textbook",):
         return build_qpe_qualtran_textbook(config_algorithm, unitary)

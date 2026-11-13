@@ -23,6 +23,7 @@ from numpy.typing import NDArray
 from qualtran import Bloq, BloqBuilder, CtrlSpec, QBit, Register, Side, Signature, Soquet, SoquetT
 from qualtran.bloqs.basic_gates import CNOT, GlobalPhase, Hadamard, Rz, SGate
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity
+from qualtran.resource_counting import QubitCount
 
 from qhat.common import controls
 from qhat.common.hermiticity import require_real_scalar
@@ -31,6 +32,7 @@ from qhat.common.pauli_utils import validate_pauli_string
 if TYPE_CHECKING:
     import quimb.tensor as qtn
     from qualtran import AddControlledT
+    from qualtran.resource_counting import CostKey
 
 
 @attrs.frozen
@@ -51,7 +53,9 @@ class PauliStringEvolution(Bloq):
             different object that happens to be analytically equal).
         ctrl_values: One entry per control qubit, 1 (act on |1>) or 0 (act on |0>); empty for
             no control. `.controlled()` prepends one, e.g. `.controlled(CtrlSpec(cvs=0))` gives
-            `(0,)`. The controls are the `ctrl` register, before `q`. At most one for now.
+            `(0,)`. The controls are the `ctrl` register, before `q`.
+        multi_control_method: How 2 or more controls are built, "ancilla" (default) or "direct";
+            see `common/controls.py`. Ignored with 0 or 1 controls.
 
     Example:
         >>> pse = PauliStringEvolution(pauli_string="XYZ", coefficient=0.5, time=1.0)
@@ -66,6 +70,7 @@ class PauliStringEvolution(Bloq):
     hbar: float = 1.0
     is_adjoint: bool = False
     ctrl_values: Tuple[int, ...] = ()
+    multi_control_method: str = controls.DEFAULT_MULTI_CONTROL_METHOD
 
     def __attrs_post_init__(self):
         """Validate the Pauli string and controls, and store coefficient, time, and hbar as floats."""
@@ -75,6 +80,7 @@ class PauliStringEvolution(Bloq):
             object.__setattr__(self, name, value)
         object.__setattr__(self, "ctrl_values",
                            controls.validate_ctrl_values("PauliStringEvolution", self.ctrl_values))
+        controls.validate_multi_control_method("PauliStringEvolution", self.multi_control_method)
 
     @cached_property
     def signature(self) -> Signature:
@@ -173,8 +179,11 @@ class PauliStringEvolution(Bloq):
         exp(-i * coefficient * time / hbar) times the identity, i.e. a `GlobalPhase`.
 
         Under control only the rotation is controlled (see `_add_rotation`); the basis changes and
-        the CNOT chain cancel when the rotation is skipped.
+        the CNOT chain cancel when the rotation is skipped. With 2 or more controls and the
+        "ancilla" method, the controls are first ANDed into one ancilla, which controls this bloq.
         """
+        if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
+            return controls.add_with_and_ancilla(bb, self, ctrl=ctrl, q=q)
         q = np.array(q)
         active = self._active_qubits
         if not active:
@@ -204,30 +213,27 @@ class PauliStringEvolution(Bloq):
     def _add_rotation(self, bb: BloqBuilder, target: Soquet, ctrl: Optional[NDArray[Soquet]]):
         """Add Rz(theta) on the parity qubit `target`, controlled on `ctrl` if there is one.
 
-        The controlled rotation is Rz(theta/2) . CNOT . Rz(-+theta/2) . CNOT on the target (2
+        With one control the rotation is Rz(theta/2) . CNOT . Rz(-+theta/2) . CNOT on the target (2
         rotations, 2 CNOTs, exact): if the control is |1> the CNOTs flip the second rotation's
         sign, so the two add up to Rz(theta); if |0> they cancel. For a control on |0> the second
-        angle is +theta/2 instead, which swaps the two cases at no extra cost.
+        angle is +theta/2 instead, which swaps the two cases at no extra cost. With k controls
+        ("direct") it is the same idea over all 2^k sign patterns (`controls.add_controlled_rz`).
 
         Returns the target and control soquets.
         """
         theta = self._rotation_angle
         if ctrl is None:
             return bb.add(Rz(theta), q=target), None
-        ctrl = np.array(ctrl)
-        second = -theta / 2 if self.ctrl_values[0] == 1 else theta / 2
-        target = bb.add(Rz(theta / 2), q=target)
-        ctrl[0], target = bb.add(CNOT(), ctrl=ctrl[0], target=target)
-        target = bb.add(Rz(second), q=target)
-        ctrl[0], target = bb.add(CNOT(), ctrl=ctrl[0], target=target)
-        return target, ctrl
+        target, ctrl = controls.add_controlled_rz(bb, theta, target, ctrl, self.ctrl_values)
+        return target, np.array(ctrl)
 
     def _add_identity_phase(self, bb: BloqBuilder, ctrl: Optional[NDArray[Soquet]]):
         """Add exp(-i phi), phi = theta/2, the evolution of an all-identity string.
 
-        Uncontrolled it is a `GlobalPhase`. Under control it is a phase on the control qubit:
+        Uncontrolled it is a `GlobalPhase`. Under one control it is a phase on the control qubit:
         diag(1, e^{-i phi}) = e^{-i phi/2} Rz(-phi) for a control on |1>, and
-        diag(e^{-i phi}, 1) = e^{-i phi/2} Rz(phi) for a control on |0>.
+        diag(e^{-i phi}, 1) = e^{-i phi/2} Rz(phi) for a control on |0>. With k controls
+        ("direct") see `controls.add_controlled_phase`.
 
         Returns the control soquets.
         """
@@ -235,28 +241,35 @@ class PauliStringEvolution(Bloq):
         if ctrl is None:
             bb.add(GlobalPhase(np.exp(-1j * phi)))
             return None
-        ctrl = np.array(ctrl)
-        sign = -1.0 if self.ctrl_values[0] == 1 else 1.0
-        ctrl[0] = bb.add(Rz(sign * phi), q=ctrl[0])
-        bb.add(GlobalPhase(np.exp(-0.5j * phi)))
-        return ctrl
+        return np.array(controls.add_controlled_phase(bb, phi, ctrl, self.ctrl_values))
 
     def _t_complexity_(self) -> TComplexity:
         """T-complexity of the decomposition, counted by hand (no decomposition needed).
 
         Every Rz counts as 1 rotation, whatever its angle (plan D14), so the count doesn't depend
         on the coefficient or time. Uncontrolled: the basis changes and CNOT chain (Cliffords) and
-        1 rotation; an all-identity string is free. Controlled: the same plus 1 rotation and 2
-        CNOTs; an all-identity string is 1 rotation on the control.
+        1 rotation; an all-identity string is free. With k controls ("direct", or k = 1): the same
+        with the rotation replaced by 2^k rotations and 2^k CNOTs; an all-identity string is
+        2^k - 1 rotations and 2^k - 2 CNOTs. With the "ancilla" method: the AND and its uncompute
+        plus the singly-controlled count.
         """
+        if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
+            return controls.and_ancilla_t_complexity(self)
         active = self._active_qubits
-        controlled = bool(self.ctrl_values)
+        num_ctrls = len(self.ctrl_values)
         if not active:
-            return TComplexity(rotations=1) if controlled else TComplexity()
+            return controls.controlled_phase_t_complexity(num_ctrls)
         num_basis = sum(2 if self.pauli_string[i] == 'X' else 4
                         for i in active if self.pauli_string[i] != 'Z')
-        num_cnots = 2 * (len(active) - 1) + (2 if controlled else 0)
-        return TComplexity(clifford=num_basis + num_cnots, rotations=2 if controlled else 1)
+        num_cnots = 2 * (len(active) - 1)
+        return TComplexity(clifford=num_basis + num_cnots) + controls.controlled_rz_t_complexity(
+            num_ctrls)
+
+    def my_static_costs(self, cost_key: 'CostKey'):
+        """`QubitCount` without decomposing: qubits + controls + AND ancillas (if any)."""
+        if isinstance(cost_key, QubitCount):
+            return controls.peak_qubits(self.num_qubits, self.ctrl_values, self.multi_control_method)
+        return NotImplemented
 
     def get_ctrl_system(
         self, ctrl_spec: Optional[CtrlSpec] = None
@@ -287,7 +300,7 @@ class PauliStringEvolution(Bloq):
 
     def __repr__(self) -> str:
         adjoint = ", is_adjoint=True" if self.is_adjoint else ""
-        ctrl = f", ctrl_values={self.ctrl_values}" if self.ctrl_values else ""
+        ctrl = controls.ctrl_repr(self.ctrl_values, self.multi_control_method)
         return (f"PauliStringEvolution(pauli_string='{self.pauli_string}', "
                 f"coefficient={self.coefficient}, time={self.time}, hbar={self.hbar}{adjoint}"
                 f"{ctrl})")

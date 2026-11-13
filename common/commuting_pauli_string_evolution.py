@@ -19,6 +19,7 @@ import numpy as np
 from qualtran import (Bloq, BloqBuilder, CompositeBloq, CtrlSpec, QBit, Register, Side, Signature,
                       SoquetT)
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
+from qualtran.resource_counting import QubitCount
 
 from qhat.common import controls
 from qhat.common.hermiticity import require_real_scalar
@@ -28,6 +29,7 @@ from qhat.common.pauli_utils import validate_pauli_string
 if TYPE_CHECKING:
     import quimb.tensor as qtn
     from qualtran import AddControlledT
+    from qualtran.resource_counting import CostKey
 
 
 def pauli_strings_commute(pauli_string1: str, pauli_string2: str) -> bool:
@@ -108,6 +110,8 @@ class CommutingPauliStringEvolution(Bloq):
         is_adjoint: If True, the operator is U^dagger. `adjoint()` flips it; `time` and the term
             order are left as given, and the decomposition applies the terms in reverse order.
         ctrl_values: Controls, as in `PauliStringEvolution`; each term gets the same controls.
+        multi_control_method: As in `PauliStringEvolution`. With "ancilla" and 2 or more controls,
+            the controls are ANDed once for the whole bloq, and each term gets one control.
 
     Example:
         >>> terms = [("XZ", 0.5), ("ZX", 0.3)]  # These commute
@@ -122,6 +126,7 @@ class CommutingPauliStringEvolution(Bloq):
     hbar: float = 1.0
     is_adjoint: bool = False
     ctrl_values: Tuple[int, ...] = ()
+    multi_control_method: str = controls.DEFAULT_MULTI_CONTROL_METHOD
 
     def __attrs_post_init__(self):
         """Validate that all Pauli strings commute and have the same length."""
@@ -149,6 +154,8 @@ class CommutingPauliStringEvolution(Bloq):
                            require_real_scalar("CommutingPauliStringEvolution hbar", self.hbar))
         object.__setattr__(self, "ctrl_values", controls.validate_ctrl_values(
             "CommutingPauliStringEvolution", self.ctrl_values))
+        controls.validate_multi_control_method(
+            "CommutingPauliStringEvolution", self.multi_control_method)
 
         # Check that all Pauli strings pairwise commute
         if not all_commute(pauli_strings):
@@ -194,7 +201,11 @@ class CommutingPauliStringEvolution(Bloq):
         """Decompose into a sequence of PauliStringEvolution bloqs, each with the same controls.
 
         Since all terms commute, the exact evolution is the product of individual evolutions.
+        With 2 or more controls and the "ancilla" method, the controls are first ANDed into one
+        ancilla, which controls this bloq.
         """
+        if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
+            return controls.add_with_and_ancilla(bb, self, **soqs)
         # Apply each PauliStringEvolution in sequence (reversed for the adjoint)
         for pse in self._term_evolutions():
             soqs = bb.add_d(pse, **soqs)
@@ -212,16 +223,26 @@ class CommutingPauliStringEvolution(Bloq):
                 hbar=self.hbar,
                 is_adjoint=self.is_adjoint,
                 ctrl_values=self.ctrl_values,
+                multi_control_method=self.multi_control_method,
             )
             for pauli_string, coefficient in terms
         )
 
     def _t_complexity_(self) -> TComplexity:
-        """Return the T-complexity by summing individual term complexities."""
+        """Return the T-complexity by summing individual term complexities (plus the AND ladder
+        for the "ancilla" method)."""
+        if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
+            return controls.and_ancilla_t_complexity(self)
         total_complexity = TComplexity()
         for pse in self._term_evolutions():
             total_complexity += t_complexity(pse)
         return total_complexity
+
+    def my_static_costs(self, cost_key: 'CostKey'):
+        """`QubitCount` without decomposing: qubits + controls + AND ancillas (if any)."""
+        if isinstance(cost_key, QubitCount):
+            return controls.peak_qubits(self.num_qubits, self.ctrl_values, self.multi_control_method)
+        return NotImplemented
 
     @property
     def num_terms(self) -> int:
@@ -259,6 +280,6 @@ class CommutingPauliStringEvolution(Bloq):
 
     def __repr__(self) -> str:
         adjoint = ", is_adjoint=True" if self.is_adjoint else ""
-        ctrl = f", ctrl_values={self.ctrl_values}" if self.ctrl_values else ""
+        ctrl = controls.ctrl_repr(self.ctrl_values, self.multi_control_method)
         return (f"CommutingPauliStringEvolution(pauli_terms={self.pauli_terms}, "
                 f"time={self.time}, hbar={self.hbar}{adjoint}{ctrl})")
