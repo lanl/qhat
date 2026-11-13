@@ -8,9 +8,10 @@ same Pauli string are combined for efficiency.
 
 import logging
 import numbers
+from collections import Counter
 from functools import cached_property
 from math import cbrt
-from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Set, Tuple, Union
 
 import attrs
 import numpy as np
@@ -21,7 +22,7 @@ from qualtran.resource_counting import QubitCount
 if TYPE_CHECKING:
     import quimb.tensor as qtn
     from qualtran import AddControlledT
-    from qualtran.resource_counting import CostKey
+    from qualtran.resource_counting import BloqCountT, CostKey, SympySymbolAllocator
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
 
 from qhat.common import controls
@@ -533,28 +534,64 @@ class Trotterization(Bloq):
         if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
             return controls.add_with_and_ancilla(bb, self, **soqs)
 
-        # Time step for each Trotterization step
-        dt = self.time / self.num_steps
-
         # Apply each term in the expanded sequence (reversed for the adjoint)
         sequence = reversed(self.expanded_sequence) if self.is_adjoint else self.expanded_sequence
         for term_idx, coeff in sequence:
-            pauli_string, h_i = self.pauli_terms[term_idx]
-
-            # Create CommutingPauliStringEvolution for this term
-            # The effective evolution is exp(-i * h_i * P_i * coeff * dt / hbar)
-            # Currently wraps a single term, but enables future grouping of commuting terms
-            cpse = CommutingPauliStringEvolution(
-                pauli_terms=((pauli_string, h_i * coeff),),
-                time=dt,
-                hbar=self.hbar,
-                is_adjoint=self.is_adjoint,
-                ctrl_values=self.ctrl_values,
-                multi_control_method=self.multi_control_method,
-            )
-            soqs = bb.add_d(cpse, **soqs)
+            soqs = bb.add_d(self._term_evolution(term_idx, coeff), **soqs)
 
         return soqs
+
+    def _term_evolution(self, term_idx: int, coeff: float) -> CommutingPauliStringEvolution:
+        """The bloq the decomposition applies for one (term_index, coefficient) pair.
+
+        The effective evolution is exp(-i * h_i * P_i * coeff * dt / hbar), with the adjoint flag
+        and controls of this Trotterization. Currently wraps a single term, but enables future
+        grouping of commuting terms. `build_call_graph` uses the same bloqs, so its callees equal
+        the decomposition's.
+        """
+        pauli_string, h_i = self.pauli_terms[term_idx]
+        return CommutingPauliStringEvolution(
+            pauli_terms=((pauli_string, h_i * coeff),),
+            time=self.time / self.num_steps,
+            hbar=self.hbar,
+            is_adjoint=self.is_adjoint,
+            ctrl_values=self.ctrl_values,
+            multi_control_method=self.multi_control_method,
+        )
+
+    def _occurrences(self) -> Counter:
+        """How often each (term_index, coefficient) pair appears in `expanded_sequence`, without
+        expanding it: the prologue and epilogue once, the core num_steps times and the bridge
+        num_steps - 1 times.
+
+        Example: fourth order with 2 terms and 3 steps has 6 distinct pairs, whatever the steps.
+        """
+        counts = Counter()
+        for segment, repeats in ((self._prologue, 1),
+                                 (self._repeat_core, self.num_steps),
+                                 (self._repeat_bridge, self.num_steps - 1),
+                                 (self._epilogue, 1)):
+            if repeats == 0:
+                continue  # the bridge of a 1-step Trotterization; a 0 count would be a callee
+            for pair in segment:
+                counts[pair] += repeats
+        return counts
+
+    def build_call_graph(self, ssa: 'SympySymbolAllocator') -> Set['BloqCountT']:
+        """The decomposition's callees and their counts, without building the decomposition.
+
+        Qualtran's default decomposes the whole circuit, which grows with num_steps (e.g. 25 s
+        for `QECGatesCost` of a 500-step QPE). Here the work grows only with the length of the
+        repeat pattern. The callees are exactly the decomposition's bloqs: the same coefficients,
+        time step, adjoint flag and controls. With the "ancilla" method and 2 or more controls,
+        they are the AND, its uncompute, and this bloq with one control.
+        """
+        if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
+            return controls.and_ancilla_call_graph(self)
+        counts = Counter()
+        for (term_idx, coeff), n in self._occurrences().items():
+            counts[self._term_evolution(term_idx, coeff)] += n
+        return set(counts.items())
 
     def _t_complexity_(self) -> TComplexity:
         """Return T-complexity by counting term occurrences.
@@ -570,22 +607,11 @@ class Trotterization(Bloq):
             return controls.and_ancilla_t_complexity(self)
 
         # Count occurrences of each term in the expanded sequence
-        term_counts = {}
-        # -- prologue happens once
-        for term_idx, coeff in self._prologue:
-            term_counts[term_idx] = term_counts.get(term_idx, 0) + 1
-        # -- repeat_core happens num_steps times
-        for term_idx, coeff in self._repeat_core:
-            term_counts[term_idx] = term_counts.get(term_idx, 0) + self.num_steps
-        # -- repeat_bridge happens (num_steps-1) times
-        for term_idx, coeff in self._repeat_bridge:
-            term_counts[term_idx] = term_counts.get(term_idx, 0) + (self.num_steps - 1)
-        # -- epilogue happens once
-        for term_idx, coeff in self._epilogue:
-            term_counts[term_idx] = term_counts.get(term_idx, 0) + 1
+        term_counts = Counter()
+        for (term_idx, coeff), n in self._occurrences().items():
+            term_counts[term_idx] += n
 
         # Compute complexity once per unique term and multiply by occurrence count
-        dt = self.time / self.num_steps
         total_complexity = TComplexity()
 
         for term_idx, count in term_counts.items():

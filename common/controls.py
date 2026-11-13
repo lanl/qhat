@@ -17,7 +17,8 @@ With 0 or 1 controls it is ignored.
 """
 
 import numbers
-from typing import TYPE_CHECKING, Dict, Iterable, List, Sequence, Tuple
+from collections import Counter
+from typing import TYPE_CHECKING, Dict, Iterable, List, Sequence, Set, Tuple
 
 import attrs
 import numpy as np
@@ -29,6 +30,7 @@ from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexit
 
 if TYPE_CHECKING:
     from qualtran import AddControlledT
+    from qualtran.resource_counting import BloqCountT
 
 MULTI_CONTROL_METHODS = ("ancilla", "direct")
 DEFAULT_MULTI_CONTROL_METHOD = "ancilla"
@@ -147,6 +149,13 @@ def add_with_and_ancilla(
     return {'ctrl': ctrl, **out}
 
 
+def and_ancilla_call_graph(bloq: Bloq) -> Set['BloqCountT']:
+    """Call graph of `add_with_and_ancilla(bloq)`: the AND, its uncompute, and the bloq on one
+    control, each once."""
+    ladder = _and_ladder(bloq.ctrl_values)
+    return {(ladder, 1), (ladder.adjoint(), 1), (attrs.evolve(bloq, ctrl_values=(1,)), 1)}
+
+
 def and_ancilla_t_complexity(bloq: Bloq) -> TComplexity:
     """T-complexity of `add_with_and_ancilla(bloq)`: the AND and its uncompute, plus the bloq
     on one control."""
@@ -180,13 +189,34 @@ def add_controlled_rz(
     k = len(ctrl_values)
     if k == 0:
         return bb.add(Rz(theta), q=target), ctrl
-    gray = [i ^ (i >> 1) for i in range(2 ** k)]
-    for step, subset in enumerate(gray):
-        sign = np.prod([_sign(ctrl_values[j]) for j in range(k) if subset >> j & 1])
-        target = bb.add(Rz(float(sign) * theta / 2 ** k), q=target)
+    gray = _gray_code(k)
+    for step, (subset, angle) in enumerate(zip(gray, _controlled_rz_angles(theta, ctrl_values))):
+        target = bb.add(Rz(angle), q=target)
         flipped = (subset ^ gray[(step + 1) % 2 ** k]).bit_length() - 1
         ctrl[flipped], target = bb.add(CNOT(), ctrl=ctrl[flipped], target=target)
     return target, ctrl
+
+
+def _gray_code(k: int) -> List[int]:
+    """The 2^k subsets of k controls in Gray-code order, as bit masks, e.g. [0, 1, 3, 2]."""
+    return [i ^ (i >> 1) for i in range(2 ** k)]
+
+
+def _controlled_rz_angles(theta: float, ctrl_values: Tuple[int, ...]) -> List[float]:
+    """The Rz angles `add_controlled_rz` applies, in order (theta alone for no controls)."""
+    k = len(ctrl_values)
+    if k == 0:
+        return [theta]
+    return [float(np.prod([_sign(ctrl_values[j]) for j in range(k) if subset >> j & 1]))
+            * theta / 2 ** k for subset in _gray_code(k)]
+
+
+def controlled_rz_call_graph(theta: float, ctrl_values: Tuple[int, ...]) -> Counter:
+    """The gates of `add_controlled_rz`, counted: its Rz rotations and 2^k CNOTs."""
+    counts = Counter(Rz(angle) for angle in _controlled_rz_angles(theta, ctrl_values))
+    if ctrl_values:
+        counts[CNOT()] += 2 ** len(ctrl_values)
+    return counts
 
 
 def controlled_rz_t_complexity(num_ctrls: int) -> TComplexity:
@@ -215,6 +245,16 @@ def add_controlled_phase(
         phi = phi / 2
     bb.add(GlobalPhase(np.exp(-1j * phi)))
     return ctrl
+
+
+def controlled_phase_call_graph(phi: float, ctrl_values: Tuple[int, ...]) -> Counter:
+    """The gates of `add_controlled_phase`, counted, following the same recursion."""
+    counts = Counter()
+    for last in reversed(range(len(ctrl_values))):
+        counts += controlled_rz_call_graph(_sign(ctrl_values[last]) * phi, ctrl_values[:last])
+        phi = phi / 2
+    counts[GlobalPhase(np.exp(-1j * phi))] += 1
+    return counts
 
 
 def controlled_phase_t_complexity(num_ctrls: int) -> TComplexity:

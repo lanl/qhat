@@ -12,8 +12,9 @@ where:
 """
 
 import numbers
+from collections import Counter
 from functools import cached_property
-from typing import TYPE_CHECKING, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, Optional, Set, Tuple
 
 import attrs
 import numpy as np
@@ -32,7 +33,7 @@ from qhat.common.pauli_utils import validate_pauli_string
 if TYPE_CHECKING:
     import quimb.tensor as qtn
     from qualtran import AddControlledT
-    from qualtran.resource_counting import CostKey
+    from qualtran.resource_counting import BloqCountT, CostKey, SympySymbolAllocator
 
 
 @attrs.frozen
@@ -242,6 +243,31 @@ class PauliStringEvolution(Bloq):
             bb.add(GlobalPhase(np.exp(-1j * phi)))
             return None
         return np.array(controls.add_controlled_phase(bb, phi, ctrl, self.ctrl_values))
+
+    def build_call_graph(self, ssa: 'SympySymbolAllocator') -> Set['BloqCountT']:
+        """The decomposition's gates and their counts, without building the decomposition.
+
+        Qualtran's default builds the decomposition, which is slow when a Hamiltonian has
+        thousands of distinct terms. The gates are exactly those `build_composite_bloq` adds,
+        angles included. Example: `IXIZI` is 2 H, 2 CNOT and 1 Rz.
+        """
+        if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
+            return controls.and_ancilla_call_graph(self)
+        active = self._active_qubits
+        if not active:
+            return set(controls.controlled_phase_call_graph(
+                self._rotation_angle / 2, self.ctrl_values).items())
+        counts = Counter()
+        for i in active:
+            if self.pauli_string[i] == 'Y':
+                counts[SGate(is_adjoint=True)] += 1
+                counts[SGate()] += 1
+            if self.pauli_string[i] in 'XY':
+                counts[Hadamard()] += 2
+        if len(active) > 1:
+            counts[CNOT()] += 2 * (len(active) - 1)
+        counts += controls.controlled_rz_call_graph(self._rotation_angle, self.ctrl_values)
+        return set(counts.items())
 
     def _t_complexity_(self) -> TComplexity:
         """T-complexity of the decomposition, counted by hand (no decomposition needed).

@@ -10,8 +10,9 @@ This exact decomposition is valid when all Pauli strings commute with each other
 """
 
 import numbers
+from collections import Counter
 from functools import cached_property
-from typing import TYPE_CHECKING, Dict, Iterable, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, Optional, Sequence, Set, Tuple
 
 import attrs
 import numpy as np
@@ -29,7 +30,7 @@ from qhat.common.pauli_utils import validate_pauli_string
 if TYPE_CHECKING:
     import quimb.tensor as qtn
     from qualtran import AddControlledT
-    from qualtran.resource_counting import CostKey
+    from qualtran.resource_counting import BloqCountT, CostKey, SympySymbolAllocator
 
 
 def pauli_strings_commute(pauli_string1: str, pauli_string2: str) -> bool:
@@ -227,6 +228,13 @@ class CommutingPauliStringEvolution(Bloq):
             )
             for pauli_string, coefficient in terms
         )
+
+    def build_call_graph(self, ssa: 'SympySymbolAllocator') -> Set['BloqCountT']:
+        """The decomposition's term evolutions (or, for the "ancilla" method with 2 or more
+        controls, the AND, its uncompute and this bloq on one control), without building it."""
+        if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
+            return controls.and_ancilla_call_graph(self)
+        return set(Counter(self._term_evolutions()).items())
 
     def _t_complexity_(self) -> TComplexity:
         """Return the T-complexity by summing individual term complexities (plus the AND ladder
