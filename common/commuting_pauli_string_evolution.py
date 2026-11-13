@@ -11,20 +11,23 @@ This exact decomposition is valid when all Pauli strings commute with each other
 
 import numbers
 from functools import cached_property
-from typing import TYPE_CHECKING, Dict, Iterable, Sequence, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, Optional, Sequence, Tuple
 
 import attrs
 import numpy as np
 
-from qualtran import Bloq, BloqBuilder, CompositeBloq, QBit, Register, Side, Signature, SoquetT
+from qualtran import (Bloq, BloqBuilder, CompositeBloq, CtrlSpec, QBit, Register, Side, Signature,
+                      SoquetT)
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
 
+from qhat.common import controls
 from qhat.common.hermiticity import require_real_scalar
 from qhat.common.pauli_string_evolution import PauliStringEvolution
 from qhat.common.pauli_utils import validate_pauli_string
 
 if TYPE_CHECKING:
     import quimb.tensor as qtn
+    from qualtran import AddControlledT
 
 
 def pauli_strings_commute(pauli_string1: str, pauli_string2: str) -> bool:
@@ -104,6 +107,7 @@ class CommutingPauliStringEvolution(Bloq):
         hbar: Reduced Planck constant (default 1.0 for natural units).
         is_adjoint: If True, the operator is U^dagger. `adjoint()` flips it; `time` and the term
             order are left as given, and the decomposition applies the terms in reverse order.
+        ctrl_values: Controls, as in `PauliStringEvolution`; each term gets the same controls.
 
     Example:
         >>> terms = [("XZ", 0.5), ("ZX", 0.3)]  # These commute
@@ -117,6 +121,7 @@ class CommutingPauliStringEvolution(Bloq):
     time: float
     hbar: float = 1.0
     is_adjoint: bool = False
+    ctrl_values: Tuple[int, ...] = ()
 
     def __attrs_post_init__(self):
         """Validate that all Pauli strings commute and have the same length."""
@@ -142,6 +147,8 @@ class CommutingPauliStringEvolution(Bloq):
                            require_real_scalar("CommutingPauliStringEvolution time", self.time))
         object.__setattr__(self, "hbar",
                            require_real_scalar("CommutingPauliStringEvolution hbar", self.hbar))
+        object.__setattr__(self, "ctrl_values", controls.validate_ctrl_values(
+            "CommutingPauliStringEvolution", self.ctrl_values))
 
         # Check that all Pauli strings pairwise commute
         if not all_commute(pauli_strings):
@@ -179,23 +186,20 @@ class CommutingPauliStringEvolution(Bloq):
 
     @cached_property
     def signature(self) -> Signature:
-        """Return the signature with a register of qubits."""
-        return Signature([Register('q', QBit(), shape=(self.num_qubits,), side=Side.THRU)])
+        """The `ctrl` register (if controlled), then a register of qubits."""
+        return Signature(controls.ctrl_registers(self.ctrl_values)
+                         + [Register('q', QBit(), shape=(self.num_qubits,), side=Side.THRU)])
 
     def build_composite_bloq(self, bb: BloqBuilder, **soqs: SoquetT) -> Dict[str, SoquetT]:
-        """Decompose into a sequence of PauliStringEvolution bloqs.
+        """Decompose into a sequence of PauliStringEvolution bloqs, each with the same controls.
 
         Since all terms commute, the exact evolution is the product of individual evolutions.
         """
-        # Get the input register
-        assert len(soqs) == 1, f"Expected 1 register, got {len(soqs)}"
-        reg_name, register = list(soqs.items())[0]
-
         # Apply each PauliStringEvolution in sequence (reversed for the adjoint)
         for pse in self._term_evolutions():
-            register = bb.add(pse, q=register)
+            soqs = bb.add_d(pse, **soqs)
 
-        return {reg_name: register}
+        return soqs
 
     def _term_evolutions(self) -> Tuple[PauliStringEvolution, ...]:
         """One PauliStringEvolution per term, in the order they are applied."""
@@ -207,6 +211,7 @@ class CommutingPauliStringEvolution(Bloq):
                 time=self.time,
                 hbar=self.hbar,
                 is_adjoint=self.is_adjoint,
+                ctrl_values=self.ctrl_values,
             )
             for pauli_string, coefficient in terms
         )
@@ -222,6 +227,15 @@ class CommutingPauliStringEvolution(Bloq):
     def num_terms(self) -> int:
         """Number of Pauli string terms in the Hamiltonian."""
         return len(self.pauli_terms)
+
+    def get_ctrl_system(
+        self, ctrl_spec: Optional[CtrlSpec] = None
+    ) -> Tuple['CommutingPauliStringEvolution', 'AddControlledT']:
+        """Controlled version: the same bloq with the new control value prepended to `ctrl_values`.
+
+        Only single-qubit controls on |1> or |0> are supported; others raise ValueError.
+        """
+        return controls.get_ctrl_system(self, ctrl_spec)
 
     def adjoint(self) -> 'CommutingPauliStringEvolution':
         """Return U^dagger (flips `is_adjoint`; `time` and the terms are unchanged)."""
@@ -241,9 +255,10 @@ class CommutingPauliStringEvolution(Bloq):
         term_strs = [f"{coeff}*{ps}" for ps, coeff in self.pauli_terms]
         H_str = " + ".join(term_strs)
         text = f"exp(-i * ({H_str}) * {self.time} / {self.hbar})"
-        return f"[{text}]†" if self.is_adjoint else text
+        return controls.ctrl_str(self.ctrl_values, f"[{text}]†" if self.is_adjoint else text)
 
     def __repr__(self) -> str:
         adjoint = ", is_adjoint=True" if self.is_adjoint else ""
+        ctrl = f", ctrl_values={self.ctrl_values}" if self.ctrl_values else ""
         return (f"CommutingPauliStringEvolution(pauli_terms={self.pauli_terms}, "
-                f"time={self.time}, hbar={self.hbar}{adjoint})")
+                f"time={self.time}, hbar={self.hbar}{adjoint}{ctrl})")

@@ -612,3 +612,170 @@ class TestAdjointAndPower:
     def test_invalid_power_raises(self, power):
         with pytest.raises(ValueError):
             PauliStringEvolution("XZ", 0.37, 0.91) ** power
+
+
+# ==================================================================================
+# Test: Rotation counting at special angles (plan D14)
+# ==================================================================================
+
+class TestRotationCountIgnoresAngle:
+    """Every non-identity term counts as one rotation, whatever its angle."""
+
+    @pytest.mark.parametrize("coefficient, time", [(0.0, 0.91), (np.pi / 8, 1.0), (np.pi / 2, 1.0)])
+    def test_special_angles_count_as_one_rotation(self, coefficient, time):
+        # Angles 0, pi/4 and pi: Qualtran would count Rz at these as a Clifford or a T.
+        tc = t_complexity(PauliStringEvolution("XZ", coefficient, time))
+        assert (tc.t, tc.clifford, tc.rotations) == (0, 4, 1)
+
+    def test_fast_trotter_count_is_sum_of_term_counts(self):
+        """Includes a zero-coefficient term; R1 finding 2 (13 vs 7 rotations before D14)."""
+        from qualtran.cirq_interop.t_complexity_protocol import TComplexity
+        from qhat.common.trotter_flattened import Trotterization
+        tr = Trotterization((('XZ', .4), ('ZI', 0.), ('YX', .3)), (.5, .5), .7, 3)
+        cbloq = tr.decompose_bloq().flatten(
+            lambda binst: not isinstance(binst.bloq, PauliStringEvolution))
+        terms = [binst.bloq for binst in cbloq.bloq_instances]
+        assert all(isinstance(term, PauliStringEvolution) for term in terms)
+        total = sum((t_complexity(term) for term in terms), start=TComplexity())
+        assert t_complexity(tr) == total
+        assert total.rotations == tr.num_operations
+
+
+# ==================================================================================
+# Test: Controlled evolution
+# ==================================================================================
+
+def _controlled_matrix(unitary, ctrl_value):
+    """U on the block where the control equals `ctrl_value`, the identity elsewhere."""
+    dim = unitary.shape[0]
+    result = np.eye(2 * dim, dtype=complex)
+    result[ctrl_value * dim:(ctrl_value + 1) * dim, ctrl_value * dim:(ctrl_value + 1) * dim] = unitary
+    return result
+
+
+class TestControlled:
+    """Controlled versions are our own bloq, exact, and cheap."""
+
+    @pytest.mark.parametrize("pauli_string", DECOMPOSITION_STRINGS)
+    @pytest.mark.parametrize("ctrl_value", [1, 0])
+    @pytest.mark.parametrize("is_adjoint", [False, True])
+    def test_decomposition_equals_block_matrix(self, pauli_string, ctrl_value, is_adjoint):
+        """Exact equality (no "up to a phase"), against a matrix built independently."""
+        from qualtran import CtrlSpec
+        pse = PauliStringEvolution(pauli_string, -0.62, 1.37, 1.7, is_adjoint=is_adjoint)
+        forward = expm(-1j * -0.62 * 1.37 / 1.7 * pauli_string_to_matrix(pauli_string))
+        expected = _controlled_matrix(forward.conj().T if is_adjoint else forward, ctrl_value)
+        cpse = pse.controlled(CtrlSpec(cvs=ctrl_value))
+        np.testing.assert_allclose(cpse.decompose_bloq().tensor_contract(), expected, atol=1e-10)
+        np.testing.assert_allclose(cpse.tensor_contract(), expected, atol=1e-10)
+
+    def test_returns_our_bloq(self):
+        from qualtran import CtrlSpec
+        pse = PauliStringEvolution("XZ", 0.37, 0.91)
+        assert pse.controlled() == PauliStringEvolution("XZ", 0.37, 0.91, ctrl_values=(1,))
+        assert pse.controlled(CtrlSpec(cvs=0)).ctrl_values == (0,)
+        assert [reg.name for reg in pse.controlled().signature] == ['ctrl', 'q']
+        assert pse.controlled().signature.n_qubits() == 3
+
+    def test_controlled_and_adjoint_commute(self):
+        from qualtran import CtrlSpec
+        pse = PauliStringEvolution("XYZ", 0.37, 0.91)
+        for spec in (CtrlSpec(), CtrlSpec(cvs=0)):
+            assert pse.controlled(spec).adjoint() == pse.adjoint().controlled(spec)
+            assert type(pse.controlled(spec).adjoint()) is PauliStringEvolution
+
+    def test_power_keeps_controls(self):
+        pse = PauliStringEvolution("XZ", 0.37, 0.91).controlled()
+        assert (pse ** 3).ctrl_values == (1,) and (pse ** -2).ctrl_values == (1,)
+        np.testing.assert_allclose(
+            (pse ** -2).decompose_bloq().tensor_contract(),
+            np.linalg.matrix_power(pse.tensor_contract(), 2).conj().T, atol=1e-10)
+
+    @pytest.mark.parametrize("ctrl_value", [1, 0])
+    def test_only_the_rotation_is_controlled(self, ctrl_value):
+        """The basis changes and the ladder aren't controlled; Rz is replaced by 2 Rz + 2 CNOT."""
+        from qualtran import CtrlSpec
+        cbloq = PauliStringEvolution("IXIZI", 0.5, 0.3).controlled(
+            CtrlSpec(cvs=ctrl_value)).decompose_bloq()
+        names = sorted(type(binst.bloq).__name__ for binst in cbloq.bloq_instances)
+        assert names == ["CNOT"] * 4 + ["Hadamard"] * 2 + ["Rz"] * 2
+
+    # (string, Cliffords, rotations) for the controlled term: the uncontrolled Cliffords + 2 CNOTs,
+    # and 2 rotations. All-identity: 1 rotation on the control. Negative controls cost the same.
+    @pytest.mark.parametrize("pauli_string, cliffords, rotations", [
+        ("Z", 2, 2),
+        ("IIIZ", 2, 2),
+        ("X", 4, 2),
+        ("IYI", 6, 2),
+        ("XIYIZ", 2 + 4 + 4 + 2, 2),
+        ("YY", 8 + 2 + 2, 2),
+        ("II", 0, 1),
+    ])
+    @pytest.mark.parametrize("ctrl_value", [1, 0])
+    def test_hand_count(self, pauli_string, cliffords, rotations, ctrl_value):
+        from qualtran import CtrlSpec
+        cpse = PauliStringEvolution(pauli_string, 0.37, 0.91).controlled(CtrlSpec(cvs=ctrl_value))
+        tc = t_complexity(cpse)
+        assert (tc.t, tc.clifford, tc.rotations) == (0, cliffords, rotations)
+        assert cpse._t_complexity_() == t_complexity(cpse.decompose_bloq())
+
+    @pytest.mark.parametrize("spec", ["cvs=(1, 1)", "cvs=[1]", "cvs=2", "QUInt(2), cvs=2"])
+    def test_unsupported_ctrl_spec_raises(self, spec):
+        from qualtran import CtrlSpec, QUInt
+        ctrl_spec = eval(f"CtrlSpec({spec})", {"CtrlSpec": CtrlSpec, "QUInt": QUInt})
+        with pytest.raises(ValueError, match="single-qubit controls"):
+            PauliStringEvolution("XZ", 0.37, 0.91).controlled(ctrl_spec)
+
+    def test_two_controls_not_implemented(self):
+        with pytest.raises(NotImplementedError):
+            PauliStringEvolution("XZ", 0.37, 0.91).controlled().controlled()
+        with pytest.raises(NotImplementedError):
+            PauliStringEvolution("XZ", 0.37, 0.91, ctrl_values=(1, 0))
+
+    @pytest.mark.parametrize("ctrl_values", [(2,), (True,), (-1,)])
+    def test_invalid_ctrl_values_raise(self, ctrl_values):
+        with pytest.raises(ValueError):
+            PauliStringEvolution("XZ", 0.37, 0.91, ctrl_values=ctrl_values)
+
+    def test_str_and_repr(self):
+        from qualtran import CtrlSpec
+        pse = PauliStringEvolution("XY", 0.37, 0.91).controlled(CtrlSpec(cvs=0))
+        assert str(pse).startswith("C[0](")
+        assert "ctrl_values=(0,)" in repr(pse)
+        assert "ctrl_values" not in repr(PauliStringEvolution("XY", 0.37, 0.91))
+
+    def test_inside_a_composite_bloq(self):
+        """The adder wires an outside qubit into `ctrl` (used by FlexibleQPE)."""
+        from qualtran import BloqBuilder, CtrlSpec, QBit, Register
+        pse = PauliStringEvolution("XZ", 0.37, 0.91)
+        bb = BloqBuilder()
+        c = bb.add_register('c', 1)
+        q = bb.add_register(Register('q', QBit(), shape=(2,)))
+        _, adder = pse.get_ctrl_system(CtrlSpec(cvs=0))
+        (c,), (q,) = adder(bb, [c], {'q': q})
+        cbloq = bb.finalize(c=c, q=q)
+        np.testing.assert_allclose(
+            cbloq.tensor_contract(), _controlled_matrix(pse.tensor_contract(), 0), atol=1e-10)
+
+    def test_pyliqtr_counts_drop(self):
+        """pyLIQTR decomposes the circuit; only the rotation should be controlled (plan D10).
+
+        A controlled term costs pyLIQTR exactly two of the uncontrolled term's rotations, plus 2
+        CNOTs. Qualtran's generic `Controlled` wrapper controlled every gate, i.e. 6x the T for
+        "XYZI" (1,252 vs 206).
+        """
+        from qualtran import Controlled, CtrlSpec
+        from qhat.analysis.resource_estimation import estimate_resources
+        from qhat.common.logging_utils import add_custom_levels
+        add_custom_levels()
+
+        def counts(bloq):
+            res = estimate_resources("pyliqtr", bloq)["pyliqtr"]
+            return res["T_count"], res["Clifford_count"]
+
+        pse = PauliStringEvolution("XYZI", 0.37, 0.91)
+        t_u, _ = counts(pse)
+        t_new, cliff_new = counts(pse.controlled())
+        t_old, cliff_old = counts(Controlled(pse, CtrlSpec()))
+        assert t_new == 2 * t_u
+        assert t_new < t_old / 5 and cliff_new < cliff_old / 5
