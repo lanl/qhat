@@ -432,3 +432,58 @@ class TestResourceEstimation:
             u.controlled(): 2**m - 1,
             QFTTextBook(m, with_reverse=True).adjoint(): 1,
         }
+
+
+# -------------------------------------------------------------------------------------------------
+# Controlled Trotterization inside FlexibleQPE (plan T4)
+# -------------------------------------------------------------------------------------------------
+
+class TestControlledTrotterization:
+    """FlexibleQPE controls each U^(2^j) with Trotterization's own controls, not `Controlled`."""
+
+    TERMS = [("XZI", 0.5), ("ZIY", 0.3), ("YXX", -0.2), ("III", 0.4)]
+
+    def make(self, num_steps=3):
+        return Trotterization.from_method(
+            pauli_terms=self.TERMS, method="fourth order", time=0.43, num_steps=num_steps)
+
+    def test_controlled_powers_are_trotterizations(self):
+        u = self.make()
+        qpe = FlexibleQPE(u, 3)
+        for j in range(3):
+            controlled = qpe.controlled_power(j)
+            assert type(controlled) is Trotterization
+            assert controlled == (u ** 2**j).controlled()
+            assert controlled.ctrl_values == (1,)
+
+    def test_decomposition_has_no_generic_controlled(self):
+        from qualtran import Controlled
+        qpe = FlexibleQPE(self.make(), 3)
+        bloqs = [binst.bloq for binst, _, _ in qpe.decompose_bloq().iter_bloqnections()]
+        assert sum(type(b) is Trotterization for b in bloqs) == 3
+        assert not any(isinstance(b, Controlled) for b in bloqs)
+
+    def test_decomposition_matches_tensor(self):
+        qpe = FlexibleQPE(self.make(num_steps=2), 3)
+        np.testing.assert_allclose(
+            qpe.tensor_contract(), generic_tensor_contract(qpe), atol=1e-10)
+
+    def test_counts_and_qubits(self):
+        u = self.make()
+        m = 3
+        qpe = FlexibleQPE(u, m)
+        expected = t_complexity(RectangularWindowState(m)) + t_complexity(qpe.qft_inv)
+        for j in range(m):
+            expected = expected + t_complexity((u ** 2**j).controlled())
+        assert t_complexity(qpe) == expected
+        assert get_cost_value(qpe, QubitCount()) == m + u.num_qubits
+
+    def test_large_step_count_is_fast(self):
+        import time
+        qpe = FlexibleQPE(self.make(num_steps=5000), 6)
+        start = time.time()
+        tc = t_complexity(qpe)
+        qubits = get_cost_value(qpe, QubitCount())
+        qpe.tensor_contract()
+        assert time.time() - start < 10
+        assert tc.rotations > 0 and qubits == 6 + 3

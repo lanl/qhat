@@ -6,6 +6,7 @@ import tomlkit
 from pathlib import Path
 from tomlkit.toml_file import TOMLFile
 
+from qhat.common.controls import CONTROLLED_ROTATION_METHODS, MULTI_CONTROL_METHODS
 from qhat.common.git_utils import get_git_hash
 
 logger = logging.getLogger(__name__)
@@ -142,6 +143,12 @@ class UnitaryConfiguration(ConfigurationBase):
         self.trotter_steps = kwargs.get("trotter_steps", None)
         self.phase_scale_factor = kwargs.get("phase_scale_factor", 1.01)
         self.tensor_contraction_method = kwargs.get("tensor_contraction_method", None)
+        # How a unitary with 2 or more controls is built ("ancilla" or "direct"); `None` means
+        # the default, "ancilla" (see common/controls.py)
+        self.multi_control_method = kwargs.get("multi_control_method", None)
+        # How each controlled rotation is built ("textbook" or "ancilla"); `None` means the
+        # default, "textbook" (see common/controls.py)
+        self.controlled_rotation_method = kwargs.get("controlled_rotation_method", None)
         # Validate trotter_steps
         if self.trotter_steps is not None:
             if not isinstance(self.trotter_steps, int) or self.trotter_steps < 1:
@@ -163,6 +170,18 @@ class UnitaryConfiguration(ConfigurationBase):
                 raise ValueError(
                     f"tensor_contraction_method must be one of {valid_methods}, "
                     f"got '{self.tensor_contraction_method}'")
+        # Validate multi_control_method
+        if self.multi_control_method is not None:
+            if self.multi_control_method not in MULTI_CONTROL_METHODS:
+                raise ValueError(
+                    f"multi_control_method must be one of {list(MULTI_CONTROL_METHODS)}, "
+                    f"got '{self.multi_control_method}'")
+        # Validate controlled_rotation_method
+        if self.controlled_rotation_method is not None:
+            if self.controlled_rotation_method not in CONTROLLED_ROTATION_METHODS:
+                raise ValueError(
+                    f"controlled_rotation_method must be one of "
+                    f"{list(CONTROLLED_ROTATION_METHODS)}, got '{self.controlled_rotation_method}'")
     def encode_pauli_lcu(self, **kwargs):
         self._only_once()
         self.method = "pauli lcu"
@@ -184,6 +203,8 @@ class UnitaryConfiguration(ConfigurationBase):
         self.save_if_present(table, "trotter_steps")
         self.save_if_present(table, "phase_scale_factor")
         self.save_if_present(table, "tensor_contraction_method")
+        self.save_if_present(table, "multi_control_method")
+        self.save_if_present(table, "controlled_rotation_method")
         return table
 
 # -------------------------------------------------------------------------------------------------
@@ -197,6 +218,12 @@ class AlgorithmConfiguration(ConfigurationBase):
         # Components for "QPE: QHAT flexible"; `None` yields default options
         self.ancilla_prep = None
         self.qft_inv = None
+        # "QPE: QHAT flexible" only: how each U^(2^j) is controlled, "controlled" (default) or
+        # "sign" (sign-controlled square root; symmetric Trotter with an even step count only)
+        self.controlled_power_method = None
+        # "controlled time evolution" only: one 0 or 1 per control qubit, e.g. [1, 0, 1]; `None`
+        # means a single control on |1>
+        self.control_values = None
     def _generate_TOML_table(self):
         table = tomlkit.table()
         table["method"] = self.method
@@ -205,6 +232,8 @@ class AlgorithmConfiguration(ConfigurationBase):
         self.save_if_present(table, "energy_error")
         self.save_if_present(table, "ancilla_prep")
         self.save_if_present(table, "qft_inv")
+        self.save_if_present(table, "controlled_power_method")
+        self.save_if_present(table, "control_values")
         return table
 
 # -------------------------------------------------------------------------------------------------
@@ -218,6 +247,11 @@ class AnalysisConfiguration(ConfigurationBase):
         # Do resource estimation (e.g., qubit and gate counts)
         # Can be a string ('pyliqtr', 'qualtran', 'cirq') or list (['pyliqtr', 'qualtran'])
         self.resource_estimator = None
+        # Precision for converting rotations to T gates; set at most one (see convert_rotations)
+        # -- rotation_gate_precision: for each rotation (default 1e-10)
+        # -- algorithm_precision: total, divided by the number of rotations
+        self.rotation_gate_precision = None
+        self.algorithm_precision = None
         # Write unitary matrix of full algorithm to a file
         self.algorithm_matrix_output_file = None
         # Do numerical simulation with the provided starting state(s)
@@ -340,6 +374,8 @@ class AnalysisConfiguration(ConfigurationBase):
     def _generate_TOML_table(self):
         table = tomlkit.table()
         self.save_if_present(table, "resource_estimator")
+        self.save_if_present(table, "rotation_gate_precision")
+        self.save_if_present(table, "algorithm_precision")
         self.save_if_present(table, "algorithm_matrix_output_file")
         self.save_if_present(table, "numerical_simulation_inputs")
         self.save_if_present(table, "matrix_memory_threshold_gb")

@@ -158,7 +158,10 @@ def analyze_algorithm(
     # TODO: Would it be useful to analyze in terms of a different basis (e.g., Toffoli gates)?
     if config_analysis.resource_estimator is not None:
         logger.info(f"Performing resource estimation using {config_analysis.resource_estimator}.")
-        results["resource_estimates"] = estimate_resources(config_analysis.resource_estimator, algorithm)
+        results["resource_estimates"] = estimate_resources(
+            config_analysis.resource_estimator, algorithm,
+            rotation_gate_precision=config_analysis.rotation_gate_precision,
+            algorithm_precision=config_analysis.algorithm_precision)
         logger.verbose("Resource estimation complete")
 
     # Analysis Category : error analysis  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _

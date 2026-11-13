@@ -16,7 +16,7 @@ from qhat.analysis.resource_estimation import estimate_resources
 # Mock Resource Estimation Functions
 # =============================================================================
 
-def mock_pyliqtr_resources(algorithm):
+def mock_pyliqtr_resources(algorithm, *args):
     """Mock pyLIQTR resource estimation."""
     return {
         "Clifford_count": 100,
@@ -25,7 +25,7 @@ def mock_pyliqtr_resources(algorithm):
     }
 
 
-def mock_qualtran_resources(algorithm):
+def mock_qualtran_resources(algorithm, *args):
     """Mock Qualtran resource estimation."""
     return {
         "Clifford_count": 105,
@@ -34,7 +34,7 @@ def mock_qualtran_resources(algorithm):
     }
 
 
-def mock_cirq_resources(algorithm):
+def mock_cirq_resources(algorithm, *args):
     """Mock Cirq resource estimation (not implemented yet)."""
     raise NotImplementedError
 

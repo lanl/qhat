@@ -299,4 +299,9 @@ class TestConfigurationAndResources:
         algorithm = build_algorithm(make_config(num_phase_qubits=3), trotter)
         resources = estimate_resources(estimator, algorithm)[estimator.lower()]
         assert resources["qubit_count"] == 3 + 2
-        assert resources["T_count"] > 0
+        if estimator == "qualtran":
+            # Controlled Pauli terms cost rotations and Cliffords only, and the Qualtran estimator
+            # doesn't report rotations yet, so its T count is 0.
+            assert resources["Clifford_count"] > 0
+        else:
+            assert resources["T_count"] > 0

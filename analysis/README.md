@@ -261,6 +261,13 @@ However, this section is still under development and currently has very limited 
   - `algorithm.ancilla_prep`: initial state of the phase register; defaults to "rectangular" (a
     Hadamard on each phase qubit, yielding "textbook" phase estimation);
   - `algorithm.qft_inv`: inverse quantum Fourier transform; defaults to "textbook".
+  - `algorithm.controlled_power_method`: how each U^(2^j) is controlled by its phase qubit.
+    "controlled" (default) applies controlled U^(2^j). "sign" applies V^† when the phase qubit is
+    |0> and V when it is |1>, with V^2 = U^(2^j). The phase register reads out the same
+    distribution, at about a quarter of the rotations, with no T gates or ancillas. "sign" needs
+    the flattened Trotterization with a symmetric `trotter_order` (e.g. "second order" or "fourth
+    order", not "first order" or "third order") and an even number of Trotter steps; otherwise
+    it raises an error. It can't be combined with `controlled_rotation_method = "ancilla"`.
 - Qubitized Phase Estimation: Setting `algorithm.method` to "QPE: pyliqtr qubitized" will embed the
   unitary encoding of the Hamiltonian into a phase estimation algorithm that uses pyLIQTR's
   qubitized phase estimation.  This uses only a single ancilla qubit for the phase, with multiple
@@ -307,6 +314,12 @@ discussed below.
 - **pyLIQTR Resource Estimation**: Setting `analysis.resource_estimator` to "pyLIQTR" will use the
   resource estimation capability from pyLIQTR, which is in turn based on the resource estimation
   capability from Qualtran.
+- **Rotations**: Both estimators count every rotation as one rotation, total them, and convert the
+  total to T and Clifford gates once at the end, using pyLIQTR's fit (about 3.02 log2(1/precision)
+  T gates per rotation). The results hold `rotation_count`, the unconverted `T_count_unconverted`
+  and `Clifford_count_unconverted`, and the converted `T_count` and `Clifford_count`. Set
+  `analysis.rotation_gate_precision` (per rotation; default 1e-10) or
+  `analysis.algorithm_precision` (total, divided by the number of rotations), not both.
 - **Cirq Resource Estimation**: Setting `analysis.resource_estimator` to "Cirq" is available but
   deprecated and may not work correctly.
 

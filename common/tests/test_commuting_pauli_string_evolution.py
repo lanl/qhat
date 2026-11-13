@@ -560,3 +560,137 @@ class TestProperties:
             time=1.0
         )
         assert cpse.num_qubits == 4
+
+
+# ==================================================================================
+# Test: adjoint flag and powers
+# ==================================================================================
+
+class TestAdjointAndPower:
+    """Terms share qubits and commute (XX, YY, ZZ), with unequal coefficients."""
+
+    TERMS = (("XXI", 0.5), ("YYI", 0.3), ("ZZI", -0.2), ("IXX", 0.4))
+
+    def make(self, terms=None, time=0.83):
+        # IXX does not commute with YYI; keep only mutually commuting terms
+        return CommutingPauliStringEvolution(terms or self.TERMS[:3], time)
+
+    def test_adjoint_is_conjugate_transpose(self):
+        cpse = self.make()
+        expected = cpse.tensor_contract().conj().T
+        adj = cpse.adjoint()
+        assert adj.is_adjoint
+        np.testing.assert_allclose(adj.tensor_contract(), expected, atol=1e-10)
+        np.testing.assert_allclose(adj.decompose_bloq().tensor_contract(), expected, atol=1e-10)
+
+    def test_decomposition_is_reversed_with_adjointed_terms(self):
+        adj = self.make().adjoint()
+        pieces = [b.bloq for b, _, _ in adj.decompose_bloq().iter_bloqnections()]
+        assert [p.pauli_string for p in pieces] == ["ZZI", "YYI", "XXI"]
+        assert all(p.is_adjoint for p in pieces)
+
+    def test_double_adjoint_equals_original_with_same_hash(self):
+        cpse = self.make()
+        assert cpse.adjoint() != cpse
+        assert cpse.adjoint().adjoint() == cpse
+        assert hash(cpse.adjoint().adjoint()) == hash(cpse)
+
+    def test_t_complexity_unchanged(self):
+        cpse = self.make()
+        assert t_complexity(cpse.adjoint()) == t_complexity(cpse)
+
+    @pytest.mark.parametrize("k", [1, 2, 4])
+    def test_power(self, k):
+        cpse = self.make()
+        np.testing.assert_allclose(
+            (cpse ** k).tensor_contract(),
+            np.linalg.matrix_power(cpse.tensor_contract(), k), atol=1e-10)
+        assert (cpse ** -k) == (cpse ** k).adjoint()
+        np.testing.assert_allclose(
+            (cpse ** -k).decompose_bloq().tensor_contract(),
+            np.linalg.matrix_power(cpse.tensor_contract(), k).conj().T, atol=1e-10)
+
+    def test_power_of_adjoint_keeps_flag(self):
+        cpse = self.make()
+        assert cpse.adjoint() ** 3 == (cpse ** 3).adjoint()
+
+    @pytest.mark.parametrize("power", [0, 1.5, 2.0, True])
+    def test_invalid_power_raises(self, power):
+        with pytest.raises(ValueError):
+            self.make() ** power
+
+    def test_str_and_repr(self):
+        cpse = self.make()
+        assert "†" in str(cpse.adjoint()) and "†" not in str(cpse)
+        assert "is_adjoint=True" in repr(cpse.adjoint())
+
+
+class TestOwnControlledBloq:
+    """`.controlled()` returns our bloq, which passes its controls to every term."""
+
+    TERMS = (("XZI", 0.4), ("ZXI", -0.7), ("IIY", 0.3), ("III", 0.9))  # commuting, with I and III
+
+    def expected(self, ctrl_value, is_adjoint, time=0.83):
+        forward = np.eye(8, dtype=complex)
+        for pauli_string, coefficient in self.TERMS:
+            forward = expm(-1j * coefficient * time * pauli_string_to_matrix(pauli_string)) @ forward
+        unitary = forward.conj().T if is_adjoint else forward
+        result = np.eye(16, dtype=complex)
+        result[8 * ctrl_value:8 * ctrl_value + 8, 8 * ctrl_value:8 * ctrl_value + 8] = unitary
+        return result
+
+    @pytest.mark.parametrize("ctrl_value", [1, 0])
+    @pytest.mark.parametrize("is_adjoint", [False, True])
+    def test_decomposition_equals_block_matrix(self, ctrl_value, is_adjoint):
+        from qualtran import CtrlSpec
+        cpse = CommutingPauliStringEvolution(self.TERMS, 0.83, is_adjoint=is_adjoint).controlled(
+            CtrlSpec(cvs=ctrl_value))
+        expected = self.expected(ctrl_value, is_adjoint)
+        np.testing.assert_allclose(cpse.decompose_bloq().tensor_contract(), expected, atol=1e-10)
+        np.testing.assert_allclose(cpse.tensor_contract(), expected, atol=1e-10)
+
+    def test_terms_get_the_controls(self):
+        from qualtran import CtrlSpec
+        cpse = CommutingPauliStringEvolution(self.TERMS, 0.83).controlled(CtrlSpec(cvs=0))
+        assert cpse.ctrl_values == (0,)
+        terms = [binst.bloq for binst in cpse.decompose_bloq().bloq_instances]
+        assert len(terms) == 4
+        assert all(isinstance(t, PauliStringEvolution) and t.ctrl_values == (0,) for t in terms)
+
+    def test_controlled_and_adjoint_commute(self):
+        cpse = CommutingPauliStringEvolution(self.TERMS, 0.83)
+        assert cpse.controlled().adjoint() == cpse.adjoint().controlled()
+        assert type(cpse.controlled().adjoint()) is CommutingPauliStringEvolution
+        assert (cpse.controlled() ** -2) == (cpse ** 2).adjoint().controlled()
+
+    def test_t_complexity_is_sum_of_controlled_terms(self):
+        # XZI: 2 + 2 + 2 = 6 Cliffords; ZXI: 6; IIY: 4 + 2 = 6; 2 rotations each; III: 1 rotation
+        tc = t_complexity(CommutingPauliStringEvolution(self.TERMS, 0.83).controlled())
+        assert (tc.t, tc.clifford, tc.rotations) == (0, 18, 7)
+
+    def test_unsupported_ctrl_spec_raises(self):
+        from qualtran import CtrlSpec
+        with pytest.raises(ValueError, match="single-qubit controls"):
+            CommutingPauliStringEvolution(self.TERMS, 0.83).controlled(CtrlSpec(cvs=(1, 1)))
+        with pytest.raises(ValueError, match="multi_control_method"):
+            CommutingPauliStringEvolution(self.TERMS, 0.83, multi_control_method="toffoli")
+
+
+class TestCallGraph:
+    """`build_call_graph` lists exactly the decomposition's term evolutions (plan T7)."""
+
+    TERMS = (("XZI", 0.3), ("ZXI", -0.4), ("III", 0.2), ("IIZ", 0.5))
+
+    @pytest.mark.parametrize("adjoint", [False, True])
+    @pytest.mark.parametrize("ctrls", [((), "ancilla"), ((0,), "ancilla"), ((1, 0), "ancilla"),
+                                       ((1, 0), "direct"), ((0, 1, 1), "ancilla")])
+    def test_equals_decomposition_call_graph(self, ctrls, adjoint):
+        ctrl_values, method = ctrls
+        cpse = CommutingPauliStringEvolution(self.TERMS, 0.7, hbar=0.9, is_adjoint=adjoint,
+                                             ctrl_values=ctrl_values, multi_control_method=method)
+        assert dict(cpse.build_call_graph(None)) == dict(
+            cpse.decompose_bloq().build_call_graph(None))
+
+    def test_repeated_term_is_counted_twice(self):
+        cpse = CommutingPauliStringEvolution((("XZ", 0.3), ("ZX", 0.1), ("XZ", 0.3)), 0.7)
+        assert dict(cpse.build_call_graph(None))[PauliStringEvolution("XZ", 0.3, 0.7)] == 2

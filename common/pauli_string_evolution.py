@@ -11,23 +11,51 @@ where:
     - ℏ is the reduced Planck constant (defaults to 1 in natural units)
 """
 
+import numbers
+from collections import Counter
 from functools import cached_property
-from typing import TYPE_CHECKING, Dict, Tuple
+from typing import TYPE_CHECKING, Dict, Optional, Set, Tuple
 
 import attrs
 import numpy as np
 from scipy.linalg import expm
 
 from numpy.typing import NDArray
-from qualtran import Bloq, BloqBuilder, QBit, Register, Side, Signature, Soquet, SoquetT
+from qualtran import Bloq, BloqBuilder, CtrlSpec, QBit, Register, Side, Signature, Soquet, SoquetT
 from qualtran.bloqs.basic_gates import CNOT, GlobalPhase, Hadamard, Rz, SGate
-from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
+from qualtran.cirq_interop.t_complexity_protocol import TComplexity
+from qualtran.resource_counting import QubitCount
 
+from qhat.common import controls
 from qhat.common.hermiticity import require_real_scalar
 from qhat.common.pauli_utils import validate_pauli_string
 
 if TYPE_CHECKING:
+    import cirq
     import quimb.tensor as qtn
+    from qualtran import AddControlledT
+    from qualtran.cirq_interop import CirqQuregT
+    from qualtran.resource_counting import BloqCountT, CostKey, SympySymbolAllocator
+
+
+@attrs.frozen
+class CirqSafeSGate(SGate):
+    """Qualtran's `SGate`, except that S^dagger converts to Cirq as `cirq.S**-1`.
+
+    Qualtran 0.4's `SGate(is_adjoint=True).as_cirq_op` returns plain `cirq.S`, so anything that
+    goes through Cirq (e.g. pyLIQTR, `BloqAsCirqGate`) would see S instead of S^dagger (notes F19).
+    Everything else (tensor, 1 Clifford in `t_complexity` and `QECGatesCost`) is `SGate`'s.
+    Example: `CirqSafeSGate(is_adjoint=True)` is diag(1, -i) in Qualtran and in Cirq.
+    """
+
+    def as_cirq_op(
+        self, qubit_manager: 'cirq.QubitManager', q: 'CirqQuregT'
+    ) -> Tuple['cirq.Operation', Dict[str, 'CirqQuregT']]:
+        import cirq
+
+        (q,) = q
+        gate = cirq.S**-1 if self.is_adjoint else cirq.S
+        return gate(q), {'q': np.array([q])}
 
 
 @attrs.frozen
@@ -43,6 +71,21 @@ class PauliStringEvolution(Bloq):
         coefficient: Scalar coefficient multiplying the Pauli string in the Hamiltonian.
         time: Evolution time parameter.
         hbar: Reduced Planck constant (default 1.0 for natural units).
+        is_adjoint: If True, the operator is U^dagger = exp(+i * coefficient * PauliString * time
+            / hbar). `adjoint()` flips it; `time` is left as given (a negative `time` is a
+            different object that happens to be analytically equal).
+        ctrl_values: One entry per control qubit, 1 (act on |1>) or 0 (act on |0>); empty for
+            no control. `.controlled()` prepends one, e.g. `.controlled(CtrlSpec(cvs=0))` gives
+            `(0,)`. The controls are the `ctrl` register, before `q`.
+        multi_control_method: How 2 or more controls are built, "ancilla" (default) or "direct";
+            see `common/controls.py`. Ignored with 0 or 1 controls.
+        controlled_rotation_method: How the rotation is controlled, "textbook" (default; 2
+            rotations) or "ancilla" (1 rotation + 4 T through an AND ancilla); see
+            `common/controls.py`. Ignored without controls.
+        omit_control_phase: Set by a parent bloq with the "ancilla" rotation method. If True, the
+            bloq leaves out the phase exp(-i * coefficient * time / hbar) (conjugated for the
+            adjoint) on the active control, so it is C-U times exp(+i * coefficient * time / hbar)
+            there; the parent applies the sum of these phases once. Needs controls and "ancilla".
 
     Example:
         >>> pse = PauliStringEvolution(pauli_string="XYZ", coefficient=0.5, time=1.0)
@@ -55,19 +98,34 @@ class PauliStringEvolution(Bloq):
     coefficient: float
     time: float
     hbar: float = 1.0
+    is_adjoint: bool = False
+    ctrl_values: Tuple[int, ...] = ()
+    multi_control_method: str = controls.DEFAULT_MULTI_CONTROL_METHOD
+    controlled_rotation_method: str = controls.DEFAULT_CONTROLLED_ROTATION_METHOD
+    omit_control_phase: bool = False
 
     def __attrs_post_init__(self):
-        """Validate the Pauli string, and store coefficient, time, and hbar as floats."""
+        """Validate the Pauli string and controls, and store coefficient, time, and hbar as floats."""
         validate_pauli_string(self.pauli_string)
         for name in ("coefficient", "time", "hbar"):
             value = require_real_scalar(f"PauliStringEvolution {name}", getattr(self, name))
             object.__setattr__(self, name, value)
+        object.__setattr__(self, "ctrl_values",
+                           controls.validate_ctrl_values("PauliStringEvolution", self.ctrl_values))
+        controls.validate_multi_control_method("PauliStringEvolution", self.multi_control_method)
+        controls.validate_controlled_rotation_method(
+            "PauliStringEvolution", self.controlled_rotation_method, self.ctrl_values,
+            self.multi_control_method)
+        controls.validate_omit_control_phase(
+            "PauliStringEvolution", self.omit_control_phase, self.ctrl_values,
+            self.controlled_rotation_method)
 
     @cached_property
     def signature(self) -> Signature:
-        """Return the signature with a register of qubits matching the Pauli string length."""
+        """The `ctrl` register (if controlled), then one qubit per Pauli string position."""
         # Use shape=(n,) to create an array of n individual qubits, not a single n-bit register
-        return Signature([Register('q', QBit(), shape=(self.num_qubits,), side=Side.THRU)])
+        return Signature(controls.ctrl_registers(self.ctrl_values)
+                         + [Register('q', QBit(), shape=(self.num_qubits,), side=Side.THRU)])
 
     @cached_property
     def num_qubits(self) -> int:
@@ -95,11 +153,15 @@ class PauliStringEvolution(Bloq):
         # Build the Pauli string matrix
         P = self._get_pauli_matrix()
 
-        # Compute the evolution operator: exp(-i * coefficient * P * time / hbar)
+        # Compute the evolution operator: exp(-i * coefficient * P * time / hbar), conjugate
+        # transposed for the adjoint
         angle = -1j * self.coefficient * self.time / self.hbar
         U = expm(angle * P)
 
-        return U
+        U = U.conj().T if self.is_adjoint else U
+        if self.omit_control_phase:
+            U = U * np.exp(1j * self.control_phase)
+        return controls.controlled_matrix(U, self.ctrl_values)
 
     def add_my_tensors(
         self,
@@ -115,14 +177,17 @@ class PauliStringEvolution(Bloq):
         # Get the unitary matrix for this operation
         unitary = self._compute_unitary_matrix()
 
-        # With shape=(n,), incoming['q'] is an array of Soquets
-        import_idx = [incoming['q'][i] for i in range(self.num_qubits)]
-        export_idx = [outgoing['q'][i] for i in range(self.num_qubits)]
+        # With shape=(n,), incoming['q'] is an array of Soquets; controls come first
+        num_ctrls = len(self.ctrl_values)
+        import_idx = ([incoming['ctrl'][i] for i in range(num_ctrls)]
+                      + [incoming['q'][i] for i in range(self.num_qubits)])
+        export_idx = ([outgoing['ctrl'][i] for i in range(num_ctrls)]
+                      + [outgoing['q'][i] for i in range(self.num_qubits)])
 
         # Add the unitary as a tensor to the network
         tn.add(
             qtn.Tensor(
-                data=unitary.reshape([2] * (2 * self.num_qubits)),
+                data=unitary.reshape([2] * (2 * (num_ctrls + self.num_qubits))),
                 inds=tuple(export_idx + import_idx),
                 tags=[self.pretty_name(), tag],
             )
@@ -135,53 +200,232 @@ class PauliStringEvolution(Bloq):
 
     @cached_property
     def _rotation_angle(self) -> float:
-        """Angle theta of Rz(theta) = exp(-i theta Z / 2) that implements the parity rotation."""
-        return 2.0 * self.coefficient * self.time / self.hbar
+        """Angle theta of Rz(theta) = exp(-i theta Z / 2) that implements the parity rotation.
 
-    def build_composite_bloq(self, bb: BloqBuilder, q: NDArray[Soquet]) -> Dict[str, SoquetT]:
-        """Decompose exactly (global phase included) into basis changes, CNOTs and one Rz.
+        The adjoint negates it; the basis changes and the CNOT chain are their own inverse around
+        the rotation, so they are unchanged.
+        """
+        sign = -1.0 if self.is_adjoint else 1.0
+        return sign * 2.0 * self.coefficient * self.time / self.hbar
+
+    @cached_property
+    def control_phase(self) -> float:
+        """Angle phi of the phase exp(-i phi) that the "ancilla" rotation method leaves on the
+        active control: theta/2, for any Pauli string (for an all-identity string it is the
+        whole evolution). A parent adds these up and applies them once."""
+        return self._rotation_angle / 2
+
+    @cached_property
+    def _uses_rotation_ancilla(self) -> bool:
+        return controls.uses_rotation_ancilla(self.ctrl_values, self.controlled_rotation_method)
+
+    def build_composite_bloq(
+        self, bb: BloqBuilder, q: NDArray[Soquet], ctrl: Optional[NDArray[Soquet]] = None
+    ) -> Dict[str, SoquetT]:
+        """Decompose exactly (global phase included) into basis changes, CNOTs and Rz rotations.
 
         Only the non-identity qubits are touched. Each is rotated so that its Pauli becomes Z
-        (X: H; Y: S^dagger then H), a CNOT chain collects the parity on the last of them, Rz rotates
-        by the parity, and the chain and basis changes are undone. An all-identity string is
-        exp(-i * coefficient * time / hbar) times the identity, i.e. a `GlobalPhase`.
+        (X: H; Y: S^dagger then H, using `CirqSafeSGate` so the S^dagger is right in Cirq too), a
+        CNOT chain collects the parity on the last of them, Rz rotates by the parity, and the chain
+        and basis changes are undone. An all-identity string is exp(-i * coefficient * time / hbar)
+        times the identity, i.e. a `GlobalPhase`.
+
+        Under control only the rotation is controlled (see `_add_rotation`); the basis changes and
+        the CNOT chain cancel when the rotation is skipped. With 2 or more controls and the
+        "ancilla" method, the controls are first ANDed into one ancilla, which controls this bloq.
+        With the "ancilla" rotation method, the phase on the control comes last (or not at all,
+        if `omit_control_phase`).
         """
+        if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
+            return controls.add_with_and_ancilla(bb, self, ctrl=ctrl, q=q)
         q = np.array(q)
         active = self._active_qubits
         if not active:
-            bb.add(GlobalPhase(np.exp(-1j * self.coefficient * self.time / self.hbar)))
-            return {'q': q}
+            q, ctrl = self._add_identity_phase(bb, q, ctrl)
+            return self._outputs(q, ctrl)
 
         for i in active:
             if self.pauli_string[i] == 'Y':
-                q[i] = bb.add(SGate(is_adjoint=True), q=q[i])
+                q[i] = bb.add(CirqSafeSGate(is_adjoint=True), q=q[i])
             if self.pauli_string[i] in 'XY':
                 q[i] = bb.add(Hadamard(), q=q[i])
         for i, j in zip(active[:-1], active[1:]):
             q[i], q[j] = bb.add(CNOT(), ctrl=q[i], target=q[j])
-        q[active[-1]] = bb.add(Rz(self._rotation_angle), q=q[active[-1]])
+        q, ctrl = self._add_rotation(bb, q, ctrl)
         for i, j in reversed(list(zip(active[:-1], active[1:]))):
             q[i], q[j] = bb.add(CNOT(), ctrl=q[i], target=q[j])
         for i in active:
             if self.pauli_string[i] in 'XY':
                 q[i] = bb.add(Hadamard(), q=q[i])
             if self.pauli_string[i] == 'Y':
-                q[i] = bb.add(SGate(), q=q[i])
-        return {'q': q}
+                q[i] = bb.add(CirqSafeSGate(), q=q[i])
+        if self._uses_rotation_ancilla and not self.omit_control_phase:
+            ctrl, _ = controls.add_controlled_phase(bb, self.control_phase, ctrl, self.ctrl_values)
+            ctrl = np.array(ctrl)
+        return self._outputs(q, ctrl)
+
+    def _outputs(self, q: NDArray[Soquet], ctrl: Optional[NDArray[Soquet]]) -> Dict[str, SoquetT]:
+        return {'q': q} if ctrl is None else {'ctrl': ctrl, 'q': q}
+
+    def _add_rotation(self, bb: BloqBuilder, q: NDArray[Soquet], ctrl: Optional[NDArray[Soquet]]):
+        """Add Rz(theta) on the parity qubit (the last active one), controlled on `ctrl` if any.
+
+        With one control the rotation is Rz(theta/2) . CNOT . Rz(-+theta/2) . CNOT on the target (2
+        rotations, 2 CNOTs, exact): if the control is |1> the CNOTs flip the second rotation's
+        sign, so the two add up to Rz(theta); if |0> they cancel. For a control on |0> the second
+        angle is +theta/2 instead, which swaps the two cases at no extra cost. With k controls
+        ("direct") it is Rz(theta/2) and Rz(-theta/2) around two Toffoli-like gates, borrowing
+        k-2 of the other qubits, idle during the rotation, as dirty ancillas; with too few of them,
+        the textbook idea over all 2^k sign patterns (`controls.add_direct_controlled_rz`).
+        With the "ancilla" rotation method it is `controls.add_and_ancilla_rz`, which leaves the
+        phase exp(-i theta/2) on the control to `build_composite_bloq` or a parent.
+
+        Returns the system and control soquets.
+        """
+        theta = self._rotation_angle
+        parity = self._active_qubits[-1]
+        if ctrl is None:
+            q[parity] = bb.add(Rz(theta), q=q[parity])
+            return q, None
+        if self._uses_rotation_ancilla:
+            q[parity], ctrl_soq = controls.add_and_ancilla_rz(
+                bb, theta, q[parity], ctrl[0], self.ctrl_values[0])
+            return q, np.array([ctrl_soq])
+        idle = [i for i in range(self.num_qubits) if i != parity]
+        q[parity], ctrl, dirty = controls.add_direct_controlled_rz(
+            bb, theta, q[parity], ctrl, self.ctrl_values, [q[i] for i in idle])
+        for i, soq in zip(idle, dirty):
+            q[i] = soq
+        return q, np.array(ctrl)
+
+    def _add_identity_phase(self, bb: BloqBuilder, q: NDArray[Soquet],
+                            ctrl: Optional[NDArray[Soquet]]):
+        """Add exp(-i phi), phi = theta/2, the evolution of an all-identity string.
+
+        Uncontrolled it is a `GlobalPhase`. Under one control it is a phase on the control qubit:
+        diag(1, e^{-i phi}) = e^{-i phi/2} Rz(-phi) for a control on |1>, and
+        diag(e^{-i phi}, 1) = e^{-i phi/2} Rz(phi) for a control on |0>. With k controls
+        ("direct") see `controls.add_controlled_phase`, which may borrow the (idle) system qubits.
+        With `omit_control_phase` it is nothing: the whole evolution is the phase a parent applies.
+
+        Returns the system and control soquets.
+        """
+        phi = self.control_phase
+        if ctrl is None:
+            bb.add(GlobalPhase(np.exp(-1j * phi)))
+            return q, None
+        if self.omit_control_phase:
+            return q, ctrl
+        ctrl, dirty = controls.add_controlled_phase(bb, phi, ctrl, self.ctrl_values, list(q))
+        return np.array(dirty), np.array(ctrl)
+
+    def build_call_graph(self, ssa: 'SympySymbolAllocator') -> Set['BloqCountT']:
+        """The decomposition's gates and their counts, without building the decomposition.
+
+        Qualtran's default builds the decomposition, which is slow when a Hamiltonian has
+        thousands of distinct terms. The gates are exactly those `build_composite_bloq` adds,
+        angles included. Example: `IXIZI` is 2 H, 2 CNOT and 1 Rz.
+        """
+        if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
+            return controls.and_ancilla_call_graph(self)
+        active = self._active_qubits
+        counts = Counter()
+        if not active:
+            if not self.omit_control_phase:
+                counts += controls.controlled_phase_call_graph(
+                    self.control_phase, self.ctrl_values, self.num_qubits)
+            return set(counts.items())
+        for i in active:
+            if self.pauli_string[i] == 'Y':
+                counts[CirqSafeSGate(is_adjoint=True)] += 1
+                counts[CirqSafeSGate()] += 1
+            if self.pauli_string[i] in 'XY':
+                counts[Hadamard()] += 2
+        if len(active) > 1:
+            counts[CNOT()] += 2 * (len(active) - 1)
+        if self._uses_rotation_ancilla:
+            counts += controls.and_ancilla_rz_call_graph(self._rotation_angle, self.ctrl_values[0])
+            if not self.omit_control_phase:
+                counts += controls.controlled_phase_call_graph(self.control_phase, self.ctrl_values)
+        else:
+            counts += controls.direct_controlled_rz_call_graph(
+                self._rotation_angle, self.ctrl_values, self.num_qubits - 1)
+        return set(counts.items())
 
     def _t_complexity_(self) -> TComplexity:
-        """T-complexity of the decomposition, counted by hand (no decomposition needed)."""
+        """T-complexity of the decomposition, counted by hand (no decomposition needed).
+
+        Every Rz counts as 1 rotation, whatever its angle (plan D14), so the count doesn't depend
+        on the coefficient or time. Uncontrolled: the basis changes and CNOT chain (Cliffords) and
+        1 rotation; an all-identity string is free. With one control: the same with the rotation
+        replaced by 2 rotations and 2 CNOTs. With k >= 2 controls ("direct"): 2 rotations and the
+        Toffoli-like gates of `controls.toffoli_controlled_rz_t_complexity` if the string has k-2
+        other qubits to borrow, else 2^k rotations and 2^k CNOTs; an all-identity string follows
+        `controls.controlled_phase_t_complexity`. With the "ancilla" method: the AND and its uncompute
+        plus the singly-controlled count. With the "ancilla" rotation method, the rotation is the
+        `And` pair and 1 rotation, plus 1 rotation for the phase on the control unless
+        `omit_control_phase` (which also makes an all-identity string free).
+        """
+        if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
+            return controls.and_ancilla_t_complexity(self)
         active = self._active_qubits
         if not active:
-            return TComplexity()
+            return (TComplexity() if self.omit_control_phase else
+                    controls.controlled_phase_t_complexity(self.ctrl_values, self.num_qubits))
+        phase = (TComplexity() if self.omit_control_phase
+                 else controls.controlled_phase_t_complexity(self.ctrl_values))
         num_basis = sum(2 if self.pauli_string[i] == 'X' else 4
                         for i in active if self.pauli_string[i] != 'Z')
         num_cnots = 2 * (len(active) - 1)
-        return TComplexity(clifford=num_basis + num_cnots) + t_complexity(Rz(self._rotation_angle))
+        if self._uses_rotation_ancilla:
+            rotation = controls.and_ancilla_rz_t_complexity(self.ctrl_values[0]) + phase
+        else:
+            rotation = controls.direct_controlled_rz_t_complexity(
+                self.ctrl_values, self.num_qubits - 1)
+        return TComplexity(clifford=num_basis + num_cnots) + rotation
+
+    def my_static_costs(self, cost_key: 'CostKey'):
+        """`QubitCount` without decomposing: qubits + controls + AND ancillas (if any), + 1 for the
+        "ancilla" rotation method (unless the string is all identities)."""
+        if isinstance(cost_key, QubitCount):
+            return controls.peak_qubits(
+                self.num_qubits, self.ctrl_values, self.multi_control_method,
+                controls.num_rotation_ancillas(self.ctrl_values, self.controlled_rotation_method,
+                                               bool(self._active_qubits)))
+        return NotImplemented
+
+    def get_ctrl_system(
+        self, ctrl_spec: Optional[CtrlSpec] = None
+    ) -> Tuple['PauliStringEvolution', 'AddControlledT']:
+        """Controlled version: the same bloq with the new control value prepended to `ctrl_values`.
+
+        Only single-qubit controls on |1> or |0> are supported; others raise ValueError.
+        """
+        return controls.get_ctrl_system(self, ctrl_spec)
+
+    def adjoint(self) -> 'PauliStringEvolution':
+        """Return U^dagger as a PauliStringEvolution (flips `is_adjoint`; `time` is unchanged)."""
+        return attrs.evolve(self, is_adjoint=not self.is_adjoint)
+
+    def __pow__(self, power: int) -> 'PauliStringEvolution':
+        """U**k is the same evolution for k times the time; U**(-k) is (U**k).adjoint().
+
+        Raises ValueError for 0 and for non-integer powers.
+        """
+        if isinstance(power, bool) or not isinstance(power, numbers.Integral) or power == 0:
+            raise ValueError(f"Power must be a non-zero integer, got {power}")
+        return attrs.evolve(
+            self, time=self.time * abs(int(power)), is_adjoint=self.is_adjoint != (power < 0))
 
     def __str__(self) -> str:
-        return f"exp(-i * {self.coefficient} * {self.pauli_string} * {self.time} / {self.hbar})"
+        text = f"exp(-i * {self.coefficient} * {self.pauli_string} * {self.time} / {self.hbar})"
+        return controls.ctrl_str(self.ctrl_values, f"[{text}]†" if self.is_adjoint else text)
 
     def __repr__(self) -> str:
+        adjoint = ", is_adjoint=True" if self.is_adjoint else ""
+        ctrl = controls.ctrl_repr(self.ctrl_values, self.multi_control_method,
+                                  self.controlled_rotation_method)
+        omit = ", omit_control_phase=True" if self.omit_control_phase else ""
         return (f"PauliStringEvolution(pauli_string='{self.pauli_string}', "
-                f"coefficient={self.coefficient}, time={self.time}, hbar={self.hbar})")
+                f"coefficient={self.coefficient}, time={self.time}, hbar={self.hbar}{adjoint}"
+                f"{ctrl}{omit})")
