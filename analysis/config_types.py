@@ -66,6 +66,7 @@ class HamiltonianConfiguration(ConfigurationBase):
         self.upper_bound = float('inf')
         self.exact_energy_lower_bound = False
         self.exact_energy_upper_bound = False
+        self.integral_convention = None
         self.fermion_to_qubit_transform = None
         self.boson_to_qubit_transform = None
         self.max_bosons_per_state = None
@@ -75,6 +76,7 @@ class HamiltonianConfiguration(ConfigurationBase):
             assert self.source is None
     def load_second_quantization(self,
                                  filename,
+                                 integral_convention="openfermion",
                                  fermion_to_qubit_transform="JW",
                                  boson_to_qubit_transform="binary",
                                  max_bosons_per_state=None):
@@ -91,6 +93,7 @@ class HamiltonianConfiguration(ConfigurationBase):
         else:
             raise ValueError(f"Unable to determine file format from extension: {filename}. "
                            f"Supported extensions: .h5, .hdf5, .npy, .npz, .fci")
+        self.integral_convention = integral_convention
         self.fermion_to_qubit_transform = fermion_to_qubit_transform
         self.boson_to_qubit_transform = boson_to_qubit_transform
         self.max_bosons_per_state = max_bosons_per_state
