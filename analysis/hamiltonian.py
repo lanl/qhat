@@ -377,6 +377,7 @@ def _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, bs
 def load_hdf5(config_hamiltonian: HamiltonianConfiguration):
     filename = config_hamiltonian.filename
     logger.info(f"Loading second-quantization Hamiltonian from HDF5 file \"{filename}\".")
+    logger.info(f"Ignoring integral_convention field and using default (openfermion).")
     data = h5py.File(filename)
     f0 = 0      # Currently don't support constant terms in HDF5
     f1 = data["1e"]
@@ -414,6 +415,7 @@ def load_numpy(config_hamiltonian: HamiltonianConfiguration):
     filename = config_hamiltonian.filename
     integral = config_hamiltonian.integral_convention
     logger.info(f"Loading second-quantization Hamiltonian from file \"{filename}\".")
+    logger.info(f"Using integral_convention field '{integral}'")
     data = np.load(filename)
     f0 = _get_any_of(data, ["constant", "ecore"], as_scalar=True, default=0.0)
     f1 = _get_any_of(data, ["one_body", "h1e"])
@@ -427,6 +429,7 @@ def load_numpy(config_hamiltonian: HamiltonianConfiguration):
 def load_fci(config_hamiltonian: HamiltonianConfiguration):
     filename = config_hamiltonian.filename
     logger.info(f"Loading second-quantization Hamiltonian from file \"{filename}\".")
+    logger.info(f"Ignoring integral_convention field and using chemist_spatial.")
     data = tools.fcidump.read(filename)
 
     n = data['NORB']

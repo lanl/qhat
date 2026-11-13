@@ -135,8 +135,8 @@ different, your own format may not currently be readable without help from the d
 appropriate reader.  Trying to load more than one Hamiltonian will generate an error.  We currently
 support the following inputs source:
 
-- **Second-quantization Hamiltonians**: Second-quantized Hamiltonians can be loaded from HDF5 or
-  NumPy files by calling **`hamiltonian.load_second_quantization(filename)`**. The file format is
+- **Second-quantization Hamiltonians**: Second-quantized Hamiltonians can be loaded from HDF5, NumPy, or
+  FCIDUMP files by calling **`hamiltonian.load_second_quantization(filename)`**. The file format is
   automatically detected based on the file extension:
   - `.h5` or `.hdf5`: HDF5 format (currently supports one-body term "1e" and two-body term "2e";
     constant terms and bosons not yet supported)
@@ -146,10 +146,22 @@ support the following inputs source:
     - "two_body" (required): two-body tensor
     - "bosonic\_scalar" (optional): scalar for bosonic terms
     - "fb\_interaction" (optional): fermion-boson interaction tensor
+  - `.fci`: FCIDUMP format
 
   If "bosonic\_scalar" and "fb\_interaction" are not present, this is a standard fermionic
   second-quantization Hamiltonian. The scripts in the `hamiltonian_generator` directory create
   Hamiltonians in this format, providing only the one-body and two-body tensors.
+
+  For NumPy files, the configuration field `integral_convention` can be used to
+  specify which convention is used by the one-body and two-body tensors.
+  Allowed values are:
+  - "openfermion" (the default):  physicist indexing, spin orbitals
+  - "chemist_spin":  chemist indexing, spin orbitals
+  - "chemist_spatial":  chemist indexing, spatial orbitals
+
+  For other file types, this field is ignored. HDF5 files are assumed to use the
+  "openfermion" convention, while FCIDUMP files by definition use the "chemist_spatial"
+  convention.
 
   This function accepts optional parameters for specifying fermion-to-qubit and boson-to-qubit
   transformations:
