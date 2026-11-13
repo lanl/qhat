@@ -10,6 +10,9 @@ pieces are
 
 See the README file in each directory for component-specific documentation.
 
+Developers: see the [developer's guide](/docs/DEVELOPER_GUIDE.md) for how to write QHAT bloqs, known
+pitfalls, cost-model conventions and testing conventions.
+
 If you need support or have a feature request, the best way to reach out to the team is to open an
 issue in the GitHub repository.
 
