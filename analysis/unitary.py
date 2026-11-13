@@ -26,6 +26,7 @@ from qhat.analysis.ordering import reorder_paulis
 from qhat.analysis.utils import value
 from qhat.common.controls import DEFAULT_CONTROLLED_ROTATION_METHOD, DEFAULT_MULTI_CONTROL_METHOD
 from qhat.common.hermiticity import DEFAULT_RTOL, max_relative_imaginary, require_real_scalar
+from qhat.common.terms.single_pauli_term import SinglePauliTerm
 
 logger = logging.getLogger(__name__)
 
@@ -373,8 +374,21 @@ def encode_ramped_trotter(
         logger.info(f"-- Trotter recommendation: use {method} formula with {Nsteps} steps ({Nsteps0})")
         logger.verbose(f"-- unoptimized ramp count = {Nsteps * ramps_per_step}")
 
-    pauli_strings = hamiltonian.get_all_pauli_strings(return_as='strings')
-    pauli_strings = reorder_paulis(pauli_strings, config_unitary.ordering_method)
+    # Sort Hamiltonian terms
+    hamiltonian_terms = hamiltonian.terms()
+    # TODO: This is a temporary patch.  We need to write a new ordering method that isn't
+    #       hard-coded to Pauli strings, and then implement appropriate operations on terms.
+    if all(isinstance(term, SinglePauliTerm) for term in hamiltonian_terms):
+        # Extract all the terms as {pauli_string: coefficient}
+        pauli_strings = {term.dense_string(): term.coefficient for term in hamiltonian_terms}
+        # Sort terms
+        pauli_strings = reorder_paulis(pauli_strings, config_unitary.ordering_method)
+        # Repack terms back to SinglePauliTerm
+        hamiltonian_terms = [SinglePauliTerm(*term) for term in pauli_strings.items()]
+    else:
+        logger.warning("***TERM ORDERING WARNING***\nNot all Hamiltonian terms are of type "
+                       "SinglePauliTerm.  Unable to sort terms.  Term ordering controls are "
+                       "ignored, and default order from Hamiltonian reader is used.")
 
     # Import the appropriate implementation
     if trotter_impl == 'flattened':
@@ -384,7 +398,7 @@ def encode_ramped_trotter(
         multi_control_method = getattr(config_unitary, 'multi_control_method', None)
         controlled_rotation_method = getattr(config_unitary, 'controlled_rotation_method', None)
         return build_ramped_trotterized_unitary(
-                pauli_strings.items(),
+                hamiltonian_terms,
                 method,
                 tevol_hbar,
                 Nsteps,
@@ -397,7 +411,7 @@ def encode_ramped_trotter(
         from qhat.common.trotter_original import build_ramped_trotterized_unitary
         # Original implementation doesn't support combine_terms or tensor_contraction_method parameters
         return build_ramped_trotterized_unitary(
-                pauli_strings.items(),
+                ((term.dense_string(), term.coefficient) for term in hamiltonian_terms),
                 method,
                 tevol_hbar,
                 Nsteps)

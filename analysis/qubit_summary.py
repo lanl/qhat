@@ -83,7 +83,7 @@ def qubit_summary_components(config_algorithm: AlgorithmConfiguration, unitary, 
 def has_rotations(unitary) -> bool:
     """False only if every term of the unitary is all identities (then nothing is rotated)."""
     terms = getattr(unitary, "pauli_terms", None)
-    return terms is None or any(set(ps) != {"I"} for ps, _ in terms)
+    return terms is None or any(term.has_rotations() for term in terms)
 
 def log_qubit_summary(config_algorithm: AlgorithmConfiguration, unitary, algorithm):
     """Log the qubit summary block (INFO), with a warning if the parts don't add up."""
