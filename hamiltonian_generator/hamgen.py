@@ -33,6 +33,10 @@ from qhat.hamiltonian_generator.hamgen_types import (
     HamiltonianConfiguration,
     State,
 )
+from qhat.hamiltonian_generator.thresholding import (
+    DEFAULT_COEFFICIENT_THRESHOLD,
+    spinorb_from_spatial,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -287,9 +291,21 @@ def apply_active_space(state, ham1_HartreeFock):
 
     # Build an InteractionOperator (from openfermion) with one- and two-body integrals computed
     state.log_verbose("Build instance of InteractionOperator.")
-    ham2_ActiveSpace = ham1_HartreeFock.get_molecular_hamiltonian(
-        occupied_indices=range(idx_act_occ),
-        active_indices=range(idx_act_occ, idx_frz_vac),
+    core_adjustment, one_body_integrals, two_body_integrals = (
+        ham1_HartreeFock.get_active_space_integrals(
+            occupied_indices=range(idx_act_occ),
+            active_indices=range(idx_act_occ, idx_frz_vac),
+        )
+    )
+    one_body_coefficients, two_body_coefficients = spinorb_from_spatial(
+        one_body_integrals,
+        two_body_integrals,
+        state.config_hamiltonian.coefficient_threshold,
+    )
+    ham2_ActiveSpace = InteractionOperator(
+        ham1_HartreeFock.nuclear_repulsion + core_adjustment,
+        one_body_coefficients,
+        0.5 * two_body_coefficients,
     )
     tstop = time.time()
     # Pass along metadata that needs to be preserved
@@ -299,6 +315,7 @@ def apply_active_space(state, ham1_HartreeFock):
     ham2_ActiveSpace.separation = ham1_HartreeFock.separation
     ham2_ActiveSpace.hf_time = ham1_HartreeFock.hf_time
     ham2_ActiveSpace.as_time = tstop - tstart
+    ham2_ActiveSpace.coefficient_threshold = state.config_hamiltonian.coefficient_threshold
     return ham2_ActiveSpace
 
 # -------------------------------------------------------------------------------------------------
@@ -315,6 +332,7 @@ def map_fermions_to_qubits(state, ham2_ActiveSpace):
     else:
         mapping = state.config_hamiltonian.f2q_mapping()
         raise NotImplementedError(f"invalid fermion-to-qubit mapping \"{mapping}\"")
+
     tstop = time.time()
     # Propagate previously-computed metadata that we need to preserve across all run modes
     ham3_Fermion2Qubit.hf_energy = ham2_ActiveSpace.hf_energy
@@ -325,6 +343,7 @@ def map_fermions_to_qubits(state, ham2_ActiveSpace):
     ham3_Fermion2Qubit.hf_time = ham2_ActiveSpace.hf_time
     ham3_Fermion2Qubit.as_time = ham2_ActiveSpace.as_time
     ham3_Fermion2Qubit.f2q_time = tstop - tstart
+
     # Return result
     return ham3_Fermion2Qubit
 
@@ -437,6 +456,18 @@ def get_ham2(state):
                             two_body=ham2_ActiveSpace.two_body_tensor)
         return ham2_ActiveSpace
     else:
+        cached_threshold = getattr(
+            ham2_ActiveSpace,
+            "coefficient_threshold",
+            DEFAULT_COEFFICIENT_THRESHOLD,
+        )
+        configured_threshold = state.config_hamiltonian.coefficient_threshold
+        if cached_threshold != configured_threshold:
+            raise ValueError(
+                f"Active-space cache \"{ham2_filename}\" was built with coefficient threshold "
+                f"{cached_threshold}, but the configuration requests {configured_threshold}; "
+                "remove the cache and rerun."
+            )
         state.log(' '.join([
             f"Loaded \"{ham2_cache_path}\".",
             "Continuing from after the active space is applied."]))
@@ -498,6 +529,9 @@ def compute_metadata(state, ham3_Fermion2Qubit):
     state.metadata["interatomic separation (angstroms)"] = ham3_Fermion2Qubit.separation
     # fermion-to-qubit transformation
     state.metadata["fermion-to-qubit operator mapping"] = ham3_Fermion2Qubit.f2q_mapping
+    state.metadata["spin-orbital coefficient threshold (Hartrees)"] = (
+        state.config_hamiltonian.coefficient_threshold
+    )
     # number of terms in sum of Pauli strings
     state.metadata["number of terms in sum of Pauli strings"] = len(ham3_Fermion2Qubit.terms)
     # one-norm of sum of Pauli strings
