@@ -390,8 +390,7 @@ class PauliStringEvolution(Bloq):
         if isinstance(cost_key, QubitCount):
             return controls.peak_qubits(
                 self.num_qubits, self.ctrl_values, self.multi_control_method,
-                controls.num_rotation_ancillas(self.ctrl_values, self.controlled_rotation_method,
-                                               bool(self._active_qubits)))
+                controls.num_rotation_ancillas(self.ctrl_values, self.controlled_rotation_method))
         return NotImplemented
 
     def get_ctrl_system(

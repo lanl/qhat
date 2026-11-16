@@ -294,11 +294,9 @@ class CommutingPauliStringEvolution(Bloq):
         """`QubitCount` without decomposing: qubits + controls + AND ancillas (if any), + 1 for the
         "ancilla" rotation method (unless every term is all identities)."""
         if isinstance(cost_key, QubitCount):
-            has_rotations = any(set(ps) != {'I'} for ps, _ in self.pauli_terms)
             return controls.peak_qubits(
                 self.num_qubits, self.ctrl_values, self.multi_control_method,
-                controls.num_rotation_ancillas(self.ctrl_values, self.controlled_rotation_method,
-                                               has_rotations))
+                controls.num_rotation_ancillas(self.ctrl_values, self.controlled_rotation_method))
         return NotImplemented
 
     @property

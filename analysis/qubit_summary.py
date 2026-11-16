@@ -75,15 +75,9 @@ def qubit_summary_components(config_algorithm: AlgorithmConfiguration, unitary, 
         components["rotation_note"] = "sign-controlled powers; controlled-rotation method not used"
     elif method != "time evolution" and rotation_method is not None:
         # One ancilla, reused by every controlled rotation (none if the unitary has no rotation)
-        components["rotation_ancilla"] = controls.num_rotation_ancillas(
-            (1,), rotation_method, has_rotations(unitary))
+        components["rotation_ancilla"] = controls.num_rotation_ancillas((1,), rotation_method)
         components["rotation_note"] = f"controlled-rotation method \"{rotation_method}\""
     return components
-
-def has_rotations(unitary) -> bool:
-    """False only if every term of the unitary is all identities (then nothing is rotated)."""
-    terms = getattr(unitary, "pauli_terms", None)
-    return terms is None or any(set(term.dense_string()) != {"I"} for term in terms)
 
 def log_qubit_summary(config_algorithm: AlgorithmConfiguration, unitary, algorithm):
     """Log the qubit summary block (INFO), with a warning if the parts don't add up."""

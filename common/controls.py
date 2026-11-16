@@ -107,11 +107,10 @@ def uses_rotation_ancilla(ctrl_values: Tuple[int, ...], controlled_rotation_meth
     return len(ctrl_values) == 1 and controlled_rotation_method == "ancilla"
 
 
-def num_rotation_ancillas(ctrl_values: Tuple[int, ...], controlled_rotation_method: str,
-                          has_rotations: bool) -> int:
+def num_rotation_ancillas(ctrl_values: Tuple[int, ...], controlled_rotation_method: str) -> int:
     """Ancillas the controlled rotations add at the peak: 1 (reused by every term) for "ancilla"
-    with any controls, if the bloq has a rotation at all (not only all-identity terms); else 0."""
-    return 1 if ctrl_values and controlled_rotation_method == "ancilla" and has_rotations else 0
+    with any controls; else 0."""
+    return 1 if ctrl_values and controlled_rotation_method == "ancilla" else 0
 
 
 def uses_and_ancilla(ctrl_values: Tuple[int, ...], multi_control_method: str) -> bool:
