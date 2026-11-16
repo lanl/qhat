@@ -924,6 +924,7 @@ class Trotterization(Bloq):
             return None
         return attrs.evolve(self, time=self.time / 2, num_steps=self.num_steps // 2)
 
+    # TODO: At a quick glance, it looks like this method is hard-coded to assume Pauli strings.
     def sign_controlled(self) -> 'Trotterization':
         """The sign-controlled evolution of this bloq V: V on control |1>, V^dagger on |0>.
 

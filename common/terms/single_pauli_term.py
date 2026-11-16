@@ -36,6 +36,9 @@ class SinglePauliTerm(BaseTerm):
         # TODO: What about all the parameters to manage (multi-)control?
         return PauliStringEvolution(self.dense_string(), self.coefficient, t, hbar)
 
+    def sign_controlled(self):
+        return SinglePauliTerm('Z' + self.dense_string(), -self.coefficient)
+
     def dense_string(self) -> str:
         return self.pauli_string.to_dense()
 
