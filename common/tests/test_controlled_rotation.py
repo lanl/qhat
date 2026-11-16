@@ -130,11 +130,12 @@ class TestPauliStringEvolution:
             rotations=1)
 
     def test_all_identity(self):
-        """No rotation and no ancilla: just the phase on the control, or nothing if omitted."""
+        """No rotation: just the phase on the control, or nothing if omitted. The static qubit
+        count still includes the rotation ancilla."""
         pse = PauliStringEvolution("II", 0.37, 0.91, ctrl_values=(1,),
                                    controlled_rotation_method=ANCILLA)
         assert t_complexity(pse) == TComplexity(rotations=1)
-        assert get_cost_value(pse, QubitCount()) == 3
+        assert get_cost_value(pse, QubitCount()) == 4
         omitted = attrs.evolve(pse, omit_control_phase=True)
         assert t_complexity(omitted) == TComplexity()
         assert omitted.decompose_bloq().bloq_instances == set()
@@ -214,10 +215,11 @@ class TestCommutingPauliStringEvolution:
         assert get_cost_value(cpse, QubitCount()) == 3 + 1 + 1
         assert decomposition_width(cpse) == 5
 
-    def test_only_identities_need_no_ancilla(self):
+    def test_only_identities_still_count_the_ancilla(self):
+        """The rotation ancilla is counted even though nothing uses it."""
         cpse = CommutingPauliStringEvolution((("II", 0.3),), 0.83, ctrl_values=(1,),
                                              controlled_rotation_method=ANCILLA)
-        assert get_cost_value(cpse, QubitCount()) == 3 == decomposition_width(cpse)
+        assert get_cost_value(cpse, QubitCount()) == 4 == decomposition_width(cpse)
 
 
 # -------------------------------------------------------------------------------------------------

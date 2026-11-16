@@ -386,7 +386,7 @@ class PauliStringEvolution(Bloq):
 
     def my_static_costs(self, cost_key: 'CostKey'):
         """`QubitCount` without decomposing: qubits + controls + AND ancillas (if any), + 1 for the
-        "ancilla" rotation method (unless the string is all identities)."""
+        "ancilla" rotation method."""
         if isinstance(cost_key, QubitCount):
             return controls.peak_qubits(
                 self.num_qubits, self.ctrl_values, self.multi_control_method,

@@ -956,8 +956,7 @@ class Trotterization(Bloq):
 
     def my_static_costs(self, cost_key: 'CostKey'):
         """`QubitCount` without decomposing: the qubits, the controls, the k-1 AND ancillas of
-        the "ancilla" method with k >= 2 controls, and 1 for the "ancilla" rotation method (unless
-        every term is all identities).
+        the "ancilla" method with k >= 2 controls, and 1 for the "ancilla" rotation method.
 
         Nothing else in the decomposition allocates qubits, so this is the peak number in use.
         """
