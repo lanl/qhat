@@ -9,6 +9,7 @@ class BaseTerm(ABC):
 
     @abstractmethod
     def generate_evolution_operator(self, t: float, hbar: float = 1.0):
+        """The bloq for exp(-i * scale * term * t / hbar)."""
         pass
 
     @abstractmethod

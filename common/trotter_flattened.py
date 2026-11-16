@@ -26,9 +26,7 @@ if TYPE_CHECKING:
 from qualtran.cirq_interop.t_complexity_protocol import TComplexity, t_complexity
 
 from qhat.common import controls
-from qhat.common.commuting_pauli_string_evolution import CommutingPauliStringEvolution
 from qhat.common.hermiticity import require_real_scalar
-from qhat.common.pauli_utils import validate_pauli_string
 from qhat.common.terms.base_term import BaseTerm
 
 # Get logger for this module
@@ -267,8 +265,7 @@ class Trotterization(Bloq):
     sequence of operations. By default, adjacent identical terms are combined for efficiency.
 
     Attributes:
-        pauli_terms: Sequence of (pauli_string, h_i) tuples defining the Hamiltonian.
-            Example: [("XY", 0.5), ("ZI", 0.3), ("IZ", 0.2)]
+        pauli_terms: Sequence of BaseTerm instances (the terms of the Hamiltonian).
         coefficients: Sequence of coefficients for the ramped method.
             Example: (0.5, 0.5) for second-order, (s2, s2, k, s2, s2) for fourth-order
         time: Total evolution time.
@@ -297,7 +294,7 @@ class Trotterization(Bloq):
     Example:
         >>> # Second-order Trotterization using named method
         >>> from trotterization import get_trotterization_coefficients
-        >>> terms = [("XY", 0.5), ("YZ", 0.3)]
+        >>> terms = [SinglePauliTerm("XY", 0.5), SinglePauliTerm("YZ", 0.3)]
         >>> trotter = Trotterization.from_method(
         ...     pauli_terms=terms,
         ...     method="second order",
@@ -461,7 +458,7 @@ class Trotterization(Bloq):
         """Create Trotterization using a named method.
 
         Args:
-            pauli_terms: Sequence of (pauli_string, h_i) tuples
+            pauli_terms: Sequence of BaseTerm instances
             method: Method name (e.g., "second order", "fourth order") or coefficients
             time: Total evolution time
             num_steps: Number of Trotterization steps
@@ -479,7 +476,7 @@ class Trotterization(Bloq):
 
         Example:
             >>> trotter = Trotterization.from_method(
-            ...     pauli_terms=[("X", 1.0), ("Y", 1.0)],
+            ...     pauli_terms=[SinglePauliTerm("X", 1.0), SinglePauliTerm("Y", 1.0)],
             ...     method="second order",
             ...     time=1.0,
             ...     num_steps=10
@@ -526,7 +523,7 @@ class Trotterization(Bloq):
         return sequence
 
     def build_composite_bloq(self, bb: BloqBuilder, **soqs: SoquetT) -> Dict[str, SoquetT]:
-        """Decompose into a sequence of time-evolution bloqs.
+        """Decompose into a sequence of the terms' time-evolution bloqs.
 
         Uses the expanded sequence with combined terms for efficiency. The adjoint applies the
         sequence in reverse order, with each term adjointed. Under control every term gets the
@@ -565,10 +562,9 @@ class Trotterization(Bloq):
     def _term_evolution(self, term_idx: int, coeff: float):
         """The bloq the decomposition applies for one (term_index, coefficient) pair.
 
-        The effective evolution is exp(-i * h_i * P_i * coeff * dt / hbar), with the adjoint flag
-        and controls of this Trotterization. Currently wraps a single term, but enables future
-        grouping of commuting terms. `build_call_graph` uses the same bloqs, so its callees equal
-        the decomposition's.
+        The effective evolution is exp(-i * term * coeff * dt / hbar), with the adjoint flag
+        and controls of this Trotterization. `build_call_graph` uses the same bloqs, so its
+        callees equal the decomposition's.
         """
         # TODO: What about all the adjoint/control parameters?
         #    is_adjoint=self.is_adjoint,
@@ -627,9 +623,10 @@ class Trotterization(Bloq):
         Since T-complexity is independent of time and coefficients, we count how many
         times each term appears and compute the complexity once per unique term.
 
-        Uses _term_evolution to match the decomposition used in build_composite_bloq, with the same
-        controls. The "ancilla" method adds the AND ladder once and counts the terms with one
-        control. The "ancilla" rotation method adds the summed phase on the control once.
+        Uses the terms' evolution bloqs to match the decomposition used in
+        build_composite_bloq, with the same controls. The "ancilla" method adds the AND ladder
+        once and counts the terms with one control. The "ancilla" rotation method adds the
+        summed phase on the control once.
         """
         if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
             return controls.and_ancilla_t_complexity(self)
@@ -643,10 +640,10 @@ class Trotterization(Bloq):
         total_complexity = TComplexity()
 
         for term_idx, count in term_counts.items():
-            # dummy value for coefficient, because it doesn't change the Clifford+T complexity (it
-            # only changes the value of the rotation angle, but it's the same gate complexity).
+            # dummy value for coefficient, because it doesn't change the complexity (it only
+            # changes the value of the rotation angle, but it's the same gate complexity).
             op = self._term_evolution(term_idx, 1.0)
-            term_complexity = t_complexity(cpse)
+            term_complexity = t_complexity(op)
             total_complexity += count * term_complexity
         if self._merges_control_phases:
             total_complexity += controls.controlled_phase_t_complexity(self.ctrl_values)
@@ -994,7 +991,6 @@ def build_ramped_trotterized_unitary(
 
     Args:
         hamiltonian_terms: Iterable of BaseTerm instances.
-            Example: [("XYZ", 0.5), ("ZZI", 0.3)]
         method: Trotterization method name or int (e.g., "second order", 2)
         timestep: Time step for evolution
         numsteps: Number of Trotterization steps
@@ -1014,14 +1010,14 @@ def build_ramped_trotterized_unitary(
         >>> # Old interface (for compatibility)
         >>> from common.trotter_flattened import build_ramped_trotterized_unitary
         >>> bloq = build_ramped_trotterized_unitary(
-        ...     [("XY", 0.5), ("YZ", 0.3)],
+        ...     [SinglePauliTerm("XY", 0.5), SinglePauliTerm("YZ", 0.3)],
         ...     "second order",
         ...     1.0,
         ...     10
         ... )
     """
     return Trotterization.from_method(
-        pauli_terms=hamiltonian_terms,
+        pauli_terms=tuple(hamiltonian_terms),
         method=method,
         time=timestep,
         num_steps=numsteps,
