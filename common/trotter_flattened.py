@@ -29,7 +29,7 @@ from qhat.common import controls
 from qhat.common.commuting_pauli_string_evolution import CommutingPauliStringEvolution
 from qhat.common.hermiticity import require_real_scalar
 from qhat.common.pauli_utils import validate_pauli_string
-from qhat.common.terms.single_pauli_term import SinglePauliTerm
+from qhat.common.terms.base_term import BaseTerm
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -317,16 +317,16 @@ class Trotterization(Bloq):
     """
 
     # TODO: rename pauli_terms to just "terms" or similar
-    pauli_terms: Tuple[SinglePauliTerm, ...]
+    pauli_terms: Tuple[BaseTerm, ...]
     coefficients: Tuple[float, ...]
     time: float
     num_steps: int
     hbar: float = 1.0
     combine_terms: bool = True
-    _prologue: Tuple[SinglePauliTerm, ...] = ()
-    _epilogue: Tuple[SinglePauliTerm, ...] = ()
-    _repeat_core: Tuple[SinglePauliTerm, ...] = ()
-    _repeat_bridge: Tuple[SinglePauliTerm, ...] = ()
+    _prologue: Tuple[BaseTerm, ...] = ()
+    _epilogue: Tuple[BaseTerm, ...] = ()
+    _repeat_core: Tuple[BaseTerm, ...] = ()
+    _repeat_bridge: Tuple[BaseTerm, ...] = ()
     _symmetric_bookends: bool = True
     tensor_contraction_method: Optional[str] = None
     is_adjoint: bool = False
@@ -448,7 +448,7 @@ class Trotterization(Bloq):
     @classmethod
     def from_method(
         cls,
-        pauli_terms: Sequence[SinglePauliTerm],
+        pauli_terms: Sequence[BaseTerm],
         method,
         time: float,
         num_steps: int,
@@ -577,7 +577,7 @@ class Trotterization(Bloq):
         #    controlled_rotation_method=self.controlled_rotation_method,
         #    omit_control_phase=self._merges_control_phases,
         # TODO: Shouldn't it be `coeff * dt`?
-        #    -- The coefficient backed into SinglePauliTerm is the coefficient of the Pauli string
+        #    -- The coefficient packed into BaseTerm is the coefficient of the Pauli string
         #       in the Hamiltonian.
         #    -- The coefficient here is the coefficient in the Trotter formula.
         #    -- The effective time step should be dt * coeff.
@@ -978,7 +978,7 @@ class Trotterization(Bloq):
 # =================================================================================================
 
 def build_ramped_trotterized_unitary(
-    hamiltonian_terms: Iterable[SinglePauliTerm],
+    hamiltonian_terms: Iterable[BaseTerm],
     method,
     timestep: float,
     numsteps: int,
@@ -993,7 +993,7 @@ def build_ramped_trotterized_unitary(
     used by QPE code in the analysis/ directory.
 
     Args:
-        hamiltonian_terms: Iterable of SinglePauliTerm instances.
+        hamiltonian_terms: Iterable of BaseTerm instances.
             Example: [("XYZ", 0.5), ("ZZI", 0.3)]
         method: Trotterization method name or int (e.g., "second order", 2)
         timestep: Time step for evolution
