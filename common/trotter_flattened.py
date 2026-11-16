@@ -11,7 +11,7 @@ import numbers
 from collections import Counter
 from functools import cached_property
 from math import cbrt
-from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Set, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union
 
 import attrs
 import numpy as np
@@ -526,11 +526,7 @@ class Trotterization(Bloq):
         return sequence
 
     def build_composite_bloq(self, bb: BloqBuilder, **soqs: SoquetT) -> Dict[str, SoquetT]:
-        """Decompose into a sequence of CommutingPauliStringEvolution bloqs.
-
-        Uses CommutingPauliStringEvolution to enable future grouping of commuting terms.
-        Currently, each instance contains a single term, but the infrastructure is in place
-        for future optimization where multiple commuting terms can be grouped together.
+        """Decompose into a sequence of time-evolution bloqs.
 
         Uses the expanded sequence with combined terms for efficiency. The adjoint applies the
         sequence in reverse order, with each term adjointed. Under control every term gets the
@@ -566,7 +562,7 @@ class Trotterization(Bloq):
         return sum(n * self._term_evolution(term_idx, coeff).control_phase
                    for (term_idx, coeff), n in self._occurrences().items())
 
-    def _term_evolution(self, term_idx: int, coeff: float) -> CommutingPauliStringEvolution:
+    def _term_evolution(self, term_idx: int, coeff: float):
         """The bloq the decomposition applies for one (term_index, coefficient) pair.
 
         The effective evolution is exp(-i * h_i * P_i * coeff * dt / hbar), with the adjoint flag
@@ -574,18 +570,19 @@ class Trotterization(Bloq):
         grouping of commuting terms. `build_call_graph` uses the same bloqs, so its callees equal
         the decomposition's.
         """
-        pauli_string = self.pauli_terms[term_idx].dense_string()
-        h_i = self.pauli_terms[term_idx].coefficient
-        return CommutingPauliStringEvolution(
-            pauli_terms=((pauli_string, h_i * coeff),),
-            time=self.time / self.num_steps,
-            hbar=self.hbar,
-            is_adjoint=self.is_adjoint,
-            ctrl_values=self.ctrl_values,
-            multi_control_method=self.multi_control_method,
-            controlled_rotation_method=self.controlled_rotation_method,
-            omit_control_phase=self._merges_control_phases,
-        )
+        # TODO: What about all the adjoint/control parameters?
+        #    is_adjoint=self.is_adjoint,
+        #    ctrl_values=self.ctrl_values,
+        #    multi_control_method=self.multi_control_method,
+        #    controlled_rotation_method=self.controlled_rotation_method,
+        #    omit_control_phase=self._merges_control_phases,
+        # TODO: Shouldn't it be `coeff * dt`?
+        #    -- The coefficient backed into SinglePauliTerm is the coefficient of the Pauli string
+        #       in the Hamiltonian.
+        #    -- The coefficient here is the coefficient in the Trotter formula.
+        #    -- The effective time step should be dt * coeff.
+        # TODO: Should I precompute and save dt = time / num_steps?
+        return self.pauli_terms[term_idx].generate_evolution_operator(self.time / self.num_steps, self.hbar)
 
     def _occurrences(self) -> Counter:
         """How often each (term_index, coefficient) pair appears in `expanded_sequence`, without
@@ -630,10 +627,9 @@ class Trotterization(Bloq):
         Since T-complexity is independent of time and coefficients, we count how many
         times each term appears and compute the complexity once per unique term.
 
-        Uses CommutingPauliStringEvolution to match the decomposition used in
-        build_composite_bloq, with the same controls. The "ancilla" method adds the AND ladder
-        once and counts the terms with one control. The "ancilla" rotation method adds the
-        summed phase on the control once.
+        Uses _term_evolution to match the decomposition used in build_composite_bloq, with the same
+        controls. The "ancilla" method adds the AND ladder once and counts the terms with one
+        control. The "ancilla" rotation method adds the summed phase on the control once.
         """
         if controls.uses_and_ancilla(self.ctrl_values, self.multi_control_method):
             return controls.and_ancilla_t_complexity(self)
@@ -647,20 +643,9 @@ class Trotterization(Bloq):
         total_complexity = TComplexity()
 
         for term_idx, count in term_counts.items():
-            # TODO: Can/should this use _term_evolution?
-            pauli_string = self.pauli_terms[term_idx].dense_string()
-            h_i = self.pauli_terms[term_idx].coefficient
-            # Coefficient and time don't affect T-complexity, so use dummy values
-            # Use CommutingPauliStringEvolution to match build_composite_bloq
-            cpse = CommutingPauliStringEvolution(
-                pauli_terms=((pauli_string, 1.0),),  # Dummy coefficient
-                time=1.0,         # Dummy value - doesn't affect complexity
-                hbar=1.0,
-                ctrl_values=self.ctrl_values,
-                multi_control_method=self.multi_control_method,
-                controlled_rotation_method=self.controlled_rotation_method,
-                omit_control_phase=self._merges_control_phases,
-            )
+            # dummy value for coefficient, because it doesn't change the Clifford+T complexity (it
+            # only changes the value of the rotation angle, but it's the same gate complexity).
+            op = self._term_evolution(term_idx, 1.0)
             term_complexity = t_complexity(cpse)
             total_complexity += count * term_complexity
         if self._merges_control_phases:
@@ -824,17 +809,8 @@ class Trotterization(Bloq):
         dt = self.time / self.num_steps
 
         for term_idx, coeff in terms:
-            pauli_string = self.pauli_terms[term_idx].dense_string()
-            h_i = self.pauli_terms[term_idx].coefficient
-
-            # TODO: Can/should this use _term_evolution?
-            cpse = CommutingPauliStringEvolution(
-                pauli_terms=((pauli_string, h_i * coeff),),
-                time=dt,
-                hbar=self.hbar
-            )
-
-            U_term = cpse.tensor_contract()
+            op = self._term_evolution(term_idx, coeff)
+            U_term = op.tensor_contract()
             U = U_term @ U
 
         return U
@@ -1002,7 +978,7 @@ class Trotterization(Bloq):
 # =================================================================================================
 
 def build_ramped_trotterized_unitary(
-    hamiltonian_terms: Union[Sequence[SinglePauliTerm], 'Iterable[SinglePauliTerm]'],
+    hamiltonian_terms: Iterable[SinglePauliTerm],
     method,
     timestep: float,
     numsteps: int,
