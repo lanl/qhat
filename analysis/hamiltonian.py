@@ -196,6 +196,7 @@ class Hamiltonian:
                 f"Unable to return result as \"{return_as}\".",
                 ]))
     def terms(self):
+        # TODO: Eventually this won't be SinglePauliTerm, but for now that's where we're at.
         return [SinglePauliTerm(*term)
                 for term in self._get_all_pauli_strings(return_as='strings').items()]
     def to_matrix(self, memory_threshold_gb, force_dense=None, force_sparse=None):
