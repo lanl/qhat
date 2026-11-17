@@ -572,13 +572,8 @@ class Trotterization(Bloq):
         #    multi_control_method=self.multi_control_method,
         #    controlled_rotation_method=self.controlled_rotation_method,
         #    omit_control_phase=self._merges_control_phases,
-        # TODO: Shouldn't it be `coeff * dt`?
-        #    -- The coefficient packed into BaseTerm is the coefficient of the Pauli string
-        #       in the Hamiltonian.
-        #    -- The coefficient here is the coefficient in the Trotter formula.
-        #    -- The effective time step should be dt * coeff.
-        # TODO: Should I precompute and save dt = time / num_steps?
-        return self.pauli_terms[term_idx].generate_evolution_operator(self.time / self.num_steps, self.hbar)
+        effective_dt = coeff * self.time / self.num_steps
+        return self.pauli_terms[term_idx].generate_evolution_operator(effective_dt, self.hbar)
 
     def _occurrences(self) -> Counter:
         """How often each (term_index, coefficient) pair appears in `expanded_sequence`, without
