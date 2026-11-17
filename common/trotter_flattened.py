@@ -559,21 +559,27 @@ class Trotterization(Bloq):
         return sum(n * self._term_evolution(term_idx, coeff).control_phase
                    for (term_idx, coeff), n in self._occurrences().items())
 
-    def _term_evolution(self, term_idx: int, coeff: float):
+    def _term_evolution(self, term_idx: int, coeff: float, forward_only: bool = False):
         """The bloq the decomposition applies for one (term_index, coefficient) pair.
 
         The effective evolution is exp(-i * term * coeff * dt / hbar), with the adjoint flag
         and controls of this Trotterization. `build_call_graph` uses the same bloqs, so its
-        callees equal the decomposition's.
+        callees equal the decomposition's. With `forward_only` it is instead the plain
+        uncontrolled forward evolution, for the matrix contractions, which apply the adjoint and
+        the controls to the whole matrix.
         """
-        # TODO: What about all the adjoint/control parameters?
-        #    is_adjoint=self.is_adjoint,
-        #    ctrl_values=self.ctrl_values,
-        #    multi_control_method=self.multi_control_method,
-        #    controlled_rotation_method=self.controlled_rotation_method,
-        #    omit_control_phase=self._merges_control_phases,
         effective_dt = coeff * self.time / self.num_steps
-        return self.pauli_terms[term_idx].generate_evolution_operator(effective_dt, self.hbar)
+        term = self.pauli_terms[term_idx]
+        if forward_only:
+            return term.generate_evolution_operator(effective_dt, self.hbar)
+        return term.generate_evolution_operator(
+            effective_dt, self.hbar,
+            is_adjoint=self.is_adjoint,
+            ctrl_values=self.ctrl_values,
+            multi_control_method=self.multi_control_method,
+            controlled_rotation_method=self.controlled_rotation_method,
+            omit_control_phase=self._merges_control_phases,
+        )
 
     def _occurrences(self) -> Counter:
         """How often each (term_index, coefficient) pair appears in `expanded_sequence`, without
@@ -798,10 +804,8 @@ class Trotterization(Bloq):
         dim = 2 ** self.num_qubits
         U = np.eye(dim, dtype=np.complex128)
 
-        dt = self.time / self.num_steps
-
         for term_idx, coeff in terms:
-            op = self._term_evolution(term_idx, coeff)
+            op = self._term_evolution(term_idx, coeff, forward_only=True)
             U_term = op.tensor_contract()
             U = U_term @ U
 
@@ -919,7 +923,6 @@ class Trotterization(Bloq):
             return None
         return attrs.evolve(self, time=self.time / 2, num_steps=self.num_steps // 2)
 
-    # TODO: At a quick glance, it looks like this method is hard-coded to assume Pauli strings.
     def sign_controlled(self) -> 'Trotterization':
         """The sign-controlled evolution of this bloq V: V on control |1>, V^dagger on |0>.
 
@@ -939,7 +942,8 @@ class Trotterization(Bloq):
             raise ValueError(
                 "sign_controlled() needs a symmetric Trotter sequence (e.g. second or fourth "
                 f"order), so that U(-t) is U^dagger; got coefficients {self.coefficients}.")
-        return attrs.evolve(self, pauli_terms=tuple(('Z' + p, -h) for p, h in self.pauli_terms))
+        return attrs.evolve(
+            self, pauli_terms=tuple(term.sign_controlled() for term in self.pauli_terms))
 
     def get_ctrl_system(
         self, ctrl_spec: Optional[CtrlSpec] = None

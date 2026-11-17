@@ -1,5 +1,6 @@
-from typing import Optional
+from typing import Optional, Tuple
 
+from qhat.common import controls
 from qhat.common.hermiticity import require_real_scalar
 from qhat.common.pauli_string import PauliString
 # TODO: Should I move the evolution Bloqs into the terms/ directory?
@@ -32,9 +33,25 @@ class SinglePauliTerm(BaseTerm):
     def num_qubits(self) -> int:
         return self.pauli_string.num_qubits
 
-    def generate_evolution_operator(self, t: float, hbar: float = 1.0):
-        # TODO: What about all the parameters to manage (multi-)control?
-        return PauliStringEvolution(self.dense_string(), self.coefficient, t, hbar)
+    def generate_evolution_operator(
+        self,
+        t: float,
+        hbar: float = 1.0,
+        *,
+        is_adjoint: bool = False,
+        ctrl_values: Tuple[int, ...] = (),
+        multi_control_method: str = controls.DEFAULT_MULTI_CONTROL_METHOD,
+        controlled_rotation_method: str = controls.DEFAULT_CONTROLLED_ROTATION_METHOD,
+        omit_control_phase: bool = False,
+    ):
+        return PauliStringEvolution(
+            self.dense_string(), self.coefficient, t, hbar,
+            is_adjoint=is_adjoint,
+            ctrl_values=ctrl_values,
+            multi_control_method=multi_control_method,
+            controlled_rotation_method=controlled_rotation_method,
+            omit_control_phase=omit_control_phase,
+        )
 
     def sign_controlled(self):
         return SinglePauliTerm('Z' + self.dense_string(), -self.coefficient)

@@ -1,4 +1,7 @@
 from abc import ABC, abstractmethod
+from typing import Tuple
+
+from qhat.common import controls
 
 class BaseTerm(ABC):
     """The abstract base class that defines the generic interface for Hamiltonian terms."""
@@ -8,8 +11,23 @@ class BaseTerm(ABC):
         pass
 
     @abstractmethod
-    def generate_evolution_operator(self, t: float, hbar: float = 1.0):
-        """The bloq for exp(-i * scale * term * t / hbar)."""
+    def generate_evolution_operator(
+        self,
+        t: float,
+        hbar: float = 1.0,
+        *,
+        is_adjoint: bool = False,
+        ctrl_values: Tuple[int, ...] = (),
+        multi_control_method: str = controls.DEFAULT_MULTI_CONTROL_METHOD,
+        controlled_rotation_method: str = controls.DEFAULT_CONTROLLED_ROTATION_METHOD,
+        omit_control_phase: bool = False,
+    ):
+        """The bloq for exp(-i * term * t / hbar), or its adjoint, under the given controls.
+
+        The bloq has a `q` register of `num_qubits()` qubits and, if `ctrl_values` is not empty, a
+        `ctrl` register (see `common/controls.py`). `Trotterization` also needs the bloq to have
+        a `control_phase` attribute, and to support `tensor_contract()`.
+        """
         pass
 
     # TODO: I'm not sure if this sign_controlled method is the right approach for QHAT, but
