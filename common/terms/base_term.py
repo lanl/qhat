@@ -18,7 +18,7 @@ class BaseTerm(ABC):
     #       a matter of deciding if this method is the right approach or if we should consider some
     #       other way to implement the idea of a sign-controlled variant.
     @abstractmethod
-    def sign_controlled(self) -> BaseTerm:
+    def sign_controlled(self):
         """
         Return the sign-controlled version of this Hermitian term T.
 
