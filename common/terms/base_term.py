@@ -66,6 +66,13 @@ class BaseTerm(ABC):
         pass
 
     @abstractmethod
+    def to_pauli_strings(self) -> dict[PauliString, float]:
+        # TODO: This is a temporary bridge method to be removed once Pauli-based analyses
+        #       (eigenvalue bounds, nested-commutator bounds, etc) are updated to use the term
+        #       interface.
+        pass
+
+    @abstractmethod
     def __str__(self) -> str:
         pass
 

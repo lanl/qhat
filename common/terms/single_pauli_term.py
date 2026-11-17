@@ -56,6 +56,10 @@ class SinglePauliTerm(BaseTerm):
     def sign_controlled(self):
         return SinglePauliTerm('Z' + self.dense_string(), -self.coefficient)
 
+    def to_pauli_strings(self) -> dict[PauliString, float]:
+        # TODO: Should this return a PauliString, a dense str, a sparse tuple, a sparse dict, ...?
+        return {self.pauli_string : self.coefficient}
+
     def dense_string(self) -> str:
         return self.pauli_string.to_dense()
 
