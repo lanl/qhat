@@ -265,7 +265,7 @@ class Trotterization(Bloq):
     sequence of operations. By default, adjacent identical terms are combined for efficiency.
 
     Attributes:
-        pauli_terms: Sequence of BaseTerm instances (the terms of the Hamiltonian).
+        hamiltonian_terms: Sequence of BaseTerm instances.
         coefficients: Sequence of coefficients for the ramped method.
             Example: (0.5, 0.5) for second-order, (s2, s2, k, s2, s2) for fourth-order
         time: Total evolution time.
@@ -296,7 +296,7 @@ class Trotterization(Bloq):
         >>> from trotterization import get_trotterization_coefficients
         >>> terms = [SinglePauliTerm("XY", 0.5), SinglePauliTerm("YZ", 0.3)]
         >>> trotter = Trotterization.from_method(
-        ...     pauli_terms=terms,
+        ...     hamiltonian_terms=terms,
         ...     method="second order",
         ...     time=1.0,
         ...     num_steps=10
@@ -305,7 +305,7 @@ class Trotterization(Bloq):
 
         >>> # Or with explicit coefficients
         >>> trotter = Trotterization(
-        ...     pauli_terms=terms,
+        ...     hamiltonian_terms=terms,
         ...     coefficients=(0.5, 0.5),
         ...     time=1.0,
         ...     num_steps=10,
@@ -313,8 +313,7 @@ class Trotterization(Bloq):
         ... )
     """
 
-    # TODO: rename pauli_terms to just "terms" or similar
-    pauli_terms: Tuple[BaseTerm, ...]
+    hamiltonian_terms: Tuple[BaseTerm, ...]
     coefficients: Tuple[float, ...]
     time: float
     num_steps: int
@@ -333,7 +332,7 @@ class Trotterization(Bloq):
 
     def __attrs_post_init__(self):
         """Validate inputs."""
-        if len(self.pauli_terms) == 0:
+        if len(self.hamiltonian_terms) == 0:
             raise ValueError("Must provide at least one Pauli term.")
         if self.num_steps <= 0:
             raise ValueError(f"num_steps must be positive, got {self.num_steps}")
@@ -341,7 +340,7 @@ class Trotterization(Bloq):
             raise ValueError("Must provide at least one coefficient.")
 
         # Check all terms apply to the same number of qubits
-        lengths = {term.num_qubits() for term in self.pauli_terms}
+        lengths = {term.num_qubits() for term in self.hamiltonian_terms}
         if len(lengths) > 1:
             raise ValueError(
                 f"All Pauli strings must have the same length. Got lengths: {lengths}"
@@ -368,7 +367,7 @@ class Trotterization(Bloq):
         # Initialize pattern core: a single step
         repeat_core = []
         ascending = True
-        num_terms = len(self.pauli_terms)
+        num_terms = len(self.hamiltonian_terms)
         for coeff in self.coefficients:
             # Select indices for ramp direction
             if ascending:
@@ -445,7 +444,7 @@ class Trotterization(Bloq):
     @classmethod
     def from_method(
         cls,
-        pauli_terms: Sequence[BaseTerm],
+        hamiltonian_terms: Sequence[BaseTerm],
         method,
         time: float,
         num_steps: int,
@@ -458,7 +457,7 @@ class Trotterization(Bloq):
         """Create Trotterization using a named method.
 
         Args:
-            pauli_terms: Sequence of BaseTerm instances
+            hamiltonian_terms: Sequence of BaseTerm instances
             method: Method name (e.g., "second order", "fourth order") or coefficients
             time: Total evolution time
             num_steps: Number of Trotterization steps
@@ -476,7 +475,7 @@ class Trotterization(Bloq):
 
         Example:
             >>> trotter = Trotterization.from_method(
-            ...     pauli_terms=[SinglePauliTerm("X", 1.0), SinglePauliTerm("Y", 1.0)],
+            ...     hamiltonian_terms=[SinglePauliTerm("X", 1.0), SinglePauliTerm("Y", 1.0)],
             ...     method="second order",
             ...     time=1.0,
             ...     num_steps=10
@@ -484,7 +483,7 @@ class Trotterization(Bloq):
         """
         coefficients = get_trotterization_coefficients(method)
         return cls(
-            pauli_terms=tuple(pauli_terms),
+            hamiltonian_terms=tuple(hamiltonian_terms),
             coefficients=coefficients,
             time=time,
             num_steps=num_steps,
@@ -498,7 +497,7 @@ class Trotterization(Bloq):
     @cached_property
     def num_qubits(self) -> int:
         """Number of qubits the operator acts on."""
-        return self.pauli_terms[0].num_qubits()
+        return self.hamiltonian_terms[0].num_qubits()
 
     @cached_property
     def signature(self) -> Signature:
@@ -569,7 +568,7 @@ class Trotterization(Bloq):
         the controls to the whole matrix.
         """
         effective_dt = coeff * self.time / self.num_steps
-        term = self.pauli_terms[term_idx]
+        term = self.hamiltonian_terms[term_idx]
         if forward_only:
             return term.generate_evolution_operator(effective_dt, self.hbar)
         return term.generate_evolution_operator(
@@ -692,7 +691,7 @@ class Trotterization(Bloq):
 
         Example:
             >>> trotter = Trotterization.from_method(
-            ...     pauli_terms=[("X", 1.0), ("Y", 1.0)],
+            ...     hamiltonian_terms=[("X", 1.0), ("Y", 1.0)],
             ...     method="second order",
             ...     time=1.0,
             ...     num_steps=1000
@@ -704,7 +703,7 @@ class Trotterization(Bloq):
         logger.verbose(f"Computing unitary matrix via tensor contraction...")
         logger.debug(f"-- num_qubits = {self.num_qubits}")
         logger.debug(f"-- num_steps = {self.num_steps}")
-        logger.debug(f"-- num_terms = {len(self.pauli_terms)}")
+        logger.debug(f"-- num_terms = {len(self.hamiltonian_terms)}")
         logger.debug(f"-- expanded_sequence length = {self.num_operations}")
 
         # The "qualtran" method contracts the decomposition, which already applies the adjoint
@@ -828,7 +827,7 @@ class Trotterization(Bloq):
     @property
     def num_terms(self) -> int:
         """Number of Pauli string terms in the Hamiltonian."""
-        return len(self.pauli_terms)
+        return len(self.hamiltonian_terms)
 
     @property
     def num_operations(self) -> int:
@@ -849,7 +848,7 @@ class Trotterization(Bloq):
         adjoint = ", is_adjoint=True" if self.is_adjoint else ""
         ctrl = controls.ctrl_repr(self.ctrl_values, self.multi_control_method,
                                   self.controlled_rotation_method)
-        return (f"Trotterization(pauli_terms={self.pauli_terms}, "
+        return (f"Trotterization(hamiltonian_terms={self.hamiltonian_terms}, "
                 f"coefficients={self.coefficients}, time={self.time}, "
                 f"num_steps={self.num_steps}, hbar={self.hbar}{adjoint}{ctrl})")
 
@@ -943,7 +942,8 @@ class Trotterization(Bloq):
                 "sign_controlled() needs a symmetric Trotter sequence (e.g. second or fourth "
                 f"order), so that U(-t) is U^dagger; got coefficients {self.coefficients}.")
         return attrs.evolve(
-            self, pauli_terms=tuple(term.sign_controlled() for term in self.pauli_terms))
+            self,
+            hamiltonian_terms=tuple(term.sign_controlled() for term in self.hamiltonian_terms))
 
     def get_ctrl_system(
         self, ctrl_spec: Optional[CtrlSpec] = None
@@ -1014,7 +1014,7 @@ def build_ramped_trotterized_unitary(
         ... )
     """
     return Trotterization.from_method(
-        pauli_terms=tuple(hamiltonian_terms),
+        hamiltonian_terms=tuple(hamiltonian_terms),
         method=method,
         time=timestep,
         num_steps=numsteps,
