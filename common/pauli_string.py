@@ -71,12 +71,8 @@ class PauliString:
     """
 
     num_qubits: int
-    # TODO: We need to canonicalize the Pauli strings so that two PauliString objects that
-    #       represent the same Pauli string hash to the same value.  For example, ((0,'X'),(3,'Z'))
-    #       and ((3,'Z'),(0,'X')) are the same Pauli string but probably don't hash to be the same.
-    #    -- Does that suggest that we should use dense Pauli strings (type: str) as the internal
-    #       storage?
-    #    -- Or maybe we just sort the tuple by qubit index?
+    # Note that _operators is canonicalized in __post_init__ so the same Pauli string created using
+    # different input formats or orders always yields PauliString objects that hash the same.
     _operators: SparsePauli
 
     def __post_init__(self) -> None:
