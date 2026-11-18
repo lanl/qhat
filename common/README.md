@@ -68,13 +68,6 @@ Coefficients remain separate so `PauliString` values can be used as Hamiltonian 
 
 ## Hamiltonian Representations
 
-- **`LCPSHamiltonian.py`**: Linear Combination of Pauli Strings (LCPS) Hamiltonian representation.
-  Organizes Pauli strings into commuting groups for efficient processing.
-  - Groups are containers of terms where all terms within a group commute
-  - Each term consists of a Pauli string (dense format like "IXZZYI") and a coefficient
-  - Validates structure and commutativity
-  - Compatible with pyLIQTR ProblemInstance interface
-
 - **`MixedFermionBosonOperator.py`**: Represents Hamiltonians with both fermionic and bosonic
   degrees of freedom.
   - Stores fermionic terms (one-body and two-body tensors)
@@ -142,7 +135,6 @@ pytest common/tests/test_trotter_flattened.py -v                     # 57 tests
 | `trotter_flattened.py` | ✅ 57 tests | Recommended |
 | `trotter_original.py` | ⚠️ Minimal | Deprecated |
 | `dense_pauli_exp.py` | ⚠️ Minimal | Used by legacy code |
-| `LCPSHamiltonian.py` | ⚠️ None | Production use |
 | `MixedFermionBosonOperator.py` | ⚠️ None | Production use |
 | `bosons_binary.py` | ⚠️ None | Production use |
 | `QPE_Kitaev.py` | ⚠️ None | Exploratory |
