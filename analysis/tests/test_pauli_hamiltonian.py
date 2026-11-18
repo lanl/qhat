@@ -48,7 +48,7 @@ def general_config():
 
 
 # ==================================================================================
-# Test: LinearCombinationOfPauliStrings class
+# Test: Hamiltonian.from_pauli_strings
 # ==================================================================================
 
 class TestFromPauliStrings:
@@ -478,8 +478,8 @@ class TestHamiltonianIntegration:
         config_ham.load_pauli_strings(str(test_file))
         return load_pauli(config_ham), config_gen, config_ham
 
-    def test_get_all_pauli_strings_tuples(self, sample_hamiltonian):
-        """Test getting Pauli strings as tuples."""
+    def test_to_pauli_strings_sparse(self, sample_hamiltonian):
+        """Test getting Pauli strings as sparse tuples."""
         H, _, _ = sample_hamiltonian
         pauli_dict = sparse_pauli_dict(H)
 
@@ -487,8 +487,8 @@ class TestHamiltonianIntegration:
         assert pauli_dict[tuple()] == 2.5
         assert pauli_dict[((0, 'X'),)] == 0.5
 
-    def test_get_all_pauli_strings_strings(self, sample_hamiltonian):
-        """Test getting Pauli strings as strings."""
+    def test_to_pauli_strings_dense(self, sample_hamiltonian):
+        """Test getting Pauli strings as dense strings."""
         H, _, _ = sample_hamiltonian
         pauli_dict = dense_pauli_dict(H)
 
@@ -496,7 +496,7 @@ class TestHamiltonianIntegration:
         assert pauli_dict["IIII"] == 2.5
         assert pauli_dict["XIII"] == 0.5
 
-    def test_get_all_pauli_strings_objects(self, sample_hamiltonian):
+    def test_to_pauli_strings_objects(self, sample_hamiltonian):
         """Test getting representation-independent PauliString keys."""
         H, _, _ = sample_hamiltonian
         pauli_dict = H.to_pauli_strings()

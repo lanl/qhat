@@ -186,7 +186,8 @@ class CommutingPauliStringEvolution(Bloq):
     ):
         """Create from an iterable of (pauli_string, coefficient) tuples.
 
-        This is the format used by hamiltonian.get_all_pauli_strings(return_as='strings').
+        For example, the items of {pauli.to_dense(): coefficient, ...} built from
+        hamiltonian.to_pauli_strings().
 
         Args:
             pauli_strings: Iterable of (string, coefficient) tuples

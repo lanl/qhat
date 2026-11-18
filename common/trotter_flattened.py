@@ -691,7 +691,7 @@ class Trotterization(Bloq):
 
         Example:
             >>> trotter = Trotterization.from_method(
-            ...     hamiltonian_terms=[("X", 1.0), ("Y", 1.0)],
+            ...     hamiltonian_terms=[SinglePauliTerm("X", 1.0), SinglePauliTerm("Y", 1.0)],
             ...     method="second order",
             ...     time=1.0,
             ...     num_steps=1000
