@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Tuple
 
 from qhat.common import controls
+from qhat.common.pauli_string import PauliString
 
 class BaseTerm(ABC):
     """The abstract base class that defines the generic interface for Hamiltonian terms."""
