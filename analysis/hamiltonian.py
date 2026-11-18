@@ -315,50 +315,50 @@ class Hamiltonian:
     #          return the tensors and have a translation layer to terms that get laoded into the
     #          Hamiltonian, or there could be multiple "constructors" that do the translation from
     #          the tensors to the terms.
-    def _get_all_pauli_strings(self, return_as="tuples"):
-        # Returns all Pauli strings as a flat data structure, specifically a dictionary where the
-        # key is the Pauli string and the value is the coefficient.
-        # -- If return_as == "tuples": The Pauli string is encoded as a tuple of tuples, where each
-        #    inner tuple is (qubit index, Pauli operator), with the qubit index being a
-        #    zero-indexed integer and the Pauli operator is a one-character string.  For example,
-        #    assuming at least 4 qubits, ((0, 'X'), (3, 'Z')).
-        # -- If return_as == "strings": The Pauli string is encoded as a character string, where
-        #    each character is a Pauli matrix, explicitly including identity entries.  For example,
-        #    assuming 6 qubits, "XIIZII".
-        # -- If return_as == "objects": Keys are immutable PauliString instances that can provide
-        #    either representation on demand.
-        # TODO: I'd prefer that the flag identify not the data structure but the concept: dense vs
-        #       sparse, rather than strings vs tuples.
-        if return_as == "tuples":
-            # The qubit mappings return complex coefficients (with round-off imaginary parts) when
-            # the integrals are complex, even for a Hermitian Hamiltonian; make them real here.
-            if isinstance(self._H, InteractionOperator):
-                return real_pauli_coefficients(self._fmap(self._H).terms)
-            elif isinstance(self._H, MixedFermionBosonOperator):
-                # TODO: MixedFermionBosonOperator already has its encodings, so this ignores the
-                #       encodings selected by Hamiltonian.  Clean this up.  Probably by deferring
-                #       the specification of encodings for MixedFermionBosonOperator?
-                return real_pauli_coefficients(self._H.generate_qubit_operator().terms)
-            elif isinstance(self._H, LinearCombinationOfPauliStrings):
-                return self._H.get_sparse_pauli_strings()
-            else:
-                raise TypeError(
-                    f"Unable to generate Pauli strings from object of type \"{type(self._H)}\".")
-        elif return_as == "strings":
-            as_objects = self._get_all_pauli_strings(return_as="objects")
-            return {pauli.to_dense() : coef for pauli, coef in as_objects.items()}
-        elif return_as == "objects":
-            if isinstance(self._H, LinearCombinationOfPauliStrings):
-                return self._H.get_pauli_strings()
-            as_tuples = self._get_all_pauli_strings(return_as="tuples")
-            Nq = self.num_qubits()
-            return {PauliString.from_sparse(pauli, Nq) : coef
-                    for pauli, coef in as_tuples.items()}
-        else:
-            raise ValueError("  ".join([
-                "The value of return_as must be \"tuples\", \"strings\", or \"objects\".",
-                f"Unable to return result as \"{return_as}\".",
-                ]))
+    #def _get_all_pauli_strings(self, return_as="tuples"):
+    #    # Returns all Pauli strings as a flat data structure, specifically a dictionary where the
+    #    # key is the Pauli string and the value is the coefficient.
+    #    # -- If return_as == "tuples": The Pauli string is encoded as a tuple of tuples, where each
+    #    #    inner tuple is (qubit index, Pauli operator), with the qubit index being a
+    #    #    zero-indexed integer and the Pauli operator is a one-character string.  For example,
+    #    #    assuming at least 4 qubits, ((0, 'X'), (3, 'Z')).
+    #    # -- If return_as == "strings": The Pauli string is encoded as a character string, where
+    #    #    each character is a Pauli matrix, explicitly including identity entries.  For example,
+    #    #    assuming 6 qubits, "XIIZII".
+    #    # -- If return_as == "objects": Keys are immutable PauliString instances that can provide
+    #    #    either representation on demand.
+    #    # TODO: I'd prefer that the flag identify not the data structure but the concept: dense vs
+    #    #       sparse, rather than strings vs tuples.
+    #    if return_as == "tuples":
+    #        # The qubit mappings return complex coefficients (with round-off imaginary parts) when
+    #        # the integrals are complex, even for a Hermitian Hamiltonian; make them real here.
+    #        if isinstance(self._H, InteractionOperator):
+    #            return real_pauli_coefficients(self._fmap(self._H).terms)
+    #        elif isinstance(self._H, MixedFermionBosonOperator):
+    #            # TODO: MixedFermionBosonOperator already has its encodings, so this ignores the
+    #            #       encodings selected by Hamiltonian.  Clean this up.  Probably by deferring
+    #            #       the specification of encodings for MixedFermionBosonOperator?
+    #            return real_pauli_coefficients(self._H.generate_qubit_operator().terms)
+    #        elif isinstance(self._H, LinearCombinationOfPauliStrings):
+    #            return self._H.get_sparse_pauli_strings()
+    #        else:
+    #            raise TypeError(
+    #                f"Unable to generate Pauli strings from object of type \"{type(self._H)}\".")
+    #    elif return_as == "strings":
+    #        as_objects = self._get_all_pauli_strings(return_as="objects")
+    #        return {pauli.to_dense() : coef for pauli, coef in as_objects.items()}
+    #    elif return_as == "objects":
+    #        if isinstance(self._H, LinearCombinationOfPauliStrings):
+    #            return self._H.get_pauli_strings()
+    #        as_tuples = self._get_all_pauli_strings(return_as="tuples")
+    #        Nq = self.num_qubits()
+    #        return {PauliString.from_sparse(pauli, Nq) : coef
+    #                for pauli, coef in as_tuples.items()}
+    #    else:
+    #        raise ValueError("  ".join([
+    #            "The value of return_as must be \"tuples\", \"strings\", or \"objects\".",
+    #            f"Unable to return result as \"{return_as}\".",
+    #            ]))
     #def terms(self):
     #    # TODO: Eventually this won't be SinglePauliTerm, but for now that's where we're at.
     #    return [SinglePauliTerm(*term)
