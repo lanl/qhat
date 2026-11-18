@@ -175,14 +175,11 @@ class Hamiltonian:
         # TODO: This suggests that an identity term type would be useful, especially if we restrict
         #       all other term types to prevent them from being identity.
         for term in self._terms:
-            if term.pauli_string.to_sparse() == ():
-                print(f"Updating term {term.pauli_string} {term.coefficient}")
+            if isinstance(term, SinglePauliTerm) and term.pauli_string.to_sparse() == ():
                 term.coefficient += dE
-                print(f"-- new coefficient = {term.coefficient}")
                 break
         else:
-            self._terms.insert(0, SinglePauliTerm((), dE, self._terms[0].num_qubits()))
-            print(f"Inserted new term {self._terms[0].pauli_string} {self._terms[0].coefficient}")
+            self._terms.insert(0, SinglePauliTerm((), dE, self._num_qubits))
         if isinstance(self._core_operator, InteractionOperator):
             t0 = self._core_operator.constant + dE
             t1 = self._core_operator.one_body_tensor
