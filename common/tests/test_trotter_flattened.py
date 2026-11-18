@@ -990,7 +990,8 @@ class TestBackwardCompatibility:
 
     def test_backward_compatible_with_analysis_usage(self):
         """Test the exact usage pattern from analysis/unitary.py."""
-        # This simulates the exact call from unitary.py line 122-126
+        # This simulates the call to build_ramped_trotterized_unitary in encode_ramped_trotter
+        # (analysis/unitary.py)
         pauli_strings = [("XII", 0.5), ("IXI", 0.3), ("IIX", 0.2)]
         method = "second order"
         timestep = 1.0
