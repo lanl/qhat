@@ -53,57 +53,6 @@ bosonic_mapping = {
 
 # -------------------------------------------------------------------------------------------------
 
-class LinearCombinationOfPauliStrings:
-    def __init__(self, **kwargs):
-        formats = [fmt for fmt in ["dense", "sparse"] if fmt in kwargs]
-        if not formats:
-            raise ValueError("No data provided to LinearCombinationOfPauliStrings.")
-        if len(formats) > 1:
-            raise ValueError("Too many formats provided to LinearCombinationOfPauliStrings.")
-
-        input_format = formats[0]
-        input_data = kwargs[input_format]
-        if not isinstance(input_data, dict):
-            raise TypeError("Pauli string data must be provided as a dictionary.")
-
-        identity = PauliString.from_sparse((), kwargs["num_qubits"])
-        self._nq = identity.num_qubits
-        self._data = {}
-        for raw_pauli, coefficient in input_data.items():
-            if input_format == "dense":
-                pauli = PauliString.from_dense(raw_pauli)
-                if pauli.num_qubits != self._nq:
-                    raise ValueError(
-                        f"Dense Pauli string {raw_pauli!r} has length "
-                        f"{pauli.num_qubits}, expected {self._nq}."
-                    )
-            else:
-                pauli = PauliString.from_sparse(raw_pauli, self._nq)
-
-            # Combine coefficients for inputs that canonicalize to the same PauliString.    
-            self._data[pauli] = self._data.get(pauli, 0.0) + coefficient
-
-    def num_qubits(self):
-        return self._nq
-
-    def get_pauli_strings(self):
-        """Return a copy of the canonical PauliString-keyed coefficient dictionary."""
-        return self._data.copy()
-
-    def get_dense_pauli_strings(self):
-        return {pauli.to_dense() : coef for pauli, coef in self._data.items()}
-
-    def get_sparse_pauli_strings(self):
-        return {pauli.to_sparse() : coef for pauli, coef in self._data.items()}
-
-    def energy_shift(self, shift):
-        shift = require_real_scalar("energy shift", shift)
-        identity = PauliString.from_sparse((), self._nq)
-        identity_coefficient = self._data.get(identity, 0.0) + shift
-        self._data[identity] = identity_coefficient
-
-# -------------------------------------------------------------------------------------------------
-
 def _validate_fermionic_tensors(constant, one_body, two_body):
     """Check second-quantization tensors; return (real constant, number of spin orbitals)."""
     if len(one_body.shape) != 2 or one_body.shape[0] != one_body.shape[1]:
@@ -124,9 +73,6 @@ def _pauli_terms_from_qubit_operator(qubit_operator, num_qubits):
     return [SinglePauliTerm(ps, c, num_qubits) for ps, c in pauli_strings.items()]
 
 # -------------------------------------------------------------------------------------------------
-
-# TODO: The heavy use of isinstance() suggests that perhaps Hamiltonian should be a base class that
-#       other things are built on top of?
 
 class Hamiltonian:
     def __init__(self, terms, num_qubits, core_operator=None):
@@ -370,194 +316,6 @@ class Hamiltonian:
         terms = _pauli_terms_from_qubit_operator(
             operator.generate_qubit_operator(), operator.num_qubits())
         return cls(terms, operator.num_qubits(), core_operator=operator)
-
-
-
-    #def __init__(self, hamiltonian):
-    #    self._H = hamiltonian
-    #    self._energy_shift_total = 0.0  # Track cumulative energy shift for analysis corrections
-    #def get_core_operator(self):
-    #    # TODO: This should probably be replaced by a function that generates an appropriate
-    #    #       pyLIQTR problem instance.
-    #    return self._H
-    def set_fermionic_mapping(self, mapping):
-        # self._fmap is never used for LinearCombinationOfPauliStrings
-        if isinstance(mapping, str):
-            self._fmap = fermionic_mapping[mapping]
-        else:
-            self._fmap = mapping
-        if isinstance(self._H, MixedFermionBosonOperator):
-            self._H.set_fermionic_encoding(self._fmap)
-    def set_bosonic_mapping(self, mapping, max_bosons_per_state):
-        # self._bmap is never used for LinearCombinationOfPauliStrings
-        if isinstance(mapping, str):
-            self._bmap = bosonic_mapping[mapping](max_bosons_per_state)
-        else:
-            self._bmap = mapping
-        if isinstance(self._H, MixedFermionBosonOperator):
-            self._H.set_bosonic_encoding(self._bmap)
-    #def num_qubits(self):
-    #    if isinstance(self._H, InteractionOperator):
-    #        return self._H.n_qubits
-    #    elif isinstance(self._H, MixedFermionBosonOperator):
-    #        return self._H.num_qubits()
-    #    elif isinstance(self._H, LinearCombinationOfPauliStrings):
-    #        return self._H.num_qubits()
-    #    else:
-    #        raise TypeError("Unable to determine the number of qubits.")
-    # TODO: The next step is to get rid of _get_all_pauli_strings and switch the internal
-    #       representation here in the Hamiltonian object to be a collection of terms, and to do
-    #       appropriate operations on those terms to meet the other interfaces.
-    #       -- I'm wondering if the Hamiltonian or the file readers or a translation layer between
-    #          the two of them?  For example, NumPy and HDF5 and FCIDUMP can give you
-    #          second-quantizatino tensors, and translating that to terms is the same after it's
-    #          read from the data file.  So it could be that the file readers get the tensors and
-    #          then call a standard translator to terms and return a Hamiltonian, or they could
-    #          return the tensors and have a translation layer to terms that get laoded into the
-    #          Hamiltonian, or there could be multiple "constructors" that do the translation from
-    #          the tensors to the terms.
-    #def _get_all_pauli_strings(self, return_as="tuples"):
-    #    # Returns all Pauli strings as a flat data structure, specifically a dictionary where the
-    #    # key is the Pauli string and the value is the coefficient.
-    #    # -- If return_as == "tuples": The Pauli string is encoded as a tuple of tuples, where each
-    #    #    inner tuple is (qubit index, Pauli operator), with the qubit index being a
-    #    #    zero-indexed integer and the Pauli operator is a one-character string.  For example,
-    #    #    assuming at least 4 qubits, ((0, 'X'), (3, 'Z')).
-    #    # -- If return_as == "strings": The Pauli string is encoded as a character string, where
-    #    #    each character is a Pauli matrix, explicitly including identity entries.  For example,
-    #    #    assuming 6 qubits, "XIIZII".
-    #    # -- If return_as == "objects": Keys are immutable PauliString instances that can provide
-    #    #    either representation on demand.
-    #    # TODO: I'd prefer that the flag identify not the data structure but the concept: dense vs
-    #    #       sparse, rather than strings vs tuples.
-    #    if return_as == "tuples":
-    #        # The qubit mappings return complex coefficients (with round-off imaginary parts) when
-    #        # the integrals are complex, even for a Hermitian Hamiltonian; make them real here.
-    #        if isinstance(self._H, InteractionOperator):
-    #            return real_pauli_coefficients(self._fmap(self._H).terms)
-    #        elif isinstance(self._H, MixedFermionBosonOperator):
-    #            # TODO: MixedFermionBosonOperator already has its encodings, so this ignores the
-    #            #       encodings selected by Hamiltonian.  Clean this up.  Probably by deferring
-    #            #       the specification of encodings for MixedFermionBosonOperator?
-    #            return real_pauli_coefficients(self._H.generate_qubit_operator().terms)
-    #        elif isinstance(self._H, LinearCombinationOfPauliStrings):
-    #            return self._H.get_sparse_pauli_strings()
-    #        else:
-    #            raise TypeError(
-    #                f"Unable to generate Pauli strings from object of type \"{type(self._H)}\".")
-    #    elif return_as == "strings":
-    #        as_objects = self._get_all_pauli_strings(return_as="objects")
-    #        return {pauli.to_dense() : coef for pauli, coef in as_objects.items()}
-    #    elif return_as == "objects":
-    #        if isinstance(self._H, LinearCombinationOfPauliStrings):
-    #            return self._H.get_pauli_strings()
-    #        as_tuples = self._get_all_pauli_strings(return_as="tuples")
-    #        Nq = self.num_qubits()
-    #        return {PauliString.from_sparse(pauli, Nq) : coef
-    #                for pauli, coef in as_tuples.items()}
-    #    else:
-    #        raise ValueError("  ".join([
-    #            "The value of return_as must be \"tuples\", \"strings\", or \"objects\".",
-    #            f"Unable to return result as \"{return_as}\".",
-    #            ]))
-    #def terms(self):
-    #    # TODO: Eventually this won't be SinglePauliTerm, but for now that's where we're at.
-    #    return [SinglePauliTerm(*term)
-    #            for term in self._get_all_pauli_strings(return_as='strings').items()]
-    #def to_matrix(self, memory_threshold_gb, force_dense=None, force_sparse=None):
-    #    """
-    #    Convert the Hamiltonian to its exact matrix representation.
-    #
-    #    The choice between dense and sparse representation is based on the memory
-    #    threshold. Dense matrices require (2^num_qubits)^2 * 16 bytes.
-    #
-    #    Parameters:
-    #        memory_threshold_gb: float, memory threshold in GB for dense representation
-    #        force_dense: bool or None, force dense matrix representation
-    #        force_sparse: bool or None, force matrix-free operator
-    #
-    #    Returns:
-    #        numpy array (dense) or PauliStringOperator (sparse/matrix-free)
-    #
-    #    Raises:
-    #        ValueError: If both force_dense and force_sparse are True
-    #
-    #    Example:
-    #        >>> hamiltonian = Hamiltonian(...)
-    #        >>> H_exact = hamiltonian.to_matrix(memory_threshold_gb=16.0)
-    #        >>> # For small systems: H_exact is numpy array
-    #        >>> # For large systems: H_exact is PauliStringOperator
-    #    """
-    #    from qhat.analysis.matrix_operations import create_hamiltonian_operator
-    #
-    #    # Get Pauli strings as dense format (full string per term)
-    #    pauli_dict = self._get_all_pauli_strings(return_as="strings")
-    #    num_qubits = self.num_qubits()
-    #
-    #    logger.verbose(f"Converting Hamiltonian to matrix for {num_qubits} qubits")
-    #    logger.verbose(f"Hamiltonian has {len(pauli_dict)} Pauli terms")
-    #
-    #    # Create operator (dense or sparse based on memory threshold)
-    #    return create_hamiltonian_operator(
-    #        pauli_dict, num_qubits, memory_threshold_gb,
-    #        force_dense=force_dense,
-    #        force_sparse=force_sparse
-    #    )
-    #def energy_shift(self, dE):
-    #    dE = require_real_scalar("energy shift", dE)
-    #    # Track the cumulative shift for analysis corrections
-    #    self._energy_shift_total += dE
-    #
-    #    if isinstance(self._H, InteractionOperator):
-    #        t0 = self._H.constant + dE
-    #        t1 = self._H.one_body_tensor
-    #        t2 = self._H.two_body_tensor
-    #        self._H = InteractionOperator(t0, t1, t2)
-    #    elif isinstance(self._H, MixedFermionBosonOperator):
-    #        self._H.energy_shift(dE)
-    #    elif isinstance(self._H, LinearCombinationOfPauliStrings):
-    #        self._H.energy_shift(dE)
-    #    else:
-    #        raise TypeError(
-    #            f"Unable to shift a fermionic Hamiltonian of type \"{type(self._H)}\".")
-    #def get_energy_shift(self) -> float:
-    #    """
-    #    Get the cumulative energy shift applied to this Hamiltonian.
-    #
-    #    This is used by analysis functions to correct eigenvalues and errors
-    #    for meaningful comparisons between exact and approximate representations.
-    #
-    #    Returns:
-    #        The total energy shift applied via energy_shift() calls
-    #    """
-    #    return self._energy_shift_total
-    #def compute_initial_energy_bounds(
-    #        self,
-    #        config_hamiltonian: HamiltonianConfiguration):
-    #    logger.info("Computing initial energy bounds.")
-    #    pauli_sum = self._get_all_pauli_strings()
-    #    logger.verbose(f"-- number of Pauli strings = {len(pauli_sum)}")
-    #    energy_shift = pauli_sum.get(tuple(), 0.0) # identity term (may not exist in all formats)
-    #    dE = sum(abs(coefficient) for coefficient in pauli_sum.values()) - abs(energy_shift)
-    #    Elo0 = energy_shift - dE
-    #    Ehi0 = energy_shift + dE
-    #    logger.verbose(f"-- energy shift = {energy_shift}")
-    #    logger.verbose(f"-- computed bounds = [{Elo0}, {Ehi0})")
-    #    EloU = value(config_hamiltonian.lower_bound, float('-inf'))
-    #    EhiU = value(config_hamiltonian.upper_bound, float('inf'))
-    #    Elo1 = max(Elo0, EloU)
-    #    Ehi1 = min(Ehi0, EhiU)
-    #    logger.verbose(f"-- limited bounds = [{Elo1}, {Ehi1})")
-    #    if config_hamiltonian.exact_energy_lower_bound:
-    #        assert config_hamiltonian.lower_bound is not None
-    #        Elo1 = config_hamiltonian.lower_bound
-    #    if config_hamiltonian.exact_energy_upper_bound:
-    #        assert config_hamiltonian.upper_bound is not None
-    #        Ehi1 = config_hamiltonian.upper_bound
-    #    Elo1 = require_real_scalar("lower energy bound", Elo1)
-    #    Ehi1 = require_real_scalar("upper energy bound", Ehi1)
-    #    logger.verbose(f"-- initial bounds = [{Elo1}, {Ehi1})")
-    #    return (Elo1, Ehi1)
 
 # -------------------------------------------------------------------------------------------------
 
@@ -887,8 +645,6 @@ def get_physical_hamiltonian(config_hamiltonian: HamiltonianConfiguration):
 
     if config_hamiltonian.source == "numpy":
         return load_numpy(config_hamiltonian)
-    elif config_hamiltonian.source == "LCPS":
-        return load_LCPS(config_hamiltonian)
     elif config_hamiltonian.source == "hdf5":
         return load_hdf5(config_hamiltonian)
     elif config_hamiltonian.source == "pauli":
