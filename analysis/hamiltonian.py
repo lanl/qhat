@@ -274,6 +274,30 @@ class Hamiltonian:
         Ehi1 = require_real_scalar("upper energy bound", Ehi1)
         logger.verbose(f"-- initial bounds = [{Elo1}, {Ehi1})")
         return (Elo1, Ehi1)
+    @classmethod
+    def from_pauli_strings(cls, pauli_strings, num_qubits):
+        # TODO: This assumes that pauli_strings is a dict of {pauli_string : coefficient, ...}, but
+        #       different types for the Pauli strings are supported because the SinglePauliString
+        #       constructor handles that for us.  Do we want to support the tuple((pauli_string,
+        #       coefficient), ...) format as well?
+        #    -- The main complication there is deduplication without overwriting a previous value.
+        #    -- Currently the way to get a duplicate value is if you use the sparse format and
+        #       switch the order (e.g.: ((3,'Z'),(0,'X')) vs ((0,'X'),(3,'Z')) would be the same
+        #       Pauli string but hash to different dict keys) or to mix different formats (e.g.,
+        #       tuple vs str vs PauliString could represent the same Pauli string but would hash to
+        #       different dict keys).
+        pauli_terms = (SinglePauliString(ps, c, num_qubits) for ps, c in pauli_strings.items())
+        term_dict = {term.pauli_string : 0.0 for term in pauli_terms}
+        if len(term_dict) < len(pauli_terms):
+            # The same Pauli string appears in multiple terms, so combine them
+            # -- Could be different types to store the Pauli string in the pauli_strings argument
+            # -- Could be sparse Pauli strings as tuples with the order rearranged
+            # All of this washes out once you canonicalize to the PauliString class (which
+            # SinglePauliTerm does internally).
+            for term in pauli_terms:
+                term_dict[term.pauli_string] += term.coefficient
+            pauli_terms = (SinglePauliString(ps, c, num_qubits) for ps, c in term_dict.items()))
+        return cls(pauli_terms, num_qubits)
 
 
 
