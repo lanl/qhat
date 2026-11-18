@@ -108,13 +108,98 @@ class LinearCombinationOfPauliStrings:
 #       other things are built on top of?
 
 class Hamiltonian:
-    def __init__(self, hamiltonian):
-        self._H = hamiltonian
-        self._energy_shift_total = 0.0  # Track cumulative energy shift for analysis corrections
+    def __init__(self, terms, num_qubits, core_operator=None):
+        """
+        Construct a Hamiltonian from a collection of terms and a number of qubits (optionally also
+        a core operator).
+
+        The Hamiltonian is assumed to be the sum of the terms.  While addition of operators is
+        commutative, the order does matter because some methods will transform the terms into
+        time-evolution operators that multiply together, and time-evolution operators are not
+        commutative under multiplication.
+        """
+        self.terms = list(Terms)
+        self.num_qubits = num_qubits
+        self.core_operator = core_oeprator
+        self._energy_shift_total = 0.0
+        for term in terms:
+            assert term.num_qubits() == self.num_qubits
+    def num_qubits(self):
+        """
+        The number of qubits that this Hamiltonian operates on.
+        """
+        return self.num_qubits
+    def terms(self):
+        """
+        Returns an ordered container of the terms in the Hamiltonian.
+        """
+        # TODO: Currently __init__ saves the terms with no processing and this returns the terms
+        #       with no processing.  That implies that they are already packed into term classes
+        #       before being passed to the constructor.  That is done by the classmethods
+        #       from_pauli_string, from_second_quantization, etc.
+        return self.terms
     def get_core_operator(self):
-        # TODO: This should probably be replaced by a function that generates an appropriate
-        #       pyLIQTR problem instance.
-        return self._H
+        """
+        Returns the core operator, which may be needed by downstream algorithms (such as block
+        encodings from pyLIQTR).
+        """
+        # TODO: Do we really need to store the core_operator, or can it be constructed on demand?
+        if self.core_operator is None:
+            raise ValueError(
+                "This Hamiltonian was not generated with a core operator, so requesting the core "
+                "operator is an invalid operation.")
+        return self.core_operator
+    def to_pauli_strings(self):
+        # TODO: This is a temporary bridge method to be removed once Pauli-based analyses
+        #       (eigenvalue bounds, nested-commutator bounds, etc) are updated to use the term
+        #       interface.
+        pauli_strings = {}
+        for term in self.terms:
+            term_dict = term.to_pauli_strings()
+            for key, value in term_dict.items():
+                pauli_strings[key] = pauli_strings.get(key, 0) + value
+        return pauli_strings
+    def energy_shift(self, dE):
+        """
+        Shifts the energy spectrum of the Hamiltonian by shifting the identity term.
+        """
+        dE = require_real_scalar("energy shift", dE)
+        # Track the cumulative shift for analysis corrections
+        self._energy_shift_total += dE
+        for term in terms:
+            # TODO: Find the identity term and update it
+            pass
+        if isinstance(self.core_operator, InteractionOperator):
+            t0 = self.core_operator.constant + dE
+            t1 = self.core_operator.one_body_tensor
+            t2 = self.core_operator.two_body_tensor
+            self.core_operator = InteractionOperator(t0, t1, t2)
+        elif isinstance(self.core_operator, MixedFermionBosonOperator):
+            self.core_operator.energy_shift(dE)
+        elif self.core_operator is not None:
+            raise TypeError(
+                "Unable to apply an energy shift a Hamiltonian with core_operator of type "
+                f"\"{type(self.core_operator)}\".")
+    def get_energy_shift(self) -> float:
+        """
+        Get the cumulative energy shift applied to this Hamiltonian.
+
+        This is used by analysis functions to correct eigenvalues and errors
+        for meaningful comparisons between exact and approximate representations.
+
+        Returns:
+            The total energy shift applied via energy_shift() calls
+        """
+        return self._energy_shift_total
+
+
+    #def __init__(self, hamiltonian):
+    #    self._H = hamiltonian
+    #    self._energy_shift_total = 0.0  # Track cumulative energy shift for analysis corrections
+    #def get_core_operator(self):
+    #    # TODO: This should probably be replaced by a function that generates an appropriate
+    #    #       pyLIQTR problem instance.
+    #    return self._H
     def set_fermionic_mapping(self, mapping):
         # self._fmap is never used for LinearCombinationOfPauliStrings
         if isinstance(mapping, str):
@@ -131,15 +216,15 @@ class Hamiltonian:
             self._bmap = mapping
         if isinstance(self._H, MixedFermionBosonOperator):
             self._H.set_bosonic_encoding(self._bmap)
-    def num_qubits(self):
-        if isinstance(self._H, InteractionOperator):
-            return self._H.n_qubits
-        elif isinstance(self._H, MixedFermionBosonOperator):
-            return self._H.num_qubits()
-        elif isinstance(self._H, LinearCombinationOfPauliStrings):
-            return self._H.num_qubits()
-        else:
-            raise TypeError("Unable to determine the number of qubits.")
+    #def num_qubits(self):
+    #    if isinstance(self._H, InteractionOperator):
+    #        return self._H.n_qubits
+    #    elif isinstance(self._H, MixedFermionBosonOperator):
+    #        return self._H.num_qubits()
+    #    elif isinstance(self._H, LinearCombinationOfPauliStrings):
+    #        return self._H.num_qubits()
+    #    else:
+    #        raise TypeError("Unable to determine the number of qubits.")
     # TODO: The next step is to get rid of _get_all_pauli_strings and switch the internal
     #       representation here in the Hamiltonian object to be a collection of terms, and to do
     #       appropriate operations on those terms to meet the other interfaces.
@@ -195,10 +280,10 @@ class Hamiltonian:
                 "The value of return_as must be \"tuples\", \"strings\", or \"objects\".",
                 f"Unable to return result as \"{return_as}\".",
                 ]))
-    def terms(self):
-        # TODO: Eventually this won't be SinglePauliTerm, but for now that's where we're at.
-        return [SinglePauliTerm(*term)
-                for term in self._get_all_pauli_strings(return_as='strings').items()]
+    #def terms(self):
+    #    # TODO: Eventually this won't be SinglePauliTerm, but for now that's where we're at.
+    #    return [SinglePauliTerm(*term)
+    #            for term in self._get_all_pauli_strings(return_as='strings').items()]
     def to_matrix(self, memory_threshold_gb, force_dense=None, force_sparse=None):
         """
         Convert the Hamiltonian to its exact matrix representation.
@@ -238,35 +323,35 @@ class Hamiltonian:
             force_dense=force_dense,
             force_sparse=force_sparse
         )
-    def energy_shift(self, dE):
-        dE = require_real_scalar("energy shift", dE)
-        # Track the cumulative shift for analysis corrections
-        self._energy_shift_total += dE
+    #def energy_shift(self, dE):
+    #    dE = require_real_scalar("energy shift", dE)
+    #    # Track the cumulative shift for analysis corrections
+    #    self._energy_shift_total += dE
+    #
+    #    if isinstance(self._H, InteractionOperator):
+    #        t0 = self._H.constant + dE
+    #        t1 = self._H.one_body_tensor
+    #        t2 = self._H.two_body_tensor
+    #        self._H = InteractionOperator(t0, t1, t2)
+    #    elif isinstance(self._H, MixedFermionBosonOperator):
+    #        self._H.energy_shift(dE)
+    #    elif isinstance(self._H, LinearCombinationOfPauliStrings):
+    #        self._H.energy_shift(dE)
+    #    else:
+    #        raise TypeError(
+    #            f"Unable to shift a fermionic Hamiltonian of type \"{type(self._H)}\".")
 
-        if isinstance(self._H, InteractionOperator):
-            t0 = self._H.constant + dE
-            t1 = self._H.one_body_tensor
-            t2 = self._H.two_body_tensor
-            self._H = InteractionOperator(t0, t1, t2)
-        elif isinstance(self._H, MixedFermionBosonOperator):
-            self._H.energy_shift(dE)
-        elif isinstance(self._H, LinearCombinationOfPauliStrings):
-            self._H.energy_shift(dE)
-        else:
-            raise TypeError(
-                f"Unable to shift a fermionic Hamiltonian of type \"{type(self._H)}\".")
-
-    def get_energy_shift(self) -> float:
-        """
-        Get the cumulative energy shift applied to this Hamiltonian.
-
-        This is used by analysis functions to correct eigenvalues and errors
-        for meaningful comparisons between exact and approximate representations.
-
-        Returns:
-            The total energy shift applied via energy_shift() calls
-        """
-        return self._energy_shift_total
+    #def get_energy_shift(self) -> float:
+    #    """
+    #    Get the cumulative energy shift applied to this Hamiltonian.
+    #
+    #    This is used by analysis functions to correct eigenvalues and errors
+    #    for meaningful comparisons between exact and approximate representations.
+    #
+    #    Returns:
+    #        The total energy shift applied via energy_shift() calls
+    #    """
+    #    return self._energy_shift_total
     def compute_initial_energy_bounds(
             self,
             config_hamiltonian: HamiltonianConfiguration):
