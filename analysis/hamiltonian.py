@@ -160,8 +160,8 @@ class Hamiltonian:
         pauli_strings = {}
         for term in self._terms:
             term_dict = term.to_pauli_strings()
-            for key, value in term_dict.items():
-                pauli_strings[key] = pauli_strings.get(key, 0) + value
+            for pstr, coeff in term_dict.items():
+                pauli_strings[pstr] = pauli_strings.get(pstr, 0) + coeff
         return pauli_strings
     def energy_shift(self, dE):
         """
@@ -180,6 +180,9 @@ class Hamiltonian:
                 break
         else:
             self._terms.insert(0, SinglePauliTerm((), dE, self._num_qubits))
+        # TODO: If we can reconstruct the core operator on demand, then we don't need to update it
+        #       here, preventing inconsistencies and eliminating the need to worry if it somehow
+        #       was set to an invalid value.
         if isinstance(self._core_operator, InteractionOperator):
             t0 = self._core_operator.constant + dE
             t1 = self._core_operator.one_body_tensor
@@ -232,7 +235,7 @@ class Hamiltonian:
 
         # TODO: We'll need to add a to_matrix method to each term to support this feature
         # Get Pauli strings as dense format (full string per term)
-        pauli_dict = {key.to_dense(): value for key, value in self.to_pauli_strings().items()}
+        pauli_dict = {pstr.to_dense(): coeff for pstr, coeff in self.to_pauli_strings().items()}
         num_qubits = self.num_qubits()
 
         logger.verbose(f"Converting Hamiltonian to matrix for {num_qubits} qubits")
@@ -249,7 +252,7 @@ class Hamiltonian:
             config_hamiltonian: HamiltonianConfiguration):
         # TODO: This is one of the uses of to_pauli_strings that we need to address in the future
         logger.info("Computing initial energy bounds.")
-        pauli_sum = {key.to_sparse() : value for key, value in self.to_pauli_strings().items()}
+        pauli_sum = {pstr.to_sparse() : coeff for pstr, coeff in self.to_pauli_strings().items()}
         logger.verbose(f"-- number of Pauli strings = {len(pauli_sum)}")
         energy_shift = pauli_sum.get(tuple(), 0.0) # identity term (may not exist in all formats)
         dE = sum(abs(coefficient) for coefficient in pauli_sum.values()) - abs(energy_shift)
