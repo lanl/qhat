@@ -166,9 +166,19 @@ class Hamiltonian:
         dE = require_real_scalar("energy shift", dE)
         # Track the cumulative shift for analysis corrections
         self._energy_shift_total += dE
+        # Update the identity term
+        # TODO: Check that this works as expected
+        # TODO: This suggests that an identity term type would be useful, especially if we restrict
+        #       all other term types to prevent them from being identity.
         for term in terms:
-            # TODO: Find the identity term and update it
-            pass
+            if term.pauli_string.to_sparse() == ():
+                print(f"Updating term {term.pauli_string} {term.coefficient}")
+                term.coefficient += dE
+                print(f"-- new coefficient = {term.coefficient}")
+                break
+        else:
+            terms.insert(0, SinglePauliTerm((), dE, terms[0].num_qubits()))
+            print(f"Inserted new term {terms[0].pauli_string} {terms[0].coefficient}")
         if isinstance(self.core_operator, InteractionOperator):
             t0 = self.core_operator.constant + dE
             t1 = self.core_operator.one_body_tensor
@@ -191,6 +201,7 @@ class Hamiltonian:
             The total energy shift applied via energy_shift() calls
         """
         return self._energy_shift_total
+
 
 
     #def __init__(self, hamiltonian):
