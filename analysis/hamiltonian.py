@@ -157,7 +157,6 @@ class Hamiltonian:
         # Track the cumulative shift for analysis corrections
         self._energy_shift_total += dE
         # Update the identity term
-        # TODO: Check that this works as expected
         # TODO: This suggests that an identity term type would be useful, especially if we restrict
         #       all other term types to prevent them from being identity.
         for i, term in enumerate(self._terms):
