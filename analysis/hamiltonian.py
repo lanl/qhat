@@ -122,7 +122,10 @@ class Hamiltonian:
         self._num_qubits = num_qubits
         self._core_operator = core_operator
         self._energy_shift_total = 0.0
-        for term in terms:
+        for term in self._terms:
+            if term.num_qubits() != self._num_qubits:
+                raise ValueError(f"Mismatch in number of qubits.  Term {term} has "
+                                 f"{term.num_qubits()} qubits but should have {self._num_qubits}.")
             assert term.num_qubits() == self._num_qubits
     def num_qubits(self):
         """
