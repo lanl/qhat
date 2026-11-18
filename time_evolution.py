@@ -341,6 +341,10 @@ if __name__ == "__main__":
         state                = _load_state_from_config(config_file)
         physical_hamiltonian = get_physical_hamiltonian(state.config_hamiltonian)
         n_qubits         = physical_hamiltonian.num_qubits()
+        # TODO: BROKEN.  Hamiltonian.get_all_pauli_strings was removed in the term-based
+        #       restructure, so this config-file path raises AttributeError.  This script is
+        #       outside analysis/ and common/, so it is easy to miss when testing.  Fix with:
+        #           {p.to_sparse(): c for p, c in physical_hamiltonian.to_pauli_strings().items()}
         pauli_dict       = physical_hamiltonian.get_all_pauli_strings(return_as="tuples")
         using_pauli_file = False
 

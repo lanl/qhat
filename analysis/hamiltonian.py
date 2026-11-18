@@ -69,6 +69,21 @@ def _pauli_terms_from_qubit_operator(qubit_operator, num_qubits):
 
 # -------------------------------------------------------------------------------------------------
 
+# TODO: Tests to rewrite once the term-based Hamiltonian design settles.  They use APIs removed in
+#       the restructure: get_all_pauli_strings, LinearCombinationOfPauliStrings, and the
+#       single-argument Hamiltonian(...) constructor.
+#       -- analysis/tests/test_complex_hamiltonian.py      (get_all_pauli_strings)
+#       -- analysis/tests/test_exact_matrix.py             (LinearCombinationOfPauliStrings)
+#       -- analysis/tests/test_fourth_order_selection.py   (LinearCombinationOfPauliStrings)
+#       -- analysis/tests/test_hamlib_loader.py            (both)
+#       -- analysis/tests/test_multi_control_config.py     (LinearCombinationOfPauliStrings)
+#       -- analysis/tests/test_pauli_hamiltonian.py        (both; test_get_core_operator also
+#                                                           expects an LCPS core operator)
+#       -- analysis/tests/test_pauli_string_lcu.py         (both)
+#       Stale comments that still refer to get_all_pauli_strings:
+#       -- common/commuting_pauli_string_evolution.py      (from-tuples constructor docstring)
+#       -- common/tests/test_trotter_flattened.py          (test_build_with_generator)
+
 class Hamiltonian:
     def __init__(self, terms, num_qubits, core_operator=None):
         """

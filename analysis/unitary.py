@@ -35,6 +35,12 @@ class PauliStringLCU(LCUBlockEncoding):
 
     def __init__(self, hamiltonian, prepare_type=None, energy_error=None, **kwargs):
 
+        # TODO: BROKEN.  Fix once the term-based Hamiltonian design settles:
+        #       -- SinglePauliTerm is not imported at module level (only inside
+        #          encode_ramped_trotter), so the isinstance check raises NameError.
+        #       -- `hamiltonian.terms` in the list comprehension below is missing its call
+        #          parentheses.
+        #       -- `term.coefficients` should be `term.coefficient`.
         for term in hamiltonian.terms():
             if not isinstance(term, SinglePauliTerm):
                 raise ValueError("When using the PauliStringLCU block encoding, the Hamiltonian "
