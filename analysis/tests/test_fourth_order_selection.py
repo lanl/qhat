@@ -6,7 +6,7 @@ Simple test to verify fourth-order Trotter selection works in analysis/unitary.p
 import pytest
 from qhat.analysis.unitary import encode_ramped_trotter
 from qhat.analysis.config_types import UnitaryConfiguration
-from qhat.analysis.hamiltonian import LinearCombinationOfPauliStrings, Hamiltonian
+from qhat.analysis.hamiltonian import Hamiltonian
 
 
 @pytest.fixture
@@ -18,8 +18,7 @@ def simple_hamiltonian():
         ((0, 'Z'), (2, 'X')): 0.2,
         ((0, 'X'),): 0.1,
     }
-    lcps = LinearCombinationOfPauliStrings(sparse=pauli_dict, num_qubits=3)
-    return Hamiltonian(lcps)
+    return Hamiltonian.from_pauli_strings(pauli_dict, 3)
 
 
 def create_config(energy_error, explicit_order=None):

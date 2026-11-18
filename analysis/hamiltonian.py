@@ -169,7 +169,7 @@ class Hamiltonian:
                 if cancelled and len(self._terms) > 1:
                     del self._terms[i]
                 else:
-                    term.coefficient = new_coefficient
+                    self._terms[i] = SinglePauliTerm(term.pauli_string, new_coefficient)
                 break
         else:
             if dE != 0.0:

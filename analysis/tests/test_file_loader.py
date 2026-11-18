@@ -25,7 +25,7 @@ def test_toy_fci_file():
 
     config_hamiltonian = MockConfig()
     config_hamiltonian.filename = str(test_file)
-    config_hamiltonian.fermion_to_qubit_transform = None
+    config_hamiltonian.fermion_to_qubit_transform = "JW"
 
     H = load_fci(config_hamiltonian)
     assert isinstance(H, Hamiltonian)
@@ -127,7 +127,7 @@ def test_real_fci_file():
 
     config_hamiltonian = MockConfig()
     config_hamiltonian.filename = str(test_file)
-    config_hamiltonian.fermion_to_qubit_transform = None
+    config_hamiltonian.fermion_to_qubit_transform = "JW"
 
     H = load_fci(config_hamiltonian)
     check_32_2ru_III_3pl_operator(H, "Real FCI file")
@@ -141,7 +141,7 @@ def test_numpy_file_openfermion():
 
     config_hamiltonian = MockConfig()
     config_hamiltonian.filename = str(test_file)
-    config_hamiltonian.fermion_to_qubit_transform = None
+    config_hamiltonian.fermion_to_qubit_transform = "JW"
     config_hamiltonian.integral_convention = "openfermion"
 
     H = load_numpy(config_hamiltonian)
@@ -182,7 +182,7 @@ def test_numpy_file_chemist_spatial():
 
     config_hamiltonian = MockConfig()
     config_hamiltonian.filename = str(test_file)
-    config_hamiltonian.fermion_to_qubit_transform = None
+    config_hamiltonian.fermion_to_qubit_transform = "JW"
     config_hamiltonian.integral_convention = "chemist_spatial"
 
     H = load_numpy(config_hamiltonian)

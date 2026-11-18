@@ -5,7 +5,14 @@ from qhat.common import controls
 from qhat.common.pauli_string import PauliString
 
 class BaseTerm(ABC):
-    """The abstract base class that defines the generic interface for Hamiltonian terms."""
+    """The abstract base class that defines the generic interface for Hamiltonian terms.
+
+    Terms must be immutable value objects with `__eq__` and `__hash__`, because bloqs such as
+    `Trotterization` hold them and need to compare and hash equal when built from equal terms.
+    The simplest way to meet this is to make each term class `@attrs.frozen` (see
+    `SinglePauliTerm`, which keeps a custom `__init__` with `init=False` and `__attrs_init__`);
+    its fields must themselves be immutable and hashable (e.g. tuples, not lists).
+    """
 
     @abstractmethod
     def num_qubits(self) -> int:

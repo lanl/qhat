@@ -19,6 +19,7 @@ from qualtran.resource_counting._qubit_counts import _cbloq_max_width
 
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.pauli_utils import pauli_string_to_matrix
+from qhat.common.tests.term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 from .test_multi_control import block_matrix
 
@@ -30,7 +31,7 @@ SYMMETRIC = ["second order", "fourth order"]
 
 
 def trotter(method="fourth order", num_steps=4, terms=TERMS, **kwargs):
-    return Trotterization.from_method(terms, method, TIME, num_steps, hbar=HBAR, **kwargs)
+    return Trotterization.from_method(single_pauli_terms(terms), method, TIME, num_steps, hbar=HBAR, **kwargs)
 
 
 def reference(tr, sign=1):
@@ -38,8 +39,9 @@ def reference(tr, sign=1):
     dt = tr.time / tr.num_steps
     out = np.eye(2**tr.num_qubits, dtype=complex)
     for i, c in tr.expanded_sequence:
-        p, h = tr.pauli_terms[i]
-        out = expm(-1j * sign * h * c * dt / tr.hbar * pauli_string_to_matrix(p)) @ out
+        term = tr.hamiltonian_terms[i]
+        out = expm(-1j * sign * term.coefficient * c * dt / tr.hbar
+                   * pauli_string_to_matrix(term.pauli_string.to_dense())) @ out
     return out.conj().T if tr.is_adjoint else out
 
 
@@ -62,7 +64,7 @@ class TestIsSymmetric:
     @pytest.mark.parametrize("num_steps", [1, 3])
     def test_methods(self, method, expected, num_steps):
         if isinstance(method, tuple):
-            tr = Trotterization(TERMS, method, TIME, num_steps)
+            tr = Trotterization(single_pauli_terms(TERMS), method, TIME, num_steps)
         else:
             tr = trotter(method, num_steps)
         assert tr.is_symmetric is expected
@@ -74,7 +76,7 @@ class TestIsSymmetric:
     def test_bookends_decide(self):
         """Two terms with (0.3, 0.7): the repeat core is a palindrome, but the prologue (0.3)
         and the epilogue (0.7) differ, so the sequence isn't symmetric."""
-        tr = Trotterization((("XZ", 0.4), ("ZI", -0.3)), (0.3, 0.7), TIME, 4)
+        tr = Trotterization(single_pauli_terms((("XZ", 0.4), ("ZI", -0.3))), (0.3, 0.7), TIME, 4)
         assert tr._repeat_core == tr._repeat_core[::-1]
         assert tr.is_symmetric is False
         assert not np.allclose(reference(attrs.evolve(tr, time=-TIME)), reference(tr).conj().T,
@@ -125,7 +127,8 @@ class TestSignControlled:
         more CNOTs than the term; an all-identity term becomes 1 rotation on the control."""
         v = trotter(num_steps=3)
         s = v.sign_controlled()
-        assert s.pauli_terms == tuple(('Z' + p, -h) for p, h in TERMS)
+        assert [(term.pauli_string.to_dense(), term.coefficient)
+                for term in s.hamiltonian_terms] == [('Z' + p, -h) for p, h in TERMS]
         assert s.num_qubits == v.num_qubits + 1
         occurrences = len(v.expanded_sequence)
         rotating = sum(1 for i, _ in v.expanded_sequence if set(TERMS[i][0]) != {'I'})

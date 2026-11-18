@@ -359,9 +359,10 @@ if __name__ == "__main__":
 
 def test_controlled_time_evolution_of_trotterization_is_own_bloq():
     """Controlled time evolution keeps a Trotterization (plan T4), exactly controlled."""
+    from qhat.common.tests.term_helpers import single_pauli_terms
     from qhat.common.trotter_flattened import Trotterization
     unitary = Trotterization.from_method(
-        [("XZ", 0.5), ("ZI", 0.3), ("YX", 0.2)], "fourth order", time=0.43, num_steps=3)
+        single_pauli_terms([("XZ", 0.5), ("ZI", 0.3), ("YX", 0.2)]), "fourth order", time=0.43, num_steps=3)
     config = AlgorithmConfiguration()
     config.method = "controlled time evolution"
     algorithm = build_algorithm(config, unitary)

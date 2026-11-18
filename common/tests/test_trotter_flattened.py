@@ -13,6 +13,8 @@ from qualtran import CtrlSpec, QUInt
 from qualtran.cirq_interop.t_complexity_protocol import t_complexity
 
 from qhat.common.pauli_utils import pauli_string_to_matrix
+from qhat.common.terms.single_pauli_term import SinglePauliTerm
+from qhat.common.tests.term_helpers import single_pauli_terms as _terms
 from qhat.common.trotter_flattened import (
     Trotterization,
     build_ramped_trotterized_unitary,
@@ -39,7 +41,7 @@ def expand_ramped_trotterization(
 
     # Create Trotterization instance
     trotter = Trotterization(
-        pauli_terms=pauli_terms,
+        hamiltonian_terms=_terms(pauli_terms),
         coefficients=tuple(coefficients),
         time=1.0,
         num_steps=num_steps,
@@ -144,7 +146,7 @@ class TestInstantiation:
         since multiple steps are redundant when there's no non-commutation error.
         """
         trotter = Trotterization(
-            pauli_terms=(("XYZ", 0.5),),
+            hamiltonian_terms=_terms((("XYZ", 0.5),)),
             coefficients=(1.0,),
             time=1.0,
             num_steps=10
@@ -156,7 +158,7 @@ class TestInstantiation:
     def test_valid_multiple_terms(self):
         """Test creation with multiple terms."""
         trotter = Trotterization(
-            pauli_terms=(("XY", 0.5), ("YZ", 0.3), ("ZX", 0.2)),
+            hamiltonian_terms=_terms((("XY", 0.5), ("YZ", 0.3), ("ZX", 0.2))),
             coefficients=(0.5, 0.5),
             time=2.0,
             num_steps=20
@@ -168,7 +170,7 @@ class TestInstantiation:
     def test_second_order_coefficients(self):
         """Test with second-order coefficients."""
         trotter = Trotterization(
-            pauli_terms=(("X", 1.0), ("Y", 1.0)),
+            hamiltonian_terms=_terms((("X", 1.0), ("Y", 1.0))),
             coefficients=(0.5, 0.5),
             time=1.0,
             num_steps=5
@@ -179,7 +181,7 @@ class TestInstantiation:
         """Test that empty terms list raises error."""
         with pytest.raises(ValueError, match="at least one"):
             Trotterization(
-                pauli_terms=(),
+                hamiltonian_terms=(),
                 coefficients=(1.0,),
                 time=1.0,
                 num_steps=1
@@ -189,7 +191,7 @@ class TestInstantiation:
         """Test that zero steps raises error."""
         with pytest.raises(ValueError, match="positive"):
             Trotterization(
-                pauli_terms=(("X", 1.0),),
+                hamiltonian_terms=_terms((("X", 1.0),)),
                 coefficients=(1.0,),
                 time=1.0,
                 num_steps=0
@@ -199,7 +201,7 @@ class TestInstantiation:
         """Test that negative steps raises error."""
         with pytest.raises(ValueError, match="positive"):
             Trotterization(
-                pauli_terms=(("X", 1.0),),
+                hamiltonian_terms=_terms((("X", 1.0),)),
                 coefficients=(1.0,),
                 time=1.0,
                 num_steps=-5
@@ -209,7 +211,7 @@ class TestInstantiation:
         """Test that empty coefficients raises error."""
         with pytest.raises(ValueError, match="at least one coefficient"):
             Trotterization(
-                pauli_terms=(("X", 1.0),),
+                hamiltonian_terms=_terms((("X", 1.0),)),
                 coefficients=(),
                 time=1.0,
                 num_steps=1
@@ -219,7 +221,7 @@ class TestInstantiation:
         """Test that different length strings raise error."""
         with pytest.raises(ValueError, match="same length"):
             Trotterization(
-                pauli_terms=(("XI", 1.0), ("XYZ", 1.0)),
+                hamiltonian_terms=_terms((("XI", 1.0), ("XYZ", 1.0))),
                 coefficients=(1.0,),
                 time=1.0,
                 num_steps=1
@@ -227,13 +229,8 @@ class TestInstantiation:
 
     def test_invalid_character_raises_error(self):
         """Test that invalid characters raise error."""
-        with pytest.raises(ValueError, match="Invalid character"):
-            Trotterization(
-                pauli_terms=(("XAZ", 1.0),),
-                coefficients=(1.0,),
-                time=1.0,
-                num_steps=1
-            )
+        with pytest.raises(ValueError, match="Invalid Pauli operator"):
+            SinglePauliTerm("XAZ", 1.0)
 
 
 # ==================================================================================
@@ -246,7 +243,7 @@ class TestSignature:
     def test_signature_structure(self):
         """Test that signature has correct structure."""
         trotter = Trotterization(
-            pauli_terms=(("XYZ", 0.5), ("ZYX", 0.3)),
+            hamiltonian_terms=_terms((("XYZ", 0.5), ("ZYX", 0.3))),
             coefficients=(0.5, 0.5),
             time=1.0,
             num_steps=10
@@ -268,7 +265,7 @@ class TestExpandedSequence:
     def test_expanded_sequence_cached(self):
         """Test that expanded_sequence is cached."""
         trotter = Trotterization(
-            pauli_terms=(("XY", 0.5), ("YZ", 0.3)),
+            hamiltonian_terms=_terms((("XY", 0.5), ("YZ", 0.3))),
             coefficients=(0.5, 0.5),
             time=1.0,
             num_steps=1
@@ -280,7 +277,7 @@ class TestExpandedSequence:
     def test_expanded_sequence_correctness(self):
         """Test that expanded_sequence matches expand_ramped_trotterization."""
         trotter = Trotterization(
-            pauli_terms=(("X", 1.0), ("Y", 1.0), ("Z", 1.0)),
+            hamiltonian_terms=_terms((("X", 1.0), ("Y", 1.0), ("Z", 1.0))),
             coefficients=(0.5, 0.5),
             time=1.0,
             num_steps=2
@@ -291,7 +288,7 @@ class TestExpandedSequence:
     def test_num_operations(self):
         """Test num_operations property."""
         trotter = Trotterization(
-            pauli_terms=(("X", 1.0), ("Y", 1.0)),
+            hamiltonian_terms=_terms((("X", 1.0), ("Y", 1.0))),
             coefficients=(0.5, 0.5),
             time=1.0,
             num_steps=1
@@ -311,7 +308,7 @@ class TestUnitaryGeneration:
         """Test single term matches analytical result."""
         # Single term with first-order method
         trotter = Trotterization(
-            pauli_terms=(("X", 0.5),),
+            hamiltonian_terms=_terms((("X", 0.5),)),
             coefficients=(1.0,),
             time=1.0,
             num_steps=1
@@ -329,7 +326,7 @@ class TestUnitaryGeneration:
     def test_single_term_multiple_steps_matches_analytical(self, method, num_steps, combine_terms):
         """A single-term Hamiltonian is exact for any num_steps, including after step collapse."""
         trotter = Trotterization.from_method(
-            pauli_terms=[("XZ", 0.5)],
+            hamiltonian_terms=_terms([("XZ", 0.5)]),
             method=method,
             time=1.3,
             num_steps=num_steps,
@@ -342,7 +339,7 @@ class TestUnitaryGeneration:
     def test_unitarity(self):
         """Test that generated matrix is unitary."""
         trotter = Trotterization(
-            pauli_terms=(("XY", 0.5), ("YZ", 0.3)),
+            hamiltonian_terms=_terms((("XY", 0.5), ("YZ", 0.3))),
             coefficients=(0.5, 0.5),
             time=1.0,
             num_steps=5
@@ -361,7 +358,7 @@ class TestUnitaryGeneration:
         h_y = 0.3
 
         trotter = Trotterization(
-            pauli_terms=(("X", h_x), ("Y", h_y)),
+            hamiltonian_terms=_terms((("X", h_x), ("Y", h_y))),
             coefficients=(1.0,),  # First-order
             time=0.1,
             num_steps=100
@@ -384,7 +381,7 @@ class TestUnitaryGeneration:
 
         # First-order
         trotter1 = Trotterization(
-            pauli_terms=(("X", h_x), ("Y", h_y)),
+            hamiltonian_terms=_terms((("X", h_x), ("Y", h_y))),
             coefficients=(1.0,),
             time=time,
             num_steps=num_steps
@@ -393,7 +390,7 @@ class TestUnitaryGeneration:
 
         # Second-order
         trotter2 = Trotterization(
-            pauli_terms=(("X", h_x), ("Y", h_y)),
+            hamiltonian_terms=_terms((("X", h_x), ("Y", h_y))),
             coefficients=(0.5, 0.5),
             time=time,
             num_steps=num_steps
@@ -419,7 +416,7 @@ class TestUnitaryGeneration:
 
         # 5 steps
         trotter5 = Trotterization(
-            pauli_terms=(("X", h_x), ("Z", h_z)),
+            hamiltonian_terms=_terms((("X", h_x), ("Z", h_z))),
             coefficients=(0.5, 0.5),
             time=time,
             num_steps=5
@@ -428,7 +425,7 @@ class TestUnitaryGeneration:
 
         # 20 steps
         trotter20 = Trotterization(
-            pauli_terms=(("X", h_x), ("Z", h_z)),
+            hamiltonian_terms=_terms((("X", h_x), ("Z", h_z))),
             coefficients=(0.5, 0.5),
             time=time,
             num_steps=20
@@ -457,7 +454,7 @@ class TestResourceEstimation:
     def test_returns_tcomplexity_object(self):
         """Test that _t_complexity_ returns a TComplexity object."""
         trotter = Trotterization(
-            pauli_terms=(("XY", 0.5), ("YX", 0.3)),
+            hamiltonian_terms=_terms((("XY", 0.5), ("YX", 0.3))),
             coefficients=(0.5, 0.5),
             time=1.0,
             num_steps=10
@@ -471,7 +468,7 @@ class TestResourceEstimation:
     def test_non_negative_counts(self):
         """Test that all resource counts are non-negative."""
         trotter = Trotterization(
-            pauli_terms=(("XY", 0.5),),
+            hamiltonian_terms=_terms((("XY", 0.5),)),
             coefficients=(1.0,),
             time=1.0,
             num_steps=5
@@ -486,7 +483,7 @@ class TestResourceEstimation:
         """Test that complexity scales with number of operations."""
         # Fewer operations
         trotter1 = Trotterization(
-            pauli_terms=(("X", 1.0),),
+            hamiltonian_terms=_terms((("X", 1.0),)),
             coefficients=(1.0,),
             time=1.0,
             num_steps=5
@@ -495,7 +492,7 @@ class TestResourceEstimation:
 
         # More operations (more steps)
         trotter2 = Trotterization(
-            pauli_terms=(("X", 1.0),),
+            hamiltonian_terms=_terms((("X", 1.0),)),
             coefficients=(1.0,),
             time=1.0,
             num_steps=20
@@ -508,13 +505,13 @@ class TestResourceEstimation:
     def test_complexity_independent_of_time(self):
         """Test that complexity is independent of time value."""
         trotter1 = Trotterization(
-            pauli_terms=(("XYZ", 0.5),),
+            hamiltonian_terms=_terms((("XYZ", 0.5),)),
             coefficients=(1.0,),
             time=0.1,
             num_steps=10
         )
         trotter2 = Trotterization(
-            pauli_terms=(("XYZ", 0.5),),
+            hamiltonian_terms=_terms((("XYZ", 0.5),)),
             coefficients=(1.0,),
             time=10.0,
             num_steps=10
@@ -539,7 +536,7 @@ class TestDecomposition:
         from qualtran import CompositeBloq
 
         trotter = Trotterization(
-            pauli_terms=(("XY", 0.5),),
+            hamiltonian_terms=_terms((("XY", 0.5),)),
             coefficients=(1.0,),
             time=1.0,
             num_steps=5
@@ -550,7 +547,7 @@ class TestDecomposition:
     def test_decompose_unitary_matches_original(self):
         """Test that decomposed bloq produces same unitary as original."""
         trotter = Trotterization(
-            pauli_terms=(("X", 0.5), ("Y", 0.3)),
+            hamiltonian_terms=_terms((("X", 0.5), ("Y", 0.3))),
             coefficients=(0.5, 0.5),
             time=1.0,
             num_steps=10
@@ -577,7 +574,7 @@ class TestStringRepresentations:
         Note: Single-term Hamiltonians are optimized to 1 step.
         """
         trotter = Trotterization(
-            pauli_terms=(("XY", 0.5),),
+            hamiltonian_terms=_terms((("XY", 0.5),)),
             coefficients=(1.0,),
             time=1.0,
             num_steps=10
@@ -590,7 +587,7 @@ class TestStringRepresentations:
     def test_str_representation_second_order(self):
         """Test string representation for second-order."""
         trotter = Trotterization(
-            pauli_terms=(("X", 1.0), ("Y", 1.0)),
+            hamiltonian_terms=_terms((("X", 1.0), ("Y", 1.0))),
             coefficients=(0.5, 0.5),
             time=2.0,
             num_steps=20
@@ -603,7 +600,7 @@ class TestStringRepresentations:
     def test_repr_representation(self):
         """Test repr representation."""
         trotter = Trotterization(
-            pauli_terms=(("XY", 0.5),),
+            hamiltonian_terms=_terms((("XY", 0.5),)),
             coefficients=(1.0,),
             time=1.0,
             num_steps=5
@@ -624,7 +621,7 @@ class TestPower:
     @pytest.mark.parametrize("k", [1, 2, 3, 8])
     def test_power_matches_matrix_power(self, method, combine_terms, k):
         trotter = Trotterization.from_method(
-            pauli_terms=[("XZ", 0.5), ("ZY", 0.3), ("YI", 0.2)],
+            hamiltonian_terms=_terms([("XZ", 0.5), ("ZY", 0.3), ("YI", 0.2)]),
             method=method,
             time=0.4,
             num_steps=3,
@@ -635,7 +632,7 @@ class TestPower:
 
     def test_power_preserves_time_step(self):
         trotter = Trotterization.from_method(
-            pauli_terms=[("X", 1.0), ("Z", 1.0)], method="second order", time=0.5, num_steps=4)
+            hamiltonian_terms=_terms([("X", 1.0), ("Z", 1.0)]), method="second order", time=0.5, num_steps=4)
         powered = trotter ** 3
         assert powered.num_steps == 12
         assert powered.time == pytest.approx(1.5)
@@ -644,7 +641,7 @@ class TestPower:
     @pytest.mark.parametrize("power", [0, 1.5, 2.0, True])
     def test_invalid_power_raises(self, power):
         trotter = Trotterization.from_method(
-            pauli_terms=[("X", 1.0)], method="first order", time=1.0, num_steps=1)
+            hamiltonian_terms=_terms([("X", 1.0)]), method="first order", time=1.0, num_steps=1)
         with pytest.raises(ValueError):
             trotter ** power
 
@@ -661,13 +658,13 @@ class TestPhaseErrorFromEnergyError:
         # A single Z term is exact: energies +/- c give eigenvalues exp(-/+ i c t / hbar)
         c, t = 0.3, 0.7
         trotter = Trotterization.from_method(
-            pauli_terms=[("Z", c)], method="first order", time=t, num_steps=1, hbar=hbar)
+            hamiltonian_terms=_terms([("Z", c)]), method="first order", time=t, num_steps=1, hbar=hbar)
         phases = np.angle(np.linalg.eigvals(trotter.tensor_contract())) / (2 * np.pi)
         assert np.ptp(phases) == pytest.approx(trotter.phase_error_from_energy_error(2 * c))
 
     def test_scales_with_time(self):
         trotter = Trotterization.from_method(
-            pauli_terms=[("X", 1.0)], method="first order", time=0.5, num_steps=2)
+            hamiltonian_terms=_terms([("X", 1.0)]), method="first order", time=0.5, num_steps=2)
         assert trotter.phase_error_from_energy_error(0.1) == pytest.approx(0.1 * 0.5 / (2 * np.pi))
         assert (trotter ** 4).phase_error_from_energy_error(0.1) == pytest.approx(
             4 * trotter.phase_error_from_energy_error(0.1))
@@ -683,7 +680,7 @@ class TestProperties:
     def test_num_terms(self):
         """Test num_terms property."""
         trotter = Trotterization(
-            pauli_terms=(("X", 1.0), ("Y", 1.0), ("Z", 1.0)),
+            hamiltonian_terms=_terms((("X", 1.0), ("Y", 1.0), ("Z", 1.0))),
             coefficients=(0.5, 0.5),
             time=1.0,
             num_steps=10
@@ -693,7 +690,7 @@ class TestProperties:
     def test_num_qubits(self):
         """Test num_qubits property."""
         trotter = Trotterization(
-            pauli_terms=(("XYZX", 0.5),),
+            hamiltonian_terms=_terms((("XYZX", 0.5),)),
             coefficients=(1.0,),
             time=1.0,
             num_steps=5
@@ -706,7 +703,7 @@ class TestProperties:
         Note: Single-term Hamiltonians are optimized to 1 step.
         """
         trotter = Trotterization(
-            pauli_terms=(("X", 1.0),),
+            hamiltonian_terms=_terms((("X", 1.0),)),
             coefficients=(1.0,),
             time=1.0,
             num_steps=42
@@ -850,7 +847,7 @@ class TestConvenienceConstructors:
     def test_from_method_second_order(self):
         """Test from_method with second-order."""
         trotter = Trotterization.from_method(
-            pauli_terms=[("X", 1.0), ("Y", 1.0)],
+            hamiltonian_terms=_terms([("X", 1.0), ("Y", 1.0)]),
             method="second order",
             time=1.0,
             num_steps=10
@@ -865,7 +862,7 @@ class TestConvenienceConstructors:
         Note: Single-term Hamiltonians are optimized to 1 step.
         """
         trotter = Trotterization.from_method(
-            pauli_terms=[("XY", 0.5)],
+            hamiltonian_terms=_terms([("XY", 0.5)]),
             method="fourth order",
             time=2.0,
             num_steps=20
@@ -878,7 +875,7 @@ class TestConvenienceConstructors:
         """Test from_method with custom coefficients."""
         custom_coeffs = [0.3, 0.4, 0.3]
         trotter = Trotterization.from_method(
-            pauli_terms=[("Z", 1.0)],
+            hamiltonian_terms=_terms([("Z", 1.0)]),
             method=custom_coeffs,
             time=1.0,
             num_steps=5
@@ -888,7 +885,7 @@ class TestConvenienceConstructors:
     def test_from_method_with_integer(self):
         """Test from_method with integer method identifier."""
         trotter = Trotterization.from_method(
-            pauli_terms=[("X", 1.0), ("Y", 1.0)],
+            hamiltonian_terms=_terms([("X", 1.0), ("Y", 1.0)]),
             method=2,  # Integer for second-order
             time=1.0,
             num_steps=10
@@ -903,14 +900,14 @@ class TestConvenienceConstructors:
         num_steps = 10
 
         trotter_int = Trotterization.from_method(
-            pauli_terms=terms,
+            hamiltonian_terms=_terms(terms),
             method=2,
             time=time,
             num_steps=num_steps
         )
 
         trotter_str = Trotterization.from_method(
-            pauli_terms=terms,
+            hamiltonian_terms=_terms(terms),
             method="second order",
             time=time,
             num_steps=num_steps
@@ -926,14 +923,14 @@ class TestConvenienceConstructors:
         num_steps = 10
 
         trotter1 = Trotterization.from_method(
-            pauli_terms=terms,
+            hamiltonian_terms=_terms(terms),
             method="second order",
             time=time,
             num_steps=num_steps
         )
 
         trotter2 = Trotterization(
-            pauli_terms=tuple(terms),
+            hamiltonian_terms=_terms(tuple(terms)),
             coefficients=(0.5, 0.5),
             time=time,
             num_steps=num_steps
@@ -954,7 +951,7 @@ class TestBackwardCompatibility:
         """Test the old interface function exists and works."""
         # Old interface: build_ramped_trotterized_unitary(pauli_strings, method, timestep, numsteps)
         bloq = build_ramped_trotterized_unitary(
-            [("X", 1.0), ("Y", 1.0)],
+            _terms([("X", 1.0), ("Y", 1.0)]),
             "second order",
             1.0,
             10
@@ -967,7 +964,7 @@ class TestBackwardCompatibility:
     def test_build_with_integer_method(self):
         """Test old interface with integer method."""
         bloq = build_ramped_trotterized_unitary(
-            [("X", 1.0), ("Y", 1.0)],
+            _terms([("X", 1.0), ("Y", 1.0)]),
             2,  # Integer for second-order
             1.0,
             10
@@ -976,11 +973,11 @@ class TestBackwardCompatibility:
 
     def test_build_with_generator(self):
         """Test old interface with generator input (as from analysis Hamiltonian)."""
-        # Simulate what hamiltonian.get_all_pauli_strings(return_as='strings') returns
+        # Simulate an iterable of terms that is not a list or tuple
         def pauli_generator():
-            yield ("XY", 0.5)
-            yield ("YZ", 0.3)
-            yield ("ZX", 0.2)
+            yield SinglePauliTerm("XY", 0.5)
+            yield SinglePauliTerm("YZ", 0.3)
+            yield SinglePauliTerm("ZX", 0.2)
 
         bloq = build_ramped_trotterized_unitary(
             pauli_generator(),
@@ -1000,7 +997,7 @@ class TestBackwardCompatibility:
         Nsteps = 10
 
         bloq = build_ramped_trotterized_unitary(
-            pauli_strings,
+            _terms(pauli_strings),
             method,
             timestep,
             Nsteps
@@ -1022,11 +1019,11 @@ class TestBackwardCompatibility:
         num_steps = 5
 
         # Old interface
-        bloq_old = build_ramped_trotterized_unitary(terms, method, time, num_steps)
+        bloq_old = build_ramped_trotterized_unitary(_terms(terms), method, time, num_steps)
 
         # New interface
         bloq_new = Trotterization.from_method(
-            pauli_terms=terms,
+            hamiltonian_terms=_terms(terms),
             method=method,
             time=time,
             num_steps=num_steps
@@ -1051,7 +1048,7 @@ class TestOstmeyerMethods:
     def test_blanes_moan_fourth_instantiation(self):
         """Test that Blanes & Moan fourth-order method can be instantiated."""
         trotter = Trotterization.from_method(
-            pauli_terms=[("X", 1.0), ("Y", 1.0)],
+            hamiltonian_terms=_terms([("X", 1.0), ("Y", 1.0)]),
             method="bm4",
             time=1.0,
             num_steps=10
@@ -1062,7 +1059,7 @@ class TestOstmeyerMethods:
     def test_blanes_moan_fourth_unitarity(self):
         """Test that Blanes & Moan fourth produces unitary matrices."""
         trotter = Trotterization.from_method(
-            pauli_terms=[("XY", 0.5), ("YZ", 0.3)],
+            hamiltonian_terms=_terms([("XY", 0.5), ("YZ", 0.3)]),
             method="bm4",
             time=1.0,
             num_steps=5
@@ -1078,7 +1075,7 @@ class TestOstmeyerMethods:
     def test_ostmeyer_fourth_instantiation(self):
         """Test that Ostmeyer fourth-order method can be instantiated."""
         trotter = Trotterization.from_method(
-            pauli_terms=[("X", 1.0), ("Y", 1.0)],
+            hamiltonian_terms=_terms([("X", 1.0), ("Y", 1.0)]),
             method="opt4",
             time=1.0,
             num_steps=10
@@ -1089,7 +1086,7 @@ class TestOstmeyerMethods:
     def test_ostmeyer_fourth_unitarity(self):
         """Test that Ostmeyer fourth produces unitary matrices."""
         trotter = Trotterization.from_method(
-            pauli_terms=[("XY", 0.5), ("YZ", 0.3)],
+            hamiltonian_terms=_terms([("XY", 0.5), ("YZ", 0.3)]),
             method="opt4",
             time=1.0,
             num_steps=5
@@ -1105,7 +1102,7 @@ class TestOstmeyerMethods:
     def test_blanes_moan_sixth_instantiation(self):
         """Test that Blanes & Moan sixth-order method can be instantiated."""
         trotter = Trotterization.from_method(
-            pauli_terms=[("X", 1.0), ("Y", 1.0)],
+            hamiltonian_terms=_terms([("X", 1.0), ("Y", 1.0)]),
             method="bm6",
             time=1.0,
             num_steps=10
@@ -1116,7 +1113,7 @@ class TestOstmeyerMethods:
     def test_blanes_moan_sixth_unitarity(self):
         """Test that Blanes & Moan sixth produces unitary matrices."""
         trotter = Trotterization.from_method(
-            pauli_terms=[("XY", 0.5), ("YZ", 0.3)],
+            hamiltonian_terms=_terms([("XY", 0.5), ("YZ", 0.3)]),
             method="bm6",
             time=1.0,
             num_steps=5
@@ -1154,7 +1151,7 @@ class TestOstmeyerMethods:
 
         for method_name in methods:
             trotter = Trotterization.from_method(
-                pauli_terms=[("X", h_x), ("Y", h_y)],
+                hamiltonian_terms=_terms([("X", h_x), ("Y", h_y)]),
                 method=method_name,
                 time=time,
                 num_steps=num_steps
@@ -1184,7 +1181,7 @@ class TestOstmeyerMethods:
 
         # Fourth-order (Suzuki)
         trotter4 = Trotterization.from_method(
-            pauli_terms=[("X", h_x), ("Y", h_y)],
+            hamiltonian_terms=_terms([("X", h_x), ("Y", h_y)]),
             method=4,
             time=time,
             num_steps=num_steps
@@ -1194,7 +1191,7 @@ class TestOstmeyerMethods:
 
         # Sixth-order (Blanes & Moan)
         trotter6 = Trotterization.from_method(
-            pauli_terms=[("X", h_x), ("Y", h_y)],
+            hamiltonian_terms=_terms([("X", h_x), ("Y", h_y)]),
             method=6,
             time=time,
             num_steps=num_steps
@@ -1213,7 +1210,7 @@ class TestOstmeyerMethods:
 
         for method_name in ["bm4", "opt4", "bm6"]:
             trotter = Trotterization.from_method(
-                pauli_terms=terms,
+                hamiltonian_terms=_terms(terms),
                 method=method_name,
                 time=time,
                 num_steps=num_steps
@@ -1255,7 +1252,7 @@ class TestTensorContractionMethods:
         pauli_terms = [('X', 1.0), ('Z', 0.5), ('Y', 0.3)]
 
         trotter = Trotterization.from_method(
-            pauli_terms=pauli_terms,
+            hamiltonian_terms=_terms(pauli_terms),
             method='second order',
             time=0.1,
             num_steps=num_steps,
@@ -1280,7 +1277,7 @@ class TestTensorContractionMethods:
         results = {}
         for method in methods:
             trotter = Trotterization.from_method(
-                pauli_terms=pauli_terms,
+                hamiltonian_terms=_terms(pauli_terms),
                 method='second order',
                 time=0.1,
                 num_steps=num_steps,
@@ -1306,7 +1303,7 @@ class TestTensorContractionMethods:
 
         # This should not raise an error anymore
         trotter = Trotterization.from_method(
-            pauli_terms=pauli_terms,
+            hamiltonian_terms=_terms(pauli_terms),
             method='second order',
             time=0.1,
             num_steps=num_steps,
@@ -1325,7 +1322,7 @@ class TestTensorContractionMethods:
         pauli_terms = [('X', 1.0), ('Z', 0.5)]
 
         trotter = Trotterization.from_method(
-            pauli_terms=pauli_terms,
+            hamiltonian_terms=_terms(pauli_terms),
             method='second order',
             time=0.1,
             num_steps=1
@@ -1345,7 +1342,7 @@ class TestTensorContractionMethods:
         Without combining, all terms stay separate with no prologue/bridge/epilogue.
         """
         trotter = Trotterization(
-            pauli_terms=(('X', 1.0), ('Z', 0.5)),
+            hamiltonian_terms=_terms((('X', 1.0), ('Z', 0.5))),
             coefficients=(0.5, 0.5),  # second-order
             time=1.0,
             num_steps=3,
@@ -1377,7 +1374,7 @@ class TestTensorContractionMethods:
         assert len(ruth_coeffs) == 5  # Verify it's the 5-coefficient version
 
         trotter = Trotterization(
-            pauli_terms=(('X', 1.0), ('Y', 0.5), ('Z', 0.3)),
+            hamiltonian_terms=_terms((('X', 1.0), ('Y', 0.5), ('Z', 0.3))),
             coefficients=ruth_coeffs,
             time=1.0,
             num_steps=2,
@@ -1405,7 +1402,7 @@ class TestTensorContractionMethods:
         enabling cross-step combining via prologue/bridge/epilogue.
         """
         trotter = Trotterization(
-            pauli_terms=(('X', 1.0), ('Z', 0.5)),
+            hamiltonian_terms=_terms((('X', 1.0), ('Z', 0.5))),
             coefficients=(0.5, 0.5),
             time=1.0,
             num_steps=3,
@@ -1447,7 +1444,7 @@ class TestTensorContractionMethods:
         coeffs = (0.3, 0.4, 0.5, 0.6)
 
         trotter = Trotterization(
-            pauli_terms=(('X', 1.0), ('Z', 0.5)),
+            hamiltonian_terms=_terms((('X', 1.0), ('Z', 0.5))),
             coefficients=coeffs,
             time=1.0,
             num_steps=3,
@@ -1520,7 +1517,7 @@ class TestTensorContractionMethods:
         # Small num_steps: verify it doesn't crash (auto selects incremental)
         for num_steps in [1, 2, 5, 9]:
             trotter = Trotterization.from_method(
-                pauli_terms=pauli_terms,
+                hamiltonian_terms=_terms(pauli_terms),
                 method='second order',
                 time=0.1,
                 num_steps=num_steps,
@@ -1532,7 +1529,7 @@ class TestTensorContractionMethods:
         # Large num_steps: verify it doesn't crash (auto may select structured)
         for num_steps in [10, 50]:
             trotter = Trotterization.from_method(
-                pauli_terms=pauli_terms,
+                hamiltonian_terms=_terms(pauli_terms),
                 method='second order',
                 time=0.1,
                 num_steps=num_steps,
@@ -1546,7 +1543,7 @@ class TestTensorContractionMethods:
         pauli_terms = [('X', 1.0), ('Z', 0.5)]
 
         trotter = Trotterization.from_method(
-            pauli_terms=pauli_terms,
+            hamiltonian_terms=_terms(pauli_terms),
             method='second order',
             time=0.1,
             num_steps=5,
@@ -1567,7 +1564,7 @@ class TestTensorContractionMethods:
         pauli_terms = [('X', 1.0)]
 
         trotter = Trotterization(
-            pauli_terms=tuple(pauli_terms),
+            hamiltonian_terms=_terms(tuple(pauli_terms)),
             coefficients=(0.5, 0.5),
             time=0.1,
             num_steps=5,
@@ -1596,7 +1593,7 @@ class TestTensorsInsideOtherBloqs:
     @staticmethod
     def _trotter(num_steps=4, **kwargs):
         return Trotterization.from_method(
-            pauli_terms=[("XZ", 0.5), ("ZY", 0.3), ("YX", 0.2)],
+            hamiltonian_terms=_terms([("XZ", 0.5), ("ZY", 0.3), ("YX", 0.2)]),
             method="second order",
             time=0.4,
             num_steps=num_steps,
@@ -1697,7 +1694,7 @@ class TestAdjoint:
     @pytest.mark.parametrize("combine_terms", [True, False])
     def test_matches_conjugate_transpose(self, method, num_steps, combine_terms):
         trotter = Trotterization.from_method(
-            pauli_terms=self.PAULI_TERMS, method=method, time=0.4, num_steps=num_steps,
+            hamiltonian_terms=_terms(self.PAULI_TERMS), method=method, time=0.4, num_steps=num_steps,
             combine_terms=combine_terms)
         adj = trotter.adjoint()
         assert isinstance(adj, Trotterization)
@@ -1710,13 +1707,14 @@ class TestAdjoint:
     def test_decomposition_order_is_reversed(self, method, combine_terms):
         """The adjoint decomposes into the forward terms in reverse order, each adjointed."""
         trotter = Trotterization.from_method(
-            pauli_terms=self.PAULI_TERMS, method=method, time=0.4, num_steps=3,
+            hamiltonian_terms=_terms(self.PAULI_TERMS), method=method, time=0.4, num_steps=3,
             combine_terms=combine_terms)
         adj = trotter.adjoint()
 
         def terms(t):
             # iter_bloqnections is in application order (bloq_instances is an unordered set)
-            return [(bloq.bloq.pauli_terms, bloq.bloq.time, bloq.bloq.is_adjoint)
+            return [((bloq.bloq.pauli_string, bloq.bloq.coefficient), bloq.bloq.time,
+                     bloq.bloq.is_adjoint)
                     for bloq, _, _ in t.decompose_bloq().iter_bloqnections()]
 
         forward, backward = terms(trotter), terms(adj)
@@ -1726,13 +1724,15 @@ class TestAdjoint:
 
     def test_double_adjoint_is_identity(self):
         trotter = Trotterization.from_method(
-            pauli_terms=self.PAULI_TERMS, method="third order", time=0.4, num_steps=3,
+            hamiltonian_terms=_terms(self.PAULI_TERMS), method="third order", time=0.4,
+            num_steps=3,
             tensor_contraction_method="incremental")
         assert trotter.adjoint().adjoint() == trotter
 
     def test_adjoint_inside_composite_bloq_uses_fast_path(self):
         trotter = Trotterization.from_method(
-            pauli_terms=self.PAULI_TERMS, method="fourth order", time=0.4, num_steps=200)
+            hamiltonian_terms=_terms(self.PAULI_TERMS), method="fourth order", time=0.4,
+            num_steps=200)
         expected = trotter.tensor_contract().conj().T
         cbloq = trotter.as_composite_bloq().adjoint()
         with _no_decomposition():
@@ -1753,14 +1753,15 @@ class TestAdjointFlag:
 
     def make(self, method="third order", **kwargs):
         return Trotterization.from_method(
-            pauli_terms=self.PAULI_TERMS, method=method, time=0.4, num_steps=3, **kwargs)
+            hamiltonian_terms=_terms(self.PAULI_TERMS), method=method, time=0.4, num_steps=3,
+            **kwargs)
 
     def test_adjoint_changes_only_the_flag(self):
         trotter = self.make()
         adj = trotter.adjoint()
         assert adj.is_adjoint and not trotter.is_adjoint
-        assert (adj.time, adj.coefficients, adj.pauli_terms) == (
-            trotter.time, trotter.coefficients, trotter.pauli_terms)
+        assert (adj.time, adj.coefficients, adj.hamiltonian_terms) == (
+            trotter.time, trotter.coefficients, trotter.hamiltonian_terms)
 
     def test_double_adjoint_equals_original_with_same_hash(self):
         trotter = self.make()
@@ -1806,7 +1807,8 @@ class TestNegativePower:
 
     def make(self, method="third order", **kwargs):
         return Trotterization.from_method(
-            pauli_terms=self.PAULI_TERMS, method=method, time=0.4, num_steps=3, **kwargs)
+            hamiltonian_terms=_terms(self.PAULI_TERMS), method=method, time=0.4, num_steps=3,
+            **kwargs)
 
     @pytest.mark.parametrize("method", ["first order", "third order", "fourth order"])
     @pytest.mark.parametrize("k", [1, 2, 5])
@@ -1870,7 +1872,7 @@ def hand_count(trotter):
     from qualtran.cirq_interop.t_complexity_protocol import TComplexity
     total = TComplexity()
     for idx, n in Counter(i for i, _ in trotter.expanded_sequence).items():
-        active = [p for p in trotter.pauli_terms[idx][0] if p != 'I']
+        active = [p for p in trotter.hamiltonian_terms[idx].dense_string() if p != 'I']
         if not active:
             total += n * TComplexity(rotations=1)
             continue
@@ -1888,7 +1890,7 @@ class TestControlled:
 
     def make(self, method="third order", num_steps=3, terms=None, **kwargs):
         return Trotterization(
-            pauli_terms=tuple(terms or self.PAULI_TERMS), coefficients=self.METHODS[method],
+            hamiltonian_terms=_terms(tuple(terms or self.PAULI_TERMS)), coefficients=self.METHODS[method],
             time=0.43, num_steps=num_steps, hbar=0.9, **kwargs)
 
     def reference(self, method="third order", num_steps=3, terms=None):
@@ -1943,10 +1945,10 @@ class TestControlled:
         assert controlled != trotter.controlled(CtrlSpec(cvs=0))
 
     def test_terms_carry_the_controls(self):
-        from qhat.common.commuting_pauli_string_evolution import CommutingPauliStringEvolution
+        from qhat.common.pauli_string_evolution import PauliStringEvolution
         controlled = self.make().controlled(CtrlSpec(cvs=0))
         subbloqs = [binst.bloq for binst, _, _ in controlled.decompose_bloq().iter_bloqnections()]
-        assert subbloqs and all(type(b) is CommutingPauliStringEvolution for b in subbloqs)
+        assert subbloqs and all(type(b) is PauliStringEvolution for b in subbloqs)
         assert all(b.ctrl_values == (0,) for b in subbloqs)
 
     def test_controlled_and_adjoint_commute(self):
@@ -2064,7 +2066,8 @@ class TestCallGraph:
 
     def make(self, method="fourth order", num_steps=3, ctrl_values=(), **kwargs):
         trotter = Trotterization.from_method(
-            pauli_terms=self.PAULI_TERMS, method=method, time=0.43, num_steps=num_steps,
+            hamiltonian_terms=_terms(self.PAULI_TERMS), method=method, time=0.43,
+            num_steps=num_steps,
             hbar=0.9, **kwargs)
         for value in reversed(ctrl_values):
             trotter = trotter.controlled(CtrlSpec(cvs=value))

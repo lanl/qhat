@@ -20,6 +20,7 @@ from qualtran.resource_counting._qubit_counts import _cbloq_max_width
 
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.qpe_window_state import precision_bits, QPEWindowStateBase, RectangularWindowState
+from qhat.common.tests.term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 from qhat.common.trotter_original import build_ramped_trotterized_unitary
 
@@ -76,7 +77,8 @@ class RyWindowState(QPEWindowStateBase):
 
 def small_trotterization():
     return Trotterization.from_method(
-        pauli_terms=[("XZ", 0.5), ("ZY", 0.3)], method="second order", time=0.3, num_steps=2
+        hamiltonian_terms=single_pauli_terms([("XZ", 0.5), ("ZY", 0.3)]),
+        method="second order", time=0.3, num_steps=2
     )
 
 
@@ -441,11 +443,11 @@ class TestResourceEstimation:
 class TestControlledTrotterization:
     """FlexibleQPE controls each U^(2^j) with Trotterization's own controls, not `Controlled`."""
 
-    TERMS = [("XZI", 0.5), ("ZIY", 0.3), ("YXX", -0.2), ("III", 0.4)]
+    TERMS = single_pauli_terms([("XZI", 0.5), ("ZIY", 0.3), ("YXX", -0.2), ("III", 0.4)])
 
     def make(self, num_steps=3):
         return Trotterization.from_method(
-            pauli_terms=self.TERMS, method="fourth order", time=0.43, num_steps=num_steps)
+            hamiltonian_terms=self.TERMS, method="fourth order", time=0.43, num_steps=num_steps)
 
     def test_controlled_powers_are_trotterizations(self):
         u = self.make()

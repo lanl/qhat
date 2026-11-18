@@ -27,6 +27,7 @@ from qhat.common.pauli_string_evolution import PauliStringEvolution
 from qhat.common.pauli_utils import pauli_string_to_matrix
 from .test_multi_control import (block_matrix, check_exact, decomposition_width,
                                  reference_trotter_matrix)
+from qhat.common.tests.term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 
 ANCILLA = "ancilla"
@@ -43,7 +44,7 @@ def and_pair(ctrl_value):
 
 
 def trotter(order=(0.3, 0.7), num_steps=3, **kwargs):
-    return Trotterization(TROTTER_TERMS, order, TIME, num_steps, hbar=HBAR,
+    return Trotterization(single_pauli_terms(TROTTER_TERMS), order, TIME, num_steps, hbar=HBAR,
                           controlled_rotation_method=ANCILLA, **kwargs)
 
 
@@ -244,13 +245,12 @@ class TestTrotterization:
 
     @pytest.mark.parametrize("ctrl_value", [1, 0])
     def test_exactly_one_correction(self, ctrl_value):
-        """Every term leaves out its phase, through both levels; the Trotterization adds one."""
+        """Every term leaves out its phase; the Trotterization adds one."""
         bloq = trotter(ctrl_values=(ctrl_value,))
         terms = [binst.bloq for binst in bloq.decompose_bloq().bloq_instances
-                 if isinstance(binst.bloq, CommutingPauliStringEvolution)]
+                 if isinstance(binst.bloq, PauliStringEvolution)]
         assert len(terms) == bloq.num_operations
         assert all(term.omit_control_phase for term in terms)
-        assert all(pse.omit_control_phase for term in terms for pse in term._term_evolutions())
         assert count_bloqs(bloq, Rz) == 1 and count_bloqs(bloq, GlobalPhase) == 1
         assert bloq._control_phase == pytest.approx(sum(term.control_phase for term in terms))
 
@@ -343,8 +343,9 @@ class TestValidation:
     def test_unknown_method_raises(self, bloq_type):
         make = {"pse": lambda **kw: PauliStringEvolution("XZ", 0.3, 0.7, **kw),
                 "cpse": lambda **kw: CommutingPauliStringEvolution((("XZ", 0.3),), 0.7, **kw),
-                "trotter": lambda **kw: Trotterization((("XZ", 0.3), ("ZI", 0.2)), (1.0,), 0.7,
-                                                       2, **kw)}[bloq_type]
+                "trotter": lambda **kw: Trotterization(
+                    single_pauli_terms((("XZ", 0.3), ("ZI", 0.2))), (1.0,), 0.7, 2, **kw)
+                }[bloq_type]
         with pytest.raises(ValueError, match=r"\('textbook', 'ancilla'\)"):
             make(controlled_rotation_method="toffoli")
 

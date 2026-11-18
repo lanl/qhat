@@ -9,7 +9,7 @@ import pytest
 import tempfile
 import os
 
-from qhat.analysis.hamiltonian import Hamiltonian, LinearCombinationOfPauliStrings
+from qhat.analysis.hamiltonian import Hamiltonian
 from qhat.analysis.matrix_operations import PauliStringOperator
 
 
@@ -25,8 +25,7 @@ def test_hamiltonian_to_matrix_small_system():
         'XX': -0.5,
         'II': 1.0
     }
-    lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
-    hamiltonian = Hamiltonian(lcps)
+    hamiltonian = Hamiltonian.from_pauli_strings(pauli_data, 2)
 
     # Convert to matrix (should be dense for 2 qubits with 1 GB threshold)
     H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
@@ -43,8 +42,7 @@ def test_hamiltonian_to_matrix_large_system():
     """Test converting a large Hamiltonian to matrix-free operator."""
     # Create a 20-qubit Hamiltonian (dimension 2^20 = 1,048,576)
     pauli_data = {'X' * 20: 1.0}
-    lcps = LinearCombinationOfPauliStrings(num_qubits=20, dense=pauli_data)
-    hamiltonian = Hamiltonian(lcps)
+    hamiltonian = Hamiltonian.from_pauli_strings(pauli_data, 20)
 
     # Convert to matrix (should be matrix-free for 20 qubits with 1 GB threshold)
     H_op = hamiltonian.to_matrix(memory_threshold_gb=1.0)
@@ -57,8 +55,7 @@ def test_hamiltonian_to_matrix_large_system():
 def test_hamiltonian_to_matrix_force_dense():
     """Test forcing dense representation."""
     pauli_data = {'ZZ': 0.5}
-    lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
-    hamiltonian = Hamiltonian(lcps)
+    hamiltonian = Hamiltonian.from_pauli_strings(pauli_data, 2)
 
     H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0, force_dense=True)
     assert isinstance(H_matrix, np.ndarray)
@@ -67,8 +64,7 @@ def test_hamiltonian_to_matrix_force_dense():
 def test_hamiltonian_to_matrix_force_sparse():
     """Test forcing sparse representation."""
     pauli_data = {'ZZ': 0.5}
-    lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
-    hamiltonian = Hamiltonian(lcps)
+    hamiltonian = Hamiltonian.from_pauli_strings(pauli_data, 2)
 
     H_op = hamiltonian.to_matrix(memory_threshold_gb=1.0, force_sparse=True)
     assert isinstance(H_op, PauliStringOperator)
@@ -79,8 +75,7 @@ def test_hamiltonian_to_matrix_known_eigenvalues():
     # Simple 2-qubit Hamiltonian: H = Z⊗Z
     # Eigenvalues: [1, -1, -1, 1] (for basis |00⟩, |01⟩, |10⟩, |11⟩)
     pauli_data = {'ZZ': 1.0}
-    lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
-    hamiltonian = Hamiltonian(lcps)
+    hamiltonian = Hamiltonian.from_pauli_strings(pauli_data, 2)
 
     H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 
@@ -93,8 +88,7 @@ def test_hamiltonian_to_matrix_known_eigenvalues():
 def test_hamiltonian_to_matrix_identity():
     """Test Hamiltonian that's just identity."""
     pauli_data = {'II': 2.5}
-    lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
-    hamiltonian = Hamiltonian(lcps)
+    hamiltonian = Hamiltonian.from_pauli_strings(pauli_data, 2)
 
     H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 
@@ -106,8 +100,7 @@ def test_hamiltonian_to_matrix_pauli_x():
     """Test Hamiltonian with Pauli X."""
     # H = X⊗I on 2 qubits
     pauli_data = {'XI': 1.0}
-    lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
-    hamiltonian = Hamiltonian(lcps)
+    hamiltonian = Hamiltonian.from_pauli_strings(pauli_data, 2)
 
     H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 
@@ -127,8 +120,7 @@ def test_hamiltonian_to_matrix_multiple_terms():
         'ZZ': -1.0,
         'II': 0.5
     }
-    lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
-    hamiltonian = Hamiltonian(lcps)
+    hamiltonian = Hamiltonian.from_pauli_strings(pauli_data, 2)
 
     H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 
@@ -154,8 +146,7 @@ def test_exact_matrix_hermiticity():
 
     for pauli_data in test_cases:
         num_qubits = len(list(pauli_data.keys())[0])
-        lcps = LinearCombinationOfPauliStrings(num_qubits=num_qubits, dense=pauli_data)
-        hamiltonian = Hamiltonian(lcps)
+        hamiltonian = Hamiltonian.from_pauli_strings(pauli_data, num_qubits)
 
         # Force dense to make Hermiticity check easy
         H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0, force_dense=True)
@@ -167,8 +158,7 @@ def test_exact_matrix_hermiticity():
 def test_exact_matrix_real_eigenvalues():
     """Test that exact matrix has real eigenvalues (Hermitian property)."""
     pauli_data = {'XX': 1.0, 'YY': 0.5, 'ZZ': -0.3}
-    lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
-    hamiltonian = Hamiltonian(lcps)
+    hamiltonian = Hamiltonian.from_pauli_strings(pauli_data, 2)
 
     H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
     eigenvalues = np.linalg.eigvalsh(H_matrix)
@@ -180,8 +170,7 @@ def test_exact_matrix_real_eigenvalues():
 def test_exact_matrix_energy_bounds():
     """Test that eigenvalues are within expected energy bounds."""
     pauli_data = {'ZI': 1.0, 'IZ': 1.0, 'ZZ': -2.0}
-    lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
-    hamiltonian = Hamiltonian(lcps)
+    hamiltonian = Hamiltonian.from_pauli_strings(pauli_data, 2)
 
     H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
     eigenvalues = np.linalg.eigvalsh(H_matrix)
@@ -199,8 +188,7 @@ def test_exact_matrix_energy_bounds():
 def test_matrix_free_operator_matvec():
     """Test matrix-free operator gives correct results."""
     pauli_data = {'XX': 1.0, 'ZZ': -1.0}
-    lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
-    hamiltonian = Hamiltonian(lcps)
+    hamiltonian = Hamiltonian.from_pauli_strings(pauli_data, 2)
 
     # Get both dense and sparse versions
     H_dense = hamiltonian.to_matrix(memory_threshold_gb=1.0, force_dense=True)
@@ -232,8 +220,7 @@ def test_hamiltonian_from_pauli_strings():
         ((0, 'X'), (1, 'X')): -0.5,  # XX
         (): 1.0  # Identity
     }
-    lcps = LinearCombinationOfPauliStrings(num_qubits=2, sparse=pauli_strings_sparse)
-    hamiltonian = Hamiltonian(lcps)
+    hamiltonian = Hamiltonian.from_pauli_strings(pauli_strings_sparse, 2)
 
     H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 
@@ -248,8 +235,7 @@ def test_three_qubit_system():
         'XXX': 0.5,
         'III': -0.5
     }
-    lcps = LinearCombinationOfPauliStrings(num_qubits=3, dense=pauli_data)
-    hamiltonian = Hamiltonian(lcps)
+    hamiltonian = Hamiltonian.from_pauli_strings(pauli_data, 3)
 
     H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 
@@ -269,8 +255,7 @@ def test_three_qubit_system():
 def test_single_qubit_hamiltonian():
     """Test with a single qubit."""
     pauli_data = {'X': 1.0}
-    lcps = LinearCombinationOfPauliStrings(num_qubits=1, dense=pauli_data)
-    hamiltonian = Hamiltonian(lcps)
+    hamiltonian = Hamiltonian.from_pauli_strings(pauli_data, 1)
 
     H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 
@@ -283,8 +268,7 @@ def test_single_qubit_hamiltonian():
 def test_empty_hamiltonian():
     """Test with only identity term."""
     pauli_data = {'II': 1.0}
-    lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
-    hamiltonian = Hamiltonian(lcps)
+    hamiltonian = Hamiltonian.from_pauli_strings(pauli_data, 2)
 
     H_matrix = hamiltonian.to_matrix(memory_threshold_gb=1.0)
 

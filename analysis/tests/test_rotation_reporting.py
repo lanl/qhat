@@ -15,6 +15,7 @@ from qhat.analysis.resource_estimation import (
     DEFAULT_ROTATION_GATE_PRECISION, convert_rotations, estimate_resources)
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.logging_utils import add_custom_levels
+from qhat.common.tests.term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 
 add_custom_levels()
@@ -29,7 +30,7 @@ def t_per_rotation(precision):
 
 
 def trotter(steps=5):
-    return Trotterization.from_method(TERMS, "second order", 0.37, steps)
+    return Trotterization.from_method(single_pauli_terms(TERMS), "second order", 0.37, steps)
 
 
 # --- the conversion formula ----------------------------------------------------------------------
