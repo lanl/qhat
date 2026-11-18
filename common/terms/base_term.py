@@ -12,6 +12,26 @@ class BaseTerm(ABC):
     The simplest way to meet this is to make each term class `@attrs.frozen` (see
     `SinglePauliTerm`, which keeps a custom `__init__` with `init=False` and `__attrs_init__`);
     its fields must themselves be immutable and hashable (e.g. tuples, not lists).
+
+    Adding a new term type:
+    -- Define the class in a module under `common/terms/`, which is where the tests look for
+       term classes.
+    -- Register it in `TERM_EXAMPLES` in `common/tests/test_terms.py`: add an entry that maps the
+       class to a function returning a list of at least two different terms (the function is
+       called several times, and separately built terms must compare equal).  That runs the
+       generic tests in `TestTermContract` on your class, which check that:
+          -- terms built separately from the same values are equal and hash the same, different
+             terms are not equal, and terms work as set members and dict keys;
+          -- attributes cannot be reassigned or added;
+          -- `num_qubits`, `to_pauli_strings`, `str` and `repr` return sensible values;
+          -- `sign_controlled` returns a term with one more qubit;
+          -- `generate_evolution_operator` returns a bloq with a `q` register of `num_qubits()`
+             qubits, a `control_phase`, a unitary matrix, an adjoint that is the conjugate
+             transpose, and a `ctrl` register when controlled.
+       `test_every_term_class_is_registered` fails if a term class under `common/terms/` has no
+       entry.
+    -- Put tests for behavior specific to your class in its own class in that file, like
+       `TestSinglePauliTerm`.
     """
 
     @abstractmethod

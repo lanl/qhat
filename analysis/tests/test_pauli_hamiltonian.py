@@ -24,6 +24,7 @@ from qhat.analysis.hamiltonian import (
 )
 from qhat.common.pauli_string import PauliString
 from qhat.common.terms.base_term import BaseTerm
+from qhat.common.trotter_flattened import Trotterization
 
 
 def dense_pauli_dict(H):
@@ -182,6 +183,19 @@ class TestFromPauliStrings:
         H.energy_shift(2.5)
         H.energy_shift(-0.5)
         assert H.get_energy_shift() == 2.0
+
+    def test_energy_shift_leaves_existing_terms_unchanged(self):
+        """Terms are immutable, so a shift replaces the identity term instead of editing it."""
+        H = Hamiltonian.from_pauli_strings({"IIII": 1.0, "XIII": 0.5}, 4)
+        before = list(H.terms())
+        trotter = Trotterization.from_method(before, "second order", time=1.0, num_steps=2)
+
+        H.energy_shift(2.5)
+
+        assert dense_pauli_dict(H) == {"IIII": 3.5, "XIII": 0.5}
+        assert [term.coefficient for term in before] == [1.0, 0.5]
+        assert [term.coefficient for term in trotter.hamiltonian_terms] == [1.0, 0.5]
+        assert H.terms()[0] is not before[0]
 
 
 # ==================================================================================
