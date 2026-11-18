@@ -317,8 +317,8 @@ def encode_ramped_trotter(
         #       strings.  Going forward, this will likely need to be improved.
         from openfermion import QubitOperator
         c1, c2 = trotter_error_estimator_fast(
-            list(QubitOperator(item.pauli_string.to_sparse(), item.coefficient) for item in
-                 hamiltonian.terms()),
+            list(QubitOperator(pstr.to_sparse(), coeff)
+                 for pstr, coeff in hamiltonian.to_pauli_strings().items()),
             error_coeff_time_limit,
             mode=error_coeff_mode,
             auto_exact=error_coeff_auto_exact
