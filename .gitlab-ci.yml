@@ -86,7 +86,7 @@ run-common-tests:
     - hostname
     - source .venv/bin/activate
     - cd common
-    - python3.11 -m pytest . -v
+    - python3.11 -m pytest tests/ -v
   cache:
     key: "${CI_COMMIT_REF_SLUG}"
     paths:
@@ -99,7 +99,7 @@ run-analysis-tests:
     - hostname
     - source .venv/bin/activate
     - cd analysis
-    - python3.11 -m pytest . -v
+    - python3.11 -m pytest tests/ -v
   cache:
     key: "${CI_COMMIT_REF_SLUG}"
     paths:
@@ -112,7 +112,7 @@ run-hamgen-tests:
     - hostname
     - source .venv/bin/activate
     - cd hamiltonian_generator
-    - python3.11 -m pytest . -v
+    - python3.11 -m pytest tests/ -v
   cache:
     key: "${CI_COMMIT_REF_SLUG}"
     paths:
