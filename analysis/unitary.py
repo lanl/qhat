@@ -35,19 +35,14 @@ class PauliStringLCU(LCUBlockEncoding):
 
     def __init__(self, hamiltonian, prepare_type=None, energy_error=None, **kwargs):
 
-        # TODO: BROKEN.  Fix once the term-based Hamiltonian design settles:
-        #       -- SinglePauliTerm is not imported at module level (only inside
-        #          encode_ramped_trotter), so the isinstance check raises NameError.
-        #       -- `hamiltonian.terms` in the list comprehension below is missing its call
-        #          parentheses.
-        #       -- `term.coefficients` should be `term.coefficient`.
+        from qhat.common.terms.single_pauli_term import SinglePauliTerm
         for term in hamiltonian.terms():
             if not isinstance(term, SinglePauliTerm):
                 raise ValueError("When using the PauliStringLCU block encoding, the Hamiltonian "
                                  "needs to be decomposed into single Pauli string terms.  Got a "
                                  f"term of type({type(term)}: {term}.")
-        pauli_terms = [cirq.DensePauliString(term.dense_string(),coefficient=term.coefficients)
-                          for term in hamiltonian.terms]
+        pauli_terms = [cirq.DensePauliString(term.dense_string(),coefficient=term.coefficient)
+                          for term in hamiltonian.terms()]
 
         ##  n_terms   :   Number of problem terms
         ##  n_pad     :   Number of padding terms
