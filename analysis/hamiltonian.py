@@ -1,9 +1,7 @@
-from functools import reduce
 import h5py
 import json
 import logging
 import numpy as np
-import scipy.constants as sc
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -11,9 +9,7 @@ from typing import Any
 from openfermion import (
     InteractionOperator,
     QubitOperator,
-    binary_code_transform,
     bravyi_kitaev,
-    count_qubits,
     jordan_wigner,
 )
 from openfermion.chem.molecular_data import spinorb_from_spatial
@@ -31,7 +27,6 @@ from qhat.common.hermiticity import (
     require_real_scalar,
 )
 from qhat.common.MixedFermionBosonOperator import MixedFermionBosonOperator
-from qhat.common.pauli_string import PauliString
 from qhat.common.terms.single_pauli_term import SinglePauliTerm
 
 logger = logging.getLogger(__name__)
