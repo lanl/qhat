@@ -28,6 +28,7 @@ from qhat.common.hermiticity import (
     require_real_scalar,
 )
 from qhat.common.MixedFermionBosonOperator import MixedFermionBosonOperator
+from qhat.common.terms.base_term import BaseTerm
 from qhat.common.terms.single_pauli_term import SinglePauliTerm
 
 logger = logging.getLogger(__name__)
@@ -106,6 +107,13 @@ class Hamiltonian:
         if not self._terms:
             raise ValueError("A Hamiltonian must have at least one term.")
         for term in self._terms:
+            # All terms must actually be terms
+            if not isinstance(term, BaseTerm):
+                raise TypeError("All terms in the Hamiltonian must derive from BaseTerm.")
+            # Ensure the number of qubits matches
+            # -- They don't _actually_ need to match, because each term could use a subset of the
+            #    qubits.  But to simplify the logic, we're just going to require that the number of
+            #    qubits match and the consistency check and stitching together of terms is trivial.
             if term.num_qubits() != self._num_qubits:
                 raise ValueError(f"Mismatch in number of qubits.  Term {term} has "
                                  f"{term.num_qubits()} qubits but should have {self._num_qubits}.")
@@ -118,10 +126,6 @@ class Hamiltonian:
         """
         Returns an ordered container of the terms in the Hamiltonian.
         """
-        # TODO: Currently __init__ saves the terms with no processing and this returns the terms
-        #       with no processing.  That implies that they are already packed into term classes
-        #       before being passed to the constructor.  That is done by the classmethods
-        #       from_pauli_string, from_second_quantization, etc.
         return self._terms
     # TODO: Rename to just `core_operator` for consistency with num_qubits() and terms()?
     def get_core_operator(self):
