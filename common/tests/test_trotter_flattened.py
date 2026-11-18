@@ -14,7 +14,7 @@ from qualtran.cirq_interop.t_complexity_protocol import t_complexity
 
 from qhat.common.pauli_utils import pauli_string_to_matrix
 from qhat.common.terms.single_pauli_term import SinglePauliTerm
-from qhat.common.tests.term_helpers import single_pauli_terms as _terms
+from .term_helpers import single_pauli_terms as _terms
 from qhat.common.trotter_flattened import (
     Trotterization,
     build_ramped_trotterized_unitary,

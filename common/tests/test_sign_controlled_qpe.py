@@ -19,7 +19,7 @@ from qualtran.resource_counting._qubit_counts import _cbloq_max_width
 
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.pauli_utils import pauli_string_to_matrix
-from qhat.common.tests.term_helpers import single_pauli_terms
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 from .test_multi_control import block_matrix
 

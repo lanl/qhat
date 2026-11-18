@@ -9,7 +9,7 @@ from qhat.analysis.algorithm import (
 from qhat.analysis.config_types import AlgorithmConfiguration
 from qhat.analysis.qubit_summary import log_qubit_summary
 from qhat.analysis.resource_estimation import estimate_resources
-from qhat.common.tests.term_helpers import single_pauli_terms
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 from qualtran.resource_counting import get_cost_value, QubitCount
 

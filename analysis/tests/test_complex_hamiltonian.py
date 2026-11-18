@@ -22,7 +22,7 @@ from qhat.analysis.unitary import encode_double_factorization, encode_ramped_tro
 from qhat.common.commuting_pauli_string_evolution import CommutingPauliStringEvolution
 from qhat.common.pauli_string_evolution import PauliStringEvolution
 from qhat.common.qpe_window_state import precision_bits
-from qhat.common.tests.term_helpers import single_pauli_terms
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 
 NORB = 3

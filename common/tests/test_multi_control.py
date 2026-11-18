@@ -20,7 +20,7 @@ from qhat.common.commuting_pauli_string_evolution import (CommutingPauliStringEv
                                                           all_commute)
 from qhat.common.pauli_string_evolution import PauliStringEvolution
 from qhat.common.pauli_utils import pauli_string_to_matrix
-from qhat.common.tests.term_helpers import single_pauli_terms
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization, get_trotterization_coefficients
 
 METHODS = ["ancilla", "direct"]

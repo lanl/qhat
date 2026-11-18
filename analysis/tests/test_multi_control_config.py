@@ -8,7 +8,7 @@ from qhat.analysis.algorithm import build_algorithm, log_multi_control_method
 from qhat.analysis.config_types import AlgorithmConfiguration, UnitaryConfiguration
 from qhat.analysis.hamiltonian import Hamiltonian
 from qhat.analysis.unitary import encode_ramped_trotter
-from qhat.common.tests.term_helpers import single_pauli_terms
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 
 

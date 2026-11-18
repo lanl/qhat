@@ -9,7 +9,7 @@ See ALTERNATION_BUG_SUMMARY.md for details.
 """
 
 import pytest
-from qhat.common.tests.term_helpers import single_pauli_terms
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import (
     Trotterization,
     get_trotterization_coefficients,

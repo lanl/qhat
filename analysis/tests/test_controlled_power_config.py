@@ -9,7 +9,7 @@ from qhat.analysis.config_types import AlgorithmConfiguration
 from qhat.analysis.qubit_summary import log_qubit_summary
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.pauli_string_evolution import PauliStringEvolution
-from qhat.common.tests.term_helpers import single_pauli_terms
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 
 # Three qubits, non-commuting terms, an odd time and an even step count

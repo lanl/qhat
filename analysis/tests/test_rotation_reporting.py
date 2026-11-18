@@ -15,7 +15,7 @@ from qhat.analysis.resource_estimation import (
     DEFAULT_ROTATION_GATE_PRECISION, convert_rotations, estimate_resources)
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.logging_utils import add_custom_levels
-from qhat.common.tests.term_helpers import single_pauli_terms
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 
 add_custom_levels()

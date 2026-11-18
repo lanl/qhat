@@ -22,7 +22,7 @@ from qhat.analysis.resource_estimation import estimate_resources
 from qhat.analysis.unitary import encode_as_unitary
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.pauli_string_evolution import PauliStringEvolution
-from qhat.common.tests.term_helpers import single_pauli_terms
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 
 PAULIS = {"I": np.eye(2), "X": np.array([[0, 1], [1, 0]]),

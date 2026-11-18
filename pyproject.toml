@@ -28,5 +28,5 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["qhat", "qhat.analysis", "qhat.common", "qhat.hamiltonian_generator"]
+packages = ["qhat", "qhat.analysis", "qhat.common", "qhat.common.terms", "qhat.hamiltonian_generator"]
 package-dir = {"qhat" = ".", "qhat.analysis" = "analysis", "qhat.common" = "common", "qhat.hamiltonian_generator" = "hamiltonian_generator"}

@@ -20,7 +20,7 @@ from qualtran.resource_counting._qubit_counts import _cbloq_max_width
 
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.qpe_window_state import precision_bits, QPEWindowStateBase, RectangularWindowState
-from qhat.common.tests.term_helpers import single_pauli_terms
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 from qhat.common.trotter_original import build_ramped_trotterized_unitary
 
