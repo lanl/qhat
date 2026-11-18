@@ -118,9 +118,9 @@ class Hamiltonian:
         time-evolution operators that multiply together, and time-evolution operators are not
         commutative under multiplication.
         """
-        self.terms = list(Terms)
+        self.terms = list(terms)
         self.num_qubits = num_qubits
-        self.core_operator = core_oeprator
+        self.core_operator = core_operator
         self._energy_shift_total = 0.0
         for term in terms:
             assert term.num_qubits() == self.num_qubits
