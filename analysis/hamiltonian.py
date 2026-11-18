@@ -20,6 +20,7 @@ from qhat.analysis.config_types import HamiltonianConfiguration
 from qhat.analysis.utils import value
 from qhat.common.bosons_binary import BosonicBinaryEncoding
 from qhat.common.hermiticity import (
+    DEFAULT_RTOL,
     check_hermitian_one_body,
     check_hermitian_two_body,
     real_pauli_coefficients,
@@ -80,6 +81,9 @@ def _pauli_terms_from_qubit_operator(qubit_operator, num_qubits):
 #       -- analysis/tests/test_pauli_hamiltonian.py        (both; test_get_core_operator also
 #                                                           expects an LCPS core operator)
 #       -- analysis/tests/test_pauli_string_lcu.py         (both)
+#       -- analysis/tests/test_file_loader.py              (sets fermion_to_qubit_transform=None,
+#                                                           but the mapping is now applied at load
+#                                                           time; pass "JW" instead)
 #       Stale comments that still refer to get_all_pauli_strings:
 #       -- common/commuting_pauli_string_evolution.py      (from-tuples constructor docstring)
 #       -- common/tests/test_trotter_flattened.py          (test_build_with_generator)
@@ -152,12 +156,21 @@ class Hamiltonian:
         # TODO: Check that this works as expected
         # TODO: This suggests that an identity term type would be useful, especially if we restrict
         #       all other term types to prevent them from being identity.
-        for term in self._terms:
+        for i, term in enumerate(self._terms):
             if isinstance(term, SinglePauliTerm) and term.pauli_string.to_sparse() == ():
-                term.coefficient += dE
+                new_coefficient = term.coefficient + dE
+                # Shifting to centre the spectrum cancels the identity coefficient; drop the term
+                # when only round-off remains (but never leave the Hamiltonian with no terms).
+                cancelled = (abs(new_coefficient)
+                             <= DEFAULT_RTOL * max(abs(term.coefficient), abs(dE)))
+                if cancelled and len(self._terms) > 1:
+                    del self._terms[i]
+                else:
+                    term.coefficient = new_coefficient
                 break
         else:
-            self._terms.insert(0, SinglePauliTerm((), dE, self._num_qubits))
+            if dE != 0.0:
+                self._terms.insert(0, SinglePauliTerm((), dE, self._num_qubits))
         # TODO: If we can reconstruct the core operator on demand, then we don't need to update it
         #       here, preventing inconsistencies and eliminating the need to worry if it somehow
         #       was set to an invalid value.
