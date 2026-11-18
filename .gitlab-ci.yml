@@ -86,8 +86,7 @@ run-common-tests:
     - hostname
     - source .venv/bin/activate
     - cd common
-    # LCPSHamiltonian.py is named explicitly because its name doesn't match pytest's patterns
-    - python3.11 -m pytest . LCPSHamiltonian.py -v
+    - python3.11 -m pytest . -v
   cache:
     key: "${CI_COMMIT_REF_SLUG}"
     paths:
