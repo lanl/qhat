@@ -104,6 +104,27 @@ class LinearCombinationOfPauliStrings:
 
 # -------------------------------------------------------------------------------------------------
 
+def _validate_fermionic_tensors(constant, one_body, two_body):
+    """Check second-quantization tensors; return (real constant, number of spin orbitals)."""
+    if len(one_body.shape) != 2 or one_body.shape[0] != one_body.shape[1]:
+        raise ValueError(f"One-body tensor must be square, got shape {one_body.shape}.")
+    num_orbitals = one_body.shape[0]
+    if tuple(two_body.shape) != (num_orbitals,) * 4:
+        raise ValueError(
+            f"Two-body tensor must have shape {(num_orbitals,) * 4}, got {two_body.shape}.")
+    constant = require_real_scalar("constant energy term", constant)
+    check_hermitian_one_body("one-body tensor", one_body)
+    check_hermitian_two_body("two-body tensor", two_body)
+    return constant, num_orbitals
+
+def _pauli_terms_from_qubit_operator(qubit_operator, num_qubits):
+    # The qubit mappings return complex coefficients (with round-off imaginary parts) when the
+    # integrals are complex, even for a Hermitian Hamiltonian; make them real here.
+    pauli_strings = real_pauli_coefficients(qubit_operator.terms)
+    return [SinglePauliTerm(ps, c, num_qubits) for ps, c in pauli_strings.items()]
+
+# -------------------------------------------------------------------------------------------------
+
 # TODO: The heavy use of isinstance() suggests that perhaps Hamiltonian should be a base class that
 #       other things are built on top of?
 
@@ -286,18 +307,67 @@ class Hamiltonian:
         #       Pauli string but hash to different dict keys) or to mix different formats (e.g.,
         #       tuple vs str vs PauliString could represent the same Pauli string but would hash to
         #       different dict keys).
-        pauli_terms = (SinglePauliString(ps, c, num_qubits) for ps, c in pauli_strings.items())
-        term_dict = {term.pauli_string : 0.0 for term in pauli_terms}
-        if len(term_dict) < len(pauli_terms):
-            # The same Pauli string appears in multiple terms, so combine them
-            # -- Could be different types to store the Pauli string in the pauli_strings argument
-            # -- Could be sparse Pauli strings as tuples with the order rearranged
-            # All of this washes out once you canonicalize to the PauliString class (which
-            # SinglePauliTerm does internally).
-            for term in pauli_terms:
-                term_dict[term.pauli_string] += term.coefficient
-            pauli_terms = (SinglePauliString(ps, c, num_qubits) for ps, c in term_dict.items()))
-        return cls(pauli_terms, num_qubits)
+        pauli_terms = [SinglePauliTerm(ps, c, num_qubits) for ps, c in pauli_strings.items()]
+        # Different keys can represent the same Pauli string (see above).  This washes out once
+        # SinglePauliTerm canonicalizes to PauliString, so combine coefficients on that key.
+        combined = {}
+        for term in pauli_terms:
+            combined[term.pauli_string] = combined.get(term.pauli_string, 0.0) + term.coefficient
+        return cls((SinglePauliTerm(ps, c) for ps, c in combined.items()), num_qubits)
+    # TODO: Revisit whether from_second_quantization and from_mixed_fermion_boson should merge.
+    #       Mixed fermion-boson input is still second quantization, just with additional tensors.
+    #       One option is a single from_second_quantization with optional bosonic kwargs (or a
+    #       grouped bosonic-data argument).  Revisit once the Hamiltonians we need are better
+    #       understood.
+    @classmethod
+    def from_second_quantization(cls, constant, one_body, two_body, fermion_mapping):
+        """
+        Construct a Hamiltonian from fermionic second-quantization tensors in the OpenFermion
+        convention.  `fermion_mapping` is a name in `fermionic_mapping` or a callable that maps an
+        InteractionOperator to a QubitOperator.
+        """
+        constant, _ = _validate_fermionic_tensors(constant, one_body, two_body)
+        if isinstance(fermion_mapping, str):
+            fermion_mapping = fermionic_mapping[fermion_mapping]
+        operator = InteractionOperator(constant, one_body, two_body)
+        terms = _pauli_terms_from_qubit_operator(fermion_mapping(operator), operator.n_qubits)
+        return cls(terms, operator.n_qubits, core_operator=operator)
+    @classmethod
+    def from_mixed_fermion_boson(
+            cls, constant, one_body, two_body, boson_number_coefficient, interaction,
+            fermion_mapping, boson_mapping, max_bosons_per_state):
+        """
+        Construct a Hamiltonian from mixed fermion-boson second-quantization tensors.  The
+        fermionic tensors are in the OpenFermion convention, and `interaction` has shape
+        (Nf, Nf, Nb).  `fermion_mapping` is a name in `fermionic_mapping` or a callable;
+        `boson_mapping` is a name in `bosonic_mapping` (which uses `max_bosons_per_state`) or an
+        encoding object.
+        """
+        constant, num_orbitals = _validate_fermionic_tensors(constant, one_body, two_body)
+        if (len(interaction.shape) != 3
+                or tuple(interaction.shape[:2]) != (num_orbitals, num_orbitals)
+                or interaction.shape[2] == 0):
+            raise ValueError(
+                f"Fermion-boson interaction tensor must have shape ({num_orbitals}, "
+                f"{num_orbitals}, Nb) with Nb > 0, got {interaction.shape}.")
+        boson_number_coefficient = require_real_scalar(
+            "bosonic number coefficient", boson_number_coefficient)
+        for n in range(interaction.shape[2]):
+            check_hermitian_one_body(
+                f"fermion-boson interaction tensor [:,:,{n}]", interaction[:, :, n])
+        if isinstance(fermion_mapping, str):
+            fermion_mapping = fermionic_mapping[fermion_mapping]
+        if isinstance(boson_mapping, str):
+            if max_bosons_per_state is None:
+                raise ValueError("Maximum bosons per state is required for a bosonic mapping.")
+            boson_mapping = bosonic_mapping[boson_mapping](max_bosons_per_state)
+        operator = MixedFermionBosonOperator(
+            constant, one_body, two_body, boson_number_coefficient, interaction)
+        operator.set_fermionic_encoding(fermion_mapping)
+        operator.set_bosonic_encoding(boson_mapping)
+        terms = _pauli_terms_from_qubit_operator(
+            operator.generate_qubit_operator(), operator.num_qubits())
+        return cls(terms, operator.num_qubits(), core_operator=operator)
 
 
 
