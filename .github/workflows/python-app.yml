@@ -94,17 +94,26 @@ jobs:
             config_file: ''
             config_params: '-p method=double-factorization'
 
+          # For pytest suites, config_params holds the paths pytest collects (relative to the
+          # directory).  Explicit paths are needed for LCPSHamiltonian.py, whose name doesn't match
+          # pytest's default test-file patterns.
           - name: common-unit-tests
             directory: common
             script: pytest
             config_file: ''
-            config_params: ''
+            config_params: '. LCPSHamiltonian.py'
 
           - name: analysis-unit-tests
             directory: analysis
             script: pytest
             config_file: ''
-            config_params: ''
+            config_params: '.'
+
+          - name: hamgen-unit-tests
+            directory: hamiltonian_generator
+            script: pytest
+            config_file: ''
+            config_params: '.'
 
     name: Test ${{ matrix.test-suite.name }}
 
@@ -134,7 +143,7 @@ jobs:
         set -euxo pipefail
         cd ${{ matrix.test-suite.directory }}
         if [ "${{ matrix.test-suite.script }}" = "pytest" ]; then
-          python -m pytest tests/ -v
+          python -m pytest ${{ matrix.test-suite.config_params }} -v
         else
           python ${{ matrix.test-suite.script }} ${{ matrix.test-suite.config_file }} ${{ matrix.test-suite.config_params }}
         fi

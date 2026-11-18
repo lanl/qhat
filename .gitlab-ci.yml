@@ -86,7 +86,8 @@ run-common-tests:
     - hostname
     - source .venv/bin/activate
     - cd common
-    - python3.11 -m pytest tests/ -v
+    # LCPSHamiltonian.py is named explicitly because its name doesn't match pytest's patterns
+    - python3.11 -m pytest . LCPSHamiltonian.py -v
   cache:
     key: "${CI_COMMIT_REF_SLUG}"
     paths:
@@ -99,7 +100,20 @@ run-analysis-tests:
     - hostname
     - source .venv/bin/activate
     - cd analysis
-    - python3.11 -m pytest tests/ -v
+    - python3.11 -m pytest . -v
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .venv/
+    policy: pull
+
+run-hamgen-tests:
+  stage: test
+  script:
+    - hostname
+    - source .venv/bin/activate
+    - cd hamiltonian_generator
+    - python3.11 -m pytest . -v
   cache:
     key: "${CI_COMMIT_REF_SLUG}"
     paths:
