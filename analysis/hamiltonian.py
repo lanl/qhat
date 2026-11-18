@@ -201,6 +201,46 @@ class Hamiltonian:
             The total energy shift applied via energy_shift() calls
         """
         return self._energy_shift_total
+    def to_matrix(self, memory_threshold_gb, force_dense=None, force_sparse=None):
+        """
+        Convert the Hamiltonian to its exact matrix representation.
+
+        The choice between dense and sparse representation is based on the memory
+        threshold. Dense matrices require (2^num_qubits)^2 * 16 bytes.
+
+        Parameters:
+            memory_threshold_gb: float, memory threshold in GB for dense representation
+            force_dense: bool or None, force dense matrix representation
+            force_sparse: bool or None, force matrix-free operator
+
+        Returns:
+            numpy array (dense) or PauliStringOperator (sparse/matrix-free)
+
+        Raises:
+            ValueError: If both force_dense and force_sparse are True
+
+        Example:
+            >>> hamiltonian = Hamiltonian(...)
+            >>> H_exact = hamiltonian.to_matrix(memory_threshold_gb=16.0)
+            >>> # For small systems: H_exact is numpy array
+            >>> # For large systems: H_exact is PauliStringOperator
+        """
+        from qhat.analysis.matrix_operations import create_hamiltonian_operator
+
+        # TODO: We'll need to add a to_matrix method to each term to support this feature
+        # Get Pauli strings as dense format (full string per term)
+        pauli_dict = {key.to_dense(): value for key, value in self.to_pauli_strings().items()}
+        num_qubits = self.num_qubits()
+
+        logger.verbose(f"Converting Hamiltonian to matrix for {num_qubits} qubits")
+        logger.verbose(f"Hamiltonian has {len(pauli_dict)} Pauli terms")
+
+        # Create operator (dense or sparse based on memory threshold)
+        return create_hamiltonian_operator(
+            pauli_dict, num_qubits, memory_threshold_gb,
+            force_dense=force_dense,
+            force_sparse=force_sparse
+        )
 
 
 
@@ -295,45 +335,45 @@ class Hamiltonian:
     #    # TODO: Eventually this won't be SinglePauliTerm, but for now that's where we're at.
     #    return [SinglePauliTerm(*term)
     #            for term in self._get_all_pauli_strings(return_as='strings').items()]
-    def to_matrix(self, memory_threshold_gb, force_dense=None, force_sparse=None):
-        """
-        Convert the Hamiltonian to its exact matrix representation.
-
-        The choice between dense and sparse representation is based on the memory
-        threshold. Dense matrices require (2^num_qubits)^2 * 16 bytes.
-
-        Parameters:
-            memory_threshold_gb: float, memory threshold in GB for dense representation
-            force_dense: bool or None, force dense matrix representation
-            force_sparse: bool or None, force matrix-free operator
-
-        Returns:
-            numpy array (dense) or PauliStringOperator (sparse/matrix-free)
-
-        Raises:
-            ValueError: If both force_dense and force_sparse are True
-
-        Example:
-            >>> hamiltonian = Hamiltonian(...)
-            >>> H_exact = hamiltonian.to_matrix(memory_threshold_gb=16.0)
-            >>> # For small systems: H_exact is numpy array
-            >>> # For large systems: H_exact is PauliStringOperator
-        """
-        from qhat.analysis.matrix_operations import create_hamiltonian_operator
-
-        # Get Pauli strings as dense format (full string per term)
-        pauli_dict = self._get_all_pauli_strings(return_as="strings")
-        num_qubits = self.num_qubits()
-
-        logger.verbose(f"Converting Hamiltonian to matrix for {num_qubits} qubits")
-        logger.verbose(f"Hamiltonian has {len(pauli_dict)} Pauli terms")
-
-        # Create operator (dense or sparse based on memory threshold)
-        return create_hamiltonian_operator(
-            pauli_dict, num_qubits, memory_threshold_gb,
-            force_dense=force_dense,
-            force_sparse=force_sparse
-        )
+    #def to_matrix(self, memory_threshold_gb, force_dense=None, force_sparse=None):
+    #    """
+    #    Convert the Hamiltonian to its exact matrix representation.
+    #
+    #    The choice between dense and sparse representation is based on the memory
+    #    threshold. Dense matrices require (2^num_qubits)^2 * 16 bytes.
+    #
+    #    Parameters:
+    #        memory_threshold_gb: float, memory threshold in GB for dense representation
+    #        force_dense: bool or None, force dense matrix representation
+    #        force_sparse: bool or None, force matrix-free operator
+    #
+    #    Returns:
+    #        numpy array (dense) or PauliStringOperator (sparse/matrix-free)
+    #
+    #    Raises:
+    #        ValueError: If both force_dense and force_sparse are True
+    #
+    #    Example:
+    #        >>> hamiltonian = Hamiltonian(...)
+    #        >>> H_exact = hamiltonian.to_matrix(memory_threshold_gb=16.0)
+    #        >>> # For small systems: H_exact is numpy array
+    #        >>> # For large systems: H_exact is PauliStringOperator
+    #    """
+    #    from qhat.analysis.matrix_operations import create_hamiltonian_operator
+    #
+    #    # Get Pauli strings as dense format (full string per term)
+    #    pauli_dict = self._get_all_pauli_strings(return_as="strings")
+    #    num_qubits = self.num_qubits()
+    #
+    #    logger.verbose(f"Converting Hamiltonian to matrix for {num_qubits} qubits")
+    #    logger.verbose(f"Hamiltonian has {len(pauli_dict)} Pauli terms")
+    #
+    #    # Create operator (dense or sparse based on memory threshold)
+    #    return create_hamiltonian_operator(
+    #        pauli_dict, num_qubits, memory_threshold_gb,
+    #        force_dense=force_dense,
+    #        force_sparse=force_sparse
+    #    )
     #def energy_shift(self, dE):
     #    dE = require_real_scalar("energy shift", dE)
     #    # Track the cumulative shift for analysis corrections
