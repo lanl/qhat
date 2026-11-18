@@ -105,10 +105,11 @@ Coefficients remain separate so `PauliString` values can be used as Hamiltonian 
 
 These files are examples or development test scripts, not production code:
 
-- **`dps_test.py`**: Example/test script for DensePauliString and DensePauliExponential
-- **`trotter_test.py`**: Example/test script for the flattened Trotter implementation
+- **`tests/test_dps.py`**: Example/test script for DensePauliString and DensePauliExponential
+- **`tests/test_trotter_resources.py`**: Example/test script for the flattened Trotter implementation
 
-⚠️ **Note:** These are not proper unit tests and are not integrated into the test suite.
+⚠️ **Note:** These are not proper unit tests: they run as part of the test suite but make no
+assertions, so they only check that the code runs without raising an exception.
 
 ## Testing
 
