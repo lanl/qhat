@@ -143,6 +143,8 @@ class Hamiltonian:
         self._num_qubits = num_qubits
         self._core_operator = core_operator
         self._energy_shift_total = 0.0
+        if not self._terms:
+            raise ValueError("A Hamiltonian must have at least one term.")
         for term in self._terms:
             if term.num_qubits() != self._num_qubits:
                 raise ValueError(f"Mismatch in number of qubits.  Term {term} has "
@@ -577,57 +579,33 @@ def _convert_to_openfermion(f1in, f2in, integral_convention):
 
 # -------------------------------------------------------------------------------------------------
 
-def _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, bs, fb, integral_convention="openfermion"):
+def _construct_second_quantization(config_hamiltonian, f0, f1, f2, bs, fb, integral_convention="openfermion"):
     f1, f2 = _convert_to_openfermion(f1, f2, integral_convention)
-    assert len(f1.shape) == 2
-    Nf = f1.shape[0]
-    assert f1.shape[1] == Nf
-    assert len(f2.shape) == 4
-    assert f2.shape[0] == Nf
-    assert f2.shape[1] == Nf
-    assert f2.shape[2] == Nf
-    assert f2.shape[3] == Nf
-    Nb = 0
-    if fb is not None:
-        assert len(fb.shape) == 3
-        assert fb.shape[0] == Nf
-        assert fb.shape[1] == Nf
-        Nb = fb.shape[2]
-    f0 = require_real_scalar("constant energy term", f0)
-    check_hermitian_one_body("one-body tensor", f1)
-    check_hermitian_two_body("two-body tensor", f2)
-    if bs is not None:
-        bs = require_real_scalar("bosonic number coefficient", bs)
-    if fb is not None:
-        for n in range(Nb):
-            check_hermitian_one_body(f"fermion-boson interaction tensor [:,:,{n}]", fb[:, :, n])
+    fermion_mapping = config_hamiltonian.fermion_to_qubit_transform
     if bs is None and fb is None:
-        H = Hamiltonian(InteractionOperator(f0, f1, f2))
+        # pure-fermion case
+        H = Hamiltonian.from_second_quantization(f0, f1, f2, fermion_mapping)
         logger.info(f"Fermionic second-quantization Hamiltonian uses {H.num_qubits()} qubits.")
-        H.set_fermionic_mapping(config_hamiltonian.fermion_to_qubit_transform)
-        logger.info(" ".join(["Mapping fermionic operators to qubit operaturs using",
-                                     f"{config_hamiltonian.fermion_to_qubit_transform} method."]))
+        logger.info(f"Mapped fermionic operators to qubit operators using {fermion_mapping} method.")
         return H
     else:
-        assert bs is not None
-        assert fb is not None
-        assert Nb > 0
-        H = Hamiltonian(MixedFermionBosonOperator(f0, f1, f2, bs, fb))
-        logger.info(" ".join([
-            "mixed fermionic-bosonic second-quantization Hamiltonian",
-            f"uses {H.num_qubits()} qubits."]))
-        H.set_fermionic_mapping(config_hamiltonian.fermion_to_qubit_transform)
-        logger.info(" ".join(["Mapping fermionic operators to qubit operaturs using",
-                                     f"{config_hamiltonian.fermion_to_qubit_transform} method."]))
+        # mixed fermion-boson case (currently no pure-boson case)
+        if bs is None or fb is None:
+            raise ValueError(
+                    "Second-quantization Hamiltonians with bosons must provide both the "
+                    "bosonic scalar term and the fermion-boson interaction term.")
         if config_hamiltonian.max_bosons_per_state is None:
-            raise ValueError("User did not specify maximum bosons per state.")
-        H.set_bosonic_mapping(
-                config_hamiltonian.boson_to_qubit_transform,
-                config_hamiltonian.max_bosons_per_state)
-        logger.info(" ".join(["Mapping bosonic operators to qubit operaturs using",
-                                     f"{config_hamiltonian.boson_to_qubit_transform} method",
-                                     f"with {config_hamiltonian.max_bosons_per_state} maximum",
-                                     "bosons per state."]))
+            raise ValueError(
+                "Hamiltonian includes bosons but user did not specify maximum bosons per state.")
+        boson_mapping = config_hamiltonian.boson_to_qubit_transform
+        max_bosons = config_hamiltonian.max_bosons_per_state
+        H = Hamiltonian.from_mixed_fermion_boson(
+                f0, f1, f2, bs, fb, fermion_mapping, boson_mapping, max_bosons)
+        logger.info(
+            f"Mixed fermionic-bosonic second-quantization Hamiltonian uses {H.num_qubits()} qubits.")
+        logger.info(f"Mapped fermionic operators to qubit operators using {fermion_mapping} method.")
+        logger.info(f"Mapped bosonic operators to qubit operators using {boson_mapping} method "
+                    f"with {max_bosons} maximum bosons per state.")
         return H
 
 # -------------------------------------------------------------------------------------------------
@@ -642,7 +620,7 @@ def load_hdf5(config_hamiltonian: HamiltonianConfiguration):
     f2 = data["2e"]
     bs = None   # Currently don't support bosons in HDF5
     fb = None   # Currently don't support bosons in HDF5
-    return _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, bs, fb)
+    return _construct_second_quantization(config_hamiltonian, f0, f1, f2, bs, fb)
 
 # -------------------------------------------------------------------------------------------------
 
@@ -680,7 +658,7 @@ def load_numpy(config_hamiltonian: HamiltonianConfiguration):
     f2 = _get_any_of(data, ["two_body", "eri"])
     bs = _get_any_of(data, ["bosonic_scalar"], default=None)
     fb = _get_any_of(data, ["fb_interaction"], default=None)
-    return _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, bs, fb, integral)
+    return _construct_second_quantization(config_hamiltonian, f0, f1, f2, bs, fb, integral)
 
 # -------------------------------------------------------------------------------------------------
 
@@ -708,7 +686,7 @@ def load_fci(config_hamiltonian: HamiltonianConfiguration):
         raise ValueError(f"Incorrect f2 shape {f2.shape}. "
                          f"f2 shape should be ({n}, {n}, {n}, {n}).")
 
-    return _verify_and_construct_second_quantization(config_hamiltonian, f0, f1, f2, None, None, "chemist_spatial")
+    return _construct_second_quantization(config_hamiltonian, f0, f1, f2, None, None, "chemist_spatial")
 
 # -------------------------------------------------------------------------------------------------
 
@@ -804,7 +782,7 @@ def load_hamlib_hdf5(config_hamiltonian: HamiltonianConfiguration):
 
     logger.info(f"Loaded {len(pauli_dict)} Pauli terms on {numq} qubits.")
 
-    return Hamiltonian(LinearCombinationOfPauliStrings(num_qubits=numq, sparse=pauli_dict))
+    return Hamiltonian.from_pauli_strings(pauli_dict, numq)
 
 # -------------------------------------------------------------------------------------------------
 
@@ -854,12 +832,7 @@ def load_pauli(config_hamiltonian: HamiltonianConfiguration):
                     numq = len(pauli)
                     pauli_dict[pauli] = coefficient
         pauli_dict = real_pauli_file_coefficients(pauli_dict)
-        if fmt == "dense":
-            return Hamiltonian(LinearCombinationOfPauliStrings(num_qubits=numq, dense=pauli_dict))
-        elif fmt == "sparse":
-            return Hamiltonian(LinearCombinationOfPauliStrings(num_qubits=numq, sparse=pauli_dict))
-        else:
-            raise ValueError(f"Invalid Pauli format: \"{fmt}\".")
+        return Hamiltonian.from_pauli_strings(pauli_dict, numq)
     elif extension == "json":
         with open(filename, 'r') as file:
             data = json.load(file)
@@ -894,7 +867,7 @@ def load_pauli(config_hamiltonian: HamiltonianConfiguration):
 
         pauli_dict = real_pauli_file_coefficients(pauli_dict)
 
-        return Hamiltonian(LinearCombinationOfPauliStrings(num_qubits=numq, sparse=pauli_dict))
+        return Hamiltonian.from_pauli_strings(pauli_dict, numq)
     else:
         raise ValueError(
             f"Invalid file extension for loading a Pauli string file: \"{extension}\".")
