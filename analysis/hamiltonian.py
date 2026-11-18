@@ -241,6 +241,34 @@ class Hamiltonian:
             force_dense=force_dense,
             force_sparse=force_sparse
         )
+    def compute_initial_energy_bounds(
+            self,
+            config_hamiltonian: HamiltonianConfiguration):
+        # TODO: This is one of the uses of to_pauli_strings that we need to address in the future
+        logger.info("Computing initial energy bounds.")
+        pauli_sum = {key.to_sparse() : value for key, value in self.to_pauli_strings().items()}
+        logger.verbose(f"-- number of Pauli strings = {len(pauli_sum)}")
+        energy_shift = pauli_sum.get(tuple(), 0.0) # identity term (may not exist in all formats)
+        dE = sum(abs(coefficient) for coefficient in pauli_sum.values()) - abs(energy_shift)
+        Elo0 = energy_shift - dE
+        Ehi0 = energy_shift + dE
+        logger.verbose(f"-- energy shift = {energy_shift}")
+        logger.verbose(f"-- computed bounds = [{Elo0}, {Ehi0})")
+        EloU = value(config_hamiltonian.lower_bound, float('-inf'))
+        EhiU = value(config_hamiltonian.upper_bound, float('inf'))
+        Elo1 = max(Elo0, EloU)
+        Ehi1 = min(Ehi0, EhiU)
+        logger.verbose(f"-- limited bounds = [{Elo1}, {Ehi1})")
+        if config_hamiltonian.exact_energy_lower_bound:
+            assert config_hamiltonian.lower_bound is not None
+            Elo1 = config_hamiltonian.lower_bound
+        if config_hamiltonian.exact_energy_upper_bound:
+            assert config_hamiltonian.upper_bound is not None
+            Ehi1 = config_hamiltonian.upper_bound
+        Elo1 = require_real_scalar("lower energy bound", Elo1)
+        Ehi1 = require_real_scalar("upper energy bound", Ehi1)
+        logger.verbose(f"-- initial bounds = [{Elo1}, {Ehi1})")
+        return (Elo1, Ehi1)
 
 
 
@@ -391,7 +419,6 @@ class Hamiltonian:
     #    else:
     #        raise TypeError(
     #            f"Unable to shift a fermionic Hamiltonian of type \"{type(self._H)}\".")
-
     #def get_energy_shift(self) -> float:
     #    """
     #    Get the cumulative energy shift applied to this Hamiltonian.
@@ -403,33 +430,33 @@ class Hamiltonian:
     #        The total energy shift applied via energy_shift() calls
     #    """
     #    return self._energy_shift_total
-    def compute_initial_energy_bounds(
-            self,
-            config_hamiltonian: HamiltonianConfiguration):
-        logger.info("Computing initial energy bounds.")
-        pauli_sum = self._get_all_pauli_strings()
-        logger.verbose(f"-- number of Pauli strings = {len(pauli_sum)}")
-        energy_shift = pauli_sum.get(tuple(), 0.0) # identity term (may not exist in all formats)
-        dE = sum(abs(coefficient) for coefficient in pauli_sum.values()) - abs(energy_shift)
-        Elo0 = energy_shift - dE
-        Ehi0 = energy_shift + dE
-        logger.verbose(f"-- energy shift = {energy_shift}")
-        logger.verbose(f"-- computed bounds = [{Elo0}, {Ehi0})")
-        EloU = value(config_hamiltonian.lower_bound, float('-inf'))
-        EhiU = value(config_hamiltonian.upper_bound, float('inf'))
-        Elo1 = max(Elo0, EloU)
-        Ehi1 = min(Ehi0, EhiU)
-        logger.verbose(f"-- limited bounds = [{Elo1}, {Ehi1})")
-        if config_hamiltonian.exact_energy_lower_bound:
-            assert config_hamiltonian.lower_bound is not None
-            Elo1 = config_hamiltonian.lower_bound
-        if config_hamiltonian.exact_energy_upper_bound:
-            assert config_hamiltonian.upper_bound is not None
-            Ehi1 = config_hamiltonian.upper_bound
-        Elo1 = require_real_scalar("lower energy bound", Elo1)
-        Ehi1 = require_real_scalar("upper energy bound", Ehi1)
-        logger.verbose(f"-- initial bounds = [{Elo1}, {Ehi1})")
-        return (Elo1, Ehi1)
+    #def compute_initial_energy_bounds(
+    #        self,
+    #        config_hamiltonian: HamiltonianConfiguration):
+    #    logger.info("Computing initial energy bounds.")
+    #    pauli_sum = self._get_all_pauli_strings()
+    #    logger.verbose(f"-- number of Pauli strings = {len(pauli_sum)}")
+    #    energy_shift = pauli_sum.get(tuple(), 0.0) # identity term (may not exist in all formats)
+    #    dE = sum(abs(coefficient) for coefficient in pauli_sum.values()) - abs(energy_shift)
+    #    Elo0 = energy_shift - dE
+    #    Ehi0 = energy_shift + dE
+    #    logger.verbose(f"-- energy shift = {energy_shift}")
+    #    logger.verbose(f"-- computed bounds = [{Elo0}, {Ehi0})")
+    #    EloU = value(config_hamiltonian.lower_bound, float('-inf'))
+    #    EhiU = value(config_hamiltonian.upper_bound, float('inf'))
+    #    Elo1 = max(Elo0, EloU)
+    #    Ehi1 = min(Ehi0, EhiU)
+    #    logger.verbose(f"-- limited bounds = [{Elo1}, {Ehi1})")
+    #    if config_hamiltonian.exact_energy_lower_bound:
+    #        assert config_hamiltonian.lower_bound is not None
+    #        Elo1 = config_hamiltonian.lower_bound
+    #    if config_hamiltonian.exact_energy_upper_bound:
+    #        assert config_hamiltonian.upper_bound is not None
+    #        Ehi1 = config_hamiltonian.upper_bound
+    #    Elo1 = require_real_scalar("lower energy bound", Elo1)
+    #    Ehi1 = require_real_scalar("upper energy bound", Ehi1)
+    #    logger.verbose(f"-- initial bounds = [{Elo1}, {Ehi1})")
+    #    return (Elo1, Ehi1)
 
 # -------------------------------------------------------------------------------------------------
 
