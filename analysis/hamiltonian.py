@@ -118,17 +118,17 @@ class Hamiltonian:
         time-evolution operators that multiply together, and time-evolution operators are not
         commutative under multiplication.
         """
-        self.terms = list(terms)
-        self.num_qubits = num_qubits
-        self.core_operator = core_operator
+        self._terms = list(terms)
+        self._num_qubits = num_qubits
+        self._core_operator = core_operator
         self._energy_shift_total = 0.0
         for term in terms:
-            assert term.num_qubits() == self.num_qubits
+            assert term.num_qubits() == self._num_qubits
     def num_qubits(self):
         """
         The number of qubits that this Hamiltonian operates on.
         """
-        return self.num_qubits
+        return self._num_qubits
     def terms(self):
         """
         Returns an ordered container of the terms in the Hamiltonian.
@@ -137,24 +137,25 @@ class Hamiltonian:
         #       with no processing.  That implies that they are already packed into term classes
         #       before being passed to the constructor.  That is done by the classmethods
         #       from_pauli_string, from_second_quantization, etc.
-        return self.terms
+        return self._terms
+    # TODO: Rename to just `core_operator` for consistency with num_qubits() and terms()?
     def get_core_operator(self):
         """
         Returns the core operator, which may be needed by downstream algorithms (such as block
         encodings from pyLIQTR).
         """
         # TODO: Do we really need to store the core_operator, or can it be constructed on demand?
-        if self.core_operator is None:
+        if self._core_operator is None:
             raise ValueError(
                 "This Hamiltonian was not generated with a core operator, so requesting the core "
                 "operator is an invalid operation.")
-        return self.core_operator
+        return self._core_operator
     def to_pauli_strings(self):
         # TODO: This is a temporary bridge method to be removed once Pauli-based analyses
         #       (eigenvalue bounds, nested-commutator bounds, etc) are updated to use the term
         #       interface.
         pauli_strings = {}
-        for term in self.terms:
+        for term in self._terms:
             term_dict = term.to_pauli_strings()
             for key, value in term_dict.items():
                 pauli_strings[key] = pauli_strings.get(key, 0) + value
@@ -170,26 +171,28 @@ class Hamiltonian:
         # TODO: Check that this works as expected
         # TODO: This suggests that an identity term type would be useful, especially if we restrict
         #       all other term types to prevent them from being identity.
-        for term in terms:
+        for term in self._terms:
             if term.pauli_string.to_sparse() == ():
                 print(f"Updating term {term.pauli_string} {term.coefficient}")
                 term.coefficient += dE
                 print(f"-- new coefficient = {term.coefficient}")
                 break
         else:
-            terms.insert(0, SinglePauliTerm((), dE, terms[0].num_qubits()))
-            print(f"Inserted new term {terms[0].pauli_string} {terms[0].coefficient}")
-        if isinstance(self.core_operator, InteractionOperator):
-            t0 = self.core_operator.constant + dE
-            t1 = self.core_operator.one_body_tensor
-            t2 = self.core_operator.two_body_tensor
-            self.core_operator = InteractionOperator(t0, t1, t2)
-        elif isinstance(self.core_operator, MixedFermionBosonOperator):
-            self.core_operator.energy_shift(dE)
-        elif self.core_operator is not None:
+            self._terms.insert(0, SinglePauliTerm((), dE, self._terms[0].num_qubits()))
+            print(f"Inserted new term {self._terms[0].pauli_string} {self._terms[0].coefficient}")
+        if isinstance(self._core_operator, InteractionOperator):
+            t0 = self._core_operator.constant + dE
+            t1 = self._core_operator.one_body_tensor
+            t2 = self._core_operator.two_body_tensor
+            self._core_operator = InteractionOperator(t0, t1, t2)
+        elif isinstance(self._core_operator, MixedFermionBosonOperator):
+            self._core_operator.energy_shift(dE)
+        elif self._core_operator is not None:
             raise TypeError(
                 "Unable to apply an energy shift a Hamiltonian with core_operator of type "
-                f"\"{type(self.core_operator)}\".")
+                f"\"{type(self._core_operator)}\".")
+    # TODO: Rename to just `energy_shift` for consistency with `terms()` and `num_qubits()`?  But
+    #       `energy_shift()` already exists as the function that updates the energy shift.
     def get_energy_shift(self) -> float:
         """
         Get the cumulative energy shift applied to this Hamiltonian.
