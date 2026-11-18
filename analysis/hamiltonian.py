@@ -126,7 +126,6 @@ class Hamiltonian:
             if term.num_qubits() != self._num_qubits:
                 raise ValueError(f"Mismatch in number of qubits.  Term {term} has "
                                  f"{term.num_qubits()} qubits but should have {self._num_qubits}.")
-            assert term.num_qubits() == self._num_qubits
     def num_qubits(self):
         """
         The number of qubits that this Hamiltonian operates on.
