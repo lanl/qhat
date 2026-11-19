@@ -141,6 +141,11 @@ class Hamiltonian:
         # Update the identity term
         # TODO: This suggests that an identity term type would be useful, especially if we restrict
         #       all other term types to prevent them from being identity.
+        # TODO: Does this block suggest that terms need a way to check if we can add two of them
+        #       together into a single term?  For example, two Pauli terms can be combined if they
+        #       represent the same Pauli string.  Two diagonal operators can probably be trivially
+        #       added together.  Not sure if this is a good idea or not, or what the interface
+        #       would look like.
         for i, term in enumerate(self._terms):
             if isinstance(term, SinglePauliTerm) and term.pauli_string.to_sparse() == ():
                 new_coefficient = term.coefficient + dE
@@ -159,6 +164,12 @@ class Hamiltonian:
         # TODO: If we can reconstruct the core operator on demand, then we don't need to update it
         #       here, preventing inconsistencies and eliminating the need to worry if it somehow
         #       was set to an invalid value.
+        #    -- From Pauli strings, I don't see an easy way to reconstruct the core operator.
+        #       However, right now the only two types of core operator are InteractionOperator and
+        #       MixedFermionBosonOperator, and it's possible that the second-quantization terms may
+        #       store sufficient information to reconstruct those core operators.  If that happens,
+        #       then we could decide whether it's better to drop the core operator and reconstruct
+        #       it on demand or to keep it in the class.
         if isinstance(self._core_operator, InteractionOperator):
             t0 = self._core_operator.constant + dE
             t1 = self._core_operator.one_body_tensor
