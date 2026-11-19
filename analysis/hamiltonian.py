@@ -109,8 +109,7 @@ class Hamiltonian:
         Returns an ordered container of the terms in the Hamiltonian.
         """
         return self._terms
-    # TODO: Rename to just `core_operator` for consistency with num_qubits() and terms()?
-    def get_core_operator(self):
+    def core_operator(self):
         """
         Returns the core operator, which may be needed by downstream algorithms (such as block
         encodings from pyLIQTR).

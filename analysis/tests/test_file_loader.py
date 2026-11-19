@@ -29,7 +29,7 @@ def test_toy_fci_file():
 
     H = load_fci(config_hamiltonian)
     assert isinstance(H, Hamiltonian)
-    intop = H.get_core_operator()
+    intop = H.core_operator()
     assert isinstance(intop, InteractionOperator)
 
     # check scalars
@@ -79,7 +79,7 @@ def test_toy_fci_file():
 def check_32_2ru_III_3pl_operator(H, filetype):
 #    """Check correctness of operator from file "32_2ru_III_3pl.*"
     assert isinstance(H, Hamiltonian)
-    intop = H.get_core_operator()
+    intop = H.core_operator()
     assert isinstance(intop, InteractionOperator)
 
     # check scalars
@@ -146,7 +146,7 @@ def test_numpy_file_openfermion():
 
     H = load_numpy(config_hamiltonian)
     assert isinstance(H, Hamiltonian)
-    intop = H.get_core_operator()
+    intop = H.core_operator()
     assert isinstance(intop, InteractionOperator)
 
     # check scalars

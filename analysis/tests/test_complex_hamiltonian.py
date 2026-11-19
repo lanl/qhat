@@ -88,7 +88,7 @@ class TestLoading:
     def test_accepts_complex_typed_constant_with_zero_imaginary_part(self, tmp_path):
         h1, h2 = complex_hermitian_integrals()
         _, H = load(tmp_path, ecore=np.array(1.0 + 0j), h1e=h1, eri=h2)
-        assert H.get_core_operator().constant == 1.0
+        assert H.core_operator().constant == 1.0
 
     def test_rejects_complex_energy_shift(self, complex_hamiltonian):
         _, H = complex_hamiltonian

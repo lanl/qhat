@@ -172,7 +172,7 @@ def encode_pauli_lcu_pyliqtr(
     #       the ElectronicStructure be wrapped in a ChemicalHamiltonian?  Can methods other than
     #       Linear T use an ElectronicStructure?
     problem_instance = ChemicalHamiltonian(
-            mol_ham=hamiltonian.get_core_operator(),
+            mol_ham=hamiltonian.core_operator(),
             mol_name="molecular hamiltonian")
     # TODO: Do we want to exercise any of the other options to PauliStringLCU?
     return PyLIQTRPauliStringLCU(
@@ -206,7 +206,7 @@ def encode_double_factorization(
     logger.verbose("Encoding with double-factorized block encoding from pyLIQTR.")
 
     # pyLIQTR's double factorization keeps only the real part of the integrals (see issue #115).
-    core = hamiltonian.get_core_operator()
+    core = hamiltonian.core_operator()
     if isinstance(core, InteractionOperator):
         for label, tensor in (("one-body", core.one_body_tensor), ("two-body", core.two_body_tensor)):
             ratio = max_relative_imaginary(tensor)

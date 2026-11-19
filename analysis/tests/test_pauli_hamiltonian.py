@@ -563,12 +563,12 @@ class TestHamiltonianIntegration:
             assert isinstance(term, BaseTerm)
             assert term.num_qubits() == 4
 
-    def test_get_core_operator(self, sample_hamiltonian):
+    def test_core_operator(self, sample_hamiltonian):
         """Test that a Pauli string Hamiltonian has no core operator."""
         H, _, _ = sample_hamiltonian
 
         with pytest.raises(ValueError, match="core operator"):
-            H.get_core_operator()
+            H.core_operator()
 
 
 # ==================================================================================
