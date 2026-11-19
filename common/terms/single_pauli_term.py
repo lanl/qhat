@@ -5,7 +5,6 @@ import attrs
 from qhat.common import controls
 from qhat.common.hermiticity import require_real_scalar
 from qhat.common.pauli_string import PauliString
-# TODO: Should I move the evolution Bloqs into the terms/ directory?
 from qhat.common.pauli_string_evolution import PauliStringEvolution
 from qhat.common.terms.base_term import BaseTerm
 
