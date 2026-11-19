@@ -27,6 +27,7 @@ Usage
 """
 
 import argparse
+import os as _os
 import sys
 from typing import Dict, List, Tuple
 
@@ -35,6 +36,8 @@ from scipy.linalg import expm
 
 from qhat.analysis.configuration import load_configuration
 from qhat.analysis.hamiltonian import get_physical_hamiltonian
+
+_ANALYSIS_DIR = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "analysis")
 
 
 def _load_state_from_config(config_file: str):
@@ -47,7 +50,7 @@ def _load_state_from_config(config_file: str):
     saved_argv   = sys.argv[:]
     try:
         sys.argv = [sys.argv[0], config_file]
-        state = load_configuration()
+        state, _, _ = load_configuration()
     finally:
         sys.argv = saved_argv
     if hasattr(state.config_hamiltonian, "filename"):
@@ -341,7 +344,7 @@ if __name__ == "__main__":
         state                = _load_state_from_config(config_file)
         physical_hamiltonian = get_physical_hamiltonian(state.config_hamiltonian)
         n_qubits         = physical_hamiltonian.num_qubits()
-        pauli_dict       = physical_hamiltonian.get_all_pauli_strings(return_as="tuples")
+        pauli_dict = {p.to_sparse(): c for p, c in physical_hamiltonian.to_pauli_strings().items()}
         using_pauli_file = False
 
     print(f"  -> {n_qubits} qubits, {len(pauli_dict)} Pauli terms loaded.")

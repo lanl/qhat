@@ -22,6 +22,7 @@ from qhat.analysis.unitary import encode_double_factorization, encode_ramped_tro
 from qhat.common.commuting_pauli_string_evolution import CommutingPauliStringEvolution
 from qhat.common.pauli_string_evolution import PauliStringEvolution
 from qhat.common.qpe_window_state import precision_bits
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 
 NORB = 3
@@ -56,10 +57,10 @@ class TestLoading:
     def test_pauli_coefficients_are_floats(self, tmp_path, transform):
         h1, h2 = complex_hermitian_integrals()
         _, H = load(tmp_path, transform, ecore=np.array(2.5), h1e=h1, eri=h2)
-        terms = H.get_all_pauli_strings()
+        terms = H.to_pauli_strings()
         assert len(terms) > 1
         assert all(type(c) is float for c in terms.values())
-        assert all(type(c) is float for c in H.get_all_pauli_strings("strings").values())
+        assert all(type(term.coefficient) is float for term in H.terms())
 
     def test_energy_bounds_are_floats(self, complex_hamiltonian):
         config, H = complex_hamiltonian
@@ -87,12 +88,12 @@ class TestLoading:
     def test_accepts_complex_typed_constant_with_zero_imaginary_part(self, tmp_path):
         h1, h2 = complex_hermitian_integrals()
         _, H = load(tmp_path, ecore=np.array(1.0 + 0j), h1e=h1, eri=h2)
-        assert H.get_core_operator().constant == 1.0
+        assert H.core_operator().constant == 1.0
 
     def test_rejects_complex_energy_shift(self, complex_hamiltonian):
         _, H = complex_hamiltonian
         with pytest.raises(ValueError, match="energy shift must be real"):
-            H.energy_shift(1.0 + 0.1j)
+            H.shift_energy(1.0 + 0.1j)
 
 
 class TestNoComplexWarnings:
@@ -106,7 +107,7 @@ class TestNoComplexWarnings:
 
             lo, hi = H.compute_initial_energy_bounds(config_ham)
             E0 = (lo + hi) / 2
-            H.energy_shift(-E0)
+            H.shift_energy(-E0)
             config_alg = AlgorithmConfiguration()
             config_alg.method = "QPE: qhat flexible"
             config_alg.energy_error = energy_error
@@ -121,7 +122,7 @@ class TestNoComplexWarnings:
                 trotter_order="second order", trotter_steps=2)
             trotter = encode_ramped_trotter(config_unitary, H, tevol_hbar)
             assert type(trotter.time) is float
-            assert all(type(c) is float for _, c in trotter.pauli_terms)
+            assert all(type(term.coefficient) is float for term in trotter.hamiltonian_terms)
             trotter.decompose_bloq()
 
             phase_error, _ = qpe_requirements(config_alg, trotter)
@@ -151,12 +152,11 @@ class TestSanityChecks:
             PauliStringEvolution(pauli_string="XZ", coefficient=0.5, time=1.0 + 0.1j)
 
     def test_trotterization_rejects_complex(self):
-        terms = [("XI", 0.5), ("ZZ", 0.25)]
+        terms = single_pauli_terms([("XI", 0.5), ("ZZ", 0.25)])
         with pytest.raises(ValueError, match="Trotterization time must be real"):
             Trotterization.from_method(terms, "second order", time=1.0 + 0.1j, num_steps=2)
         with pytest.raises(ValueError, match="coefficient of ZZ must be real"):
-            Trotterization.from_method([("XI", 0.5), ("ZZ", 0.25j)], "second order",
-                                       time=1.0, num_steps=2)
+            single_pauli_terms([("XI", 0.5), ("ZZ", 0.25j)])
 
     def test_pauli_string_evolution_stores_floats(self):
         pse = PauliStringEvolution(pauli_string="XZ", coefficient=np.complex128(0.37 + 1e-19j),
@@ -177,10 +177,11 @@ class TestSanityChecks:
 
     def test_trotterization_stores_floats(self):
         trotter = Trotterization.from_method(
-            [("XI", np.complex128(0.37 + 1e-19j)), ("ZZ", -0.21)], "second order",
-            time=np.complex128(0.81 + 1e-20j), num_steps=3)
-        assert all(type(c) is float for _, c in trotter.pauli_terms)
-        assert trotter.pauli_terms[0] == ("XI", 0.37)
+            single_pauli_terms([("XI", np.complex128(0.37 + 1e-19j)), ("ZZ", -0.21)]),
+            "second order", time=np.complex128(0.81 + 1e-20j), num_steps=3)
+        assert all(type(term.coefficient) is float for term in trotter.hamiltonian_terms)
+        assert trotter.hamiltonian_terms[0].dense_string() == "XI"
+        assert trotter.hamiltonian_terms[0].coefficient == 0.37
         assert all(type(c) is float for c in trotter.coefficients)
         assert type(trotter.time) is float and type(trotter.hbar) is float
         t_complexity(trotter)

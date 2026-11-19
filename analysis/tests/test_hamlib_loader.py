@@ -10,7 +10,12 @@ import os
 from pathlib import Path
 
 from qhat.analysis.config_types import GeneralConfiguration, HamiltonianConfiguration
-from qhat.analysis.hamiltonian import Hamiltonian, LinearCombinationOfPauliStrings, load_hamlib_hdf5
+from qhat.analysis.hamiltonian import Hamiltonian, load_hamlib_hdf5
+
+
+def sparse_pauli_dict(H):
+    """Return the Pauli strings of a Hamiltonian as {sparse tuple: coefficient}."""
+    return {pauli.to_sparse(): coef for pauli, coef in H.to_pauli_strings().items()}
 
 
 class MockConfig:
@@ -59,7 +64,7 @@ def test_load_simple_hamlib_file():
         assert isinstance(H, Hamiltonian)
 
         # Get Pauli strings
-        pauli_dict = H.get_all_pauli_strings(return_as="tuples")
+        pauli_dict = sparse_pauli_dict(H)
 
         # Expected terms
         expected = {
@@ -169,7 +174,7 @@ def test_identity_only_hamiltonian():
         H = load_hamlib_hdf5(config_hamiltonian)
 
         # Check
-        pauli_dict = H.get_all_pauli_strings(return_as="tuples")
+        pauli_dict = sparse_pauli_dict(H)
         assert len(pauli_dict) == 1
         assert tuple() in pauli_dict
         assert abs(pauli_dict[tuple()] - 3.14) < 1e-10
@@ -208,7 +213,7 @@ def test_real_hamlib_file():
         expected_nqubits = dataset.attrs['nqubits']
         expected_one_norm = dataset.attrs['one_norm']
 
-    pauli_dict = H.get_all_pauli_strings(return_as="tuples")
+    pauli_dict = sparse_pauli_dict(H)
     assert len(pauli_dict) == expected_terms, \
         f"Expected {expected_terms} terms, got {len(pauli_dict)}"
 

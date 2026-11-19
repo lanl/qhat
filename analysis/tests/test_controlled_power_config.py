@@ -9,6 +9,7 @@ from qhat.analysis.config_types import AlgorithmConfiguration
 from qhat.analysis.qubit_summary import log_qubit_summary
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.pauli_string_evolution import PauliStringEvolution
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 
 # Three qubits, non-commuting terms, an odd time and an even step count
@@ -16,7 +17,7 @@ TERMS = (("XZI", 0.5), ("IZY", 0.3), ("ZXX", 0.2))
 
 
 def trotter(method="second order", num_steps=4, **kwargs):
-    return Trotterization.from_method(TERMS, method, 0.7, num_steps, **kwargs)
+    return Trotterization.from_method(single_pauli_terms(TERMS), method, 0.7, num_steps, **kwargs)
 
 
 def make_config(method="QPE: QHAT flexible", **kwargs):
