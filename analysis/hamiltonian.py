@@ -130,7 +130,7 @@ class Hamiltonian:
             for pstr, coeff in term_dict.items():
                 pauli_strings[pstr] = pauli_strings.get(pstr, 0) + coeff
         return pauli_strings
-    def energy_shift(self, dE):
+    def shift_energy(self, dE):
         """
         Shifts the energy spectrum of the Hamiltonian by shifting the identity term.
         """

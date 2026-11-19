@@ -63,7 +63,7 @@ def run():
         # where s is the scale factor. This ensures phases never hit exactly ±π, avoiding
         # aliasing ambiguity, while matching np.angle output range directly.
         E0 = (Elo1 + Ehi1) / 2
-        physical_hamiltonian.energy_shift(-E0)
+        physical_hamiltonian.shift_energy(-E0)
         Elo2 = Elo1 - E0
         Ehi2 = Ehi1 - E0
         logger.verbose(f"-- shifted bounds = [{Elo2}, {Ehi2})")

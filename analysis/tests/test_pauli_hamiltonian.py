@@ -147,7 +147,7 @@ class TestFromPauliStrings:
         """Test energy shift with dense format."""
         data = {"IIII": 1.0, "XIII": 0.5}
         H = Hamiltonian.from_pauli_strings(data, 4)
-        H.energy_shift(2.5)
+        H.shift_energy(2.5)
         result = dense_pauli_dict(H)
         assert result["IIII"] == 3.5
         assert result["XIII"] == 0.5
@@ -156,7 +156,7 @@ class TestFromPauliStrings:
         """Test energy shift with sparse format."""
         data = {tuple(): 1.0, ((0, 'X'),): 0.5}
         H = Hamiltonian.from_pauli_strings(data, 4)
-        H.energy_shift(2.5)
+        H.shift_energy(2.5)
         result = sparse_pauli_dict(H)
         assert result[tuple()] == 3.5
         assert result[((0, 'X'),)] == 0.5
@@ -165,7 +165,7 @@ class TestFromPauliStrings:
         """Test that energy shift adds identity term if not present."""
         data = {"XIII": 0.5}
         H = Hamiltonian.from_pauli_strings(data, 4)
-        H.energy_shift(2.5)
+        H.shift_energy(2.5)
         result = dense_pauli_dict(H)
         assert result["IIII"] == 2.5
         assert result["XIII"] == 0.5
@@ -174,14 +174,14 @@ class TestFromPauliStrings:
         """Test that shifting away the whole identity coefficient removes the identity term."""
         data = {"IIII": 1.0, "XIII": 0.5}
         H = Hamiltonian.from_pauli_strings(data, 4)
-        H.energy_shift(-1.0)
+        H.shift_energy(-1.0)
         assert dense_pauli_dict(H) == {"XIII": 0.5}
 
     def test_energy_shift_total(self):
         """Test that the cumulative energy shift is tracked."""
         H = Hamiltonian.from_pauli_strings({"IIII": 1.0, "XIII": 0.5}, 4)
-        H.energy_shift(2.5)
-        H.energy_shift(-0.5)
+        H.shift_energy(2.5)
+        H.shift_energy(-0.5)
         assert H.get_energy_shift() == 2.0
 
     def test_energy_shift_leaves_existing_terms_unchanged(self):
@@ -190,7 +190,7 @@ class TestFromPauliStrings:
         before = list(H.terms())
         trotter = Trotterization.from_method(before, "second order", time=1.0, num_steps=2)
 
-        H.energy_shift(2.5)
+        H.shift_energy(2.5)
 
         assert dense_pauli_dict(H) == {"IIII": 3.5, "XIII": 0.5}
         assert [term.coefficient for term in before] == [1.0, 0.5]
@@ -546,7 +546,7 @@ class TestHamiltonianIntegration:
         pauli_before = sparse_pauli_dict(H)
         identity_before = pauli_before[tuple()]
 
-        H.energy_shift(10.0)
+        H.shift_energy(10.0)
 
         pauli_after = sparse_pauli_dict(H)
         identity_after = pauli_after[tuple()]

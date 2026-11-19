@@ -93,7 +93,7 @@ class TestLoading:
     def test_rejects_complex_energy_shift(self, complex_hamiltonian):
         _, H = complex_hamiltonian
         with pytest.raises(ValueError, match="energy shift must be real"):
-            H.energy_shift(1.0 + 0.1j)
+            H.shift_energy(1.0 + 0.1j)
 
 
 class TestNoComplexWarnings:
@@ -107,7 +107,7 @@ class TestNoComplexWarnings:
 
             lo, hi = H.compute_initial_energy_bounds(config_ham)
             E0 = (lo + hi) / 2
-            H.energy_shift(-E0)
+            H.shift_energy(-E0)
             config_alg = AlgorithmConfiguration()
             config_alg.method = "QPE: qhat flexible"
             config_alg.energy_error = energy_error
