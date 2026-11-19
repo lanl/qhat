@@ -271,13 +271,8 @@ class Hamiltonian:
         for term in pauli_terms:
             combined[term.pauli_string] = combined.get(term.pauli_string, 0.0) + term.coefficient
         return cls((SinglePauliTerm(ps, c) for ps, c in combined.items()), num_qubits)
-    # TODO: Revisit whether from_second_quantization and from_mixed_fermion_boson should merge.
-    #       Mixed fermion-boson input is still second quantization, just with additional tensors.
-    #       One option is a single from_second_quantization with optional bosonic kwargs (or a
-    #       grouped bosonic-data argument).  Revisit once the Hamiltonians we need are better
-    #       understood.
     @classmethod
-    def from_second_quantization(cls, constant, one_body, two_body, fermion_mapping):
+    def from_fermionic_second_quantization(cls, constant, one_body, two_body, fermion_mapping):
         """
         Construct a Hamiltonian from fermionic second-quantization tensors in the OpenFermion
         convention.  `fermion_mapping` is a name in `fermionic_mapping` or a callable that maps an
@@ -290,7 +285,7 @@ class Hamiltonian:
         terms = _pauli_terms_from_qubit_operator(fermion_mapping(operator), operator.n_qubits)
         return cls(terms, operator.n_qubits, core_operator=operator)
     @classmethod
-    def from_mixed_fermion_boson(
+    def from_fermion_boson_second_quantization(
             cls, constant, one_body, two_body, boson_number_coefficient, interaction,
             fermion_mapping, boson_mapping, max_bosons_per_state):
         """
@@ -351,7 +346,7 @@ def _construct_second_quantization(config_hamiltonian, f0, f1, f2, bs, fb, integ
     fermion_mapping = config_hamiltonian.fermion_to_qubit_transform
     if bs is None and fb is None:
         # pure-fermion case
-        H = Hamiltonian.from_second_quantization(f0, f1, f2, fermion_mapping)
+        H = Hamiltonian.from_fermionic_second_quantization(f0, f1, f2, fermion_mapping)
         logger.info(f"Fermionic second-quantization Hamiltonian uses {H.num_qubits()} qubits.")
         logger.info(f"Mapped fermionic operators to qubit operators using {fermion_mapping} method.")
         return H
@@ -366,7 +361,7 @@ def _construct_second_quantization(config_hamiltonian, f0, f1, f2, bs, fb, integ
                 "Hamiltonian includes bosons but user did not specify maximum bosons per state.")
         boson_mapping = config_hamiltonian.boson_to_qubit_transform
         max_bosons = config_hamiltonian.max_bosons_per_state
-        H = Hamiltonian.from_mixed_fermion_boson(
+        H = Hamiltonian.from_fermion_boson_second_quantization(
                 f0, f1, f2, bs, fb, fermion_mapping, boson_mapping, max_bosons)
         logger.info(
             f"Mixed fermionic-bosonic second-quantization Hamiltonian uses {H.num_qubits()} qubits.")
