@@ -180,9 +180,7 @@ class Hamiltonian:
             raise TypeError(
                 "Unable to apply an energy shift a Hamiltonian with core_operator of type "
                 f"\"{type(self._core_operator)}\".")
-    # TODO: Rename to just `energy_shift` for consistency with `terms()` and `num_qubits()`?  But
-    #       `energy_shift()` already exists as the function that updates the energy shift.
-    def get_energy_shift(self) -> float:
+    def total_energy_shift(self) -> float:
         """
         Get the cumulative energy shift applied to this Hamiltonian.
 

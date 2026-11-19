@@ -110,7 +110,7 @@ def run():
         approximate_time_evolution=unitary_hamiltonian,
         exact_hamiltonian=physical_hamiltonian,
         timestep=tevol_hbar,
-        energy_shift=physical_hamiltonian.get_energy_shift(),
+        energy_shift=physical_hamiltonian.total_energy_shift(),
         config_general=state.config_general
     ))
 

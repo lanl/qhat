@@ -182,7 +182,7 @@ class TestFromPauliStrings:
         H = Hamiltonian.from_pauli_strings({"IIII": 1.0, "XIII": 0.5}, 4)
         H.shift_energy(2.5)
         H.shift_energy(-0.5)
-        assert H.get_energy_shift() == 2.0
+        assert H.total_energy_shift() == 2.0
 
     def test_energy_shift_leaves_existing_terms_unchanged(self):
         """Terms are immutable, so a shift replaces the identity term instead of editing it."""
