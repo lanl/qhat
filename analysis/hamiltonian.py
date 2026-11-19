@@ -261,18 +261,11 @@ class Hamiltonian:
         return (Elo1, Ehi1)
     @classmethod
     def from_pauli_strings(cls, pauli_strings, num_qubits):
-        # TODO: This assumes that pauli_strings is a dict of {pauli_string : coefficient, ...}, but
-        #       different types for the Pauli strings are supported because the SinglePauliString
-        #       constructor handles that for us.  Do we want to support the tuple((pauli_string,
-        #       coefficient), ...) format as well?
-        #    -- The main complication there is deduplication without overwriting a previous value.
-        #    -- Currently the way to get a duplicate value is if you use the sparse format and
-        #       switch the order (e.g.: ((3,'Z'),(0,'X')) vs ((0,'X'),(3,'Z')) would be the same
-        #       Pauli string but hash to different dict keys) or to mix different formats (e.g.,
-        #       tuple vs str vs PauliString could represent the same Pauli string but would hash to
-        #       different dict keys).
-        pauli_terms = [SinglePauliTerm(ps, c, num_qubits) for ps, c in pauli_strings.items()]
-        # Different keys can represent the same Pauli string (see above).  This washes out once
+        if isinstance(pauli_strings, dict):
+            return cls.from_pauli_strings(pauli_strings.items(), num_qubits)
+        # from here we assume that pauli_strings is a collection of (pauli string, coefficient)
+        pauli_terms = [SinglePauliTerm(ps, c, num_qubits) for ps, c in pauli_strings]
+        # Different terms can have the same Pauli string (see above).  This washes out once
         # SinglePauliTerm canonicalizes to PauliString, so combine coefficients on that key.
         combined = {}
         for term in pauli_terms:
