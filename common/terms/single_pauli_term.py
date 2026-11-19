@@ -38,6 +38,9 @@ class SinglePauliTerm(BaseTerm):
     def num_qubits(self) -> int:
         return self.pauli_string.num_qubits
 
+    def to_dense_matrix(self):
+        raise NotImplementedError("SinglePauliTerm::to_dense_matrix not yet implemented")
+
     def generate_evolution_operator(
         self,
         t: float,

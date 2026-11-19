@@ -38,6 +38,24 @@ class BaseTerm(ABC):
     def num_qubits(self) -> int:
         pass
 
+    # TODO: What should the sparse / matrix-free version look like?
+    #       -- to_sparse_operator: create a new thing that you can do
+    #          > sparse_op = term.to_sparse_operator()
+    #          > result = sparse_op @ vector
+    #       -- __matmul__: the term itself can do matrix-free operations
+    #          > result = term @ vector
+    #       This is a future design decision, because we can do a lot already with a dense matrix,
+    #       but that doesn't scale well so matrix-free operations will be needed to scale certain
+    #       analyses.  So for now we explicitly build a dense matrix (for the "simple" but
+    #       poorly-scaling versions of these analyses), and later on we'll address matrix-free
+    #       operations.
+    @abstractmethod
+    def to_dense_matrix(self):
+        """
+        Generates a dense matrix that implements this term.
+        """
+        pass
+
     @abstractmethod
     def generate_evolution_operator(
         self,
