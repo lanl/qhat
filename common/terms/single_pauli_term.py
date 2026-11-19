@@ -39,7 +39,17 @@ class SinglePauliTerm(BaseTerm):
         return self.pauli_string.num_qubits
 
     def to_dense_matrix(self):
-        raise NotImplementedError("SinglePauliTerm::to_dense_matrix not yet implemented")
+        # TODO: Should PAULI_MATRICES be defined in this module and removed from matrix_operations?
+        from qhat.analysis.matrix_operations import PAULI_MATRICES
+        dense_str = self.pauli_string.to_dense()
+        result = self.coefficient * PAULI_MATRICES[dense_str[0]]
+        # TODO: Is sequential Kronecker products actually the most efficient way to build this
+        #       matrix?  It feels like there's probably a more efficient way to do this, especially
+        #       one that eliminates the need for all of the intermediate matrices built along the
+        #       way.
+        for char in dense_str[1:]:
+            result = np.kron(result, PAULI_MATRICES[char])
+        return result
 
     def generate_evolution_operator(
         self,
