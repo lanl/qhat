@@ -1,0 +1,100 @@
+Response from Claude when I asked it to look over bkk_paulistringterm3 and summarize points that
+need to go into the developer's guide.
+
+⏺ I read the draft guide on origin/bkk_control_T12 (docs/DEVELOPER_GUIDE.md). It's about writing
+  bloqs, pitfalls, cost conventions and testing, and it says nothing about terms. This branch
+  (bkk_paulistringterm3) adds the term framework, so the rewrite needs a section on it. I couldn't
+  fetch the PR itself because gh isn't authenticated, so this comes from the branch diff and the
+  draft file.
+
+  Topics for the rewrite                                                          
+
+  1. Architecture: how a Hamiltonian flows through QHAT
+  - Hamiltonian is now an ordered list of BaseTerm objects plus num_qubits and an optional
+  core_operator (analysis/hamiltonian.py).
+  - The flow is: reader or classmethod, then Hamiltonian, then terms, then Trotterization, then each
+   term's generate_evolution_operator, then a Qualtran bloq.
+  - Term order is semantic. Trotterization multiplies the per-term evolutions, which don't commute,
+  so the order changes the result.
+  - All terms must derive from BaseTerm and act on the same number of qubits. Hamiltonian.__init__
+  enforces both.
+  - LCPSHamiltonian is gone. Say what replaced it, so people don't go looking for it.
+
+  2. The term contract (BaseTerm)
+  - The required methods are num_qubits, generate_evolution_operator, sign_controlled,
+  to_pauli_strings, __str__ and __repr__.
+  - Terms must be immutable value objects with __eq__ and __hash__. Trotterization is an attrs bloq
+  that holds them, so bloq equality and hashing depend on term equality and hashing. Use 
+  @attrs.frozen and only hashable fields (tuples, not lists).
+  - SinglePauliTerm is the reference implementation. It uses init=False with __attrs_init__ to keep
+  a flexible constructor.
+  - The evolution operator must meet the bloq requirements already in the draft's section 1: a q
+  register, an optional ctrl register, a control_phase attribute, tensor_contract(), an exact
+  adjoint, and the omit_control_phase and multi-control options.
+  - Explain sign_controlled (the −Z_c ⊗ R construction used by the sign-controlled QPE) and its
+  caveats.
+
+  3. How to add a new term type (a step-by-step recipe)
+  - Put the class under common/terms/.
+  - Register it in TERM_EXAMPLES in common/tests/test_terms.py. That runs TestTermContract on it,
+  and test_every_term_class_is_registered fails if you forget.
+  - Add class-specific tests in their own class, like TestSinglePauliTerm.
+  - List the places that still assume Pauli terms, since a new term type must either support them or
+   fail clearly (see topic 5). 
+  - Say how to construct terms from readers and tests, using the Hamiltonian classmethods and
+  common/tests/term_helpers.py / analysis/tests/term_helpers.py. 
+  
+  4. Hamiltonian construction and mutation
+  - The classmethods are from_pauli_strings, from_second_quantization and from_mixed_fermion_boson.
+  Explain how each canonicalizes input and combines duplicate Pauli strings.
+  - Explain energy_shift: it edits the identity term, drops it if it cancels, keeps the cumulative
+  shift for analysis corrections, and keeps core_operator in sync.
+  - core_operator is needed by non-Trotter encodings (the pyLIQTR LCU and double-factorization
+  paths).
+  - to_matrix and compute_initial_energy_bounds are current consumers of the Pauli bridge.
+  
+  5. Transitional state and known limits (flag these clearly as in flux)
+  - to_pauli_strings is a temporary bridge on both BaseTerm and Hamiltonian. It's still used by the
+  error-coefficient estimation, energy bounds, to_matrix and nested commutators. Explain why 
+  Pauli-only analysis can over- or under-state things for non-Pauli terms (the TODO in unitary.py).
+  - PauliStringLCU raises if any term isn't a SinglePauliTerm.
+  - Term ordering (reorder_paulis) only works when every term is a SinglePauliTerm. Otherwise it
+  warns and ignores the ordering config.
+  - The trotter_implementation = "original" path still takes (string, coeff) tuples.
+  - Open design questions to record as decisions pending: whether the evolution bloqs should live
+  under terms/, whether sign_controlled is the right abstraction, an identity term type, whether
+  terms should be combinable, and whether core_operator should be reconstructed on demand.
+  
+  6. Changes to the existing bloq documentation (the draft goes stale here)
+  - Trotterization now takes hamiltonian_terms: Tuple[BaseTerm, ...] instead of pauli_terms, and no
+  longer wraps CommutingPauliStringEvolution. It calls each term's generate_evolution_operator
+  through _term_evolution. The draft's list of "our bloqs" and its "add the option to all three
+  bloqs" advice need updating. 
+  - _term_evolution(..., forward_only=True) is used for matrix contraction, where the adjoint and
+  controls apply to the whole matrix. The call graph, _t_complexity_ and the decomposition all go
+  through the same method, which keeps them consistent.
+  - my_static_costs and controls.num_rotation_ancillas no longer special-case all-identity strings
+  (has_rotations was removed). The qubit count is now independent of term content. Check this
+  against the draft's "Rotation counting" and "Qubit count means the peak" notes.
+  - Update the pitfalls section to reflect that all-identity handling now lives in the term's own
+  bloq.
+  
+  7. Testing the term framework
+  - The contract tests cover equality, hashing, immutability, sign_controlled adding one qubit, and
+  the evolution bloq's registers, unitarity and adjoint.
+  - Say when to use single_pauli_terms(...) in tests.
+  - Note that tests were rewritten away from get_all_pauli_strings and
+  LinearCombinationOfPauliStrings. 
+  - Note that time_evolution.py sits outside analysis/ and common/, so it's easy to miss when
+  refactoring. Your commit message 15d3a35 flags it as still broken.
+
+  8. Existing draft sections to keep or tighten
+  - Keep these: the bloq-piece table, pitfalls, cost-model conventions, testing, environment and the
+   AI policy.
+  - Consider moving the Pauli-specific parts (control placement in a Pauli evolution, rotation
+  counting) under a "Pauli term implementation" heading. They are properties of
+  PauliStringEvolution, not of bloqs in general.
+  
+  The draft's "Known issue" and CI notes aren't related to this branch, so I left them out. I can
+  also draft an outline with section headings and word budgets if that would help.
+

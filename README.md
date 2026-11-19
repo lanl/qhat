@@ -10,6 +10,8 @@ pieces are
 
 See the README file in each directory for component-specific documentation.
 
+Developers: see the [developer's guide](/docs/DEVGUIDE.md) for information on contributing to QHAT.
+
 If you need support or have a feature request, the best way to reach out to the team is to open an
 issue in the GitHub repository.
 
