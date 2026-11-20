@@ -106,6 +106,12 @@ jobs:
             config_file: ''
             config_params: ''
 
+          - name: hamgen-unit-tests
+            directory: hamiltonian_generator
+            script: pytest
+            config_file: ''
+            config_params: ''
+
     name: Test ${{ matrix.test-suite.name }}
 
     steps:

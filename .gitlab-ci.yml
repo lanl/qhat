@@ -105,3 +105,16 @@ run-analysis-tests:
     paths:
       - .venv/
     policy: pull
+
+run-hamgen-tests:
+  stage: test
+  script:
+    - hostname
+    - source .venv/bin/activate
+    - cd hamiltonian_generator
+    - python3.11 -m pytest tests/ -v
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .venv/
+    policy: pull

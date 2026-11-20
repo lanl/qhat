@@ -68,13 +68,6 @@ Coefficients remain separate so `PauliString` values can be used as Hamiltonian 
 
 ## Hamiltonian Representations
 
-- **`LCPSHamiltonian.py`**: Linear Combination of Pauli Strings (LCPS) Hamiltonian representation.
-  Organizes Pauli strings into commuting groups for efficient processing.
-  - Groups are containers of terms where all terms within a group commute
-  - Each term consists of a Pauli string (dense format like "IXZZYI") and a coefficient
-  - Validates structure and commutativity
-  - Compatible with pyLIQTR ProblemInstance interface
-
 - **`MixedFermionBosonOperator.py`**: Represents Hamiltonians with both fermionic and bosonic
   degrees of freedom.
   - Stores fermionic terms (one-body and two-body tensors)
@@ -112,10 +105,11 @@ Coefficients remain separate so `PauliString` values can be used as Hamiltonian 
 
 These files are examples or development test scripts, not production code:
 
-- **`dps_test.py`**: Example/test script for DensePauliString and DensePauliExponential
-- **`trotter_test.py`**: Example/test script for the flattened Trotter implementation
+- **`tests/test_dps.py`**: Example/test script for DensePauliString and DensePauliExponential
+- **`tests/test_trotter_resources.py`**: Example/test script for the flattened Trotter implementation
 
-⚠️ **Note:** These are not proper unit tests and are not integrated into the test suite.
+⚠️ **Note:** These are not proper unit tests: they run as part of the test suite but make no
+assertions, so they only check that the code runs without raising an exception.
 
 ## Testing
 
@@ -142,7 +136,6 @@ pytest common/tests/test_trotter_flattened.py -v                     # 57 tests
 | `trotter_flattened.py` | ✅ 57 tests | Recommended |
 | `trotter_original.py` | ⚠️ Minimal | Deprecated |
 | `dense_pauli_exp.py` | ⚠️ Minimal | Used by legacy code |
-| `LCPSHamiltonian.py` | ⚠️ None | Production use |
 | `MixedFermionBosonOperator.py` | ⚠️ None | Production use |
 | `bosons_binary.py` | ⚠️ None | Production use |
 | `QPE_Kitaev.py` | ⚠️ None | Exploratory |
