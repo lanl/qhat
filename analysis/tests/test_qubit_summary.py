@@ -9,6 +9,7 @@ from qhat.analysis.algorithm import (
 from qhat.analysis.config_types import AlgorithmConfiguration
 from qhat.analysis.qubit_summary import log_qubit_summary
 from qhat.analysis.resource_estimation import estimate_resources
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 from qualtran.resource_counting import get_cost_value, QubitCount
 
@@ -17,7 +18,7 @@ TERMS = (("XZI", 0.5), ("IZY", 0.3), ("ZXX", 0.2))
 
 
 def trotter(**kwargs):
-    return Trotterization(TERMS, (0.5, 0.5), 0.7, 3, **kwargs)
+    return Trotterization(single_pauli_terms(TERMS), (0.5, 0.5), 0.7, 3, **kwargs)
 
 
 def make_config(method, **kwargs):

@@ -385,6 +385,8 @@ def get_operator_type(num_qubits, memory_threshold_gb, force_dense=None, force_s
         return "sparse"
 
 
+# TODO: A lot of these operations will no longer be needed once the terms manage generating
+#       matrices on their own.
 def create_hamiltonian_operator(pauli_dict, num_qubits, memory_threshold_gb, force_dense=None, force_sparse=None):
     """
     Create either a dense matrix or matrix-free operator for the Hamiltonian.

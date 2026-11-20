@@ -230,9 +230,9 @@ supports
   - `trotter_implementation`: (Optional) Choose between two Trotter implementations:
     - `"flattened"` (default, recommended): Flattened QHAT implementation with flat expansion and
       optional term combining. Term combining reduces operation count (benefit varies by
-      Hamiltonian).  Uses `CommutingPauliStringEvolution` internally, enabling future grouping of
-      commuting terms.  This implementation has comprehensive test coverage (57 tests) and is
-      recommended for all use cases.
+      Hamiltonian).  Evolves each Hamiltonian term with the bloq from its
+      `generate_evolution_operator`, so the terms can be of different types.  This implementation
+      has comprehensive test coverage and is recommended for all use cases.
     - `"original"` (**deprecated**; will be removed in a future release): Original QHAT
       implementation with nested bloq structure (RampedTrotterizedUnitary → RampedTrotterStep →
       TrotterRamp), superseded by `"flattened"`. Selecting it logs a deprecation warning. To

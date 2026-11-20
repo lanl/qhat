@@ -9,6 +9,7 @@ See ALTERNATION_BUG_SUMMARY.md for details.
 """
 
 import pytest
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import (
     Trotterization,
     get_trotterization_coefficients,
@@ -34,7 +35,7 @@ def expand_ramped_trotterization(
 
     # Create Trotterization instance
     trotter = Trotterization(
-        pauli_terms=pauli_terms,
+        hamiltonian_terms=single_pauli_terms(pauli_terms),
         coefficients=tuple(coefficients),
         time=1.0,
         num_steps=num_steps,

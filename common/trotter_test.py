@@ -6,6 +6,7 @@ from qualtran.bloqs.phase_estimation import TextbookQPE
 from qualtran.cirq_interop.t_complexity_protocol import t_complexity, TComplexity
 
 from qhat.common.dense_pauli_exp import DensePauliString
+from qhat.common.terms.single_pauli_term import SinglePauliTerm
 from qhat.common.trotter_flattened import build_ramped_trotterized_unitary
 
 class BasicBloqs:
@@ -25,7 +26,8 @@ class BasicBloqs:
 
 def build_unitary(problem_instance, coefficients, timestep, numsteps):
     rtu = build_ramped_trotterized_unitary(
-            problem_instance.yield_PauliLCU_Info("strings"),
+            (SinglePauliTerm(pauli, coefficient)
+             for pauli, coefficient in problem_instance.yield_PauliLCU_Info("strings")),
             method=coefficients,
             timestep=timestep,
             numsteps=numsteps)

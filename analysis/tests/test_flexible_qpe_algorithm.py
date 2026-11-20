@@ -22,6 +22,7 @@ from qhat.analysis.resource_estimation import estimate_resources
 from qhat.analysis.unitary import encode_as_unitary
 from qhat.common.flexible_qpe import FlexibleQPE
 from qhat.common.pauli_string_evolution import PauliStringEvolution
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 
 PAULIS = {"I": np.eye(2), "X": np.array([[0, 1], [1, 0]]),
@@ -52,7 +53,8 @@ def unitary():
 @pytest.fixture
 def trotter():
     return Trotterization.from_method(
-        pauli_terms=[("XZ", 0.5), ("ZY", 0.3)], method="second order", time=0.4, num_steps=2)
+        hamiltonian_terms=single_pauli_terms([("XZ", 0.5), ("ZY", 0.3)]), method="second order",
+        time=0.4, num_steps=2)
 
 
 def textbook_qubits(phase_error, p_fail):
@@ -173,7 +175,8 @@ def test_driver_evolution_time_gives_P0_precision_bits(method, W, dE):
     lo, hi = qpe_energy_window(config, -W / 2, W / 2)
     t = 2 * math.pi / (hi - lo)
     u = Trotterization.from_method(
-        pauli_terms=[("XZ", 0.5), ("ZY", 0.3)], method="second order", time=t, num_steps=1)
+        hamiltonian_terms=single_pauli_terms([("XZ", 0.5), ("ZY", 0.3)]), method="second order",
+        time=t, num_steps=1)
     algorithm = build_algorithm(config, u)
     assert phase_qubits(algorithm) == P0 + math.ceil(math.log2(2 + 1 / (2 * p_fail)))
 
@@ -189,8 +192,8 @@ def test_energy_estimates_meet_requirements(Elo, Ehi, dE, p_fail):
     config = make_config(energy_error=dE, probability_of_failure=p_fail)
     lo, hi = qpe_energy_window(config, Elo, Ehi)
     t = 2 * math.pi / (hi - lo)
-    u = Trotterization.from_method(pauli_terms=BELL_TERMS, method="first order", time=t,
-                                   num_steps=1)
+    u = Trotterization.from_method(hamiltonian_terms=single_pauli_terms(BELL_TERMS),
+                                   method="first order", time=t, num_steps=1)
     qpe = build_algorithm(config, u)
     m, n = qpe.num_ancilla_qubits, qpe.num_state_qubits
     energies, states = np.linalg.eigh(hamiltonian_matrix(BELL_TERMS))

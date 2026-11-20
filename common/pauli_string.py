@@ -71,6 +71,8 @@ class PauliString:
     """
 
     num_qubits: int
+    # Note that _operators is canonicalized in __post_init__ so the same Pauli string created using
+    # different input formats or orders always yields PauliString objects that hash the same.
     _operators: SparsePauli
 
     def __post_init__(self) -> None:

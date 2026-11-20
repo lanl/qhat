@@ -18,6 +18,7 @@ from scipy.linalg import expm
 from qhat.common.commuting_pauli_string_evolution import CommutingPauliStringEvolution
 from qhat.common.pauli_string_evolution import PauliStringEvolution
 from qhat.common.pauli_utils import pauli_string_to_matrix
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 
 N = 3
@@ -34,8 +35,8 @@ def _trotter_matrix(trotter):
     """Product of the term exponentials in the expanded sequence (later terms on the left)."""
     u = np.eye(2 ** N, dtype=complex)
     for idx, coeff in trotter.expanded_sequence:
-        pauli_string, h = trotter.pauli_terms[idx]
-        u = _matrix(pauli_string, h * coeff * trotter.time / trotter.num_steps, 1.0) @ u
+        term = trotter.hamiltonian_terms[idx]
+        u = _matrix(term.dense_string(), term.coefficient * coeff * trotter.time / trotter.num_steps, 1.0) @ u
     return u
 
 
@@ -59,7 +60,7 @@ def _cases():
     """(id, bloq factory, expected matrix) for U, U^dagger, U**3 and U**-2."""
     pse = PauliStringEvolution("XYZ", 0.7, TIME)
     cpse = CommutingPauliStringEvolution(COMMUTING_TERMS, TIME)
-    trotter = Trotterization.from_method(TERMS, "second order", TIME, 3)
+    trotter = Trotterization.from_method(single_pauli_terms(TERMS), "second order", TIME, 3)
     u_pse = _matrix("XYZ", 0.7)
     u_cpse = expm(-1j * TIME * sum(h * pauli_string_to_matrix(p) for p, h in COMMUTING_TERMS))
     u_tr = _trotter_matrix(trotter)
@@ -169,7 +170,8 @@ def test_ancilla_method_has_no_cirq_unitary():
 
 
 def test_bloq_as_cirq_gate_has_the_right_qubits():
-    trotter = Trotterization.from_method(TERMS, "second order", TIME, 3).controlled()
+    trotter = Trotterization.from_method(
+        single_pauli_terms(TERMS), "second order", TIME, 3).controlled()
     gate = BloqAsCirqGate(trotter)
     assert cirq.num_qubits(gate) == N + 1
     assert gate.on(*cirq.LineQubit.range(N + 1)).qubits == tuple(cirq.LineQubit.range(N + 1))

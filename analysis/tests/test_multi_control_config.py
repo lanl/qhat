@@ -6,15 +6,16 @@ import pytest
 
 from qhat.analysis.algorithm import build_algorithm, log_multi_control_method
 from qhat.analysis.config_types import AlgorithmConfiguration, UnitaryConfiguration
-from qhat.analysis.hamiltonian import Hamiltonian, LinearCombinationOfPauliStrings
+from qhat.analysis.hamiltonian import Hamiltonian
 from qhat.analysis.unitary import encode_ramped_trotter
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization
 
 
 @pytest.fixture
 def hamiltonian():
     pauli_dict = {((0, 'X'), (1, 'Y')): 0.5, ((1, 'Y'), (2, 'Z')): 0.3, ((0, 'Z'),): 0.2}
-    return Hamiltonian(LinearCombinationOfPauliStrings(sparse=pauli_dict, num_qubits=3))
+    return Hamiltonian.from_pauli_strings(pauli_dict, 3)
 
 
 def unitary_config(**kwargs):
@@ -64,7 +65,8 @@ class TestEncodeRampedTrotter:
 
 class TestLogging:
     def trotter(self, **kwargs):
-        return Trotterization((("XZ", 0.5), ("ZY", 0.3)), (0.5, 0.5), 0.7, 3, **kwargs)
+        return Trotterization(
+            single_pauli_terms((("XZ", 0.5), ("ZY", 0.3))), (0.5, 0.5), 0.7, 3, **kwargs)
 
     @pytest.mark.parametrize("method", ["ancilla", "direct"])
     def test_ignored_with_one_control(self, caplog, method):

@@ -20,6 +20,7 @@ from qhat.common.commuting_pauli_string_evolution import (CommutingPauliStringEv
                                                           all_commute)
 from qhat.common.pauli_string_evolution import PauliStringEvolution
 from qhat.common.pauli_utils import pauli_string_to_matrix
+from .term_helpers import single_pauli_terms
 from qhat.common.trotter_flattened import Trotterization, get_trotterization_coefficients
 
 METHODS = ["ancilla", "direct"]
@@ -367,7 +368,7 @@ class TestTrotterization:
               "custom": (0.3, 0.7)}
 
     def make(self, order="third order", **kwargs):
-        return Trotterization(self.PAULI_TERMS, self.ORDERS[order], 0.43, 3, hbar=0.9, **kwargs)
+        return Trotterization(single_pauli_terms(self.PAULI_TERMS), self.ORDERS[order], 0.43, 3, hbar=0.9, **kwargs)
 
     def test_terms_do_not_commute(self):
         assert not all_commute([p for p, _ in self.PAULI_TERMS])
@@ -475,7 +476,7 @@ class TestTrotterization:
     def test_terms_carry_controls(self, method):
         trotter = self.make(ctrl_values=(1, 0), multi_control_method=method)
         bloqs = [binst.bloq for binst in trotter.decompose_bloq().bloq_instances]
-        terms = [b for b in bloqs if isinstance(b, CommutingPauliStringEvolution)]
+        terms = [b for b in bloqs if isinstance(b, PauliStringEvolution)]
         if method == "direct":
             assert len(terms) == trotter.num_operations
             assert all(t.ctrl_values == (1, 0) for t in terms)
@@ -487,7 +488,8 @@ class TestTrotterization:
 
     def test_large_step_count_is_fast(self):
         import time
-        trotter = Trotterization.from_method(self.PAULI_TERMS, "fourth order", 0.43, 5000)
+        trotter = Trotterization.from_method(single_pauli_terms(self.PAULI_TERMS), "fourth order", 0.43,
+                                           5000)
         start = time.perf_counter()
         for method in METHODS:
             controlled = attrs.evolve(trotter, ctrl_values=(1, 0, 1), multi_control_method=method)
@@ -526,7 +528,7 @@ def test_pyliqtr_counts_follow_t_complexity():
     """pyLIQTR uses our `_t_complexity_` (notes F17): rotations become T, the AND ladder adds 4 T
     per extra control."""
     from qhat.analysis.resource_estimation import resource_estimation_pyliqtr
-    trotter = Trotterization((("XZ", 0.5), ("ZY", 0.3)), (0.5, 0.5), 0.43, 3)
+    trotter = Trotterization(single_pauli_terms((("XZ", 0.5), ("ZY", 0.3))), (0.5, 0.5), 0.43, 3)
     one = resource_estimation_pyliqtr(trotter.controlled())
     for ctrl_values in [(1, 0), (0, 1, 1)]:
         k = len(ctrl_values)

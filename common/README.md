@@ -30,14 +30,14 @@ Coefficients remain separate so `PauliString` values can be used as Hamiltonian 
   `U = exp(-i * coefficient * PauliString * t / ℏ)`. Used as a building block for Trotterization.
   - Provides both unitary matrix generation and resource estimation
   - Compatible with pyLIQTR and Qualtran
-  - Fully tested with 53 comprehensive tests
+  - Comprehensively tested
 
 - **`commuting_pauli_string_evolution.py`**: Implements exact time evolution under a sum of
   commuting Pauli string Hamiltonians. Since the terms commute, the evolution can be exactly
   decomposed into a product of individual evolutions:
   `exp(-i * (c₁P₁ + c₂P₂ + ...) * t / ℏ) = exp(-i * c₁P₁ * t / ℏ) * exp(-i * c₂P₂ * t / ℏ) * ...`
   - Validates that all terms pairwise commute
-  - Fully tested with 47 comprehensive tests
+  - Comprehensively tested
 
 - **`dense_pauli_exp.py`**: Lower-level implementation using DensePauliString and
   DensePauliExponential. Provides helper functions for working with Cirq gates and Qualtran bloqs.
@@ -53,8 +53,9 @@ Coefficients remain separate so `PauliString` values can be used as Hamiltonian 
   Supports first through eighth-order methods. Features:
   - Flat expansion of all Trotter steps and ramps into a single sequence
   - Optional combining of adjacent identical terms (reduces operation count, benefit varies by Hamiltonian)
-  - Uses `CommutingPauliStringEvolution` internally, enabling future grouping of commuting terms
-  - **Fully tested with 57 comprehensive tests**
+  - Evolves each Hamiltonian term with the bloq from its `generate_evolution_operator` (see
+    `terms/`), so the terms can be of different types
+  - **Comprehensively tested**
   - **Recommended for all use cases**
 
 ### Original Implementation (Deprecated)
@@ -67,13 +68,6 @@ Coefficients remain separate so `PauliString` values can be used as Hamiltonian 
   the original gate counts).
 
 ## Hamiltonian Representations
-
-- **`LCPSHamiltonian.py`**: Linear Combination of Pauli Strings (LCPS) Hamiltonian representation.
-  Organizes Pauli strings into commuting groups for efficient processing.
-  - Groups are containers of terms where all terms within a group commute
-  - Each term consists of a Pauli string (dense format like "IXZZYI") and a coefficient
-  - Validates structure and commutativity
-  - Compatible with pyLIQTR ProblemInstance interface
 
 - **`MixedFermionBosonOperator.py`**: Represents Hamiltonians with both fermionic and bosonic
   degrees of freedom.
@@ -126,23 +120,20 @@ Modules with comprehensive test coverage have corresponding test files:
 pytest common/tests/ -v
 
 # Individual test suites
-pytest common/tests/test_pauli_string_evolution.py -v                # 53 tests
-pytest common/tests/test_commuting_pauli_string_evolution.py -v      # 47 tests
-pytest common/tests/test_trotter_flattened.py -v                     # 57 tests
+pytest common/tests/test_pauli_string_evolution.py -v
+pytest common/tests/test_commuting_pauli_string_evolution.py -v
+pytest common/tests/test_trotter_flattened.py -v
 ```
-
-**Total: 157 comprehensive tests**
 
 ## Module Status Summary
 
 | Module | Test Coverage | Status |
 |--------|---------------|--------|
-| `pauli_string_evolution.py` | ✅ 53 tests | Recommended |
-| `commuting_pauli_string_evolution.py` | ✅ 47 tests | Recommended |
-| `trotter_flattened.py` | ✅ 57 tests | Recommended |
+| `pauli_string_evolution.py` | ✅ Comprehensive | Recommended |
+| `commuting_pauli_string_evolution.py` | ✅ Comprehensive | Recommended |
+| `trotter_flattened.py` | ✅ Comprehensive | Recommended |
 | `trotter_original.py` | ⚠️ Minimal | Deprecated |
 | `dense_pauli_exp.py` | ⚠️ Minimal | Used by legacy code |
-| `LCPSHamiltonian.py` | ⚠️ None | Production use |
 | `MixedFermionBosonOperator.py` | ⚠️ None | Production use |
 | `bosons_binary.py` | ⚠️ None | Production use |
 | `QPE_Kitaev.py` | ⚠️ None | Exploratory |

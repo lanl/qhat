@@ -502,9 +502,10 @@ class TestTrotterContractionsAgree:
 
     @pytest.mark.parametrize("method", ["first order", "second order", "fourth order"])
     def test_fast_equals_qualtran(self, method):
+        from .term_helpers import single_pauli_terms
         from qhat.common.trotter_flattened import Trotterization
-        terms = [("XIZ", 0.5), ("IYI", 0.3), ("ZZI", -0.4), ("IXY", 0.2)]
-        kwargs = dict(pauli_terms=terms, method=method, time=0.83, num_steps=3)
+        terms = single_pauli_terms([("XIZ", 0.5), ("IYI", 0.3), ("ZZI", -0.4), ("IXY", 0.2)])
+        kwargs = dict(hamiltonian_terms=terms, method=method, time=0.83, num_steps=3)
         fast = Trotterization.from_method(**kwargs).tensor_contract()
         gates = Trotterization.from_method(
             tensor_contraction_method="qualtran", **kwargs).tensor_contract()
@@ -631,8 +632,10 @@ class TestRotationCountIgnoresAngle:
     def test_fast_trotter_count_is_sum_of_term_counts(self):
         """Includes a zero-coefficient term; R1 finding 2 (13 vs 7 rotations before D14)."""
         from qualtran.cirq_interop.t_complexity_protocol import TComplexity
+        from .term_helpers import single_pauli_terms
         from qhat.common.trotter_flattened import Trotterization
-        tr = Trotterization((('XZ', .4), ('ZI', 0.), ('YX', .3)), (.5, .5), .7, 3)
+        tr = Trotterization(
+            single_pauli_terms((('XZ', .4), ('ZI', 0.), ('YX', .3))), (.5, .5), .7, 3)
         cbloq = tr.decompose_bloq().flatten(
             lambda binst: not isinstance(binst.bloq, PauliStringEvolution))
         terms = [binst.bloq for binst in cbloq.bloq_instances]

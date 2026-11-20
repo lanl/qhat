@@ -11,10 +11,7 @@ from qhat.analysis.config_types import (
     GeneralConfiguration,
     GeneralConfigurationUser,
 )
-from qhat.analysis.hamiltonian import (
-    Hamiltonian,
-    LinearCombinationOfPauliStrings,
-)
+from qhat.analysis.hamiltonian import Hamiltonian
 from qhat.analysis.unitary import PauliStringLCU, PyLIQTRPauliStringLCU
 
 
@@ -26,8 +23,7 @@ def test_pauli_string_lcu1():
         'X': 1.0,
         'Z': 1.0,
     }
-    lcps = LinearCombinationOfPauliStrings(num_qubits=1, dense=pauli_data)
-    H = Hamiltonian(lcps)
+    H = Hamiltonian.from_pauli_strings(pauli_data, 1)
 
     # Convert Hamiltonian to matrix
     H_matrix = H.to_matrix(memory_threshold_gb=1.0)
@@ -39,7 +35,7 @@ def test_pauli_string_lcu1():
 
     # Verify that the upper corner of our unitary is equal to the
     # original Hamiltonian matrix, scaled
-    alpha = np.sum([v for v in H.get_all_pauli_strings().values()])
+    alpha = np.sum(list(H.to_pauli_strings().values()))
     scale = 1. / alpha
     np.testing.assert_array_almost_equal(unitarymx[0:2,0:2], scale * H_matrix)
 
@@ -53,8 +49,7 @@ def test_pauli_string_lcu2():
         'YZ': 1.0,
         'ZY': 2.0,
     }
-    lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
-    H = Hamiltonian(lcps)
+    H = Hamiltonian.from_pauli_strings(pauli_data, 2)
 
     # Convert Hamiltonian to matrix
     H_matrix = H.to_matrix(memory_threshold_gb=1.0)
@@ -66,7 +61,7 @@ def test_pauli_string_lcu2():
 
     # Verify that the upper corner of our unitary is equal to the
     # original Hamiltonian matrix, scaled
-    alpha = np.sum([v for v in H.get_all_pauli_strings().values()])
+    alpha = np.sum(list(H.to_pauli_strings().values()))
     scale = 1. / alpha
     np.testing.assert_array_almost_equal(unitarymx[0:4,0:4], scale * H_matrix)
 
@@ -75,22 +70,25 @@ def test_pauli_string_lcu2():
 # like a PyLIQTR ProblemInstance
 class PauliStringInstance(Hamiltonian, ProblemInstance):
     def __init__(self, hamiltonian):
-        super().__init__(hamiltonian)
+        super().__init__(hamiltonian.terms(), hamiltonian.num_qubits())
+
+    def _dense_pauli_strings(self):
+        return {pauli.to_dense(): coef for pauli, coef in self.to_pauli_strings().items()}
 
     def __str__(self):
-        return str(self.get_all_pauli_strings(return_as='strings'))
+        return str(self._dense_pauli_strings())
 
     def n_terms(self, encoding, **kwargs):
-        return len(self.get_all_pauli_strings())
+        return len(self.to_pauli_strings())
 
     def n_qubits(self):
         return self.num_qubits()
 
     def get_alpha(self):
-        return np.sum([v for v in self.get_all_pauli_strings().values()])
+        return np.sum(list(self.to_pauli_strings().values()))
 
     def yield_PauliLCU_Info(self, do_pad=0, return_as='strings'):
-        for t in self.get_all_pauli_strings(return_as=return_as).items():
+        for t in self._dense_pauli_strings().items():
             yield t
 
 
@@ -102,8 +100,7 @@ def test_pauli_string_lcu_pyliqtr1():
         'X': 1.0,
         'Z': 1.0,
     }
-    lcps = LinearCombinationOfPauliStrings(num_qubits=1, dense=pauli_data)
-    inst = PauliStringInstance(lcps)
+    inst = PauliStringInstance(Hamiltonian.from_pauli_strings(pauli_data, 1))
 
     # Convert Hamiltonian to matrix
     H_matrix = inst.to_matrix(memory_threshold_gb=1.0)
@@ -128,8 +125,7 @@ def test_pauli_string_lcu_pyliqtr2():
         'YZ': 1.0,
         'ZY': 2.0,
     }
-    lcps = LinearCombinationOfPauliStrings(num_qubits=2, dense=pauli_data)
-    inst = PauliStringInstance(lcps)
+    inst = PauliStringInstance(Hamiltonian.from_pauli_strings(pauli_data, 2))
 
     # Convert Hamiltonian to matrix
     H_matrix = inst.to_matrix(memory_threshold_gb=1.0)

@@ -186,7 +186,8 @@ class CommutingPauliStringEvolution(Bloq):
     ):
         """Create from an iterable of (pauli_string, coefficient) tuples.
 
-        This is the format used by hamiltonian.get_all_pauli_strings(return_as='strings').
+        For example, the items of {pauli.to_dense(): coefficient, ...} built from
+        hamiltonian.to_pauli_strings().
 
         Args:
             pauli_strings: Iterable of (string, coefficient) tuples
@@ -292,13 +293,11 @@ class CommutingPauliStringEvolution(Bloq):
 
     def my_static_costs(self, cost_key: 'CostKey'):
         """`QubitCount` without decomposing: qubits + controls + AND ancillas (if any), + 1 for the
-        "ancilla" rotation method (unless every term is all identities)."""
+        "ancilla" rotation method."""
         if isinstance(cost_key, QubitCount):
-            has_rotations = any(set(ps) != {'I'} for ps, _ in self.pauli_terms)
             return controls.peak_qubits(
                 self.num_qubits, self.ctrl_values, self.multi_control_method,
-                controls.num_rotation_ancillas(self.ctrl_values, self.controlled_rotation_method,
-                                               has_rotations))
+                controls.num_rotation_ancillas(self.ctrl_values, self.controlled_rotation_method))
         return NotImplemented
 
     @property
